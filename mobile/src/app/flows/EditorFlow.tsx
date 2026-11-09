@@ -189,6 +189,7 @@ import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRes
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
 import { AppHeader } from "./editor/chrome/AppHeader";
+import { useAutosave } from "./editor/chrome/useAutosave";
 import { ActionPill } from "./editor/chrome/ActionPill";
 import { EditorTopBar } from "./editor/chrome/EditorTopBar";
 import { FavoritesStrip } from "./editor/chrome/FavoritesStrip";
@@ -474,15 +475,6 @@ function releasePhotoPreview(url: string | null): void {
     URL.revokeObjectURL(url);
   }
 }
-/** Idle delay before the open buffer is written, matching `src/notes/saveNote.ts`
- *  (`AUTOSAVE_IDLE_MS` at 1000 ms). Kept as its own constant rather than imported:
- *  that module is the desktop's writer and pulls its IPC seam with it. */
-const AUTOSAVE_IDLE_MS = 1000;
-/** Ceiling between writes under continuous typing, matching the desktop's
- *  `AUTOSAVE_MAX_MS` (10 s). */
-const AUTOSAVE_MAX_MS = 10_000;
-
-
 export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess, onShowApprovalCode }: EditorFlowProps) {
   const { t } = useTranslation();
   // The authoritative active-vault id for every vault-targeting surface below,
@@ -763,7 +755,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // as ONE editor change, so the buffer catches up WITHOUT the reload this screen
   // does not perform, and the next whole-markdown save therefore cannot delete the
   // merged-in peer text. `./lib/liveRemoteMerge.ts` states why the mapping is
-  // needed here and not on desktop: this screen autosaves on a debounce, so a
+  // Needed here, not on desktop: this screen autosaves on a debounce, so a
   // replace that lands mid-write has a save in flight to reconcile with.
   //
   // `sessionMirrorRef` is the screen's record of what the session holds as far as
@@ -1350,8 +1342,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   }, [notes, bodies]);
   // An EVENT belongs to the calendar, not the notes list (myne-md/myne#1037).
   // Deliberately NOT in `isLiveNote`: the host's calendar read skips a record whose
-  // `live` flag is false, so that predicate must keep saying yes or the calendar
-  // empties. `resolverNotes` is untouched, so an event still resolves as a link.
+  // `live` flag is false. `resolverNotes` is untouched, so it still resolves.
   const liveNotes = useMemo(
     () =>
       notes.filter((n) => {
@@ -1424,6 +1415,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     for (const n of liveNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
     return m;
   }, [liveNotes, bodies]);
+
+  // The DELETE path's map: `folderOf` hides events, so a folder holding only them
+  // would read as empty and lose the confirmation the desktop twin shows.
+  const folderOfAll = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const n of resolverNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
+    return m;
+  }, [resolverNotes, bodies]);
 
   // The interleave cache (MYND-596): note id → `updatedAt`, the recency key the
   // shared `orderContainerChildren` reads for unlisted notes. A superset (all
@@ -1675,21 +1674,15 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const persistItemOrder = (next: Record<string, string[]> | null) => {
     if (next && HAS_TAURI) void setItemOrder(next).catch(ignorePrefsWriteFailure);
   };
-  // A note or folder row's manual neighbours, as boxes, measured when a drag
-  // starts. Keyed by the row's `data-reorder-key` (a note UUID or a folder path);
-  // a Map from a whole-document query would also see the trash/archive lists, so
-  // the query is scoped to the tree container's ref.
+  // Row boxes, measured when a drag starts and keyed by `data-reorder-key`. Scoped
+  // to the tree's ref: a document-wide query also sees the trash and archive lists.
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
   const dragBoxes = useRef<Map<string, { top: number; bottom: number }>>(new Map());
   const [dragRowKey, setDragRowKey] = useState<string | null>(null);
 
-  /**
-   * The press-and-hold reorder gesture (owner, 2026-11-08), which replaced the
-   * up/down arrows inside the row action sheet. Boxes are measured on the PRESS
-   * and the target is decided on RELEASE, so one drop is one `item_order` write
-   * and the intermediate positions cost nothing. Inert when the tree is not the
-   * manual-order surface (a tag filter or a saved view derives its own order).
-   */
+  /** The press-and-hold reorder gesture that replaced the action sheet's arrows:
+   *  boxes measured on PRESS, target decided on RELEASE, so one drop is one write.
+   *  Inert when the tree is not the manual-order surface. */
   const dragFor = (rowKey: string, containerPath: string | null) => {
     if (!reorderableTree) return undefined;
     return {
@@ -1707,9 +1700,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         dragBoxes.current = boxes;
         setDragRowKey(rowKey);
       },
-      // No per-move work: the lifted row is the feedback while the finger moves,
-      // and the drop decides where it lands. Calling setState per move would
-      // re-render the whole tree on every pointer event.
+      // No per-move work: the lifted row is the feedback, and a setState per move
+      // would re-render the whole tree on every pointer event.
       onMove: () => undefined,
       onEnd: (point: { x: number; y: number }, moved: boolean) => {
         setDragRowKey(null);
@@ -2858,46 +2850,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     }
   }
 
-  // The latest `persistOpenBuffer` for the timers above. A ref rather than a
-  // dependency: the function closes over the current buffer and re-creating the
-  // timers on every keystroke would reset the idle window to infinity, so
-  // autosave would only ever fire when the user stopped typing for good.
-  const persistOpenBufferRef = useRef(persistOpenBuffer);
-  persistOpenBufferRef.current = persistOpenBuffer;
+  useAutosave(editorText, view === "editor" && editing !== null, persistOpenBuffer);
 
-  /**
-   * AUTOSAVE (owner, 2026-11-08: "sync feels slow — I type and it saves much
-   * later"). The gap was not the sync loop: this client had no autosave, so the
-   * buffer reached disk only on an exit or a backgrounding, and a sync cannot push
-   * a write that does not exist. Same cadence as the desktop writer
-   * (`src/notes/saveNote.ts`), and the same non-exit writer the background flush
-   * uses, so one writer produces one set of bytes.
-   */
-  useEffect(() => {
-    if (view !== "editor" || editing === null) return;
-    // Nothing to autosave yet: an empty note that has never been created belongs
-    // to nobody, and `persistOpenBuffer` would refuse it anyway.
-    if (editing.id === null && editorText.trim() === "") return;
-    const timer = window.setTimeout(() => {
-      void persistOpenBufferRef.current();
-    }, AUTOSAVE_IDLE_MS);
-    return () => window.clearTimeout(timer);
-  }, [editorText, view, editing]);
-
-  // The ceiling half: one interval per open note, so a user typing without a
-  // pause still has the text on disk `AUTOSAVE_MAX_MS` after the last write.
-  useEffect(() => {
-    if (view !== "editor" || editing === null) return;
-    const interval = window.setInterval(() => {
-      void persistOpenBufferRef.current();
-    }, AUTOSAVE_MAX_MS);
-    return () => window.clearInterval(interval);
-  }, [view, editing]);
-
-  /**
-   * A list row's open: persist the open buffer first (mobile/AGENTS.md). A failed
-   * write keeps the user where the text is rather than navigating away from it.
-   */
+  /** A list row's open: persist the open buffer first, and a failed write keeps the
+   *  user where the text is rather than navigating away from it. */
   async function openFromList(id: string) {
     if (!(await persistOpenBuffer())) return;
     await openRelated(id);
@@ -3230,7 +3186,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    *  pre-computed list, which is how the two get to disagree. */
   function requestFolderTrash(path: string, name: string) {
     setFolderActions(null);
-    const noteCount = notesInSubtree(folderOf, path).length;
+    const noteCount = notesInSubtree(folderOfAll, path).length;
     if (noteCount === 0) {
       void trashFolderFromMenu(path);
       return;
@@ -3243,7 +3199,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    *  confirmation it was opened from. */
   async function trashFolderFromMenu(path: string) {
     setFolderTrash(null);
-    const ids = notesInSubtree(folderOf, path);
+    const ids = notesInSubtree(folderOfAll, path);
     try {
       for (const id of ids) await trashNote(id);
       if (HAS_TAURI) {
@@ -3772,10 +3728,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             ),
           )
         : folderOf;
-    // An untitled note is `null` here, not `""`: a title that came back empty is
-    // the absence of one (the body's first line is a SNIPPET, not the name —
-    // desktop parity, owner 2026-11-08), and a wikilink resolver that took `""`
-    // for a title would match nothing while looking like it had a target.
+    // `null`, not `""`: the body's first line is a SNIPPET, never a name (desktop
+    // parity), and a resolver taking `""` for a title matches nothing while
+    // looking like it had a target.
     const titleOf = new Map(notes.map((n) => [n.id, n.title || null]));
     // MYND-596: folders and notes interleave in ONE display-ordered list PER
     // container (shared `orderedChildren`) - a note can now sit above a folder,

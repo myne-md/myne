@@ -155,7 +155,7 @@ export type TitleRecord = {
    * **`"event"` is the one value the SIDEBAR acts on** (myne-md/myne#1037): an
    * event is read and edited in the calendar, so `liveCache` keeps it out of the
    * notes tree and its markdown is not part of the notes UI (owner, 2026-11-08).
-   * Everything else about the note is unchanged — it stays indexed, synced,
+   * Everything else about the note is unchanged, it stays indexed, synced,
    * searchable and exported. The exclusion lives in `liveCache` and NOT in
    * `isLiveNote`, because `calendar.rs` skips a record whose `live` flag is false:
    * folding it into the shared working-set predicate would empty the calendar.

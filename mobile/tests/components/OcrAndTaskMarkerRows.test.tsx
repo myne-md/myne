@@ -91,7 +91,7 @@ describe("the mobile attachment OCR switch", () => {
     render(<AttachmentOcrBlock enabled />);
     // The per-device line and the draft paragraph were removed on 2026-11-08
     // (owner: "delete that, make it identical to desktop"), so the row is the
-    // label and the shared `helper` — the same two strings
+    // label and the shared `helper`, the same two strings
     // `AttachmentOcrSettings.tsx` renders. Asserted as an ABSENCE pair as well as
     // a presence, because a filter that removed the helper too would pass a
     // presence-only check on the wrong string.

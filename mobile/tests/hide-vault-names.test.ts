@@ -217,11 +217,9 @@ describe("the Privacy row states its bounds, one press away", () => {
     // on a destructive switch may not hide behind an interaction).
     //
     // The three explanatory paragraphs that used to open in a sheet are GONE on
-    // both clients (owner, 2026-11-08: the popover was the noise). They are not
-    // lost: `agent-tooling/docs/threat-model.md` §5's hide-vault-names bullet states
-    // all four limits, including the residue caveat, verbatim — that is where a
-    // security claim is read, and it is why deleting the popover did not delete
-    // the claim.
+    // both clients (owner, 2026-11-08: the popover was the noise). The four
+    // limits stay recorded in `agent-tooling/docs/threat-model.md` §7
+    // (`decisions/clients/0799`).
     invoke.mockResolvedValue({ hidden: false, available: true });
     const container = await renderBlockAsync();
 
@@ -242,7 +240,7 @@ describe("the Privacy row states its bounds, one press away", () => {
     // The count fell 9 -> 6 on 2026-11-08, when the popover behind the `?` was
     // removed on BOTH clients (owner: the qualifying paragraphs were the noise).
     // What the pair still shares is the label, the one sentence that is the ACT,
-    // and the three error/unavailable notices — and the equality below is what
+    // and the three error/unavailable notices, and the equality below is what
     // stops either client from growing a second, quieter version of the copy back
     // on its own. (The feature's search-index key lives in
     // `settingsSearchIndex.ts`, not in the panel, so the regex never sees it.)

@@ -153,11 +153,8 @@ export function CalendarPane({
    * `createEvent`, so the two paths produce the same record.
    */
   const [composing, setComposing] = useState<string | null>(null);
-  /**
-   * The event whose form is open for EDITING, or `null`. A chip used to open the
-   * markdown note; it opens the same form a cell click opens, prefilled (owner:
-   * the markdown should only be visible when exporting).
-   */
+  /** The event whose form is open for EDITING, or `null`. A chip opens this rather
+   *  than the markdown note, which the owner wants visible only on export. */
   const [editing, setEditing] = useState<DisplayRow | null>(null);
   /** The time the user typed for a retimed occurrence, held per row. */
   const [retime, setRetime] = useState<string>("");
@@ -358,8 +355,7 @@ export function CalendarPane({
             flushDirtyPanes: ws.flushAll,
           },
         });
-        // Re-index before reloading, or the fresh read returns the OLD `start` and
-        // the row snaps back to where it was dragged from.
+        // Re-index before reloading, or the fresh read returns the OLD `start`.
         await reindexNote(gesture.row.noteId);
         setOptimistic((current) => {
           const rest = { ...current };
@@ -478,16 +474,14 @@ export function CalendarPane({
           rendered: { start: row.start, end: row.end, allDay: row.allDay },
         });
       }}
-      // An event opens its own form; a task opens the note it lives on, because a
-      // task is a line inside a document the user wrote.
+      // An event opens its form; a task opens the note it is a line inside.
       onClick={() => {
         if (row.task !== undefined) {
           ws.openNewTabInFocused(row.noteId);
           return;
         }
         if (isProjected(row)) {
-          // An appearance has no note of its own, so there is nothing to edit; the
-          // panel names the series and offers the three legal answers.
+          // An appearance has no note of its own: the panel names the series.
           setOccurrence({
             refusal: {
               reason: "belongs-to-series",
@@ -930,13 +924,9 @@ export function CalendarPane({
 
   return (
     <div
-      // The pane is granted no gutters (`PaneView`'s calendar branch), so the inset
-      // this surface keeps is its own and symmetric: `space-2` all round, which is
-      // what puts the grid's outer cells the same distance from the window edge as
-      // they are from each other. The vertical half used to be `space-3` top and
-      // bottom with nothing on the sides, which is what a body inside a 24px
-      // gutter wanted — with the gutter gone it read as a strip pressed to the
-      // edges.
+      // The pane is granted no gutters (`PaneView`'s calendar branch), so this
+      // inset is the surface's own and symmetric: `space-2` all round, which puts
+      // the outer cells as far from the window edge as from each other.
       style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, gap: "var(--space-2)", padding: "var(--space-2)" }}
       data-testid="calendar.pane"
       data-pane={paneId}
@@ -1139,11 +1129,13 @@ export function CalendarPane({
                   flushDirtyPanes: ws.flushAll,
                 },
               });
-              // `note_update` does not touch the index, and the index is what this
-              // pane reads: without this the grid keeps the old row.
+              // `note_update` does not touch the index this pane reads.
               await reindexNote(editing.noteId);
             } catch (err) {
               setFailure(err instanceof EventWriteRefused ? err.reason : null);
+              // A real I/O failure is not a refusal: rethrown so it reaches the
+              // pane's error surface instead of closing on the old values.
+              if (!(err instanceof EventWriteRefused)) throw err;
             } finally {
               setEditing(null);
               setReload((n) => n + 1);

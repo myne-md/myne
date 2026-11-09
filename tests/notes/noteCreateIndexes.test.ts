@@ -3,14 +3,14 @@
 //
 // The failure this pins is not a wrong answer, it is a missing one. `note_create`
 // upserts the SEARCH index only, so a note nobody opens carried no property row
-// until some later reconcile — and the note nobody opens is exactly what the
+// until some later reconcile, and the note nobody opens is exactly what the
 // calendar writes on a cell click. The note existed, the sidebar listed it, and
 // the grid stayed empty until the app was restarted and the rebuild-on-unlock
 // sweep indexed it.
 //
 // So the assertion is on the CHOKEPOINT rather than on a caller: `createEvent`
-// is only this file's witness. Anything that creates a note — a template, a
-// daily note, an `.ics` import, a duplicate — crosses `noteCreate`, and a fix at
+// is only this file's witness. Anything that creates a note, a template, a
+// daily note, an `.ics` import, a duplicate, crosses `noteCreate`, and a fix at
 // a call site is precisely how the calendar's path came to be left out.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

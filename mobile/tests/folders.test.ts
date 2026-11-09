@@ -216,7 +216,7 @@ describe("reorder — MYND-596 container-keyed map", () => {
   });
 });
 
-describe("reorderChildBeside — a DROP, not a nudge (owner, 2026-11-08)", () => {
+describe("reorderChildBeside, a DROP, not a nudge (owner, 2026-11-08)", () => {
   const fo = new Map<string, string | null>([
     ["na", null],
     ["nb", null],

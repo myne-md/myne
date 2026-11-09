@@ -298,7 +298,7 @@ describe("the Editor panel's topics", () => {
     // The preview renders for every topic it can depict, so its own testid is
     // present on each of those. The topics with nothing to depict draw no column,
     // which the test below asserts (myne-md/myne#885 visual pass; `writing` joined
-    // that set on the owner's report — its two bands repeated the Text topic's
+    // that set on the owner's report, its two bands repeated the Text topic's
     // specimen and a squiggle nobody decides anything by looking at).
     for (const topic of EDITOR_PANEL_TOPICS.filter(
       (meta) =>

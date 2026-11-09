@@ -135,11 +135,10 @@ export interface NoteFlags {
   /**
    * The note's canonical `kind:` value, or `null`.
    *
-   * Read for ONE decision, and it is the desktop's: a `kind: event` note belongs
-   * to the calendar, not to the notes list (myne-md/myne#1037, owner's report).
-   * The filter sits in `EditorFlow`'s `liveNotes` and NOT in `isLiveNote` — the
-   * host's calendar read skips a record whose `live` flag is false, so folding it
-   * into the shared predicate would empty the calendar on both clients.
+   * Read for ONE decision, and it is the desktop's: a `kind: event` note belongs to
+   * the calendar, not the notes list (myne-md/myne#1037). The filter sits in
+   * `liveNotes` and NOT in `isLiveNote`, because the host's calendar read skips a
+   * record whose `live` flag is false.
    */
   kind: NoteKind;
 }

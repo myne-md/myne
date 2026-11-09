@@ -2,7 +2,7 @@
 //
 // The calendar's chips used to open the NOTE, which is a markdown document: an
 // event is a note on disk, but the markdown is an implementation detail the user
-// asked not to see (owner, 2026-11-08 — "markdown should only be visible when you
+// asked not to see (owner, 2026-11-08, "markdown should only be visible when you
 // export"). So the chip opens the same form a cell click opens, prefilled, and
 // the form writes through here.
 //
@@ -15,8 +15,14 @@
 //
 // **A cleared field is a DELETED line, not an empty one.** `patchFrontmatterField`
 // takes `null` to mean "remove", so turning a repeat off leaves the note without a
-// `repeat:` key — the same shape a hand-authored one-off has, and the same
+// `repeat:` key, the same shape a hand-authored one-off has, and the same
 // byte-stability rule §3.8.5 asks of every writer in this tree.
+//
+// **`undefined` means "leave the line alone", and it is not the same as `null`.**
+// The form cannot represent every value the file may legally carry (a hand-written
+// `repeat: 1w`, a `remind: 30`), and the READER is deliberately tolerant of them.
+// Deleting such a line because the control could not draw it would lose a rule the
+// user wrote, so those fields arrive absent and are skipped here.
 
 import { formatEventInstant } from "@myne/dialect/event";
 import { patchFrontmatterField } from "@myne/dialect/surgery";
@@ -48,9 +54,11 @@ export function editFromPlan(plan: {
     title: plan.title,
     start: formatEventInstant(plan.start),
     end: plan.end === null || plan.end === undefined ? null : formatEventInstant(plan.end),
-    calendar: plan.calendar === "" || plan.calendar === undefined ? null : plan.calendar,
-    repeat: plan.repeat === "" || plan.repeat === undefined ? null : plan.repeat,
-    remind: plan.remind === "" || plan.remind === undefined ? null : plan.remind,
+    // `undefined` survives: it is the form's way of saying it could not represent
+    // the stored value, and `null` is its way of saying the user cleared it.
+    calendar: plan.calendar === "" ? null : plan.calendar,
+    repeat: plan.repeat === "" ? null : plan.repeat,
+    remind: plan.remind === "" ? null : plan.remind,
   };
 }
 
@@ -75,8 +83,8 @@ export async function applyEventEdit(args: {
   let bytes = patchFrontmatterField(encoder.encode(source), "title", next.title);
   bytes = patchFrontmatterField(bytes, "start", next.start);
   bytes = patchFrontmatterField(bytes, "end", next.end);
-  bytes = patchFrontmatterField(bytes, "calendar", next.calendar ?? null);
-  bytes = patchFrontmatterField(bytes, "repeat", next.repeat ?? null);
-  bytes = patchFrontmatterField(bytes, "remind", next.remind ?? null);
+  if (next.calendar !== undefined) bytes = patchFrontmatterField(bytes, "calendar", next.calendar);
+  if (next.repeat !== undefined) bytes = patchFrontmatterField(bytes, "repeat", next.repeat);
+  if (next.remind !== undefined) bytes = patchFrontmatterField(bytes, "remind", next.remind);
   await commitEventWrite({ noteId, source, body: decoder.decode(bytes), io });
 }

@@ -250,11 +250,10 @@ export function DeleteVaultConfirmForm({
       : onlyCopy
         ? {
             heading: t("settings.deleteVault.heading"),
-            // No eyebrow (owner, 2026-11-08). "IRREVERSIBLE" over a sentence that
-            // already says "cannot be undone" is the same fact shouted twice, and
-            // the two capability-shaped eyebrows below stay because they are not a
-            // tone: "THIS DEVICE ONLY" and "THIS BROWSER ONLY" state WHICH store
-            // the command touches, which no other line on the screen says.
+            // No eyebrow here: "IRREVERSIBLE" over a sentence that already says
+            // "cannot be undone" shouts one fact twice. The two capability-shaped
+            // eyebrows below stay, because they name WHICH store, which no other
+            // line on the screen does.
             eyebrow: null,
             primary: t("settings.deleteVault.copyPrimary"),
             primaryTestId: null,
@@ -290,7 +289,7 @@ export function DeleteVaultConfirmForm({
      shapes it is ICON-ONLY and sits at the trailing edge of the sentence it
      explains (owner, 2026-11-08). It used to be a labelled button: under the
      disclosure in the inline shape, and on the heading's line in the panel shape.
-     The label was the problem — "More about deleting this vault" is a whole
+     The label was the problem, "More about deleting this vault" is a whole
      sentence of chrome next to the one sentence that matters, and the two of them
      read as two steps. The icon means "more about THIS", the accessible name
      still says it in words, and the popover carries the text either way. */

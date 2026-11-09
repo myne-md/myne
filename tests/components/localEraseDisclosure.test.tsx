@@ -212,7 +212,7 @@ describe("the delete-vault promise", () => {
     // The owner vault's eyebrow is GONE (owner, 2026-11-08): "IRREVERSIBLE" over a
     // sentence that already says "cannot be undone" is one fact twice. The two
     // capability-shaped eyebrows stay, because those name WHICH store the command
-    // touches — asserted on the web branch right below.
+    // touches, asserted on the web branch right below.
     expect(screen.queryByTestId("delete-vault.eyebrow")).toBeNull();
   });
 

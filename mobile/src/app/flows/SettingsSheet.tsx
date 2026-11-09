@@ -906,8 +906,7 @@ const CAT_GLYPH: Record<string, ReactNode> = {
       <circle cx="12" cy="8" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   ),
-  // A pulse in a circle: the desktop's `circle-help` in this sheet's own drawing,
-  // because a question mark would read as "help" rather than a paste-able report.
+  // A pulse in a circle: a question mark would read as "help", not a report.
   diagnostics: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="8.2" />
@@ -1308,8 +1307,8 @@ export type Panel =
   // another category would say the opposite of what that tab says.
   | "ai"
   | "about"
-  // Its own category, as on the desktop since 2026-10-25: "what is this build"
-  // and "what is going wrong" are asked at different moments.
+  // Its own category, as on the desktop: "what is this build" and "what is going
+  // wrong" are asked at different moments.
   | "diagnostics"
   // deeper action panels (nested under a category)
   | "change-password"
@@ -1733,11 +1732,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   // `ai_provider_consent` is that screen's accept path: so there is no route
   // to a recorded consent that skips the disclosure.
   const [aiConsentFor, setAiConsentFor] = useState<string | null>(null);
-  /**
-   * Whether the AI panel's secondary blocks are open. Closed on arrival (owner,
-   * 2026-11-08: "simplify the mobile AI section"). Nothing is removed: the egress
-   * exclusion list and the limits stay one press away.
-   */
+  /** Whether the AI panel's secondary blocks are open; closed on arrival. Nothing
+   *  is removed, the exclusion list and the limits stay one press away. */
   const [aiAdvancedOpen, setAiAdvancedOpen] = useState(false);
   const [aiModels, setAiModels] = useState<string[]>([]);
   const [aiModelsState, setAiModelsState] = useState<"idle" | "loading" | "failed">("idle");
@@ -3021,9 +3017,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 {pinError}
               </Banner>
             )}
-            {/* No banner and no paragraph (owner, 2026-11-08): both restated the
-                row's own subtitle. What remains is the row — the method's name and
-                "Unlock with <method> after auto-lock". */}
+            {/* No banner and no paragraph: both restated the row's own subtitle.
+                What remains is the row, its method's name and "Unlock with <method>
+                after auto-lock". */}
             {!isAndroid && (
               <div style={{ marginTop: 12 }}>
                 <Group>
@@ -3058,9 +3054,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               // already set up, so DON'T show a "Set up" PIN form (setting a PIN
               // would silently overwrite the biometric credential). Reflect the
               // state + point to the toggle above as the explicit way to switch.
-              // Configured: the toggle above IS the state and the way out, so this
-              // branch draws nothing. It used to print `helperConfigured`, the
-              // same sentence the removed banner carried in other words.
+              // Configured: the toggle above IS the state and the way out.
               <div data-testid="settings.quick-unlock-biometric-configured" style={{ display: "none" }} />
             ) : (
               <>

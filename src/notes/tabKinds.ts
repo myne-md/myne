@@ -127,13 +127,9 @@ export interface TabKindSpec {
    * (myne-md/myne#773).
    */
   showsFocusedNote: boolean;
-  /**
-   * Whether this tab asks for the WHOLE surface, so both sidebars close on entry.
-   * The agent tab was the first (myne-md/myne#913); the calendar is the second
-   * (owner: day, week and month must cover the page). Declared here rather than as
-   * a `kind === ...` condition in the Editor, which is the shape that produced the
-   * seven-site problem this registry exists to remove.
-   */
+  /** Whether this tab asks for the WHOLE surface, so both sidebars close on
+   *  entry. Declared here rather than as a condition in the Editor, which is the
+   *  shape that produced the seven-site problem this registry exists to remove. */
   ownsWholeSurface?: boolean;
   /**
    * The registry command that opens this kind, when one exists.
@@ -195,8 +191,7 @@ export const TAB_KINDS: readonly TabKindSpec[] = [
     // (backlinks, outline, the "..." menu) stay off it: an event note opened from
     // a cell is an ordinary note tab.
     showsFocusedNote: false,
-    // A month grid is the widest surface in the product and it reads nothing
-    // from either sidebar, so it takes both (see `ownsWholeSurface`).
+    // A month grid reads neither sidebar.
     ownsWholeSurface: true,
     openCommandId: "calendar.show",
   },
@@ -214,8 +209,7 @@ export const TAB_KINDS: readonly TabKindSpec[] = [
     // commit; it is `showsFocusedNote` now, which says the same thing from the
     // reader's side rather than the float's.
     showsFocusedNote: false,
-    // The first whole-surface tab: it carries its own conversation rail
-    // (myne-md/myne#913).
+    // The first whole-surface tab: its own conversation rail (myne-md/myne#913).
     ownsWholeSurface: true,
     // The rail's "you are here" state reads this, so the agent's ribbon entry
     // lights up while its tab is the focused one — the reason the field exists.
@@ -242,8 +236,7 @@ export function isSingletonTabKind(kind: TabKind): boolean {
   return tabKindSpec(kind).singletonId !== undefined;
 }
 
-/** Whether the focused tab asks for the whole surface. Absent reads as `false`,
- *  and a null tab (an empty pane) is not a surface. */
+/** Whether the focused tab asks for the whole surface; absent reads as `false`. */
 export function tabOwnsWholeSurface(kind: TabKind | null | undefined): boolean {
   return kind === null || kind === undefined
     ? false

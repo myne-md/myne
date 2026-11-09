@@ -10,12 +10,9 @@ const MOVE_CANCEL_PX = 10;
 /** A point the gesture reports, in client coordinates. */
 export type HoldPoint = { x: number; y: number };
 
-/**
- * The optional DRAG phase of the same press (owner, 2026-11-08): the row action
- * sheet's up/down arrows became hold-then-drag. `onEnd` is told whether the finger
- * moved, because a hold that never moved is still the sheet; and drift cancels the
- * press before the hold fires (a scroll) but is the drag itself afterwards.
- */
+/** The optional DRAG phase of the same press: the row action sheet's up/down
+ *  arrows became hold-then-drag. `onEnd` is told whether the finger moved, because
+ *  a hold that never moved is still the sheet. */
 export type HoldDrag = {
   onStart: (point: HoldPoint) => void;
   onMove: (point: HoldPoint) => void;
@@ -58,6 +55,8 @@ export function useHold(
 } {
   const holdTimer = useRef<number | null>(null);
   const holdAt = useRef<HoldPoint | null>(null);
+  /** The last point the gesture reported, so a cancel can still end the drag. */
+  const lastAt = useRef<HoldPoint | null>(null);
   const held = useRef(false);
   /** True between the hold firing and the release, and only when `drag` is set. */
   const dragging = useRef(false);
@@ -76,6 +75,7 @@ export function useHold(
       dragging.current = false;
       movedSinceHold.current = false;
       holdAt.current = { x: e.clientX, y: e.clientY };
+      lastAt.current = holdAt.current;
       holdTimer.current = window.setTimeout(() => {
         held.current = true;
         holdTimer.current = null;
@@ -90,9 +90,9 @@ export function useHold(
     },
     onPointerMove: (e) => {
       const s = holdAt.current;
+      lastAt.current = { x: e.clientX, y: e.clientY };
       if (dragging.current) {
-        // The finger is already carrying a row: every move is a target change,
-        // never a scroll, which is why the cancel below is skipped here.
+        // Carrying a row: a move is a target change, never a scroll.
         movedSinceHold.current = true;
         drag?.onMove({ x: e.clientX, y: e.clientY });
         return;
@@ -112,20 +112,26 @@ export function useHold(
         const at = { x: e.clientX, y: e.clientY };
         clearHold();
         drag?.onEnd(at, moved);
-        // A hold that never moved is still the action sheet, and the click that
-        // follows this release must not also open the note.
+        // A hold that never moved is the sheet; the click that follows must not
+        // also open the note.
         if (!moved) onHold?.();
         return;
       }
       clearHold();
     },
     onPointerLeave: () => {
-      // Releasing outside the row still ends the drag: the row keeps receiving
-      // pointer events for the life of the gesture, so this only fires for a
-      // gesture that never started, which is the scroll case.
+      // The row keeps receiving pointer events for the gesture's life, so this
+      // only fires for a gesture that never started (the scroll case).
       if (!dragging.current) clearHold();
     },
-    onPointerCancel: clearHold,
+    onPointerCancel: () => {
+      // A UA pan takeover is how a long drag ordinarily ends, so the drag phase
+      // owes its `onEnd` here too: the row's lifted state is cleared only there.
+      const wasDragging = dragging.current;
+      const at = lastAt.current;
+      clearHold();
+      if (wasDragging && at !== null) drag?.onEnd(at, false);
+    },
     onContextMenu: (e) => {
       if (onHold) e.preventDefault();
     },

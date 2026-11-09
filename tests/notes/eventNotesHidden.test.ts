@@ -1,14 +1,14 @@
 // An event is not a row in the notes tree (myne-md/myne#1037).
 //
-// An event is a NOTE on disk — that is what makes it encrypted, synced, backed up
-// and exportable without a second store — but the notes UI must not show its
+// An event is a NOTE on disk, that is what makes it encrypted, synced, backed up
+// and exportable without a second store, but the notes UI must not show its
 // markdown: the calendar is where an event is read and edited, and a tree full of
 // `kind: event` documents beside real notes is the notes UI leaking an
 // implementation detail (owner, 2026-11-08).
 //
 // TWO claims, and the second is the one that costs the feature if it is wrong:
 //
-// 1. `liveCache` — the sidebar's working-set projection — drops events; and
+// 1. `liveCache`, the sidebar's working-set projection, drops events; and
 // 2. `isLiveNote`, the SHARED working-set predicate, still says yes for an event.
 //    `core/src/plugins/vault_indices/calendar.rs` skips any record whose `live`
 //    flag is false, so folding the exclusion into the predicate would empty the
@@ -40,7 +40,7 @@ function rec(over: Partial<TitleRecord> & { noteUuid: string }): TitleRecord {
   };
 }
 
-describe("liveCache — events are the calendar's, not the tree's", () => {
+describe("liveCache, events are the calendar's, not the tree's", () => {
   it("drops an event and keeps an ordinary note beside it", () => {
     const cache = new Map(
       [
@@ -64,7 +64,7 @@ describe("liveCache — events are the calendar's, not the tree's", () => {
   });
 });
 
-describe("isLiveNote — an event is still IN the working set", () => {
+describe("isLiveNote, an event is still IN the working set", () => {
   it("answers yes, because the calendar's range read requires it", () => {
     // The assertion is the predicate's, not this file's: `calendar.rs` refuses a
     // record whose `live` is false, and `vaultIndices` derives that flag from

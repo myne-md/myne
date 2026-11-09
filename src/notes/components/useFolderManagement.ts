@@ -48,6 +48,7 @@ import {
   type FolderArchivePlan,
   type FolderDeletePlan,
 } from "../folderActions";
+import { FOLDER_DRAG_MIME } from "./reorderDnd";
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
@@ -77,7 +78,6 @@ import {
 } from "@myne/editor/host/notes/itemOrder";
 
 const DRAG_MIME = "application/x-myne-note";
-const FOLDER_DRAG_MIME = "application/x-myne-folder";
 /** Carries the full id array when a MULTI-selection is dragged (MYND-367). The
  *  single-id `DRAG_MIME` is still written for backward compat (favorites / pane
  *  drop paths read the grabbed id); folder-drop fans out over this when set. */
@@ -846,10 +846,26 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     [ctx, closeTabs, archivedFolders, deliberate, applyDecorationRemap],
   );
 
+  // The tree is the LIVE set, so a subtree the live tree cannot see (an event,
+  // an archived folder's notes) reads as empty here and would skip both the
+  // confirmation and the trash. Widen the plan with the full-cache ids so the
+  // count the dialog shows is the set the delete touches.
+  const planFullFolderDelete = useCallback(
+    (path: string): FolderDeletePlan => {
+      const plan = planFolderDelete(path, treeRef.current, deliberate);
+      const norm = normalizeFolderPath(path);
+      const fromCache =
+        norm === null ? [] : collectSubtreeNoteIdsFromCache(ctx.cache, foldSegment(norm));
+      if (fromCache.length === 0) return plan;
+      return { ...plan, noteIds: [...new Set([...plan.noteIds, ...fromCache])] };
+    },
+    [ctx.cache, deliberate],
+  );
+
   const deleteFolderAction = useCallback(
     (node: FolderNode) => {
       setMenu(null);
-      const plan = planFolderDelete(node.path, treeRef.current, deliberate);
+      const plan = planFullFolderDelete(node.path);
       if (plan.noteIds.length === 0) {
         // Note-empty folder → delete immediately (no confirmation, unchanged).
         void performFolderDelete(node, plan).catch(() => {});
@@ -858,7 +874,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // Non-empty → confirm first; the subtree notes move to Trash on confirm.
       setConfirmFolderDelete({ node, noteCount: plan.noteIds.length });
     },
-    [deliberate, performFolderDelete],
+    [planFullFolderDelete, performFolderDelete],
   );
 
   const confirmFolderDeleteAction = useCallback(() => {
@@ -867,9 +883,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     setConfirmFolderDelete(null);
     // Recompute against the live tree at confirm time (notes may have moved
     // while the dialog was open) — pure, cheap.
-    const plan = planFolderDelete(pending.node.path, treeRef.current, deliberate);
+    const plan = planFullFolderDelete(pending.node.path);
     void performFolderDelete(pending.node, plan).catch(() => {});
-  }, [confirmFolderDelete, deliberate, performFolderDelete]);
+  }, [confirmFolderDelete, planFullFolderDelete, performFolderDelete]);
 
   const cancelFolderDelete = useCallback(
     () => setConfirmFolderDelete(null),
@@ -1323,6 +1339,13 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     /** The folder node a drag started from, or `null` (myne#281). */
     get dragFolderNode() {
       return draggedFolderNodeRef.current;
+    },
+    /** Resolve the folder a drop names in its payload, for a drag whose ref the
+     *  browser already cleared. */
+    folderNodeAt: (path: string | null): FolderNode | null => {
+      if (path === null) return null;
+      const norm = normalizeFolderPath(path);
+      return norm === null ? null : findByFoldedKey(treeRef.current.roots, foldSegment(norm));
     },
     onDragEndCleanup,
     // decorations (MYND-184 color labels / MYND-185 folder icons)

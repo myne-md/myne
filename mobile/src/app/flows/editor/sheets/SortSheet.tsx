@@ -37,7 +37,7 @@ export function SortSheet({
             {/* No "Manual" mode on the list (owner, 2026-11-08). Ordering IS the
                 tree's press-and-hold drag now, so a row offering "manual order"
                 beside two alphabetical ones described a mode the user never has
-                to choose — the arrangement is simply what is on screen. What the
+                to choose, the arrangement is simply what is on screen. What the
                 sheet keeps is the two overrides, plus the way back to the
                 arrangement when one of them is on: without that third row a user
                 who picked A→Z would have no visible path back to the order they

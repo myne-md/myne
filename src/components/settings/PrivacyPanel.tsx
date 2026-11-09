@@ -247,18 +247,10 @@ function HideVaultNamesRow() {
       // label; the owner's report is that the popover itself is the noise, so the
       // `?` is gone too.
       //
-      // **The sentence kept is the DESTRUCTIVE one**, and that is the point
-      // rather than a preference: `hideVaultNamesRow.test.tsx` has held since #411
-      // that a bound on a destructive switch may not be hidden behind an
-      // interaction, and the warning is the ACT. What left the screen are the
-      // qualifications around it, and every one of them is still stated in the
-      // record a security reader goes to: the threat model's §5 hide-vault-names
-      // bullet carries all four limits verbatim, including the residue caveat ("a
-      // full-system snapshot taken while names were enabled carries both the
-      // ciphertext and the keychain"). **That file says the four
-      // limits are "stated to the user", and after this change they are stated to
-      // the reader of the threat model instead** — an amendment owed to the
-      // companion, tracked in the branch's own report rather than dropped.
+      // **The sentence kept is the DESTRUCTIVE one**: since #411 a bound on a
+      // destructive switch may not hide behind an interaction, and the warning is
+      // the act. The four limits left the screen and stay recorded in
+      // `threat-model.md` §7 (`decisions/clients/0799`).
       helper={t("settings.privacy.hideVaultNamesInline")}
       control={(helperId, explanationId) => (
         <Switch

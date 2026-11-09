@@ -3078,6 +3078,10 @@ function PopulatedList({
           estimatedRowHeight={showTimestamps ? 44 : 30}
           heightResetToken={showTimestamps}
           overlayScrollbar
+          // A drag unmounts its own source when it scrolls out of the window, and
+          // the browser cancels the gesture when that happens. Cheap for a few
+          // seconds, and it makes every row a reachable drop target.
+          renderAll={fm.dragKind !== null}
           renderItem={(row) => {
             const anim = treeAnimRows.get(row.key);
             if (row.kind === "folder") {
@@ -3124,12 +3128,13 @@ function PopulatedList({
                     onFolderReorderDrop={(node, place) =>
                       void fm.onFolderReorder(node, place)
                     }
-                    onDropFolderInto={(node) => {
+                    onDropFolderInto={(node, draggedPath) => {
                       // myne#281 — the dragged folder re-nests under the hovered
-                      // one. `fm.dragFolder` is the node the drag started from;
-                      // the guards (self/descendant, name collision, PATH_MAX)
+                      // one. The guards (self/descendant, name collision, PATH_MAX)
                       // live in `moveFolderTo` so the menu entry gets them too.
-                      const dragged = fm.dragFolderNode;
+                      // `draggedPath` is the dataTransfer fallback: a dragend that
+                      // fires mid-gesture clears the ref but not the payload.
+                      const dragged = fm.dragFolderNode ?? fm.folderNodeAt(draggedPath);
                       if (dragged === null) return;
                       void fm.moveFolderTo(dragged, node.path);
                     }}
