@@ -326,7 +326,7 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
       const rel = formatRelativeTime(new Date(vault.last_unlock));
       if (rel !== "") parts.push(t("vaultPicker.openedRelative", { rel }));
     }
-    if (!vault.published) parts.push(t("settings.account.vaultDeviceOnly"));
+    if (!vault.published) parts.push(t("common.deviceonly"));
     return { text: parts.join(" · "), danger: false };
   };
 
@@ -374,7 +374,7 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
               `SettingRow` because a 27-character monospace value is the
               "long value rendered inline" exception the row's own header names. */}
           <ControlBlock
-            label={t("settings.account.numberLabel")}
+            label={t("common.accountnumber")}
             anchorId="account.number"
             testId="settings.account-number-row"
             helper={
@@ -390,7 +390,7 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
                   <Input
                     readOnly
                     data-testid="settings.account-number"
-                    aria-label={t("settings.account.numberLabel")}
+                    aria-label={t("common.accountnumber")}
                     value={accountNumber}
                     style={{
                       fontFamily: "var(--font-mono)",

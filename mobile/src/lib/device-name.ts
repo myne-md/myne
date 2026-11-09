@@ -47,7 +47,7 @@ export async function suggestedDeviceName(): Promise<string> {
     // the wrong question and suggested an iPad for an unfolded iPhone.
     return deviceNameForPlatform(token, isRegularSizeClass(computeSizeClass()));
   } catch {
-    return i18n.t("sync.devices.platform.unknown");
+    return i18n.t("common.thisdevice");
   }
 }
 
@@ -61,7 +61,7 @@ export async function suggestedDeviceName(): Promise<string> {
  *  id-derived label. */
 export async function nameableDeviceSuggestion(): Promise<string | null> {
   const name = await suggestedDeviceName();
-  return name === i18n.t("sync.devices.platform.unknown") ? null : name;
+  return name === i18n.t("common.thisdevice") ? null : name;
 }
 
 /** The "Name this device" field's state, shared by both mobile enrollment doors so
@@ -77,7 +77,7 @@ export function useDeviceNameField(): {
   // Seeded synchronously with the neutral label, NOT "": `resolved` must never be
   // blank, or a submit landing before the platform IPC resolves would send an
   // empty name and the device would arrive with the id-derived fallback.
-  const [suggestion, setSuggestion] = useState(() => i18n.t("sync.devices.platform.unknown"));
+  const [suggestion, setSuggestion] = useState(() => i18n.t("common.thisdevice"));
 
   useEffect(() => {
     let cancelled = false;

@@ -28,9 +28,9 @@ export function vaultExportErrorMessage(e: VaultExportError): string {
     case "VaultNotUnlocked":
       // Entry points are gated on an unlocked vault — surfacing this is
       // a router bug, but the copy stays honest if it ever fires.
-      return i18n.t("export.vault.errors.vaultLocked");
+      return i18n.t("common.thevaultislockedunlockitthentryagain");
     case "AuthOperationInProgress":
-      return i18n.t("export.vault.errors.authOperationInProgress");
+      return i18n.t("common.anothervaultoperationisinprogresswaitforittofinishthentryagain");
     case "VaultNotFound":
       return i18n.t("export.vault.errors.vaultNotFound");
     case "InvalidDestination":

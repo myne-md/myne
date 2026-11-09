@@ -150,7 +150,7 @@ export function periodOfAnchor(anchorId: string): Period | null {
 }
 
 function templateName(rec: TitleRecord): string {
-  return rec.title?.trim() || i18n.t("settings.dailyNotes.untitledTemplate");
+  return rec.title?.trim() || i18n.t("common.untitledtemplate");
 }
 
 /** Persist one setting for one period. Daily routes to its three legacy

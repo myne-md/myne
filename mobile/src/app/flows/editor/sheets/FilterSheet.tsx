@@ -57,7 +57,7 @@ export function FilterSheet({
             <div style={label}>{t("editor.filterSheet.status")}</div>
             {group(
               <>
-                {row(t("editor.nav.allNotes"), listView === "notes", () => { onPickStatus("notes"); close(); }, true)}
+                {row(t("common.allnotes"), listView === "notes", () => { onPickStatus("notes"); close(); }, true)}
                 {row(<span>{t("notes.archive.title")}{archivedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {archivedCount}</span> : ""}</span>, listView === "archive", () => { onPickStatus("archive"); close(); })}
                 {row(<span>{t("notes.list.trash")}{trashedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {trashedCount}</span> : ""}</span>, listView === "trash", () => { onPickStatus("trash"); close(); })}
               </>,

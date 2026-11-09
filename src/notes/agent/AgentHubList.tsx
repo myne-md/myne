@@ -810,13 +810,13 @@ export function AgentHubList({
           variant="filtered"
           icon="search"
           size="sm"
-          title={t("agent.hub.noMatchTitle")}
+          title={t("common.nomatches")}
           body={t("agent.hub.noMatchBody", { query: "" }).trim()}
           query={query.trim()}
           testId="agent.hub-no-match"
           action={
             <Button variant="secondary" icon="x" onClick={() => setQuery("")}>
-              {t("attachments.library.emptyClearSearch")}
+              {t("common.clearsearch")}
             </Button>
           }
         />

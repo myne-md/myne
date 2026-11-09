@@ -697,7 +697,7 @@ function tabMenuItems(
   if (!pinned) {
     items.push({
       id: "tab.close",
-      label: i18n.t("notes.tabStrip.closeTabMenuItem"),
+      label: i18n.t("common.closetab"),
       onSelect: () => close(id),
     });
   }

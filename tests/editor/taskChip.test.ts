@@ -611,7 +611,7 @@ describe("accessibility (task 10)", () => {
     i18n.addResourceBundle(
       "tr",
       "common",
-      { editor: { taskField: { title: { due: "Bitiş tarihi" } } } },
+      { common: { duedate: "Bitiş tarihi" } },
       true,
       true,
     );

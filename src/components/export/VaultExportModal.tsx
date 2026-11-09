@@ -492,7 +492,7 @@ export function VaultExportModal({
                 }}
                 data-testid="vault-export.show-in-folder"
               >
-                {t("export.vault.summary.showInFolder")}
+                {t("common.showinfolder")}
               </Button>
               <Button
                 variant="primary"

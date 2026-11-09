@@ -318,7 +318,7 @@ export function McpSection({
               onClick={() => reload()}
               data-testid="settings.mcp-retry"
             >
-              {t("settings.ai.externalAccess.retry")}
+              {t("common.tryagain")}
             </Button>
           </div>
         </div>
@@ -568,7 +568,7 @@ function folderLabel(
   folder: string,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder;
+  return folder === "" ? t("common.vaultroot") : folder;
 }
 
 /**

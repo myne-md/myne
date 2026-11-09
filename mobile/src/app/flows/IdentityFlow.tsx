@@ -1689,7 +1689,7 @@ export function IdentityFlow({
     <Screen>
       <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
-        <Title>{t("identityFlow.fork.title")}</Title>
+        <Title>{t("common.youridentity")}</Title>
         <Lead>{t("identityFlow.fork.lead")}</Lead>
       </ScreenScroll>
       <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
@@ -1727,7 +1727,7 @@ export function IdentityFlow({
     <Screen>
       <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
-        <Title>{t("identityFlow.title")}</Title>
+        <Title>{t("common.createanidentity")}</Title>
         <Lead>{t("identityFlow.lead")}</Lead>
       </ScreenScroll>
       <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
@@ -1739,7 +1739,7 @@ export function IdentityFlow({
             when the user wants sync, and registration is the explicit act on the
             identity home. */}
         <Button onClick={() => setStep("create")} data-testid="identity-flow.start">
-          {t("identityFlow.start")}
+          {t("common.createanidentity")}
         </Button>
         {/* The third door, between the two that were already here. A device that
             has never held this identity can bring an EXISTING one across with its
@@ -1795,7 +1795,7 @@ export function IdentityFlow({
     <Screen>
       <FlowHeader onBack={() => setStep("home")} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
-        <Title>{t("identityFlow.register.title")}</Title>
+        <Title>{t("common.registerthisidentity")}</Title>
         <div style={{ marginTop: "var(--space-4)" }}>
           <FieldLabel>{t("identityHome.registerServerLabel")}</FieldLabel>
           <TextField
@@ -1868,7 +1868,7 @@ export function IdentityFlow({
         }}
       />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
-        <Title>{t("identityFlow.register.title")}</Title>
+        <Title>{t("common.registerthisidentity")}</Title>
         <div style={{ marginTop: "var(--space-4)" }}>
           <FieldLabel id={registerPhraseLabelId}>
             {t("identityHome.registerPhraseLabel")}
@@ -2004,7 +2004,7 @@ export function IdentityFlow({
     <Screen>
       <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
-        <Title>{t("identityFlow.personJoin.pendingTitle")}</Title>
+        <Title>{t("common.waitingforapproval")}</Title>
         <Lead>{t("identityFlow.personJoin.pendingLead")}</Lead>
         <div style={{ marginTop: "var(--space-5)", display: "flex", justifyContent: "center" }}>
           <Spinner />
@@ -2103,7 +2103,7 @@ export function IdentityFlow({
       labels: {
         title: t("identityFlow.phrase.title"),
         phraseHeading: t("vaultCreation.kit.phraseFor"),
-        accountHeading: t("identityFlow.home.codeLabel"),
+        accountHeading: t("common.youridentitycode"),
       },
     });
 
@@ -2228,7 +2228,7 @@ export function IdentityFlow({
       <Screen>
         <FlowHeader onBack={() => setStep("phrase")} />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
-          <Title>{t("identityFlow.typeback.title")}</Title>
+          <Title>{t("common.confirmyourphrase")}</Title>
           <Lead>{t("identityFlow.phrase.typebackLead")}</Lead>
           <div style={{ marginTop: "var(--space-4)" }}>
             {challenge.map((pos, i) => (
@@ -2498,7 +2498,7 @@ export function IdentityFlow({
       <Screen>
         <FlowHeader onBack={onCancel} />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
-          <Title>{t("identityFlow.home.title")}</Title>
+          <Title>{t("common.youridentity")}</Title>
           <Lead>{t("identityFlow.home.lead")}</Lead>
           {/* What the account's vault listing answered (myne-md/myne#932 review).
               OUTSIDE the create block below, which is the half this moved out of:
@@ -2588,7 +2588,7 @@ export function IdentityFlow({
           {accountNumber ? (
             <div style={{ marginTop: "var(--space-5)" }}>
               <ListGroup
-                header={t("identityHome.accountNumberHeading")}
+                header={t("common.accountnumber")}
                 footer={t("identityHome.accountNumberHint")}
               >
                 <div style={{ padding: "14px 16px" }}>
@@ -2609,7 +2609,7 @@ export function IdentityFlow({
                   nothing telling them whether sending it is safe. Same key as
                   the desktop: one sentence, one meaning. */}
               <ListGroup
-                header={t("identityFlow.home.codeLabel")}
+                header={t("common.youridentitycode")}
                 footer={t("identityHome.shareCodeHint")}
               >
                 <div style={{ padding: "14px 16px" }}>
@@ -2625,7 +2625,7 @@ export function IdentityFlow({
               <Spinner />
             ) : pending.length === 0 && claimed.length === 0 ? (
               <div style={HINT_STYLE} data-testid="identity-flow.home-empty">
-                {t("identityFlow.home.noInvites")}
+                {t("common.noinvitationsyet")}
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -2759,7 +2759,7 @@ export function IdentityFlow({
                 style={{ marginTop: "var(--space-3)" }}
                 data-testid="identity-flow.home-register-open"
               >
-                {t("identityFlow.register.open")}
+                {t("common.registerthisidentity")}
               </Button>
             </div>
           ) : null}
@@ -2774,7 +2774,7 @@ export function IdentityFlow({
               same checkbox inside the confirmation for the act
               (`MemberRosterPanel`'s `identityForget*`); this is that shape. */}
           <div style={{ marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--line-1)" }}>
-            <FieldLabel>{t("identityFlow.home.forgetHeading")}</FieldLabel>
+            <FieldLabel>{t("common.thisdevice")}</FieldLabel>
             {error ? (
               <Banner kind="warning" style={{ marginBottom: "var(--space-3)" }}>
                 {error}
@@ -2797,7 +2797,7 @@ export function IdentityFlow({
                     style={{ color: "var(--danger)" }}
                     data-testid="identity-flow.home-forget"
                   >
-                    {t("identityFlow.home.forget")}
+                    {t("common.forgetthisidentityonthisdevice")}
                   </Button>
                   <Button
                     variant="secondary"
@@ -2818,7 +2818,7 @@ export function IdentityFlow({
                 style={{ color: "var(--danger)" }}
                 data-testid="identity-flow.home-forget-open"
               >
-                {t("identityFlow.home.forget")}
+                {t("common.forgetthisidentityonthisdevice")}
               </Button>
             )}
           </div>
@@ -2902,7 +2902,7 @@ export function IdentityFlow({
                 testId="identity-flow.accept-step"
                 n={2}
                 total={3}
-                label={t("identityHome.stepRecoveryPhrase")}
+                label={t("common.recoveryphrase")}
               />
               <Title>{t("identityHome.phraseHeading")}</Title>
               <div style={HINT_STYLE}>{t("identityHome.acceptPhraseHint")}</div>
@@ -2942,7 +2942,7 @@ export function IdentityFlow({
                 {t("identityHome.acceptPasswordNote")}
               </div>
               <div data-testid="identity-flow.accept.password-label" style={{ marginTop: "var(--space-3)" }}>
-                <FieldLabel>{t("password.createForm.passwordLabel")}</FieldLabel>
+                <FieldLabel>{t("common.masterpassword")}</FieldLabel>
               </div>
               <DevicePasswordField
                 value={password}
@@ -2951,7 +2951,7 @@ export function IdentityFlow({
                   setError(null);
                 }}
                 testId="identity-flow.accept.password-input"
-                label={t("password.createForm.passwordLabel")}
+                label={t("common.masterpassword")}
               />
               <div data-testid="identity-flow.accept.confirm-label" style={{ marginTop: "var(--space-3)" }}>
                 <FieldLabel>{t("password.createForm.confirmLabel")}</FieldLabel>
@@ -3077,7 +3077,7 @@ export function IdentityFlow({
                 testId="identity-flow.join-step"
                 n={1}
                 total={2}
-                label={t("identityHome.stepRecoveryPhrase")}
+                label={t("common.recoveryphrase")}
               />
               <Title>{t("identityHome.phraseHeading")}</Title>
               <div data-testid="identity-flow.join-hint" style={HINT_STYLE}>
@@ -3123,7 +3123,7 @@ export function IdentityFlow({
                 {t("identityHome.joinPasswordNote")}
               </div>
               <div data-testid="identity-flow.join.password-label" style={{ marginTop: "var(--space-3)" }}>
-                <FieldLabel>{t("password.createForm.passwordLabel")}</FieldLabel>
+                <FieldLabel>{t("common.masterpassword")}</FieldLabel>
               </div>
               <DevicePasswordField
                 value={joinPassword}
@@ -3132,7 +3132,7 @@ export function IdentityFlow({
                   setJoinError(null);
                 }}
                 testId="identity-flow.join.password-input"
-                label={t("password.createForm.passwordLabel")}
+                label={t("common.masterpassword")}
               />
               <div data-testid="identity-flow.join.confirm-label" style={{ marginTop: "var(--space-3)" }}>
                 <FieldLabel>{t("password.createForm.confirmLabel")}</FieldLabel>

@@ -156,7 +156,7 @@ export function ProposalDiffBody({ proposal, titleOf }: ProposalDiffBodyProps) {
           style={EDIT_BLOCK_STYLE}
         >
           <div style={{ ...CAPTION_STYLE, padding: "var(--space-2) var(--space-2) 0" }}>
-            {t("editor.chrome.rightPanel.aiChat.historyProposalNewNote")}: {note.title}
+            {t("common.newnote")}: {note.title}
           </div>
           <DiffView
             diff={diffWithSegments("", note.body)}

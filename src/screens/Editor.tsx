@@ -2331,7 +2331,7 @@ function EditorChrome({
     if (active === undefined) return;
     void (async () => {
       const name = await promptForText({
-        title: t("editor.chrome.workspacePrompt.renameTitle"),
+        title: t("common.renameworkspace"),
         initialValue: active.name,
         confirmLabel: t("common.rename"),
         testIdPrefix: "workspace-prompt",
@@ -2347,7 +2347,7 @@ function EditorChrome({
       if (slot === undefined) return;
       void (async () => {
         const name = await promptForText({
-          title: t("editor.chrome.workspacePrompt.renameTitle"),
+          title: t("common.renameworkspace"),
           initialValue: slot.name,
           confirmLabel: t("common.rename"),
           testIdPrefix: "workspace-prompt",
@@ -3884,7 +3884,7 @@ function CommandPaletteHost({
         }
         for (const f of aiPrefs.deliberate_folders) folders.add(f);
         const items: QuickPickItem[] = [
-          { id: "", label: t("commands.picker.vaultRoot") },
+          { id: "", label: t("common.vaultroot") },
           ...[...folders].sort().map((f) => ({ id: f, label: f })),
         ];
         setPicker({
@@ -4428,7 +4428,7 @@ function CommandPaletteHost({
       kind: "action",
       action: "version-history",
       icon: "rotate-ccw",
-      label: t("editor.noteActions.versionHistory"),
+      label: t("common.versionhistory"),
       onSelect: commandCtx.onOpenSnapshots,
     },
     { kind: "divider" },
@@ -4541,7 +4541,7 @@ function CommandPaletteHost({
         <DeleteConfirmModal
           title={t("notes.trash.emptyConfirmTitle")}
           body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm.count })}
-          confirmLabel={t("notes.trash.emptyConfirmCta")}
+          confirmLabel={t("common.emptytrash")}
           // The palette's own answer, threaded through `CommandContext`. It was
           // an unconditional `true` for one E2E run, on the reasoning that the
           // palette is a keyboard-first surface, and `et1` failed three times
@@ -6224,7 +6224,7 @@ function WorkspaceSwitcherControl({
                     })}
                     data-testid="editor.workspace-switcher.rename"
                     data-workspace-id={s.id}
-                    title={t("editor.chrome.workspaceSwitcher.renameTitle")}
+                    title={t("common.renameworkspace")}
                     onClick={() => {
                       setOpen(false);
                       onRename(s.id);

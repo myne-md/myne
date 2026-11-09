@@ -583,7 +583,7 @@ function NotesActionsBar({
       <IconButton
         icon="folder-plus"
         iconSize={15}
-        label={t("notes.list.newFolder")}
+        label={t("common.newfolder")}
         testId="notes.new-folder"
         tooltip
         onClick={onNewFolder}
@@ -591,7 +591,7 @@ function NotesActionsBar({
       <IconButton
         icon="file-plus"
         iconSize={15}
-        label={t("notes.list.newNote")}
+        label={t("common.newnote")}
         testId="notes.create"
         tooltip
         onClick={onCreate}
@@ -2398,7 +2398,7 @@ function PopulatedList({
     () => [
       {
         id: "__vault_root__",
-        label: t("notes.list.vaultRoot"),
+        label: t("common.vaultroot"),
         icon: "folder",
         depth: 0,
         onSelect: () => void runBulkMove(null, moveTarget?.ids),
@@ -2426,7 +2426,7 @@ function PopulatedList({
     return [
       {
         id: "__vault_root__",
-        label: t("notes.list.vaultRoot"),
+        label: t("common.vaultroot"),
         icon: "folder",
         depth: 0,
         onSelect: () => void fm.moveFolderTo(node, null),
@@ -2792,14 +2792,14 @@ function PopulatedList({
         id: "new-folder",
         group: "create",
         icon: "folder-plus",
-        label: t("notes.list.newFolder"),
+        label: t("common.newfolder"),
         onSelect: () => fm.startNewFolder(""),
       },
       {
         id: "new-note",
         group: "create",
         icon: "file-plus",
-        label: t("notes.list.newNoteMenu"),
+        label: t("common.newnote"),
         onSelect: onCreate,
       },
       {
@@ -3294,7 +3294,7 @@ function PopulatedList({
               ? t("notes.list.trashConfirmBulkWarning")
               : t("notes.list.trashConfirmWarning")
           }
-          confirmLabel={t("notes.list.trashConfirmConfirm")}
+          confirmLabel={t("common.movetotrash")}
           onCancel={cancelKeyboardDelete}
           onConfirm={runKeyboardDelete}
         />
@@ -3438,7 +3438,7 @@ function NewFolderInput({
         data-testid="notes.new-folder-input"
         placeholder={
           parentPath === ""
-            ? t("notes.list.newFolderPlaceholder")
+            ? t("common.newfolder")
             : t("notes.list.newFolderInPlaceholder", { path: parentPath })
         }
         style={NEW_FOLDER_INPUT_STYLE}

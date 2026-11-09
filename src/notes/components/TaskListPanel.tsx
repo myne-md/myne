@@ -772,7 +772,7 @@ function TaskFilterBuilder({
           { value: "today", label: t("common.today") },
           { value: "upcoming", label: t("tasks.due.upcoming") },
           { value: "later", label: t("tasks.due.later") },
-          { value: "none", label: t("tasks.due.none") },
+          { value: "none", label: t("common.nodate") },
         ];
       case "folder":
         return [
@@ -781,7 +781,7 @@ function TaskFilterBuilder({
         ];
       case "note":
         return [
-          { value: "", label: t("tasks.view.allNotes") },
+          { value: "", label: t("common.allnotes") },
           ...noteOptions.map(([id, title]) => ({ value: id, label: title })),
         ];
       case "tag":
@@ -796,7 +796,7 @@ function TaskFilterBuilder({
         ];
       case "sort":
         return [
-          { value: "due", label: t("tasks.sort.due") },
+          { value: "due", label: t("common.duedate") },
           { value: "dueDesc", label: t("tasks.sort.dueDesc") },
           { value: "priority", label: t("common.priority") },
           { value: "note", label: t("tasks.sort.note") },

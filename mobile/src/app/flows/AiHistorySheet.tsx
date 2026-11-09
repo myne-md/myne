@@ -338,7 +338,7 @@ export function AiHistorySheet({
                     aria-pressed={mode === m}
                     onClick={() => setMode(m)}
                   >
-                    {m === "vault" ? t("agent.hub.modeVault") : t("agent.hub.modeNote")}
+                    {m === "vault" ? t("agent.hub.modeVault") : t("common.thisnote")}
                   </Button>
                 ))}
               </div>
@@ -379,7 +379,7 @@ export function AiHistorySheet({
               variant="filtered"
               size="sm"
               glyph={<Icon name="message-square" size={20} />}
-              title={t("agent.hub.noMatchTitle")}
+              title={t("common.nomatches")}
               // The query is echoed by the SENTENCE rather than by the
               // component's own `query` prop, because `noMatchBody` already
               // interpolates it: passing both would print it twice.

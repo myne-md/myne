@@ -78,7 +78,7 @@ export function SnapshotsSheet({
     <Sheet onClose={onClose} style={{ maxHeight: "84%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {(close) => (
         <>
-          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center", flex: "none" }}>{t("snapshots.title")}</div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center", flex: "none" }}>{t("common.versionhistory")}</div>
 
           {error && (
             <div style={{ marginTop: 10, flex: "none" }}>

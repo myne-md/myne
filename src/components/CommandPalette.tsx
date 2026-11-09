@@ -970,7 +970,7 @@ export function CommandPalette({
           // stays mounted and empty so the combobox's `aria-controls` and
           // `aria-activedescendant` wiring keeps pointing at something real.
           <div style={EMPTY_STYLE} role="status">
-            {t("commandPalette.noMatches")}
+            {t("common.nomatches")}
           </div>
         )}
         {pinError !== null && (

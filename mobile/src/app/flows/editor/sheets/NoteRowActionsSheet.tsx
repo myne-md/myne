@@ -59,7 +59,7 @@ export function NoteRowActionsSheet({
 
           {row(t("notes.archive.title"), onArchive)}
           {sep}
-          {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}
+          {row(t("common.movetotrash"), onTrash, { danger: true, groupTop: true })}
         </>
       )}
     </Sheet>

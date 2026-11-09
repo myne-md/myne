@@ -448,7 +448,7 @@ export function DeviceManagementPanel({
             style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", margin: 0, lineHeight: "var(--leading-normal)" }}
             data-testid="sync.sas-changed"
           >
-            {t("sync.devices.verifyChanged")}
+            {t("common.thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue")}
           </p>
         )}
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -644,7 +644,7 @@ export function DeviceManagementPanel({
                     <span data-testid="sync.device-name">{displayName(d, names)}</span>
                     {d.is_current && (
                       <span style={BADGE} data-testid="sync.this-device">
-                        {t("sync.devices.thisDevice")}
+                        {t("common.thisdevice")}
                       </span>
                     )}
                   </span>

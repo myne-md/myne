@@ -344,7 +344,7 @@ export function PhotoNoteSheet({
       {canCommit && (
         <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
           <Segmented
-            options={[t("photoNote.thisNote"), t("photoNote.newNote")]}
+            options={[t("common.thisnote"), t("common.newnote")]}
             active={destination}
             onChange={setDestination}
             ariaLabel={t("photoNote.destinationLabel")}

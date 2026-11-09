@@ -837,7 +837,7 @@ export function exportToastAction(
   const path = toast.revealPath;
   if (path === undefined) return undefined;
   return {
-    label: i18n.t("export.note.flow.showInFolder"),
+    label: i18n.t("common.showinfolder"),
     onAction: () => {
       void revealItemInDir(path).catch(() => {});
       dismiss();

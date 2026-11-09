@@ -1189,7 +1189,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
                     style={{ borderBottom: "1px solid var(--line-1)" }}
                   >
                     <div style={{ ...CAPTION, padding: "var(--space-2) 0 0" }}>
-                      {t("editor.chrome.rightPanel.aiChat.historyProposalNewNote")}:{" "}
+                      {t("common.newnote")}:{" "}
                       {note.title}
                     </div>
                     {lineDiff("", note.body).map((line, j) => (

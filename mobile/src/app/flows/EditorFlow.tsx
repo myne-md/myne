@@ -3679,7 +3679,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>
   );
   const paletteCommands: PaletteCommand[] = [
-    { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
+    { id: "new-note", label: t("common.newnote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
     { id: "new-drawing", label: t("notes.newTab.createDrawing"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" {...gi} /></svg>, run: () => newDrawing() },
     { id: "daily", label: t("commands.actions.openTodayNote.label"), icon: calendarGlyph, run: () => void openToday() },
     // myne#177: the weekly and monthly siblings, palette-only like daily and
@@ -3947,7 +3947,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   {listView === "notes" && (
                     <button
                       onClick={() => openFolderPrompt({ mode: "new" })}
-                      aria-label={t("notes.list.newFolder")}
+                      aria-label={t("common.newfolder")}
                       data-testid="notes.new-folder"
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, border: "1px solid var(--line-2)", borderRadius: 10, background: "transparent", color: "var(--fg-2)", cursor: "pointer" }}
                     >
@@ -3961,11 +3961,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     <button
                       onClick={newNote}
                       data-testid="notes.new-note"
-                      aria-label={t("notes.list.newNote")}
+                      aria-label={t("common.newnote")}
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
                     >
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" /></svg>
-                      {t("notes.list.newNote")}
+                      {t("common.newnote")}
                     </button>
                   )}
                 </div>
@@ -4019,7 +4019,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                       style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--fg-1)", fontSize: 14 }}
                     />
                     {searchQuery !== "" && (
-                      <button onClick={() => setSearchQuery("")} aria-label={t("editor.list.clearSearch")} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexShrink: 0 }}>
+                      <button onClick={() => setSearchQuery("")} aria-label={t("common.clearsearch")} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexShrink: 0 }}>
                         <svg width="15" height="15" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="var(--fg-3)" strokeWidth="1.8" strokeLinecap="round" /></svg>
                       </button>
                     )}
@@ -4198,7 +4198,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                               {t("notes.archive.folderDeleteConfirm", { count: subtreeCount })}
                             </span>
                             <button onClick={() => void deleteArchivedFolderToTrash(path)} data-testid="archive.folder-delete-confirm" data-folder-path={path} style={{ border: "none", background: "transparent", color: "var(--danger)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                              {t("notes.archive.folderDeleteConfirmCta")}
+                              {t("common.movetotrash")}
                             </button>
                             <button onClick={() => setConfirmArchiveFolder(null)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
                               {t("notes.archive.cancel")}
@@ -4701,7 +4701,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     ? t("common.rename")
                     : folderPrompt.mode === "subfolder"
                       ? t("notes.list.newSubfolder")
-                      : t("notes.list.newFolder")}
+                      : t("common.newfolder")}
                 </div>
                 <input
                   data-testid="notes.folder-prompt-input"
@@ -4711,7 +4711,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   placeholder={
                     folderPrompt.mode === "subfolder"
                       ? t("notes.list.newFolderInPlaceholder", { path: folderPrompt.parent.replace(/\/$/, "") })
-                      : t("notes.list.newFolderPlaceholder")
+                      : t("common.newfolder")
                   }
                   autoFocus
                   autoCapitalize="none"
@@ -4725,7 +4725,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     data-testid="notes.folder-prompt-submit"
                     onClick={() => void submitFolderPrompt()}
                   >
-                    {folderPrompt.mode === "rename" ? t("common.rename") : t("notes.list.newFolder")}
+                    {folderPrompt.mode === "rename" ? t("common.rename") : t("common.newfolder")}
                   </Button>
                 </div>
               </>

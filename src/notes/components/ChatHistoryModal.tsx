@@ -195,7 +195,7 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
               data-testid="ai.history-retry"
               onClick={() => void refresh()}
             >
-              {t("editor.chrome.rightPanel.aiChat.historyRetry")}
+              {t("common.tryagain")}
             </Button>
           }
           testId="ai.history-error"

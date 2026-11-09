@@ -128,7 +128,7 @@ const LOADING_STYLE: CSSProperties = {
 };
 
 function displayName(rec: TitleRecord, t: TFunction): string {
-  return rec.title?.trim() || t("notes.newFromTemplate.untitledTemplate");
+  return rec.title?.trim() || t("common.untitledtemplate");
 }
 
 type Step =

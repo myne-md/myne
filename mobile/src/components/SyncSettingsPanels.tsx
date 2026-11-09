@@ -592,7 +592,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.enroll">
-      <FieldLabel mt={6}>{t("sync.enroll.accountNumberLabel")}</FieldLabel>
+      <FieldLabel mt={6}>{t("common.accountnumber")}</FieldLabel>
       <input
         value={accountNumber}
         onChange={(e) => {
@@ -631,7 +631,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
       <FieldLabel>{t("sync.enroll.signInWith")}</FieldLabel>
       <Segmented
-        options={[t("sync.enroll.passwordLabel"), t("sync.enroll.recoveryPhraseLabel")]}
+        options={[t("sync.enroll.passwordLabel"), t("common.recoveryphrase")]}
         active={MODE_VALUES.indexOf(mode)}
         onChange={(i: number) => {
           clearOutcome();
@@ -658,7 +658,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
         </>
       ) : (
         <>
-          <FieldLabel>{t("sync.enroll.recoveryPhraseLabel")}</FieldLabel>
+          <FieldLabel>{t("common.recoveryphrase")}</FieldLabel>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--fg-3)" }}>
             {t("sync.settings.recoveryPhraseHint")}
           </p>
@@ -875,7 +875,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
             style={{ margin: "var(--space-4) var(--space-1) 0", fontSize: "var(--text-sm)", lineHeight: "var(--leading-relaxed)", color: "var(--fg-2)" }}
             data-testid="sync.sas-changed"
           >
-            {t("sync.devices.verifyChanged")}
+            {t("common.thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue")}
           </p>
         )}
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -980,7 +980,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
             }}
             data-testid="sync.remove-device-cancel"
           >
-            {t("sync.settings.keepDevice")}
+            {t("common.keepit")}
           </button>
         </div>
       </div>
@@ -1043,7 +1043,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
 
       {pending.length > 0 && (
         <div data-testid="sync.pending-devices">
-          <SectionLabel mt={12}>{t("sync.join.waitingTitle")}</SectionLabel>
+          <SectionLabel mt={12}>{t("common.waitingforapproval")}</SectionLabel>
           <Group>
             {pending.map((d, i) => (
               <Row key={d.device_id_hex} first={i === 0} testId="sync.pending-row">
@@ -1162,7 +1162,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
                       }}
                       data-testid="sync.this-device"
                     >
-                      {t("sync.devices.thisDevice")}
+                      {t("common.thisdevice")}
                     </span>
                   )}
                   {hasDeviceName(names, d.device_id_hex) && (

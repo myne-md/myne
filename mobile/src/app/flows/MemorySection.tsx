@@ -346,7 +346,7 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
         <div style={HELPER}>
           <p data-testid="settings.memory.load-failed">{t("settings.memory.loadFailed")}</p>
           <Button variant="secondary" data-testid="settings.memory.retry" onClick={() => void reload()}>
-            {t("settings.memory.retryLabel")}
+            {t("common.tryagain")}
           </Button>
         </div>
       ) : rows === null ? null : rows.length === 0 ? (

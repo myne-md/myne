@@ -79,7 +79,7 @@ export function ListView({
   const { t } = useTranslation();
   const columns = useMemo(() => displayColumns(def), [def]);
   const { stream, total } = useMemo(
-    () => buildViewStream(result, t("notes.views.list.noValue")),
+    () => buildViewStream(result, t("common.novalue")),
     [result, t],
   );
 
@@ -95,7 +95,7 @@ export function ListView({
   const rows = makeViewRowHandlers(onOpenNote, onContextMenu);
 
   if (total === 0) {
-    return <ViewEmpty message={t("notes.views.list.empty")} />;
+    return <ViewEmpty message={t("common.nonotesmatchthisview")} />;
   }
 
   const renderItem = (item: ViewStreamItem): ReactNode => {

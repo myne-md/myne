@@ -109,7 +109,7 @@ export function MobileTableView({
   );
 
   const { stream, total } = useMemo(
-    () => buildViewStream(result, t("notes.views.table.noValue")),
+    () => buildViewStream(result, t("common.novalue")),
     [result, t],
   );
 
@@ -124,7 +124,7 @@ export function MobileTableView({
   );
 
   if (total === 0) {
-    return <MobileViewEmpty message={t("notes.views.table.empty")} />;
+    return <MobileViewEmpty message={t("common.nonotesmatchthisview")} />;
   }
 
   const renderRow = (row: ViewRow, key: string): ReactNode => (
