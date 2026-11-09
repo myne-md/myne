@@ -389,7 +389,7 @@ export function IdentitySetupPanel({
                 <Input
                   readOnly
                   mono
-                  aria-label={t("sync.panel.identity.codeLabel")}
+                  aria-label={t("common.youridentitycode")}
                   value={heldCode}
                   data-testid={testId("held-code")}
                   style={{ userSelect: "all" }}
@@ -514,7 +514,7 @@ export function IdentitySetupPanel({
                     onClick={() => setConfirmForget(false)}
                     data-testid={testId("forget-cancel")}
                   >
-                    {t("identitySetup.forgetCancel")}
+                    {t("common.keepit")}
                   </Button>
                   <div style={{ flex: 1 }} />
                   <Button

@@ -188,7 +188,7 @@ export function TagBrowserSheet({
                     onClick={() => { close(); onOpenNote(id); }}
                     style={{ display: "block", width: "100%", textAlign: "start", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "12px 4px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                   >
-                    {titleById.get(id) || t("editor.untitledNote")}
+                    {titleById.get(id) || t("common.untitlednote")}
                   </button>
                 ))}
                 <div style={{ height: "calc(8px + env(safe-area-inset-bottom, 0px))" }} />

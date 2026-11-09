@@ -52,7 +52,7 @@ export function FolderActionsSheet({
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-          {row(t("notes.list.newNote"), onNewNote)}
+          {row(t("common.newnote"), onNewNote)}
           {row(t("notes.newTab.createDrawing"), onNewDrawing)}
           {row(t("notes.list.newSubfolder"), onNewSubfolder, { testId: "notes.folder-new-subfolder" })}
           {sep}

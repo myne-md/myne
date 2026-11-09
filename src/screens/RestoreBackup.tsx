@@ -155,7 +155,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
             color: "var(--fg-display)",
           }}
         >
-          {t("restore.title")}
+          {t("common.restorefrombackup")}
         </div>
 
         {state.step === "pick" && (

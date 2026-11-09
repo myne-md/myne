@@ -434,7 +434,7 @@ export function NewTabChooser({
 
       <div style={CREATE_ROW}>
         <Button variant="ghost" icon="plus" onClick={onCreate} data-testid="notes.newTab.create-note">
-          {t("notes.newTab.createNote")}
+          {t("common.newnote")}
         </Button>
         <Button
           variant="ghost"

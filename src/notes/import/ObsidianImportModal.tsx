@@ -715,7 +715,7 @@ function SetupBody({
               onClick={onChooseFolder}
               data-testid="import.choose-source"
             >
-              {t("notes.import.modal.chooseFolder")}
+              {t("common.choosefolder")}
             </Button>
           </div>
         </div>

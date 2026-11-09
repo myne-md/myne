@@ -239,7 +239,7 @@ export function TableView({
   );
 
   const { stream, total } = useMemo(
-    () => buildViewStream(result, t("notes.views.table.noValue")),
+    () => buildViewStream(result, t("common.novalue")),
     [result, t],
   );
 
@@ -374,7 +374,7 @@ export function TableView({
   const rows = makeViewRowHandlers(onOpenNote, onContextMenu);
 
   if (total === 0) {
-    return <ViewEmpty message={t("notes.views.table.empty")} />;
+    return <ViewEmpty message={t("common.nonotesmatchthisview")} />;
   }
 
   const renderItem = (item: TableItem): ReactNode => {

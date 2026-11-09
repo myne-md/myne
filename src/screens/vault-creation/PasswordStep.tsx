@@ -47,7 +47,7 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
     <StepLayout>
       <StepCounter
         step="password"
-        label={t("vaultCreation.password.eyebrowLabel")}
+        label={t("common.masterpassword")}
       />
       <StepHeading>{t("vaultCreation.password.heading")}</StepHeading>
 

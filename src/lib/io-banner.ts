@@ -18,7 +18,7 @@ export function ioBanner(kind: IoFailureKind): string {
       // special-case NotFound to a dedicated `VaultNotFound` variant;
       // this branch is unreachable in practice when the caller
       // discriminates.
-      return i18n.t("vault.ioBanner.notFound");
+      return i18n.t("common.vaultfilenotfoundpleaserestarttheapp");
     case "NoSpace":
     case "Other":
       return i18n.t("vault.ioBanner.cannotRead");

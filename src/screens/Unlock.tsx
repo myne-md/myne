@@ -274,7 +274,7 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "VaultNotFound":
       return {
         kind: "banner",
-        text: i18n.t("unlock.errors.vaultNotFound"),
+        text: i18n.t("common.vaultfilenotfoundpleaserestarttheapp"),
       };
     case "VaultAlreadyUnlocked":
       // Stays a banner, and myne-md/myne#535 is the reason it is worth saying
@@ -322,7 +322,7 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
     case "JoinFailure":
       return {
         kind: "banner",
-        text: i18n.t("unlock.errors.unexpected"),
+        text: i18n.t("common.unexpectederrorpleasetryagain"),
       };
     case "KdfMemoryExceedsHostCapability":
       // A plain banner, deliberately NOT the `corrupted` mode. The vault is
@@ -361,7 +361,7 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
       // will ever check.
       return {
         kind: "banner",
-        text: i18n.t("unlock.errors.unexpected"),
+        text: i18n.t("common.unexpectederrorpleasetryagain"),
       };
   }
 }

@@ -203,7 +203,7 @@ export function ViewImportDialog({ open, onClose }: ViewImportDialogProps) {
     }
   }, []);
 
-  const untitled = t("notes.views.untitledView");
+  const untitled = t("common.untitledview");
 
   const renderBody = (): ReactNode => {
     switch (step.kind) {

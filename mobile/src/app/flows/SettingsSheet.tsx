@@ -2157,7 +2157,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           setPwError(t("settings.vault.samePassword"));
           break;
         case "InvalidVaultMeta":
-          setPwError(t("settings.vault.vaultUnreadable"));
+          setPwError(t("common.vaultfileisunreadablerestorefromabackup"));
           break;
         case "IoError":
           setPwError(ioBanner(e.detail.io_error_kind));
@@ -2396,7 +2396,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 </span>
               </Row>
               <Row onClick={() => setPanel("change-password")}>
-                <span style={rowLabel}>{t("settings.changePassword.title")}</span>
+                <span style={rowLabel}>{t("common.changepassword")}</span>
                 <RowChevron />
               </Row>
               <Row onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
@@ -2641,7 +2641,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 weekly or monthly note's folder, title format and template out of
                 `vault.prefs` and could author none of them, so it filed its notes
                 by a configuration only a computer could set. */}
-            <SectionLabel mt={22}>{t("settings.dailyNotes.blockLabel")}</SectionLabel>
+            <SectionLabel mt={22}>{t("common.periodicnotes")}</SectionLabel>
             <PeriodicNotesBlock prefs={eff} onToast={setToast} />
           </div>
         )}
@@ -3106,7 +3106,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             </div>
             <div style={{ marginTop: 18 }}>
               <Button onClick={submitChangePassword} disabled={pwBusy}>
-                {pwBusy ? t("settings.vault.changing") : t("settings.changePassword.title")}
+                {pwBusy ? t("settings.vault.changing") : t("common.changepassword")}
               </Button>
             </div>
           </div>

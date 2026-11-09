@@ -313,7 +313,7 @@ export function slashCommands(): readonly SlashCommand[] {
       // opens (native date / recurrence builder / priority select). A non-task
       // line is auto-converted to `- [ ] ` first.
       id: "due",
-      label: i18n.t("editor.slash.due"),
+      label: i18n.t("common.duedate"),
       icon: "D",
       svgIcon: "calendar",
       apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "due"),

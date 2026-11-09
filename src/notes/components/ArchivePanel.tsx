@@ -347,7 +347,7 @@ export function ArchivePanel({
             ).length,
           })}
           warning={t("notes.archive.folderDeleteWarning")}
-          confirmLabel={t("notes.archive.folderDeleteConfirmCta")}
+          confirmLabel={t("common.movetotrash")}
           confirmTestId="archive.folder-delete-confirm"
           cancelTestId="archive.folder-delete-cancel"
           onCancel={() => setConfirmFolder(null)}

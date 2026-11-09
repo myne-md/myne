@@ -114,7 +114,7 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
     case "VaultNotFound":
       return {
         kind: "banner-retry",
-        banner: i18n.t("recover.errors.vaultNotFound"),
+        banner: i18n.t("common.vaultfilenotfoundpleaserestarttheapp"),
       };
     case "VaultAlreadyUnlocked":
       // Stage-transition bug-canary: user shouldn't reach phrase-entry
@@ -144,12 +144,12 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
       // (it's an A8f precondition). Treat as generic banner.
       return {
         kind: "banner-retry",
-        banner: i18n.t("recover.errors.unexpected"),
+        banner: i18n.t("common.unexpectederrorpleasetryagain"),
       };
     case "JoinFailure":
       return {
         kind: "banner-retry",
-        banner: i18n.t("recover.errors.unexpected"),
+        banner: i18n.t("common.unexpectederrorpleasetryagain"),
       };
     case "RecoveryAbortedByLock":
       // Defensive — an A8f-side variant (lock raced complete_recovery);
@@ -163,7 +163,7 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
       // Defensive — A8f-side floor; A8d takes no password. Generic.
       return {
         kind: "banner-retry",
-        banner: i18n.t("recover.errors.unexpected"),
+        banner: i18n.t("common.unexpectederrorpleasetryagain"),
       };
   }
 }

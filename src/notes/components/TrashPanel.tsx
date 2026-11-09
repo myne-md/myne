@@ -228,7 +228,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                   })
                 }
               >
-                {t("notes.trash.empty")}
+                {t("common.emptytrash")}
               </Button>
             )}
             <IconButton
@@ -320,7 +320,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
           body={t("notes.trash.emptyConfirmBody", {
             count: confirm.ids.length,
           })}
-          confirmLabel={t("notes.trash.emptyConfirmCta")}
+          confirmLabel={t("common.emptytrash")}
           openedByKey={confirm.viaKey}
           onCancel={() => setConfirm(null)}
           onConfirm={() => void confirmPurge()}

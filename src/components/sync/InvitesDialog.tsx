@@ -158,7 +158,7 @@ export function InvitesDialog({
           </DestructiveBanner>
           <div>
             <Button variant="secondary" onClick={onRetry} data-testid="invites.retry">
-              {t("invites.retry")}
+              {t("common.tryagain")}
             </Button>
           </div>
         </>
@@ -179,7 +179,7 @@ export function InvitesDialog({
         >
           <p style={HINT_STYLE}>{t("invites.notEnrolled")}</p>
           <Button onClick={() => setRegisterOpen(true)} data-testid="invites.register-cta">
-            {t("identityHome.registerCta")}
+            {t("common.registerthisidentity")}
           </Button>
         </div>
       ) : unavailable === "pending" ? (
@@ -199,7 +199,7 @@ export function InvitesDialog({
         </div>
       ) : pending.length === 0 && claimed.length === 0 ? (
         <p style={HINT_STYLE} data-testid="invites.empty">
-          {t("invites.empty")}
+          {t("common.noinvitationsyet")}
         </p>
       ) : (
         <>

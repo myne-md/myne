@@ -95,7 +95,7 @@ describe("TemplatesManager create flow", () => {
     fireEvent.click(await screen.findByTestId("templates.new-create"));
     await waitFor(() =>
       expect(createTemplate).toHaveBeenCalledWith(
-        "templates.manager.newTemplateName",
+        "common.untitledtemplate",
         "",
       ),
     );

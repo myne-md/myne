@@ -65,7 +65,7 @@ export function StartupOpenSettings() {
 
   const modeOptions: SelectOption<StartupOpen>[] = [
     { value: "last", label: t("settings.files.startup.optionLast") },
-    { value: "empty", label: t("settings.files.startup.optionEmpty") },
+    { value: "empty", label: t("common.newnote") },
     { value: "specific", label: t("settings.files.startup.optionSpecific") },
   ];
 

@@ -1165,7 +1165,7 @@ export function CreateVaultFlow({
       <Screen>
         <FlowHeader label={t("createVault.stepLabel", { current: 4, total: 4 })} onBack={() => setStep("kit")} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
-          <Title>{t("createVault.typebackTitle")}</Title>
+          <Title>{t("common.confirmyourphrase")}</Title>
           <Lead>{t("createVault.typebackLead")}</Lead>
           {/* The commit failure lands here, because this is where the commit is
               requested from now that the account number has no step of its own. */}

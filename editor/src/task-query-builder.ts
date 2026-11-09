@@ -202,7 +202,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   );
   const sort = select(
     [
-      { value: "due", label: i18n.t("tasks.builder.sortDue") },
+      { value: "due", label: i18n.t("common.duedate") },
       { value: "priority", label: i18n.t("common.priority") },
       { value: "path", label: i18n.t("tasks.builder.sortPath") },
     ],

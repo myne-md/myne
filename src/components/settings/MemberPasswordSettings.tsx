@@ -197,7 +197,7 @@ export function MemberPasswordSettings() {
             onClick={() => setReminderDismissed(true)}
             style={LINK_STYLE}
           >
-            {t("settings.memberPassword.reminderDismiss")}
+            {t("common.notnow")}
           </Button>
         </p>
       ) : null}

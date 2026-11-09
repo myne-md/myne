@@ -198,7 +198,7 @@ export function createFindBarView(
   const input = document.createElement("input");
   input.type = "text";
   input.className = "cm-find-bar-input";
-  const findPlaceholder = i18n.t("editor.find.placeholder");
+  const findPlaceholder = i18n.t("common.findinnote");
   input.placeholder = findPlaceholder;
   input.setAttribute("aria-label", findPlaceholder);
   input.setAttribute("data-testid", "find.input");
@@ -340,7 +340,7 @@ export function createFindBarView(
         total: state.match.total,
       });
     } else if (state.status === "no-match") {
-      const noMatch = i18n.t("editor.find.noMatches");
+      const noMatch = i18n.t("common.nomatches");
       status.textContent = noMatch;
       status.className = "cm-find-bar-status cm-find-bar-status--nomatch";
       liveText = noMatch;

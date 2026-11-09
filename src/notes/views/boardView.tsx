@@ -565,7 +565,7 @@ export function BoardView({
       rendered.map((lane) => ({
         value: lane.value,
         label:
-          lane.value === "" ? t("notes.views.cards.noValue") : lane.value,
+          lane.value === "" ? t("common.novalue") : lane.value,
       })),
     [rendered, t],
   );
@@ -705,7 +705,7 @@ export function BoardView({
           reason: refusalSentence(drag.refusal.reason, t),
           lane:
             drag.refusal.fromLane === ""
-              ? t("notes.views.cards.noValue")
+              ? t("common.novalue")
               : drag.refusal.fromLane,
         })}
       </p>
@@ -786,7 +786,7 @@ export function BoardView({
   if (rendered.length === 0) {
     return (
       <div data-testid={VIEW_TESTID.empty} style={EMPTY_STYLE}>
-        {t("notes.views.cards.empty")}
+        {t("common.nonotesmatchthisview")}
       </div>
     );
   }
@@ -844,7 +844,7 @@ export function BoardView({
       <div data-testid={VIEW_TESTID.boardLanes} style={LANES_STYLE}>
         {rendered.map((lane: BoardLane) => {
           const label =
-            lane.value === "" ? t("notes.views.cards.noValue") : lane.value;
+            lane.value === "" ? t("common.novalue") : lane.value;
           const isDropTarget = drag.hoverLane === lane.value;
           const isRenaming = renameTarget === lane.value;
           return (
@@ -1015,7 +1015,7 @@ export function BoardView({
               if (id !== null) runLifecycle(id, "trash");
             }}
           >
-            {t("notes.list.trashConfirmConfirm")}
+            {t("common.movetotrash")}
           </Button>
         </div>
       </ModalShell>

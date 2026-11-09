@@ -406,7 +406,7 @@ export function MemberRosterPanel({
           apart from the member list and the invitations below. */}
       {personReady ? (
       <SettingsSection
-        title={t("sync.memberRoster.identityHeading")}
+        title={t("common.youridentity")}
         testId="member-roster.identity-section"
       >
         <div data-testid="member-roster.person-ready" style={SECTION_STYLE}>
@@ -511,7 +511,7 @@ export function MemberRosterPanel({
                   }}
                   data-testid="member-roster.forget-cancel"
                 >
-                  {t("sync.memberRoster.identityForgetCancel")}
+                  {t("common.keepit")}
                 </Button>
                 <div style={{ flex: 1 }} />
                 <Button
@@ -536,7 +536,7 @@ export function MemberRosterPanel({
               }}
               data-testid="member-roster.forget-cta"
             >
-              {t("sync.memberRoster.identityForgetCta")}
+              {t("common.forgetthisidentityonthisdevice")}
             </Button>
           )}
         </div>
@@ -562,7 +562,7 @@ export function MemberRosterPanel({
             onClick={reload}
             style={{ alignSelf: "flex-start" }}
           >
-            {t("invites.retry")}
+            {t("common.tryagain")}
           </Button>
         </div>
       ) : members.length === 0 ? (
@@ -1161,7 +1161,7 @@ function InviteMemberModal({
       <p>{t("sync.memberRoster.inviteHint")}</p>
       <textarea
         data-testid="member-roster.invite-code"
-        aria-label={t("sync.memberRoster.inviteCodeLabel")}
+        aria-label={t("common.youridentitycode")}
         value={code}
         onChange={(e) => {
           setCode(e.target.value);

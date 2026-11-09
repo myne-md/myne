@@ -288,7 +288,7 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
               testId="identity-home.accept-step"
               n={2}
               total={3}
-              label={t("identityHome.stepRecoveryPhrase")}
+              label={t("common.recoveryphrase")}
             />
             <StepHeading>{t("identityHome.phraseHeading")}</StepHeading>
             <PhraseStepBody
@@ -455,7 +455,7 @@ export function JoinVaultWizard({ invite, onCancel, onAccepted }: InviteWizardPr
               testId="identity-home.join-step"
               n={1}
               total={2}
-              label={t("identityHome.stepRecoveryPhrase")}
+              label={t("common.recoveryphrase")}
             />
             <StepHeading>{t("identityHome.phraseHeading")}</StepHeading>
             <PhraseStepBody

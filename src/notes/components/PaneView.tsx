@@ -2660,7 +2660,7 @@ export function PaneView({
           const view = prefs.saved_views.find((v) => v.id === it.id);
           if (view === undefined) return null;
           return view.name.trim() === ""
-            ? t("notes.pane.untitledView")
+            ? t("common.untitledview")
             : view.name;
         }}
         colorOf={(key) => {
@@ -3093,7 +3093,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         <div style={QUIET_WRAP_STYLE} data-testid="editor.view-pending">
           <p style={QUIET_TITLE_STYLE}>
             {t("notes.views.manager.pendingTitle", {
-              name: def.name.trim() === "" ? t("notes.views.untitledView") : def.name,
+              name: def.name.trim() === "" ? t("common.untitledview") : def.name,
             })}
           </p>
           <p style={QUIET_BODY_STYLE}>{t("notes.views.manager.pendingBody")}</p>

@@ -154,7 +154,7 @@ export function DateField({
         data-value={value ?? ""}
         onClick={() => (open ? setOpen(false) : openPicker())}
       >
-        {shown === "" ? t("calendar.form.noDate") : shown}
+        {shown === "" ? t("common.nodate") : shown}
       </Button>
       <AnchoredPanel open={open} onClose={() => setOpen(false)} anchorRef={triggerRef} minWidth={252} style={PANEL_STYLE}>
         <div role="dialog" aria-label={label}>

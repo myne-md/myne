@@ -215,7 +215,7 @@ function displayLabel(kind: ChipKind, value: string, typed: boolean): string {
  * sets of names for one concept is two things to keep in step.
  */
 const FIELD_NAME: Record<ChipKind, () => string> = {
-  due: () => i18n.t("editor.taskField.title.due"),
+  due: () => i18n.t("common.duedate"),
   remind: () => i18n.t("editor.taskField.title.remind"),
   repeat: () => i18n.t("editor.taskField.title.repeat"),
   priority: () => i18n.t("common.priority"),

@@ -504,7 +504,7 @@ export function SnapshotsPanel({
                     >
                       <span style={ROW_AGE_STYLE}>
                         {formatRelativeTime(new Date(s.captured_at_ms)) ||
-                          t("notes.snapshots.justNow")}
+                          t("common.justnow")}
                       </span>
                       <span style={ROW_META_STYLE}>
                         {t("notes.snapshots.encryptedSize", {

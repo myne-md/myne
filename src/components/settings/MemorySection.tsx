@@ -390,7 +390,7 @@ export function MemorySection(props: {
         <div style={HELPER_STYLE}>
           <p data-testid="settings.memory.load-failed">{t("settings.memory.loadFailed")}</p>
           <button type="button" data-testid="settings.memory.retry" style={LINK_BUTTON_STYLE} onClick={() => void reload()}>
-            {t("settings.memory.retryLabel")}
+            {t("common.tryagain")}
           </button>
         </div>
       ) : rows === null ? null : rows.length === 0 ? (
