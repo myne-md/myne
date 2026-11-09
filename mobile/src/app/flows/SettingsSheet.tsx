@@ -3052,10 +3052,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             ) : quStatus?.method === "biometric" ? (
               // Biometric quick-unlock is configured (MYND-482): quick-unlock is
               // already set up, so DON'T show a "Set up" PIN form (setting a PIN
-              // would silently overwrite the biometric credential). Reflect the
-              // state + point to the toggle above as the explicit way to switch.
-              // Configured: the toggle above IS the state and the way out.
-              <div data-testid="settings.quick-unlock-biometric-configured" style={{ display: "none" }} />
+              // would silently overwrite the biometric credential). The toggle
+              // above IS the state and the way out, so this branch renders nothing.
+              null
             ) : (
               <>
                 {/* Observability only (`src/AGENTS.md` "Test observability"): the

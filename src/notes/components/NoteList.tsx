@@ -730,18 +730,6 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
   outline: "none",
 };
 
-const BLOCK_NOTICE_STYLE: CSSProperties = {
-  margin: "6px 10px",
-  padding: "8px 10px",
-  background: "var(--warning-soft, var(--paper))",
-  borderInlineStart: "2px solid var(--line-3)",
-  borderRadius: "var(--radius-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  color: "var(--fg-2)",
-  flexShrink: 0,
-};
-
 const CASE_MERGE_STYLE: CSSProperties = {
   margin: "6px 10px",
   padding: "10px",
@@ -3248,15 +3236,6 @@ function PopulatedList({
               title: selectedTitle.trim() === "" ? t("notes.list.untitled") : selectedTitle,
             })}
       </div>
-      {fm.blockNotice !== null && (
-        <div
-          style={BLOCK_NOTICE_STYLE}
-          role="status"
-          onClick={fm.dismissBlock}
-        >
-          {fm.blockNotice}
-        </div>
-      )}
       {fm.caseMerge !== null && (
         <div ref={caseMergeDialogRef} style={CASE_MERGE_STYLE} role="alertdialog">
           <div>

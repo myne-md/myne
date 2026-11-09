@@ -3,9 +3,10 @@
 // `<input type="date">` and its siblings are WebView widgets: they ignore every
 // design token, a custom palette reaches none of them, and they differ between the
 // desktop app, the browser client and the phone. They live here rather than in
-// `primitives/` because this form is their only caller, and they reuse `grid.ts`
-// for the month matrix and `datetimeFormat` for what the user reads, so a picker
-// cannot disagree with the pane about which day is which.
+// `primitives/` because this form is their only caller. They reuse `grid.ts` for the
+// month matrix and `datetimeFormat` for what the user reads, so a picker cannot
+// disagree with the pane about which day is which (`decisions/clients/0801`: not
+// the task-field picker).
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

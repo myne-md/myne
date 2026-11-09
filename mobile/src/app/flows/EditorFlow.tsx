@@ -1702,7 +1702,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       },
       // No per-move work: the lifted row is the feedback, and a setState per move
       // would re-render the whole tree on every pointer event.
-      onMove: () => undefined,
       onEnd: (point: { x: number; y: number }, moved: boolean) => {
         setDragRowKey(null);
         // A hold that never moved is the action sheet's, which `useHold` fires.

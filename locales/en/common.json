@@ -1347,7 +1347,6 @@
           "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
-          "noticeSettingsCta": "Open AI settings",
           "insert": "Insert into note",
           "noAnswer": "No answer. Try rephrasing.",
           "newChat": "New chat",
@@ -1802,7 +1801,6 @@
     },
     "sortSheet": {
       "title": "Sort",
-      "manual": "Manual order",
       "titleAsc": "Title · A → Z",
       "titleDesc": "Title · Z → A",
       "arrangement": "My arrangement"
@@ -3194,7 +3192,6 @@
       "diagnosticLogReadError": "Myne could not read the diagnostic logging setting, so it is shown as off.",
       "diagnosticBlockLabel": "Report details",
       "diagnosticBlockHelper": "Exactly what Copy puts on your clipboard. Nothing is sent anywhere; you decide what to share.",
-      "diagnostics": "Diagnostics",
       "diagnosticsIntro": "What Myne knows about this device right now. Nothing is sent anywhere; you decide what to share.",
       "diagnosticsReading": "Reading…",
       "diagnosticCopied": "Copied",
@@ -3418,11 +3415,9 @@
     "attachmentOcr": {
       "label": "Search inside images and scanned documents",
       "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
-      "mobileDeviceLocal": "This one is per device: it decides what this phone indexes, so your other devices keep their own choice.",
       "errorSaveSetting": "Could not save this setting.",
       "processing_one": "Reading 1 attachment…",
-      "processing_other": "Reading {{count}} attachments…",
-      "draftUse": "The text this reads is also offered as a draft you can add to a note. A note syncs encrypted like any other."
+      "processing_other": "Reading {{count}} attachments…"
     },
     "folderNotes": {
       "label": "Folder notes",
@@ -4151,8 +4146,6 @@
       "hideVaultNamesLabel": "Hide vault names on the lock screen",
       "hideVaultNamesInline": "Turning it on destroys the keys that make the names stored here readable.",
       "hideVaultNamesHelper": "On a device with a usable keychain the vault picker shows a vault's name once this device has unlocked it. With this on every vault shows a placeholder such as Vault 2 instead, and that number stays with the vault however the list reorders.",
-      "hideVaultNamesErases": "Turning it on destroys the keys that make the names stored here readable, so those names cannot be recovered on this device, and no further name is written while it stays on.",
-      "hideVaultNamesResidue": "It cannot reach a copy taken earlier: a full-system backup, a disk image, or any other system-level copy of this disk made while names were showing carries both the stored names and their keys.",
       "hideVaultNamesUnavailable": "Myne can't store vault names in this copy of the app, so it stores none here and this option cannot be turned on. The picker already shows a placeholder for every vault.",
       "hideVaultNamesErrorRead": "Couldn't read the current setting. Flip the switch to set it again.",
       "hideVaultNamesErrorSave": "Couldn't save the setting, so it is unchanged. If you were turning it on, some stored names may already have been destroyed; turn it on again to finish.",
@@ -4217,7 +4210,6 @@
       "biometricOnToast": "{{method}} quick unlock is on",
       "biometricUnavailable": "{{method}} isn't available on this device.",
       "biometricAuthFailed": "{{method}} couldn't be set up. Make sure it is enabled in your device settings, or use a PIN instead.",
-      "warningBanner": "A convenience gate only. With a PIN your password is required again after a restart; a fingerprint or face check covers a restart too.",
       "biometricToggleSubtitle": "Unlock with {{method}} after auto-lock",
       "pinOnLead": "PIN quick unlock is ",
       "pinOnEmphasis": "on",
@@ -4379,8 +4371,6 @@
         "heading": "The quick brown fox",
         "bullet1": "Pack my box with five dozen liquor jugs",
         "bullet2": "How vexingly quick daft zebras jump",
-        "spellCaption": "Spell-check",
-        "spellSample": "mispelled",
         "dateTime": "Date and time",
         "toolbar": "Toolbar",
         "task": "Tasks",
