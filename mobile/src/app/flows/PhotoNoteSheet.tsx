@@ -374,14 +374,14 @@ export function PhotoNoteSheet({
             </Button>
           )}
           <Button variant="ghost" onClick={onCancel} data-testid="photo-note.cancel">
-            {t("photoNote.cancel")}
+            {t("common.cancel")}
           </Button>
         </div>
       )}
 
       {(phase === "locked" || importing) && (
         <Button variant="secondary" onClick={onCancel} data-testid="photo-note.cancel">
-          {t("photoNote.cancel")}
+          {t("common.cancel")}
         </Button>
       )}
     </Sheet>

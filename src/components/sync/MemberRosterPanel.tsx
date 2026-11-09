@@ -1072,7 +1072,7 @@ function MemberNameDialog({
             disabled={busy}
             onClick={onClear}
           >
-            {t("sync.memberRoster.nameClear")}
+            {t("common.clear")}
           </Button>
           <Button
             type="button"
@@ -1081,7 +1081,7 @@ function MemberNameDialog({
             disabled={busy}
             onClick={onCancel}
           >
-            {t("sync.memberRoster.nameCancel")}
+            {t("common.cancel")}
           </Button>
         </div>
       </form>

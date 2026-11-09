@@ -155,7 +155,7 @@ export function TagBrowserSheet({
                   {matchIds.length > 0 && (
                     <button onClick={() => setSavingName("")} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("notes.tagBrowser.saveAsView")}</button>
                   )}
-                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("notes.tagBrowser.clear")}</button>
+                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("common.clear")}</button>
                 </div>
               </div>
 

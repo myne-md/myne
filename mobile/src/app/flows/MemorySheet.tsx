@@ -296,7 +296,7 @@ export function MemorySheet({
                         data-testid="ai.memory-delete-cancel"
                         onClick={() => setDeletingId(null)}
                       >
-                        {t("settings.memory.cancelLabel")}
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   ) : (
@@ -353,7 +353,7 @@ export function MemorySheet({
                           data-testid="ai.memory-delete-cancel"
                           onClick={() => setDeletingId(null)}
                         >
-                          {t("settings.memory.cancelLabel")}
+                          {t("common.cancel")}
                         </Button>
                       </div>
                     ) : (
@@ -376,7 +376,7 @@ export function MemorySheet({
         </div>
         <div style={STACK}>
           <Button variant="ghost" data-testid="ai.memory-close" onClick={onClose}>
-            {t("settings.memory.cancelLabel")}
+            {t("common.cancel")}
           </Button>
         </div>
       </div>

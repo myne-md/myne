@@ -118,7 +118,7 @@ export function NotePdfExportNotice({
             onClick={onCancel}
             data-testid="export.pdf-cancel"
           >
-            {t("export.pdf.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button
             variant="primary"

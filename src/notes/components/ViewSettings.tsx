@@ -282,7 +282,7 @@ export function ViewSettings({
       labelId="view-settings-title"
       onClose={onCancel}
       width={480}
-      closeLabel={t("notes.viewSettings.cancel")}
+      closeLabel={t("common.cancel")}
       bodyBleed
     >
       <div data-testid="view-settings.modal" style={BODY_STYLE}>
@@ -477,7 +477,7 @@ export function ViewSettings({
           </Button>
         )}
         <Button variant="ghost" data-testid="view-settings.cancel" onClick={onCancel}>
-          {t("notes.viewSettings.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button variant="primary" data-testid="view-settings.save" onClick={save}>
           {t("notes.viewSettings.save")}

@@ -408,7 +408,7 @@ export function DeleteVaultConfirmForm({
                 disabled={inFlight}
                 data-testid="delete-vault.cancel"
               >
-                {t("settings.deleteVault.cancel")}
+                {t("common.cancel")}
               </Button>
             )}
             <Button
@@ -460,7 +460,7 @@ export function DeleteVaultConfirmForm({
               onClick={onContinueAfterPartial}
               data-testid="delete-vault.continue"
             >
-              {t("settings.deleteVault.continue")}
+              {t("common.continue")}
             </Button>
           </div>
         </>

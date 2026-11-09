@@ -149,7 +149,7 @@ export function showWikilinkConvertPreview(
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
     cancelBtn.className = "cm-attach-diff-btn";
-    cancelBtn.textContent = i18n.t("editor.wikilink.convert.cancel");
+    cancelBtn.textContent = i18n.t("common.cancel");
     const commitBtn = document.createElement("button");
     commitBtn.type = "button";
     commitBtn.className = "cm-attach-diff-btn cm-attach-diff-btn-primary";

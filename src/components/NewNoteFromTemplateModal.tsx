@@ -230,7 +230,7 @@ export function NewNoteFromTemplateModal({
           />
           <div style={ACTIONS_STYLE}>
             <Button variant="ghost" onClick={() => setStep({ kind: "pick" })}>
-              {t("notes.newFromTemplate.back")}
+              {t("common.back")}
             </Button>
             <Button
               variant="primary"

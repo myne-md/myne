@@ -187,7 +187,7 @@ function BannerActions({
       return (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
           <Button variant="ghost" disabled={busy} onClick={() => onCancel(phase.count)}>
-            {t("welcome.repairResidue.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button variant="secondary" disabled={busy} onClick={() => onConfirm(phase.count)}>
             {busy

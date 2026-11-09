@@ -327,7 +327,7 @@ export function TagBrowser({
                   transition: HOVER_TRANSITION,
                 }}
               >
-                {t("notes.tagBrowser.clear")}
+                {t("common.clear")}
               </button>
             </>
           )}
@@ -398,7 +398,7 @@ export function TagBrowser({
                 transition: HOVER_TRANSITION,
               }}
             >
-              {t("notes.tagBrowser.cancel")}
+              {t("common.cancel")}
             </button>
           </div>
         )}

@@ -31,7 +31,6 @@
     "composer": {
       "placeholder": "Yapay zekaya sorun…",
       "scopeLabel": "Üzerinde çalışılan",
-      "scopeOpenNote": "Bu not",
       "scopeCount_one": "{{count}} not",
       "scopeCount_other": "{{count}} not",
       "scopeCountUnavailable": "Bu klasörün kaç not içerdiği şu anda denetlenemedi.",
@@ -49,7 +48,6 @@
       "checking": "Denetleniyor",
       "unsupportedProvisional": "Bu geçme eşiği henüz modeller genelinde ölçülmedi, bu yüzden olması gerekenden katı veya gevşek olabilir.",
       "scopeNone": "açık not yok, dolayısıyla henüz üzerinde çalışılacak bir şey yok",
-      "scopeAllVault": "Tüm notlar",
       "scopeQuestion": "Ajan ne okuyabilir",
       "scopeFolders": "Klasörler",
       "scopeApplies": "Sonraki mesajınız için geçerli. Çöpe atılan, arşivlenen ve şablon notlar her zaman dışarıda bırakılır.",
@@ -177,7 +175,6 @@
       "undoFailed": "Çalıştırma geri alınamadı.",
       "undoReport": "{{reverted}} not geri yüklendi. Çalıştırmanın oluşturduğu {{kept}} not yerinde bırakıldı.",
       "alreadyApplied": "Uygulandı",
-      "vaultRoot": "Kasa kökü",
       "newNotesHeading_one": "{{count}} yeni not",
       "newNotesHeading_other": "{{count}} yeni not",
       "createdCount_one": "{{count}} not oluşturuldu.",
@@ -291,7 +288,6 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "İptal",
       "cleaning": "Temizleniyor…",
       "completeTitle": "Temizlik tamamlandı",
       "deleteCta": "{{count}} kullanılmayanı sil",
@@ -319,7 +315,6 @@
       "upload": "Yükle"
     },
     "deleteDialog": {
-      "cancel": "İptal",
       "confirmPrompt": "Bu ek kalıcı olarak silinsin mi? Bu işlem geri alınamaz.",
       "delete": "Sil",
       "deleting": "Siliniyor…",
@@ -463,7 +458,6 @@
       }
     },
     "export": {
-      "cancel": "İptal",
       "copying": "{{total}} / {{done}} kopyalanıyor…",
       "preparing": "Hazırlanıyor…",
       "successToast": "Yedekleme doğrulandı ve kaydedildi.",
@@ -971,7 +965,6 @@
         "noticeContainerChanged": "{{format}} biçimine sıkıştırıldı: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "İptal",
         "confirm": "Dönüştür",
         "skipped": "atlandı: {{note}}",
         "subtitle_one": "1 referans yeniden yazılacak. Uygulamadan önce gözden geçirin.",
@@ -1066,13 +1059,11 @@
       },
       "recording": {
         "barAria": "Sesli not kaydediliyor",
-        "cancel": "İptal",
         "noAudio": "Ses algılanmadı. Mikrofonunuzu kontrol edin.",
         "saving": "Kaydediliyor…",
         "stop": "Durdur"
       },
       "rename": {
-        "cancel": "İptal",
         "title": "Eki yeniden adlandır"
       },
       "summary": {
@@ -1314,7 +1305,6 @@
           "truncated": "İlk {{count}} karakter özetlendi.",
           "you": "Siz",
           "history": "Geçmiş",
-          "historyCancel": "İptal",
           "historyDelete": "Sil",
           "historyDeleteBody": "Bu, konuşmayı bir sonraki bağlantıda cihazın tamamından siler. Geri alınamaz.",
           "historyError": "Konuşmalar yüklenemedi. Tekrar deneyin.",
@@ -1570,7 +1560,6 @@
       },
       "invalidRemind": "Myne bu tarihi okuyamıyor, bu yüzden size hatırlatmayacak.",
       "addTime": "Saat ekle",
-      "clear": "Temizle",
       "dateGrid": "Tarih seç",
       "dateNext": "Gelecek ay",
       "datePrev": "Önceki ay",
@@ -1670,7 +1659,6 @@
         "embed": "Göm: {{label}}"
       },
       "convert": {
-        "cancel": "İptal",
         "choiceClause_one": " · {{count}} tanesi seçim gerektiriyor.",
         "choiceClause_other": " · {{count}} tanesi seçim gerektiriyor.",
         "chooseTarget": "Hedef seçin…",
@@ -1868,7 +1856,6 @@
         "title": "Toplantı Yapay Zekası"
       },
       "barAria": "Toplantı oturumu",
-      "cancel": "İptal",
       "chunksMissing": "Toplantının bir kısmı aktarılamadı, bu yüzden notta bir boşluk var. Gelen ses hâlâ orada.",
       "clipFailed": "Toplantının bir kısmı kaydedilemedi. Geri kalanı hâlâ notta.",
       "machineNotice": "Bu, toplantının makine tarafından oluşturulmuş bir metin dökümüdür ve hatalar içerebilir.",
@@ -1922,7 +1909,6 @@
         "filterPlainText": "Düz metin"
       },
       "modal": {
-        "cancel": "İptal",
         "export": "Dışa aktar…",
         "includeAttachments_one": "{{count}} eki dahil et",
         "includeAttachments_other": "{{count}} eki dahil et",
@@ -1933,12 +1919,10 @@
       }
     },
     "egress": {
-      "cancel": "İptal",
       "confirm": "İndir",
       "title": "Bu dosyayı indir"
     },
     "pdf": {
-      "cancel": "İptal",
       "continue": "Devam et…",
       "title": "PDF olarak dışa aktar"
     },
@@ -1975,12 +1959,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "İptal",
         "cancelling": "İptal ediliyor…",
         "title": "Dışa aktarılıyor…"
       },
       "setup": {
-        "cancel": "İptal",
         "choose": "Seç…",
         "chooseFolder": "Bir klasör seçin…",
         "destinationLabel": "Hedef",
@@ -2029,7 +2011,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "İptal",
       "count_one": "{{count}} not",
       "count_other": "{{count}} not",
       "delete": "Sil",
@@ -2073,7 +2054,6 @@
       "none": "Yok"
     },
     "deleteConfirm": {
-      "cancel": "İptal",
       "delete": "Sil",
       "title": "Bu not silinsin mi?",
       "warning": "Bu işlem geri alınamaz."
@@ -2103,7 +2083,6 @@
     "filterBuilder": {
       "addCondition": "Koşul ekle",
       "addFilterGroup": "Filtre grubu ekle",
-      "cancel": "İptal",
       "combinator": {
         "all": "tümü",
         "any": "herhangi biri"
@@ -2229,7 +2208,6 @@
     "import": {
       "base": {},
       "modal": {
-        "cancel": "İptal",
         "cancelledNotImported": "{{count}} içe aktarılmadı",
         "cancelledNotImported_one": "{{count}} içe aktarılmadı",
         "cancelledNotImported_other": "{{count}} içe aktarılmadı",
@@ -2472,7 +2450,6 @@
       "search": "Ara"
     },
     "newFromTemplate": {
-      "back": "Geri",
       "blankNote": "Boş not",
       "createNote": "Not oluştur",
       "createFirstTemplate": "Şablon oluştur",
@@ -2551,11 +2528,9 @@
       "savingEllipsis": "Kaydediliyor…"
     },
     "snapshotFailed": {
-      "dismiss": "Kapat",
       "message": "Anlık görüntü kaydedilemedi. Notunuz kaydedildi, ancak sürüm geçmişi eksik olabilir (disk dolu olabilir)."
     },
     "snapshots": {
-      "cancel": "İptal",
       "changeCount_one": "Bu anlık görüntüden bu yana {{count}} değişiklik",
       "changeCount_other": "Bu anlık görüntüden bu yana {{count}} değişiklik",
       "changeCountPrev_one": "Önceki anlık görüntüye göre {{count}} değişiklik",
@@ -2597,8 +2572,6 @@
       "moveRight": "Sağa taşı"
     },
     "tagBrowser": {
-      "cancel": "İptal",
-      "clear": "Temizle",
       "combineTagsWith": "Etiketleri şununla birleştir",
       "filtering": "Filtreleniyor…",
       "modeAll": "Tümü",
@@ -2688,11 +2661,9 @@
         "renameLane": "{{lane}} şeridini yeniden adlandır",
         "newLaneName": "Yeni şerit adı",
         "saveLaneName": "Şerit adını kaydet",
-        "cancelLaneRename": "İptal",
         "lanesNotSaved": "Kartlar taşındı, ancak şerit sırası kaydedilemedi.",
         "laneOrderRestored": "Şerit sırası geri geldi.",
         "laneOrderRestoreFailed": "Şerit sırası geri yüklenemedi.",
-        "cancel": "İptal",
         "archiveFailed": "Not arşivlenemedi.",
         "trashFailed": "Not çöpe taşınamadı.",
         "noGroupBy": "Bu panonun şerit özelliği yok. Görünüm ayarlarında gruplanacak bir özellik seçin."
@@ -2774,7 +2745,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (geniş)"
       },
-      "cancel": "İptal",
       "cardSize": "Kart boyutu",
       "cardSizeValue": "{{size}} px",
       "columns": "Sütunlar",
@@ -2857,7 +2827,6 @@
       "confirmLabel": "Ana parolayı onaylayın",
       "defaultEmptyCaption": "Hatırlayabileceğiniz bir şey seçin. Sıfırlanamaz.",
       "mismatch": "Parolalar eşleşmiyor.",
-      "passwordLabel": "Ana parola",
       "suggestPassword": "Parola öner",
       "tooShort": "En az {{n}} karakter kullanın."
     },
@@ -2996,8 +2965,6 @@
     }
   },
   "restore": {
-    "backLabel": "Geri",
-    "cancelLabel": "Geri",
     "collision": {
       "body": "Bu yedeklemedeki bir kasa bu cihazda zaten var. İkisini de tutabilirsiniz: geri yüklenen kopya, kasa listenizde ayrı bir kasa olarak görünür. Ya da şimdi geri yükleyip mevcut kasayı kasa listesinden kendiniz kaldırabilirsiniz. Kaldırma işlemi DELETE yazmanızı ister ve yalnızca geri yüklenen kasanın açıldığını doğruladıktan sonra anlamlıdır.",
       "keepBoth": "İkisini de tut",
@@ -3026,7 +2993,6 @@
       "versionHistory": "Sürüm geçmişi girişleri: {{n}}"
     },
     "working": {
-      "cancel": "İptal",
       "restoringProgress": "Geri yükleniyor… {{total}} / {{done}}",
       "verifying": "Yedekleme doğrulanıyor…",
       "verifyingProgress": "Yedekleme doğrulanıyor… {{total}} / {{done}}"
@@ -3257,7 +3223,6 @@
       "title": "Otomatik yedeklemeler"
     },
     "changePassword": {
-      "cancel": "İptal",
       "checkingStrength": "Güç denetleniyor…",
       "strengthUnavailable": "Güç denetimi yüklenemedi, bu yüzden yalnızca minimum uzunluk denetlenir.",
       "confirmLabel": "Yeni parolayı onaylayın",
@@ -3386,9 +3351,7 @@
       "mobileSharedNotice": "Bu ayarlar paylaşılır: buradaki bir değişiklik diğer cihazlarınıza ulaşır ve bir bilgisayarda ayarlanan aynı değer buraya gelir."
     },
     "deleteVault": {
-      "cancel": "İptal",
       "caseSensitiveHint": "Büyük/küçük harfe duyarlı. Silmeyi etkinleştirmek için sözcüğü tam olarak yazın.",
-      "continue": "Devam et",
       "copyPrimary": "Bu işlem, bu kasayı ve içindeki her notu kalıcı olarak siler. Geri alınamaz ve kurtarma ifadeniz verileri geri getirmez.",
       "copySecondary": "Kasa anahtarları, dosyaların bağlantısı kaldırılmadan önce bellekten sıfırlanır; diskte kalan yetim şifreli metin, kurtarılamayan Argon2id ile sarmalanmış çöp olarak kalır.",
       "keychainNote": "Silme tamamlandığında Myne, bir tane sakladığı platformlarda, bu kasa için sistem anahtarlığına sakladığı biyometrik kilit açma anahtarını silmesini de ister.",
@@ -3457,7 +3420,6 @@
     },
     "hotkeys": {
       "addBindingAria": "{{command}} için bir kısayol ekle",
-      "cancel": "İptal",
       "capturePrompt": "Bir tuşa basın…",
       "conflictIndicator": "⚠ çakışma",
       "conflictTitle": "Ayrıca {{commands}} tarafından kullanılıyor",
@@ -3544,7 +3506,6 @@
       "autoTagUnavailable": "Henüz etiket modeli kurulu değil. Kurulduğunda Ayarlar, Yapay zeka bölümünden anahtarı açın.",
       "consent": {
         "accept": "Notlarımı {{provider}} sağlayıcısına gönder",
-        "cancel": "İptal",
         "cannotVerifyLabel": "Myne neyi doğrulayamıyor",
         "revokeLabel": "Bunu nasıl geri alırsınız",
         "scopeLabel": "Bu hangi cihazları kapsıyor",
@@ -3654,7 +3615,6 @@
       "downloadInstall": "İndir",
       "downloading": "İndiriliyor…",
       "downloadingPercent": "İndiriliyor… %{{percent}}",
-      "downloadCancel": "İptal",
       "downloadFailed": "İndirme tamamlanmadı.",
       "downloadFailedChecksum": "İndirme parmak iziyle eşleşmedi ve reddedildi. Tekrar deneyin.",
       "sideloadDisclosure": "Geliştirici modu ayrıca Myne'i kendi edindiğiniz bir model dosyasına yönlendirmenize izin verir. Başka bir yerden indirdiğiniz bir dosya Myne tarafından denetlenmez, bu yüzden yalnızca güvendiğiniz birini kullanın.",
@@ -4139,8 +4099,6 @@
       "empty": "Asistan bir çalıştırma sırasında bir şey öğrendiğinde girdiler burada görünür.",
       "deleteLabel": "Sil",
       "save": "Kaydet",
-      "cancel": "İptal",
-      "cancelLabel": "İptal",
       "saveFailed": "Girdi kaydedilemedi.",
       "deleteFailed": "Girdi silinemedi.",
       "entryUnreadable": "Bu girdi okunamadı. Hâlâ saklanıyor; burada silin veya Ayarlar'da düzeltin.",
@@ -4568,8 +4526,7 @@
       "restoredToast": "Yeni bir not olarak geri yüklendi."
     },
     "stale": {
-      "body": "Myne birkaç gündür eşitleme sunucusuna ulaşamadı. Notlarınız bu cihaza kaydediliyor ama hiçbiri cihazdan çıkmadı, yani tek kopya bu. Nedenini görmek için Ayarlar → Eşitleme bölümünü açın.",
-      "dismiss": "Kapat"
+      "body": "Myne birkaç gündür eşitleme sunucusuna ulaşamadı. Notlarınız bu cihaza kaydediliyor ama hiçbiri cihazdan çıkmadı, yani tek kopya bu. Nedenini görmek için Ayarlar → Eşitleme bölümünü açın."
     },
     "status": {
       "awaitingApproval": "Onay bekleniyor",
@@ -4682,10 +4639,7 @@
       "deviceClaimsUnverified_other": "{{count}} cihaz kaydı doğrulanamadı: kayıtları adı geçen üyeler imzalamamış.",
       "nameUnverified": "Ad doğrulanmadı",
       "nameLabel": "Görünen adınız",
-      "nameEdit": "Yeniden adlandır",
       "nameSave": "Kaydet",
-      "nameClear": "Temizle",
-      "nameCancel": "İptal",
       "nameErrorEmpty": "Bir ad girin ya da kendinizinkini kaldırmak için Temizle'yi kullanın.",
       "nameErrorTooLong": "Bu ad çok uzun.",
       "nameErrorUnreadable": "Ad deposu bu cihazda okunamadı. Hiçbir şey kaydedilmedi.",
@@ -4721,8 +4675,7 @@
       "title": "Bir görünen ad seçin",
       "body": "Bu kasanın diğer üyeleri sizi üye listesinde böyle görecek. Parmak iziniz onun yanında kalır ve adı daha sonra değiştirebilirsiniz.",
       "label": "Görünen adınız",
-      "checking": "Adınız kontrol ediliyor…",
-      "save": "Devam et"
+      "checking": "Adınız kontrol ediliyor…"
     },
     "memberJoinQr": {
       "error": "Kod oluşturulamadı.",
@@ -4821,9 +4774,7 @@
       "medium": "Orta"
     },
     "section": {
-      "done": "Tamamlandı",
       "later": "Daha sonra",
-      "none": "Tarih yok",
       "overdue": "Gecikmiş",
       "upcoming": "Yaklaşan"
     },
@@ -4833,7 +4784,6 @@
     },
     "status": {
       "all": "Tümü",
-      "done": "Tamamlandı",
       "undone": "Açık"
     },
     "view": {
@@ -4854,7 +4804,6 @@
       "emptyTitle": "Henüz şablon yok",
       "listLabel": "Şablonlar",
       "newTemplate": "Yeni şablon",
-      "newTemplateName": "Başlıksız şablon",
       "removeFromTemplates": "Şablonlardan çıkar",
       "removeRowLabel": "{{name}} öğesini şablonlardan çıkar (notu korur)",
       "title": "Not şablonları",
@@ -4873,7 +4822,6 @@
     "apply": "Temayı uygula",
     "applying": "Uygulanıyor…",
     "byAuthor": "Bu bağlantı, temanın {{author}} tarafından yapıldığını söylüyor",
-    "cancel": "İptal",
     "collision": {
       "keepBoth": "İkisini de tut ve “{{name}}” olarak kur",
       "question": "Zaten “{{name}}” adında bir temanız var.",
@@ -4896,7 +4844,6 @@
   },
   "unlock": {
     "backToPicker": "Farklı bir kasa seçin",
-    "continue": "Devam et",
     "decrypting": "Şifre çözülüyor…",
     "deleteLink": "Hem parolanızı hem kurtarma ifadenizi mi kaybettiniz? Kasayı silip baştan başlayın",
     "memberRemoveLink": "Bu kasayı bu cihazdan kaldır",
@@ -5000,7 +4947,6 @@
   },
   "vaultCreation": {
     "briefing": {
-      "back": "Geri",
       "continue": "Kasa oluşturmaya devam et",
       "eyebrow": "Yeni kasa",
       "heading": "Kasanızı oluşturmadan önce",
@@ -5025,7 +4971,6 @@
       "why": "Neden?"
     },
     "confirm": {
-      "back": "Geri",
       "heading": "Kurtarma ifadenizi doğrulayın",
       "intro": "Bunları kaydettiğinizi kontrol etmek için şu dört konumdaki sözcükleri yazın.",
       "mismatch": "{{pos}}. sözcükle eşleşmiyor.",
@@ -5131,7 +5076,6 @@
       }
     },
     "password": {
-      "back": "Geri",
       "heading": "Bir ana parola seçin",
       "helperLead": "Myne parolanızı veya kurtarma ifadenizi saklamaz.",
       "submit": "Kurtarma ifadesi oluştur"
@@ -5167,7 +5111,6 @@
     },
     "kit": {
       "accountFor": "Hesap numarası — başka bir cihaz eklediğinizde",
-      "back": "Geri",
       "continue": "Bunu kaydettim, ifadeyi onayla",
       "copied": "Kit panonuzda. Uygulama çalışmayı sürdürdüğü sürece, siz devam etseniz bile Myne onu 30 saniye içinde temizler.",
       "copiedNoAutoClear": "Kopyalandı. Myne burada panonuzu temizleyemez, bu yüzden kit siz başka bir şey kopyalayana kadar panoda kalır.",
@@ -5183,8 +5126,6 @@
       "savedToFile": "Kaydedildi. Her iki sırrı da barındıran düz metin bir dosyadır, bu yüzden onu yalnızca sizin okuyabileceğiniz bir yerde saklayın."
     },
     "name": {
-      "back": "Geri",
-      "continue": "Devam et",
       "eyebrowLabel": "Kasanızı adlandırın",
       "heading": "Bu kasaya ne ad verelim?",
       "helper": "Ad, kasayla birlikte şifrelenmiş olarak saklanır. Bu cihazda, siz kilidi açmadan önce başlangıçtaki kasa seçicide gösterilir, bu yüzden o ekranı görebilen herkes onu okuyabilir; bunu kapatmak için Ayarlar'da kasa adlarını gizleyin. Daha sonra değiştirebilirsiniz.",
@@ -5241,7 +5182,6 @@
       "accountLabel": "Hesap numarası (isteğe bağlı)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (isteğe bağlı)",
       "body": "24 sözcüklük kurtarma ifadenizle kurtarmak istediğiniz kasayı seçin. Doğrudan ona gitmek için hesap numaranızı da yazabilirsiniz.",
-      "cancel": "İptal",
       "checking": "Denetleniyor…",
       "loadFailed": "Şu anda hiçbir kasa yüklenemedi.",
       "loading": "Kasalarınız yükleniyor…",
@@ -5294,7 +5234,6 @@
   "welcome": {
     "createCta": "Yeni kasa oluştur",
     "repairResidue": {
-      "cancel": "İptal",
       "cleaningUp": "Temizleniyor…",
       "cleanUp": "Temizle",
       "confirmBody_one": "{{count}} dosya kaldırılacak. Zaten okunamaz durumdalar; kurtarılabilir hiçbir şey kaybolmaz.",
@@ -5310,7 +5249,8 @@
       "foundTitle": "Tamamlanmamış bir silmeden kalan dosyalar",
       "partialBody_one": "{{count}} dosya başka bir uygulama tarafından kilitlenmiş olabilir (antivirüs, dosya eşitleme veya arama dizinleme). Uygulamayı kapatıp birazdan tekrar deneyin ya da kasa klasörünü elle kaldırın.",
       "partialBody_other": "{{count}} dosya başka bir uygulama tarafından kilitlenmiş olabilir (antivirüs, dosya eşitleme veya arama dizinleme). Uygulamayı kapatıp birazdan tekrar deneyin ya da kasa klasörünü elle kaldırın.",
-      "partialTitle": "Bazı dosyalar kaldırılamadı"
+      "partialTitle": "Bazı dosyalar kaldırılamadı",
+      "cancel": "İptal"
     },
     "repairCleanedUp_one": "{{count}} artık dosya temizlendi.",
     "repairCleanedUp_other": "{{count}} artık dosya temizlendi.",
@@ -5559,9 +5499,7 @@
     "recoverTitle": "Zaten bir tane var",
     "recoverHint": "Bu cihazda onu 24 sözcüklük kurtarma ifadesiyle kurtarın.",
     "recoverAction": "Kurtar",
-    "back": "Geri",
-    "phraseTitle": "Kimlik ifadenizi kaydedin",
-    "phraseContinue": "Devam et"
+    "phraseTitle": "Kimlik ifadenizi kaydedin"
   },
   "personIdentityCode": {
     "copy": "Kimlik kodunu kopyala",
@@ -5608,7 +5546,6 @@
     "forgetCheckbox": "Bu kimliğin bu cihazdan kaldırılacağını anlıyorum.",
     "forgetConfirm": "Kimliği unut",
     "forgetError": "Kimlik unutulamadı. Tekrar deneyin.",
-    "registerContinue": "Devam et",
     "registerSubmit": "Kaydet",
     "registerError": "Kaydedilemedi. İfadenizi ve sunucu adresini kontrol edip tekrar deneyin.",
     "registerServerLabel": "Eşitleme sunucusu adresi",
@@ -5622,13 +5559,13 @@
     "registerPhraseLabel": "Kimlik ifadeniz, 24 sözcük",
     "stepIndicator": "Adım {{n}} / {{total}} · {{label}}",
     "stepVerifyOwner": "Sahibi doğrula",
-    "stepRecoveryPhrase": "Kurtarma ifadesi",
     "stepDevicePassword": "Cihaz parolası",
     "phraseHeading": "Kurtarma ifadenizi girin",
     "passwordHeading": "Bu cihaz için parola",
     "acceptHeading": "Bu daveti kabul et",
     "acceptPhraseHint": "Kurtarma ifadenizin 24 sözcüğünü girin. Bu ifade sizin, kasa sahibinin değil.",
-    "acceptErrorBadRequest": "Davet doğrulanamadı. Kasa sahibinin kimlik kodunu yapıştırın (sizi davet ederken paylaşır)."
+    "acceptErrorBadRequest": "Davet doğrulanamadı. Kasa sahibinin kimlik kodunu yapıştırın (sizi davet ederken paylaşır).",
+    "stepRecoveryPhrase": "Kurtarma ifadesi"
   },
   "aiOnboarding": {
     "title": "Yapay zekayı kurun",
@@ -5645,14 +5582,12 @@
     },
     "download": "İndir",
     "downloading": "İndiriliyor…",
-    "cancel": "İptal",
     "complete": "Hazır",
     "retry": "Yeniden dene",
     "skip": "Atla",
     "done": "Tamam"
   },
   "photoNote": {
-    "cancel": "İptal",
     "commitNew": "Not oluştur",
     "commitNote": "Bu nota ekle",
     "defaultTitle": "Fotoğraf notu {{date}}",
@@ -5674,7 +5609,8 @@
     "discardFailed": "Fotoğraf kaldırılamadı. Hâlâ eklerinizde.",
     "readingArrived": "Siz yazarken okuma geldi. Aşağıda sizi bekliyor.",
     "untitledFile": "Fotoğraf",
-    "openFailed": "Not oluşturuldu ama açılamadı."
+    "openFailed": "Not oluşturuldu ama açılamadı.",
+    "cancel": "İptal"
   },
   "plainFile": {
     "closePending": {
@@ -5693,7 +5629,6 @@
     },
     "deeplink": {
       "body": "Her kasanın dışında yaşıyor, bu yüzden Myne onu şifrelemez.",
-      "cancel": "İptal",
       "confirm": "Aç",
       "failed": "Dosya açılamadı. Taşınmış ya da değişmiş olabilir.",
       "title": "Bu yerel dosya açılsın mı?"
@@ -5726,7 +5661,6 @@
       "confirmTitle": "Myne güncellensin ve yeniden başlatılsın mı?",
       "confirmBody": "Kasanız kilitlenecek ve Myne yeniden başlatılacak. Yavaş bir bağlantıda indirme ve kurulum birkaç dakika sürebilir.",
       "confirmPrimary": "Kasayı kilitle ve güncelle",
-      "cancel": "İptal",
       "pill": "Güncelleme mevcut"
     },
     "updating": {
@@ -5747,7 +5681,6 @@
   "identityFlow": {
     "lead": "Bir kimlik, insanların sizi bir kasaya davet etmesini sağlar ve bir kimliğin birçok kasaya sahip olmasına izin verir. Şifreli notlarınızı tutması ve size ulaşması için bir eşitleme sunucusuna ihtiyacı vardır.",
     "skip": "Şimdi değil, yalnızca bu cihazı kullan",
-    "back": "Geri",
     "serverUnreachable": "O sunucuya ulaşılamadı. Adresi kontrol edip tekrar deneyin.",
     "createFailed": "Kimlik oluşturulamadı. Eşitleme sunucusunu kontrol edip tekrar deneyin.",
     "server": {
@@ -5774,8 +5707,7 @@
       "reveal": "Göster",
       "typebackLead": "Az önce kaydettiğiniz kimlik ifadesinden şu dört sözcüğü girin.",
       "wordNumber": "{{position}}. sözcük",
-      "wordMismatch": "Bu, {{pos}}. sözcükle eşleşmiyor.",
-      "continue": "Devam et"
+      "wordMismatch": "Bu, {{pos}}. sözcükle eşleşmiyor."
     },
     "home": {
       "lead": "İnsanlar sizi bir kasaya davet edebilir. Davet edilmek için bir kasaya sahip olmanız gerekmez.",

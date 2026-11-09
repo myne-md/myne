@@ -230,7 +230,7 @@ export function AiConsentScreen({
           {t("settings.ai.consent.accept", { provider: name })}
         </Button>
         <Button variant="secondary" data-testid="ai-consent.cancel" onClick={onCancel}>
-          {t("settings.ai.consent.cancel")}
+          {t("common.cancel")}
         </Button>
       </div>
     </div>

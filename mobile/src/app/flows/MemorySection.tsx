@@ -182,7 +182,7 @@ function MemoryRow(props: {
             disabled={busy}
             onClick={() => setEditing(false)}
           >
-            {t("settings.memory.cancel")}
+            {t("common.cancel")}
           </Button>
         </div>
       </li>
@@ -225,7 +225,7 @@ function MemoryRow(props: {
             disabled={busy}
             onClick={() => setDeleteArmed(false)}
           >
-            {t("settings.memory.cancelLabel")}
+            {t("common.cancel")}
           </Button>
         </div>
       ) : (
@@ -397,7 +397,7 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
             data-testid="settings.memory.clear-cancel"
             onClick={() => setConfirmingClear(false)}
           >
-            {t("settings.memory.cancelLabel")}
+            {t("common.cancel")}
           </Button>
         </div>
       ) : (

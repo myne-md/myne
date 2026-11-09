@@ -436,7 +436,7 @@ export function RecoverySelectStep({
         onClick={onCancel}
         data-testid="recover.select-cancel"
       >
-        {t("vaultRecover.select.cancel")}
+        {t("common.cancel")}
       </Button>
     </StepShell>
   );

@@ -242,7 +242,7 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
                       data-testid="ai.conversation-delete-cancel"
                       onClick={() => setDeletingId(null)}
                     >
-                      {t("editor.chrome.rightPanel.aiChat.historyCancel")}
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       type="button"

@@ -54,12 +54,12 @@ async function runWizardToApplied(s: Session): Promise<void> {
       if (loadError.length > 0) {
         throw new Error(`seed scope failed to load: ${await loadError[0]!.textContent()}`);
       }
-      const button = await s.byTestId("settings.memory.seed.continue");
+      const button = await s.byTestId("common.continue");
       return (await button.attribute("disabled")) === null ? true : null;
     },
     { label: "the seed scope is loaded", timeoutMs: 20_000 },
   );
-  await (await s.byTestId("settings.memory.seed.continue")).click();
+  await (await s.byTestId("common.continue")).click();
   // The stub answers phase one immediately; the candidate list is the proof the
   // whole two-phase contract (prompt, parse, review) ran. A run error returns the
   // wizard to the scope step, so wait for EITHER and report the cause rather

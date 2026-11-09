@@ -182,7 +182,7 @@ export function ConfirmStep({
           disabled={committing}
           data-testid="create.confirm-back"
         >
-          {t("vaultCreation.confirm.back")}
+          {t("common.back")}
         </Button>
         <div style={{ flex: 1 }} />
         {/* One testid, and it stays `create.confirm-continue`: this control is

@@ -925,7 +925,7 @@ export function AgentHubList({
                       data-testid="agent.hub-delete-cancel"
                       onClick={() => setDeletingId(null)}
                     >
-                      {t("editor.chrome.rightPanel.aiChat.historyCancel")}
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       type="button"

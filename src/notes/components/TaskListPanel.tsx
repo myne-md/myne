@@ -763,7 +763,7 @@ function TaskFilterBuilder({
         return [
           { value: "undone", label: t("tasks.status.undone") },
           { value: "all", label: t("tasks.status.all") },
-          { value: "done", label: t("tasks.status.done") },
+          { value: "done", label: t("common.done") },
         ];
       case "due":
         return [

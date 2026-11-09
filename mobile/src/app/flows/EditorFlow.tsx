@@ -4068,7 +4068,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     {t("common.edit")}
                   </button>
                   <button onClick={() => setActiveViewId(null)} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                    {t("notes.tagBrowser.clear")}
+                    {t("common.clear")}
                   </button>
                 </div>
               </div>
@@ -4201,7 +4201,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                               {t("common.movetotrash")}
                             </button>
                             <button onClick={() => setConfirmArchiveFolder(null)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                              {t("notes.archive.cancel")}
+                              {t("common.cancel")}
                             </button>
                           </div>
                         ) : (

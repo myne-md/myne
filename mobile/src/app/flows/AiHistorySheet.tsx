@@ -493,7 +493,7 @@ export function AiHistorySheet({
                         }}
                         style={SMALL_BUTTON}
                       >
-                        {t("editor.chrome.rightPanel.aiChat.historyCancel")}
+                        {t("common.cancel")}
                       </button>
                     </>
                   ) : (

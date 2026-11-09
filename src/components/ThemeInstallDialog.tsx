@@ -304,7 +304,7 @@ function ConfirmInstall({
           disabled={applying}
           data-testid="theme-install.cancel"
         >
-          {t("themeInstall.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="primary"
