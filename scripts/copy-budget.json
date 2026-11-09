@@ -190,7 +190,7 @@
     "src/components/settings/PeriodicNotesSettings.tsx": 637,
     "src/components/settings/PlainFileSettings.tsx": 369,
     "src/components/settings/PrivacyPanel.tsx": 1425,
-    "src/components/settings/QuickUnlockSettings.tsx": 1146,
+    "src/components/settings/QuickUnlockSettings.tsx": 1148,
     "src/components/settings/ReminderSettings.tsx": 274,
     "src/components/settings/RibbonCustomizeSettings.tsx": 394,
     "src/components/settings/SeedMemoryWizard.tsx": 1155,

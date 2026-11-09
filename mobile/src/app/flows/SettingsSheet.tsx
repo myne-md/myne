@@ -1625,7 +1625,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   // the active vault; the PIN fields are local secrets wiped on every exit path.
   const [quStatus, setQuStatus] = useState<QuickUnlockStatus | null>(null);
   const [pin, setPin] = useState("");
-  const [pinConfirm, setPinConfirm] = useState("");
+  const [showQuickUnlockSetup, setShowQuickUnlockSetup] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   const [bioBusy, setBioBusy] = useState(false);
@@ -1832,8 +1832,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     setConfirmPw("");
     setPwError(null);
     setPin("");
-    setPinConfirm("");
     setPinError(null);
+    setShowQuickUnlockSetup(false);
   };
 
   // Best-effort secret wipe on unmount (V8 strings are immutable + not
@@ -2037,18 +2037,12 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       setPinError(t("settings.quickUnlock.errorPinNotDigits"));
       return;
     }
-    if (pin !== pinConfirm) {
-      setPinError(t("settings.quickUnlock.pinMismatch"));
-      return;
-    }
     setPinBusy(true);
     try {
       if (HAS_TAURI) await quickUnlockSetupPin(pin);
       setPin("");
-      setPinConfirm("");
+      setShowQuickUnlockSetup(false);
       refreshQuStatus();
-      setToast(t("settings.quickUnlock.pinOnToast"));
-      setPanel("vault");
     } catch (e) {
       const kind = (e as { kind?: string })?.kind;
       setPinError(
@@ -2068,8 +2062,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     try {
       if (HAS_TAURI) await quickUnlockDisable();
       refreshQuStatus();
-      setToast(t("settings.quickUnlock.turnedOffToast"));
-      setPanel("vault");
+      setShowQuickUnlockSetup(false);
     } catch {
       setToast(t("settings.quickUnlock.turnOffError"));
     } finally {
@@ -2087,7 +2080,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     try {
       if (HAS_TAURI) await quickUnlockSetupBiometric();
       refreshQuStatus();
-      setToast(t("settings.quickUnlock.biometricOnToast", { method: biometric }));
+      setShowQuickUnlockSetup(false);
     } catch (e) {
       const kind = (e as { kind?: string })?.kind;
       setPinError(
@@ -2111,9 +2104,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     try {
       if (HAS_TAURI) await quickUnlockDisable();
       refreshQuStatus();
-      setToast(t("settings.quickUnlock.turnedOffToast"));
     } catch {
-      setToast(t("settings.quickUnlock.turnOffError"));
+      setPinError(t("settings.quickUnlock.turnOffError"));
     } finally {
       setBioBusy(false);
     }
@@ -2401,21 +2393,76 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 <span style={rowLabel}>{t("common.changepassword")}</span>
                 <RowChevron />
               </Row>
-              <Row onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={rowLabel}>{t("settings.quickUnlock.title")}</span>
-                  <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
-                    {isAndroid ? t("settings.privacy.quickUnlockSubtitleAndroid") : t("settings.privacy.quickUnlockSubtitle", { method: biometric })}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 15, color: "var(--fg-3)" }} data-testid="settings.quick-unlock-value">
-                    {quStatus?.configured ? (quStatus.method === "pin" ? t("settings.quickUnlock.methodPin") : biometric) : t("settings.archive.off")}
-                  </span>
-                  <RowChevron />
-                </div>
-              </Row>
+              {/* Quick unlock is ONE row with a switch and its setup inline beneath
+                  it, the shape the desktop panel has. It was a drill-down whose
+                  panel asked for the PIN twice: the same setting cost two gestures
+                  here and one there, and the second field existed nowhere else in
+                  the product. */}
+              <ToggleRow
+                testId="settings.quick-unlock-row"
+                title={t("settings.quickUnlock.title")}
+                subtitle={
+                  quStatus?.configured
+                    ? t("settings.quickUnlock.helperConfigured", {
+                        method: quStatus.method === "biometric" ? biometric : t("settings.quickUnlock.methodPin"),
+                      })
+                    : t("settings.quickUnlock.helperNotConfigured")
+                }
+                on={quStatus?.configured === true || showQuickUnlockSetup}
+                disabled={pinBusy || bioBusy}
+                onToggle={() => {
+                  setPinError(null);
+                  const turningOff = quStatus?.configured === true || showQuickUnlockSetup;
+                  if (!turningOff) {
+                    setShowQuickUnlockSetup(true);
+                    return;
+                  }
+                  setShowQuickUnlockSetup(false);
+                  if (quStatus?.configured === true) {
+                    void (quStatus.method === "biometric" ? disableBiometric() : disableQuickUnlock());
+                  }
+                }}
+              />
             </Group>
+
+            {pinError !== null && (quStatus?.configured === true || !showQuickUnlockSetup) && (
+              <Banner kind="danger" style={{ marginTop: 10 }}>
+                {pinError}
+              </Banner>
+            )}
+
+            {/* The setup the switch opens, inline under its row: one PIN field (the
+                desktop panel asks once), the Set PIN button, and the platform's
+                biometric button when this device has a provider. */}
+            {showQuickUnlockSetup && quStatus?.configured !== true && (
+              <div style={{ marginTop: 12, padding: "0 2px" }}>
+                {pinError !== null && (
+                  <Banner kind="danger" style={{ marginBottom: 10 }}>
+                    {pinError}
+                  </Banner>
+                )}
+                <SheetInput
+                  type="password"
+                  inputMode="numeric"
+                  value={pin}
+                  onChange={setPin}
+                  placeholder={t("settings.quickUnlock.pinPlaceholder", { count: MIN_PIN_LEN })}
+                />
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <Button onClick={() => void submitSetupPin()} disabled={pinBusy}>
+                    {t("settings.quickUnlock.setPin")}
+                  </Button>
+                  {!isAndroid && (
+                    <Button variant="secondary" onClick={() => void enableBiometric()} disabled={bioBusy} data-testid="settings.quick-unlock-setup-biometric">
+                      {t("settings.quickUnlock.useBiometric", { method: biometric })}
+                    </Button>
+                  )}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }} data-testid="settings.quick-unlock-pin-setup">
+                  {t("settings.quickUnlock.pinSetupHelper")}
+                </div>
+              </div>
+            )}
 
             {/* Vault icon (vault-icons) — the switcher/header glyph. Inline
                 rather than a drill-down panel: it is a one-tap terminal choice
@@ -3010,79 +3057,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <div style={{ marginTop: 18 }}>
               <Button onClick={submitRename}>{t("settings.vault.vaultLabelSave")}</Button>
             </div>
-          </div>
-        )}
-
-        {panel === "quick-unlock" && (
-          <div>
-            {pinError && (
-              <Banner kind="danger" style={{ marginBottom: 4 }}>
-                {pinError}
-              </Banner>
-            )}
-            {/* No banner and no paragraph: both restated the row's own subtitle.
-                What remains is the row, its method's name and "Unlock with <method>
-                after auto-lock". */}
-            {!isAndroid && (
-              <div style={{ marginTop: 12 }}>
-                <Group>
-                  <ToggleRow
-                    first
-                    title={biometric}
-                    subtitle={t("settings.quickUnlock.biometricToggleSubtitle", { method: biometric })}
-                    on={quStatus?.method === "biometric"}
-                    onToggle={() =>
-                      void (quStatus?.method === "biometric" ? disableBiometric() : enableBiometric())
-                    }
-                    testId="settings.quick-unlock-biometric-toggle"
-                  />
-                </Group>
-              </div>
-            )}
-            {quStatus?.configured && quStatus.method === "pin" ? (
-              <>
-                <div style={{ marginTop: 14, fontSize: 15, lineHeight: 1.55, color: "var(--fg-2)" }}>
-                  {t("settings.quickUnlock.pinOnLead")}
-                  <strong style={{ color: "var(--fg-1)" }}>{t("settings.quickUnlock.pinOnEmphasis")}</strong>
-                  {t("settings.quickUnlock.pinOnRest")}
-                </div>
-                <div style={{ marginTop: 18 }}>
-                  <Button variant="danger" onClick={disableQuickUnlock} disabled={pinBusy}>
-                    {t("settings.quickUnlock.turnOffPin")}
-                  </Button>
-                </div>
-              </>
-            ) : quStatus?.method === "biometric" ? (
-              // Biometric quick-unlock is configured (MYND-482): quick-unlock is
-              // already set up, so DON'T show a "Set up" PIN form (setting a PIN
-              // would silently overwrite the biometric credential). The toggle
-              // above IS the state and the way out, so this branch renders nothing.
-              null
-            ) : (
-              <>
-                {/* Observability only (`src/AGENTS.md` "Test observability"): the
-                    PIN path is what must SURVIVE on a platform with no biometric
-                    provider, so a scenario asserting the biometric toggle's
-                    absence needs a stable handle on the thing that stayed.
-                    Without one the absence assertion passes just as well on a
-                    panel that rendered nothing at all. */}
-                <div
-                  data-testid="settings.quick-unlock-pin-setup"
-                  style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}
-                >
-                  {t("settings.quickUnlock.pinSetupHelper")}
-                </div>
-                <FieldLabel mt={14}>{t("settings.quickUnlock.methodPin")}</FieldLabel>
-                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder={t("settings.quickUnlock.pinPlaceholder", { count: MIN_PIN_LEN })}  />
-                <FieldLabel mt={12}>{t("settings.quickUnlock.confirmPin")}</FieldLabel>
-                <SheetInput type="password" inputMode="numeric" value={pinConfirm} onChange={setPinConfirm} placeholder={t("settings.quickUnlock.reenterPin")} />
-                <div style={{ marginTop: 18 }}>
-                  <Button onClick={submitSetupPin} disabled={pinBusy}>
-                    {t("settings.quickUnlock.setupButton")}
-                  </Button>
-                </div>
-              </>
-            )}
           </div>
         )}
 
