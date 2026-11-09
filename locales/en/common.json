@@ -3223,7 +3223,7 @@
       "tagline": "Pre-alpha",
       "threatModelHelper": "Open in your browser.",
       "threatModelLabel": "Threat model",
-      "updateAutoCheckHelper": "Myne downloads a small signed file from myne.md to see whether a newer version exists, then tells you. It sends your current version and platform, and nothing else. You can still check by hand with the button above.",
+      "updateAutoCheckHelper": "Myne downloads a small signed file from myne.md to see whether a newer version exists, then tells you. It sends your current version and platform, and nothing else.",
       "updateAutoCheckLabel": "Check for updates automatically",
       "updateAvailable": "Version {{version}} is available.",
       "updateChannelBeta": "Beta",
@@ -3843,7 +3843,7 @@
       "modelShowLocation": "Show the location of {{name}}",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Assign the file each role uses when it comes from somewhere other than the verified list above: open a link to get one in your browser, then pick it here. A model runs on your device; if you have named a provider instead, that provider answers.",
+      "modelsHelper": "Assign the file each role uses when it comes from somewhere other than the verified list above. A model runs on your device; if you have named a provider instead, that provider answers.",
       "downloadsLabel": "Download models",
       "catalogueOpen": "Download a model",
       "downloadsHelper": "Fetch a model from Myne's own origin. It is checked against a fingerprint built into the app before it is used, so a tampered download is rejected. Nothing is fetched unless you click.",
@@ -4981,7 +4981,6 @@
       "identityForgetCheckbox": "I understand this identity will be removed from this device.",
       "identityForgetConfirm": "Forget identity",
       "identityForgetCancel": "Keep it",
-      "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
       "identityForgetError": "Could not forget the identity. Try again.",
       "invitationDeclined": "Declined"
     },
@@ -5788,7 +5787,6 @@
     "forgetConfirm": "Forget identity",
     "forgetCta": "Forget this identity on this device",
     "forgetError": "Could not forget the identity. Try again.",
-    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it.",
     "registerCta": "Register this identity",
     "registerContinue": "Continue",
     "registerSubmit": "Register",
@@ -6202,5 +6200,10 @@
     "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
     "taskRow": "A task due {date}",
     "composeOn": "Add an event on {date}"
+  },
+  "identityForget": {
+    "body": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device.",
+    "savedPhraseTail": "If you have not saved that phrase, this device will not be able to recover it.",
+    "rosterTail": "Invites and roster actions on this device will need it unlocked again."
   }
 }

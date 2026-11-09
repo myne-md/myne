@@ -3136,7 +3136,7 @@
       "threatModelLabel": "Tehdit modeli",
       "version": "Sürüm",
       "dev": "Geliştirme",
-      "updateAutoCheckHelper": "Myne, daha yeni bir sürüm olup olmadığını görmek için myne.md'den küçük, imzalı bir dosya indirir ve size bildirir. Geçerli sürümünüzü ve platformunuzu gönderir, başka hiçbir şey göndermez. Yukarıdaki düğmeyle elle de kontrol edebilirsiniz.",
+      "updateAutoCheckHelper": "Myne, daha yeni bir sürüm olup olmadığını görmek için myne.md adresinden küçük ve imzalı bir dosya indirir ve size söyler. Yalnızca geçerli sürümünüzü ve platformunuzu gönderir.",
       "updateAutoCheckLabel": "Güncellemeleri otomatik kontrol et",
       "updateAvailable": "{{version}} sürümü mevcut.",
       "updateChannelBeta": "Beta",
@@ -3695,7 +3695,7 @@
       "modelNone": "Dosya seçilmedi",
       "modelSaveFailed": "Model yolu kaydedilemedi (kasanızın dışında olmalı).",
       "modelTranscriptionLabel": "Konuşmadan metne modeli (yazıya dökme)",
-      "modelsHelper": "Yukarıdaki doğrulanmış listeden farklı bir yerden gelen dosyayı her rol için atayın: tarayıcınızda bir bağlantı açıp indirin, sonra burada seçin. Bir model cihazınızda çalışır; bunun yerine bir sağlayıcı belirttiyseniz yanıtı o sağlayıcı verir.",
+      "modelsHelper": "Yukarıdaki doğrulanmış listede olmayan bir dosyayı ilgili rol için burada seçin. Model cihazınızda çalışır; bunun yerine bir sağlayıcı adlandırdıysanız yanıtı o sağlayıcı verir.",
       "providerHelper": "Myne, burada bir model çalıştırmak yerine adını verdiğiniz bir hizmete istek gönderebilir. Bunu yaptığında notlarınız bu cihazdan çıkar. Varsayılan “Yok” seçeneğidir ve hiçbir hizmetle iletişim kurulmaması anlamına gelir.",
       "providerKeyAdd": "API anahtarınızı yapıştırın",
       "providerKeyLabel": "API anahtarı",
@@ -4834,7 +4834,6 @@
       "identityForgetCheckbox": "Bu kimliğin bu cihazdan kaldırılacağını anlıyorum.",
       "identityForgetConfirm": "Kimliği unut",
       "identityForgetCancel": "Koru",
-      "identityForgetWarning": "Bu, kimliği yalnızca bu cihazdan kaldırır. Sunucu hesabı ve sahip olduğu ya da katıldığı hiçbir kasa etkilenmez ve kimliği 24 sözcüklük ifadesiyle başka bir cihazda kurtarabilirsiniz. Bu cihazdaki davetler ve üye listesi işlemleri için kilidinin yeniden açılması gerekecek.",
       "identityForgetError": "Kimlik unutulamadı. Tekrar deneyin.",
       "invitationDeclined": "Reddedildi"
     },
@@ -5786,7 +5785,6 @@
     "forgetConfirm": "Kimliği unut",
     "forgetCta": "Bu kimliği bu cihazda unut",
     "forgetError": "Kimlik unutulamadı. Tekrar deneyin.",
-    "forgetWarning": "Bu, kimliği yalnızca bu cihazdan kaldırır. Sunucu hesabı ve sahip olduğu ya da katıldığı hiçbir kasa etkilenmez ve kimliği 24 sözcüklük ifadesiyle başka bir cihazda kurtarabilirsiniz. O ifadeyi kaydetmediyseniz bu cihaz onu kurtaramaz.",
     "registerCta": "Bu kimliği kaydet",
     "registerContinue": "Devam et",
     "registerSubmit": "Kaydet",
@@ -6025,5 +6023,10 @@
     "joinFromQr": {
       "notFound": "Bu kod, bu cihazdaki davetlerinizde bulunmayan bir kasayı gösteriyor. Kasa sahibinden daveti bu kimliğe yeniden göndermesini isteyin."
     }
+  },
+  "identityForget": {
+    "body": "Bu kimliği yalnızca bu cihazdan kaldırır. Sunucu hesabı ve sahip olduğu ya da katıldığı kasalar etkilenmez; kimliği 24 kelimelik ifadesiyle başka bir cihazda geri alabilirsiniz.",
+    "savedPhraseTail": "Bu ifadeyi kaydetmediyseniz bu cihaz onu geri alamaz.",
+    "rosterTail": "Bu cihazdaki davetler ve kadro işlemleri için kimliğin yeniden kilidinin açılması gerekir."
   }
 }
