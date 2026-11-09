@@ -721,10 +721,9 @@ function LanguageBlock() {
  *  vault content authored on a computer, so a row is an apply control and
  *  nothing more — there is no import/export/delete affordance to render.
  *
- *  Rendered ALWAYS, including with an empty list. The helper line is the only
- *  place in the product that states the read-only scope to the user, and hiding
- *  the block on an empty list would turn "you have installed none" into "sync
- *  looks broken". */
+ *  Mounted only when there IS a theme to show (0.17.0 owner pass). An empty card
+ *  whose whole content is "there are none yet" reads as a step the user missed;
+ *  the panel's own rows already fill the surface, so nothing looks broken. */
 function CustomThemesBlock({
   entries,
   selected,
