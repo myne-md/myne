@@ -3087,7 +3087,6 @@
       "vaultLabelSave": "Kaydet",
       "vaultIconLabel": "SİMGE",
       "vaultIconDefault": "Varsayılan (imza)",
-      "renamedToast": "Kasa yeniden adlandırıldı",
       "renameError": "Kasa yeniden adlandırılamadı",
       "newPasswordMismatch": "Yeni parolalar eşleşmiyor.",
       "samePassword": "Yeni parola mevcut parolanın aynısı.",
