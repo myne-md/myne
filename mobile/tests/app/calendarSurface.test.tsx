@@ -137,7 +137,12 @@ describe("EventComposerSheet", () => {
     expect(body).toMatch(/title: Standup/);
     expect(body).toMatch(/kind:\s*event/);
     expect(body).toMatch(/start:\s*2026-11-05 09:00/);
-    expect(body).toMatch(/folder:\s*Calendar/);
+    // No `folder:` line and no `Calendar/` folder: an event lands at the vault
+    // root unless the caller names a folder (owner, 2026-11-08). The assertion is
+    // the ABSENCE, because a default that reappears here is a folder the user
+    // never asked for and cannot get rid of while the deliberate-folder registry
+    // remembers it.
+    expect(body).not.toMatch(/folder:/);
   });
 
   it("writes the repeat phrase and the reminder lead the dialect spells", async () => {

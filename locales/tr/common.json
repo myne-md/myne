@@ -1747,7 +1747,8 @@
       "title": "Sırala",
       "manual": "Manuel sıralama",
       "titleAsc": "Başlık · A → Z",
-      "titleDesc": "Başlık · Z → A"
+      "titleDesc": "Başlık · Z → A",
+      "arrangement": "Benim sıralamam"
     },
     "noteMenu": {
       "emptyNote": "Boş not",
@@ -4060,8 +4061,7 @@
       "strong": "Güçlü",
       "tooWeak": "Çok zayıf"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "{{count}} not dışa aktarıldı → {{label}}",
       "exported_other": "{{count}} not dışa aktarıldı → {{label}}",
@@ -4328,7 +4328,7 @@
         },
         "phases": {
           "projecting": "Vault'ının şekli okunuyor…",
-          "asking": "Modelden temalar isteniyor…",
+          "asking": "Modelden hafıza kayıtları isteniyor…",
           "reading": "Modelin istediği notlar okunuyor…",
           "finalizing": "Kayıtlar yazılıyor…",
           "working": "Çalışıyor…"

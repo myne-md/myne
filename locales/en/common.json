@@ -920,7 +920,8 @@
     "skipToContent": "Skip to content",
     "back": "Back",
     "continue": "Continue",
-    "phraseWordsProgress": "{{filled}} of {{total}} words"
+    "phraseWordsProgress": "{{filled}} of {{total}} words",
+    "clear": "Clear"
   },
   "deviceRevoked": {
     "cta": "Start over",
@@ -1803,7 +1804,8 @@
       "title": "Sort",
       "manual": "Manual order",
       "titleAsc": "Title · A → Z",
-      "titleDesc": "Title · Z → A"
+      "titleDesc": "Title · Z → A",
+      "arrangement": "My arrangement"
     },
     "noteMenu": {
       "emptyNote": "Empty note",
@@ -4080,7 +4082,7 @@
         },
         "phases": {
           "projecting": "Reading your vault's shape…",
-          "asking": "Asking the model for themes…",
+          "asking": "Asking the model for memory entries…",
           "reading": "Reading the notes the model asked for…",
           "finalizing": "Writing the entries…",
           "working": "Working…"
@@ -6154,7 +6156,12 @@
         "2d": "2 days before",
         "7d": "1 week before",
         "1m": "1 minute before"
-      }
+      },
+      "noDate": "No date",
+      "noTime": "No time",
+      "hour": "Hour",
+      "minute": "Minute",
+      "editTitle": "Edit event"
     },
     "occurrenceOf": "One occurrence of a series, on {{date}}",
     "occurrence": {

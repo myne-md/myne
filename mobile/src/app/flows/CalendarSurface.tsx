@@ -270,7 +270,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
                     data-testid={`calendar.event.${row.noteId}`}
                     style={{ padding: "var(--space-2) var(--space-0)", borderBottom: "1px solid var(--line-1)" }}
                   >
-                    <div style={{ fontSize: "var(--text-base)", fontWeight: "var(--weight-medium, 500)" as unknown as number }}>{row.title ?? t("calendar.untitled")}</div>
+                    <div style={{ fontSize: "var(--text-base)", fontWeight: "var(--weight-medium, 500)" as unknown as number }}>{row.title || t("calendar.untitled")}</div>
                     <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
                       {row.allDay ? t("calendar.allDay") : row.start.slice(11)}
                       {row.allDay ? "" : secondClock(row.start)}

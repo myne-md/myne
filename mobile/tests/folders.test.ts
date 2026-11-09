@@ -8,6 +8,7 @@ import {
   childKey,
   childOrderIndex,
   reorderChildOrder,
+  reorderChildBeside,
   notesInSubtree,
 } from "../src/lib/folders";
 import type { OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
@@ -212,5 +213,57 @@ describe("reorder — MYND-596 container-keyed map", () => {
     // First row can't move up; last row can't move down.
     expect(reorderChildOrder({ tree, itemOrder: {}, cache, containerPath: null, rowKey: "Apple/", delta: -1 })).toBeNull();
     expect(reorderChildOrder({ tree, itemOrder: {}, cache, containerPath: null, rowKey: "Mango/", delta: 1 })).toBeNull();
+  });
+});
+
+describe("reorderChildBeside — a DROP, not a nudge (owner, 2026-11-08)", () => {
+  const fo = new Map<string, string | null>([
+    ["na", null],
+    ["nb", null],
+    ["nc", null],
+    ["nd", null],
+  ]);
+
+  it("places a dragged row below the row it was dropped on, in one write", () => {
+    const tree = deriveTree(fo, [], []);
+    const cache = cacheOf(["na", "nb", "nc", "nd"]);
+    const order = { "": ["na", "nb", "nc", "nd"] };
+    const next = reorderChildBeside({
+      tree, itemOrder: order, cache, containerPath: null,
+      rowKey: "na", targetKey: "nc", place: "below",
+    });
+    expect(next?.[""]).toEqual(["nb", "nc", "na", "nd"]);
+  });
+
+  it("places it above, so the two sides of a row are two different results", () => {
+    const tree = deriveTree(fo, [], []);
+    const cache = cacheOf(["na", "nb", "nc", "nd"]);
+    const order = { "": ["na", "nb", "nc", "nd"] };
+    const next = reorderChildBeside({
+      tree, itemOrder: order, cache, containerPath: null,
+      rowKey: "nd", targetKey: "nb", place: "above",
+    });
+    expect(next?.[""]).toEqual(["na", "nd", "nb", "nc"]);
+  });
+
+  it("refuses a drop onto itself and a target outside the container", () => {
+    const tree = deriveTree(fo, [], []);
+    const cache = cacheOf(["na", "nb", "nc", "nd"]);
+    const order = { "": ["na", "nb", "nc", "nd"] };
+    // Onto itself: no write, rather than a rewrite that equals the old order.
+    expect(
+      reorderChildBeside({
+        tree, itemOrder: order, cache, containerPath: null,
+        rowKey: "nb", targetKey: "nb", place: "below",
+      }),
+    ).toBeNull();
+    // A row that is not in this container: a drop into another folder is a
+    // `folder:` move, not an ordering write, so it must not be silently applied.
+    expect(
+      reorderChildBeside({
+        tree, itemOrder: order, cache, containerPath: "Other/",
+        rowKey: "nb", targetKey: "na", place: "below",
+      }),
+    ).toBeNull();
   });
 });

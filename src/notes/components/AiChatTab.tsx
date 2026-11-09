@@ -587,30 +587,20 @@ export function AiChatTab({
           ) : null}
         </div>
       )}
-      {/* **One line, and one press to the full text** (issue #970, item 6).
-          The sentence above is the claim; this is where it is spelled out. The
-          enumeration of what leaves, who receives it and how to revoke already
-          exists on the provider consent surface (`CONSENT_WHAT_LEAVES` and its
-          siblings in `@myne/copy`), which is the screen the CTA opens, so this
-          surface LINKS to it rather than keeping a second, shorter copy that
-          drifts from the longer one.
+      {/* **No CTA here, and the absence is the decision** (owner, 2026-11-08).
+          This surface used to draw a pill under the sentence above that opened
+          Settings → AI → provider, on the argument that the full text of what
+          leaves ("CONSENT_WHAT_LEAVES" and its siblings) lives on that screen and
+          one link beat a second, shorter copy.
 
-          Rendered whenever there is something to open: a build with no settings
-          shell behind the tab (`onOpenSettings` undefined) gets no button, since
-          a control that goes nowhere is worse than a sentence on its own. */}
-      {ready && onOpenSettings !== undefined ? (
-        <button
-          type="button"
-          data-testid="ai.notice-settings"
-          className="myne-pill"
-          data-interactive="true"
-          onClick={() => onOpenSettings("ai", "ai.provider")}
-          style={{ alignSelf: "flex-start", marginTop: "var(--space-1)" }}
-        >
-          {t("editor.chrome.rightPanel.aiChat.noticeSettingsCta")}
-        </button>
-      ) : null}
-
+          Two things were wrong with it. The sentence directly above already names
+          the provider and says the model is not Myne's, so the pill repeated what
+          the reader had just been told one line earlier; and putting a Settings
+          door in the middle of a chat panel is a control whose target is three
+          screens away from what the user was doing. The consent text is still
+          reachable — it is the AI panel's own screen, where someone who wants to
+          read it goes. A chat panel does not need to send them.
+          `ai.notice-settings` is gone from the surface and from its tests. */}
       {/* The conversation itself, shared with the agent tab. Gated on
           `ai_enabled` so the composer is reachable in the stub E2E build and in
           a no-model state, where a send surfaces the honest error turn. */}

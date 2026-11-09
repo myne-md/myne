@@ -296,11 +296,16 @@ describe("the Editor panel's topics", () => {
     }
 
     // The preview renders for every topic it can depict, so its own testid is
-    // present on each of those. The two with nothing to depict draw no column,
-    // which the test below asserts (myne-md/myne#885 visual pass).
+    // present on each of those. The topics with nothing to depict draw no column,
+    // which the test below asserts (myne-md/myne#885 visual pass; `writing` joined
+    // that set on the owner's report — its two bands repeated the Text topic's
+    // specimen and a squiggle nobody decides anything by looking at).
     for (const topic of EDITOR_PANEL_TOPICS.filter(
       (meta) =>
-        meta.id !== "periodic" && meta.id !== "calendar" && meta.id !== "features",
+        meta.id !== "periodic" &&
+        meta.id !== "calendar" &&
+        meta.id !== "features" &&
+        meta.id !== "writing",
     )) {
       cleanup();
       openTopic(topic.id);
@@ -516,35 +521,25 @@ describe("the preview reflects the settings the requester named", () => {
     expect(shown("bold")).not.toBeNull();
   });
 
-  it("keeps the spell demo, resolves its default the way the editor does, and shows it only where spell check is the subject", async () => {
-    // `null` ≡ unset ≡ ON (SYNC-15), which is the resolution `SpellSettings` and
-    // the editor itself apply: a fresh vault has spell check ON in every note, so
-    // a specimen that read the raw pref would say the opposite of what the editor
-    // does.
-    prefsState.value = { ...BASE_PREFS, spell_enabled: null };
-    openTopic("writing");
-    mount();
-    await flush();
-    const demo = () => document.querySelector('[data-testid="settings.editor-preview-spell"]');
-    expect(demo(), "an unset spell pref means ON, so the demo belongs here").not.toBeNull();
-    expect((demo()?.textContent ?? "").length).toBeGreaterThan(0);
-
-    // Explicitly off removes it.
-    prefsState.value = { ...BASE_PREFS, spell_enabled: false };
-    cleanup();
-    openTopic("writing");
-    mount();
-    await flush();
-    expect(demo()).toBeNull();
-
-    // And the same setting on the Text topic draws no spell demo at all: the
-    // specimen is the ACTIVE topic's, which is the change this work makes.
-    prefsState.value = { ...BASE_PREFS, spell_enabled: true };
-    cleanup();
-    openTopic("text");
-    mount();
-    await flush();
-    expect(demo()).toBeNull();
+  it("draws no spell demo anywhere, whatever the spell pref is", async () => {
+    // The Writing topic's preview is gone (owner, 2026-11-08), and the spell band
+    // was one of its two. Asserted across all three pref states and both topics
+    // because the band used to be gated on the pref: a filter alone would leave
+    // "off" passing for the wrong reason.
+    for (const spellEnabled of [null, false, true]) {
+      for (const topic of ["writing", "text", "editing"]) {
+        prefsState.value = { ...BASE_PREFS, spell_enabled: spellEnabled };
+        cleanup();
+        openTopic(topic);
+        mount();
+        await flush();
+        expect(
+          document.querySelector('[data-testid="settings.editor-preview-spell"]'),
+          `a spell demo rendered on ${topic} with spell_enabled=${String(spellEnabled)}`,
+        ).toBeNull();
+        cleanup();
+      }
+    }
   });
 
   it("takes the task chip's colour and its icon-only mode from the workspace container", async () => {

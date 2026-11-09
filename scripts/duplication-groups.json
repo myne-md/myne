@@ -728,13 +728,6 @@
         "copies": 2,
         "verdict": "consolidate",
         "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
-      },
-      {
-        "id": "mobile/src/lib/eventWrite.ts + src/notes/createEvent.ts",
-        "lines": 10,
-        "copies": 2,
-        "verdict": "consolidate",
-        "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
       }
     ],
     "baseline": [
@@ -893,7 +886,6 @@
       "mobile/src/app/flows/IdentityFlow.tsx",
       "mobile/src/app/flows/MemorySheet.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx",
-      "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/app/flows/editor/sheets/ReorderRow.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/SyncSettingsPanels.tsx",
       "mobile/src/app/flows/UnlockFlow.tsx + mobile/src/screens/unlock/index.tsx",
       "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/SortSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",

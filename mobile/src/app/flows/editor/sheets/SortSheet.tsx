@@ -34,10 +34,20 @@ export function SortSheet({
             <button onClick={close} style={{ width: 60, textAlign: "end", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
           </div>
           <div style={{ overflowY: "auto", minHeight: 0 }}>
+            {/* No "Manual" mode on the list (owner, 2026-11-08). Ordering IS the
+                tree's press-and-hold drag now, so a row offering "manual order"
+                beside two alphabetical ones described a mode the user never has
+                to choose — the arrangement is simply what is on screen. What the
+                sheet keeps is the two overrides, plus the way back to the
+                arrangement when one of them is on: without that third row a user
+                who picked A→Z would have no visible path back to the order they
+                had dragged into place, which is the state this sheet exists to
+                control. */}
             <div style={{ marginTop: 8, border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
-              {row(t("editor.sortSheet.manual"), mode === "none", () => { onPick("none"); close(); }, true)}
-              {row(t("editor.sortSheet.titleAsc"), mode === "az", () => { onPick("az"); close(); })}
+              {row(t("editor.sortSheet.titleAsc"), mode === "az", () => { onPick("az"); close(); }, true)}
               {row(t("editor.sortSheet.titleDesc"), mode === "za", () => { onPick("za"); close(); })}
+              {mode !== "none" &&
+                row(t("editor.sortSheet.arrangement"), false, () => { onPick("none"); close(); })}
             </div>
           </div>
         </>

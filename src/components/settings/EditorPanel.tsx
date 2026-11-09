@@ -176,20 +176,6 @@ const SOURCE_LINE_STYLE: CSSProperties = {
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
 };
-// Spell-check demo, shown only when spell-check is on: the editor's own wavy-red
-// underline (`.cm-spell-error` in `editor/src/theme.ts`) on a misspelled word.
-const SPELL_DEMO_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-};
-const SPELL_SQUIGGLE_STYLE: CSSProperties = {
-  textDecoration: "underline wavy var(--danger, #8a2a23)",
-  color: "var(--fg-1)",
-  fontFamily: "var(--editor-font-family)",
-  fontSize: "var(--text-sm)",
-};
-
 // A band under the note body: its own hairline, a small caption, and the thing
 // it demonstrates. The note body is not a band (it is the specimen), so every
 // band here is something the ACTIVE TOPIC's settings decide.
@@ -270,7 +256,7 @@ const TASK_TEXT_DONE_STYLE: CSSProperties = {
 const PREVIEW_SAMPLE_VALUE = "2026-08-01T14:30";
 
 /** One band of the specimen. See {@link PREVIEW_BANDS}. */
-type PreviewBand = "note" | "dateTime" | "toolbar" | "spell" | "taskChip";
+type PreviewBand = "note" | "dateTime" | "toolbar" | "taskChip";
 
 /**
  * Which bands each Editor topic's specimen shows.
@@ -300,7 +286,13 @@ type PreviewBand = "note" | "dateTime" | "toolbar" | "spell" | "taskChip";
 const PREVIEW_BANDS: Record<EditorTopicId, readonly PreviewBand[]> = {
   text: ["note"],
   editing: ["note", "dateTime", "toolbar"],
-  writing: ["note", "spell"],
+  // Writing is EMPTY (owner, 2026-11-08). Its bands were the note specimen and a
+  // spell demo, and neither answers a question the topic asks: the specimen is
+  // the same note `text` already draws one tab to the left, and a squiggle under
+  // a misspelled word is not something a user decides by looking at it — they
+  // turn spell check on and see it in their own note. So the column is the
+  // controls' width here, exactly as it already is for `periodic`/`calendar`.
+  writing: [],
   tasks: ["taskChip"],
   periodic: [],
   calendar: [],
@@ -375,13 +367,6 @@ function EditorSettingsPreview() {
   });
   const lineNumbers = prefs.editor_line_numbers === true;
   const mode = asViewMode(prefs.editor_default_view_mode);
-  // `null` is unset, and unset means ON (SYNC-15): the same resolution
-  // `SpellSettings` and the editor itself apply. Reading the raw pref here
-  // (`=== true`) was the stale half of this specimen: a fresh vault has spell
-  // check ON in every note while the preview drew no demo, so the one place a
-  // user looked to check it said the opposite of what the editor did.
-  const spell = prefs.spell_enabled ?? true;
-
   const heading = t("settings.editor.preview.heading");
   const body = t("settings.typography.previewBody");
   const bullets = [
@@ -537,15 +522,6 @@ function EditorSettingsPreview() {
     </div>
   );
 
-  const spellBand = spell ? (
-    <div style={SPELL_DEMO_STYLE} data-testid="settings.editor-preview-spell">
-      <BandCaption>{t("settings.editor.preview.spellCaption")}</BandCaption>
-      <span style={SPELL_SQUIGGLE_STYLE}>
-        {t("settings.editor.preview.spellSample")}
-      </span>
-    </div>
-  ) : null;
-
   return (
     <aside
       style={PREVIEW_COL_STYLE}
@@ -563,7 +539,6 @@ function EditorSettingsPreview() {
             [
               ["note", bands.includes("note") ? <div style={{ ...typo }}>{noteBand}</div> : null],
               ["dateTime", bands.includes("dateTime") ? dateTimeBand : null],
-              ["spell", bands.includes("spell") ? spellBand : null],
               ["taskChip", bands.includes("taskChip") ? taskBand : null],
               ["toolbar", bands.includes("toolbar") ? toolbarBand : null],
             ] as const

@@ -246,6 +246,15 @@ export function applyOptimisticCreate(
  * stays discoverable via {@link resolverCache} (backlinks/graph/tag) and search.
  * Complements: {@link trashedRecords}/{@link trashedCount} back the Trash panel;
  * {@link archivedRecords}/{@link archivedCount} back the Archive view.
+ *
+ * **A calendar event is excluded too** (myne-md/myne#1037, owner's report): the
+ * calendar is where an event is read and edited, so its markdown does not belong
+ * in the notes tree — a list of `--- kind: event / start: ...` documents beside
+ * real notes is the notes UI showing an implementation detail. The exclusion is
+ * HERE and not in `isLiveNote` on purpose: `core/.../calendar.rs` skips a record
+ * whose `live` flag is false, so the shared predicate would empty the calendar
+ * itself. The note keeps every other property — indexed, synced, searchable, a
+ * wikilink and backlink target, exported.
  */
 export function liveCache(
   cache: ReadonlyMap<NoteId, TitleRecord>,
@@ -260,7 +269,11 @@ export function liveCache(
     // out of the working set — the folder-level twin of the per-note `archived:`
     // marker; like note-archive (and unlike trash) it stays in {@link
     // resolverCache}, so `archivedKeys` deliberately does NOT touch that axis.
-    if (isLiveNote(record) && !isNoteFolderArchived(record.folder, archivedKeys)) {
+    if (
+      isLiveNote(record) &&
+      record.kind !== "event" &&
+      !isNoteFolderArchived(record.folder, archivedKeys)
+    ) {
       live.set(id, record);
     }
   }
@@ -1072,8 +1085,9 @@ export function SidebarStateProvider({
       // No registration here any more (myne-md/myne#613 pr-review). `noteCreate`
       // registers at the chokepoint every create path goes through, so doing it
       // again would be a SECOND full `vault.prefs` re-encrypt for one note.
-      // MYND-31: register the new note in the index (live).
-      void reindexNote(newId);
+      // The index registration moved to that same chokepoint for the same
+      // reason (myne-md/myne#1037): the hand-written call only covered the paths
+      // that existed when it was written, and the calendar's was not one.
       setState((prev) => {
         // Seed WITH the target folder (myne-md/myne#676): the row mounts where
         // it will live, so the post-create refresh never moves it mid-rename.
@@ -1118,8 +1132,9 @@ export function SidebarStateProvider({
       // cache mutation, so a failed duplicate leaves the tree untouched (no
       // rollback needed). Same ordering as `createAndStartRename`.
       const newId = await duplicateNote(sourceId);
-      // MYND-31: register the copy in the index (live).
-      void reindexNote(newId);
+      // The copy is a `noteCreate` like any other, so the chokepoint registered
+      // it in the index (myne-md/myne#1037); doing it here again would be a
+      // second parse + apply of the same bytes.
       setState((prev) => {
         const seeded = applyOptimisticCreate(prev, newId);
         // Select (no rename) → the Editor selection-bridge opens the copy in

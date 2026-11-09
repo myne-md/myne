@@ -14,7 +14,9 @@ import {
   readDeletedFromFmBody,
   readTemplateFromFmBody,
   readConflictFromFmBody,
+  readKindFromFmBody,
   readTitleFromFmBody,
+  type NoteKind,
 } from "../dialect/surgery";
 import { locateFrontmatter } from "../dialect/lezer/frontmatter";
 import { normalizeFolderPath } from "../dialect/folderPath";
@@ -130,6 +132,16 @@ export interface NoteFlags {
   deleted: string | null;
   template: boolean;
   conflict: boolean;
+  /**
+   * The note's canonical `kind:` value, or `null`.
+   *
+   * Read for ONE decision, and it is the desktop's: a `kind: event` note belongs
+   * to the calendar, not to the notes list (myne-md/myne#1037, owner's report).
+   * The filter sits in `EditorFlow`'s `liveNotes` and NOT in `isLiveNote` — the
+   * host's calendar read skips a record whose `live` flag is false, so folding it
+   * into the shared predicate would empty the calendar on both clients.
+   */
+  kind: NoteKind;
 }
 
 // #260/#46: the selection predicates are SHARED now. They used to be
@@ -155,7 +167,14 @@ export {
  *  Defensive: an unparseable note is treated as a plain live note (all flags
  *  clear) rather than throwing and breaking the whole list. */
 export function readNoteFlags(text: string): NoteFlags {
-  const clear: NoteFlags = { trashed: null, archived: null, deleted: null, template: false, conflict: false };
+  const clear: NoteFlags = {
+    trashed: null,
+    archived: null,
+    deleted: null,
+    template: false,
+    conflict: false,
+    kind: null,
+  };
   try {
     const body = frontmatterBody(text);
     return {
@@ -164,6 +183,7 @@ export function readNoteFlags(text: string): NoteFlags {
       deleted: readDeletedFromFmBody(body),
       template: readTemplateFromFmBody(body),
       conflict: readConflictFromFmBody(body),
+      kind: readKindFromFmBody(body),
     };
   } catch {
     return clear;

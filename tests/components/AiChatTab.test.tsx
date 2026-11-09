@@ -1724,22 +1724,15 @@ describe("AiChatTab: one line, and one press to the full text (issue #970, item 
     expect(screen.getByTestId("ai.honesty-note").textContent).toContain("OpenRouter");
   });
 
-  it("sends the user to the surface that spells it out", async () => {
-    const onOpenSettings = vi.fn();
+  it("offers no settings CTA beside the sentence, even when Settings is reachable", () => {
+    // The pill that opened Settings → AI → provider is GONE (owner, 2026-11-08):
+    // the sentence above it already names the provider, and a Settings door in a
+    // chat panel is a control three screens away from what the user was doing.
+    // Asserted with the handler PRESENT, because the old test could pass for the
+    // wrong reason — a shell with no Settings rendered no button either way.
     backendClass = "in_process_local";
     surfaceState = { kind: "available" };
-    render(<AiChatTab onOpenSettings={onOpenSettings} />);
-    fireEvent.click(screen.getByTestId("ai.notice-settings"));
-    // The consent surface, which carries `CONSENT_WHAT_LEAVES` and its
-    // siblings: the full text lives there and this surface links to it rather
-    // than keeping a second, shorter copy that drifts.
-    expect(onOpenSettings).toHaveBeenCalledWith("ai", "ai.provider");
-  });
-
-  it("offers no CTA in a shell that cannot open Settings", () => {
-    backendClass = "in_process_local";
-    surfaceState = { kind: "available" };
-    render(<AiChatTab />);
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
     expect(screen.queryByTestId("ai.notice-settings")).toBeNull();
   });
 

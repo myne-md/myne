@@ -116,7 +116,7 @@ import {
   unarchiveNote,
   type NoteFlags,
 } from "../../lib/note-organize";
-import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChildOrder, notesInSubtree } from "../../lib/folders";
+import { deriveTree, subtreeCount, orderedChildren, reorderChildBeside, notesInSubtree } from "../../lib/folders";
 import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
@@ -474,6 +474,14 @@ function releasePhotoPreview(url: string | null): void {
     URL.revokeObjectURL(url);
   }
 }
+/** Idle delay before the open buffer is written, matching `src/notes/saveNote.ts`
+ *  (`AUTOSAVE_IDLE_MS` at 1000 ms). Kept as its own constant rather than imported:
+ *  that module is the desktop's writer and pulls its IPC seam with it. */
+const AUTOSAVE_IDLE_MS = 1000;
+/** Ceiling between writes under continuous typing, matching the desktop's
+ *  `AUTOSAVE_MAX_MS` (10 s). */
+const AUTOSAVE_MAX_MS = 10_000;
+
 
 export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess, onShowApprovalCode }: EditorFlowProps) {
   const { t } = useTranslation();
@@ -755,7 +763,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // as ONE editor change, so the buffer catches up WITHOUT the reload this screen
   // does not perform, and the next whole-markdown save therefore cannot delete the
   // merged-in peer text. `./lib/liveRemoteMerge.ts` states why the mapping is
-  // needed here and not on desktop: this screen does not autosave.
+  // needed here and not on desktop: this screen autosaves on a debounce, so a
+  // replace that lands mid-write has a save in flight to reconcile with.
   //
   // `sessionMirrorRef` is the screen's record of what the session holds as far as
   // this buffer knows: the text it loaded, then the text each of the screen's OWN
@@ -1339,7 +1348,18 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     }
     return m;
   }, [notes, bodies]);
-  const liveNotes = useMemo(() => notes.filter((n) => isLiveNote(noteFlags.get(n.id)!)), [notes, noteFlags]);
+  // An EVENT belongs to the calendar, not the notes list (myne-md/myne#1037).
+  // Deliberately NOT in `isLiveNote`: the host's calendar read skips a record whose
+  // `live` flag is false, so that predicate must keep saying yes or the calendar
+  // empties. `resolverNotes` is untouched, so an event still resolves as a link.
+  const liveNotes = useMemo(
+    () =>
+      notes.filter((n) => {
+        const flags = noteFlags.get(n.id);
+        return flags !== undefined && flags.kind !== "event" && isLiveNote(flags);
+      }),
+    [notes, noteFlags],
+  );
   // The note-set every RESOLVER surface runs against (graph, backlinks, the
   // vault-indices sweep) - desktop's `resolverCache` rule, verbatim
   // (`src/notes/sidebarState.tsx`): trashed / soft-deleted / template /
@@ -1655,33 +1675,65 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const persistItemOrder = (next: Record<string, string[]> | null) => {
     if (next && HAS_TAURI) void setItemOrder(next).catch(ignorePrefsWriteFailure);
   };
-  const noteReorder = (id: string) => {
-    if (!reorderableTree || favSet.has(id)) return undefined;
-    const containerPath = folderOf.get(id) ?? null;
-    const { index, count } = childOrderIndex({
-      tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: id,
-    });
-    if (index < 0) return undefined;
-    const nudge = (delta: -1 | 1) =>
-      persistItemOrder(reorderChildOrder({
-        tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: id, delta,
-      }));
-    return { id, canUp: index > 0, canDown: index < count - 1, onUp: () => nudge(-1), onDown: () => nudge(1) };
-  };
-  const folderReorder = (path: string) => {
+  // A note or folder row's manual neighbours, as boxes, measured when a drag
+  // starts. Keyed by the row's `data-reorder-key` (a note UUID or a folder path);
+  // a Map from a whole-document query would also see the trash/archive lists, so
+  // the query is scoped to the tree container's ref.
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const dragBoxes = useRef<Map<string, { top: number; bottom: number }>>(new Map());
+  const [dragRowKey, setDragRowKey] = useState<string | null>(null);
+
+  /**
+   * The press-and-hold reorder gesture (owner, 2026-11-08), which replaced the
+   * up/down arrows inside the row action sheet. Boxes are measured on the PRESS
+   * and the target is decided on RELEASE, so one drop is one `item_order` write
+   * and the intermediate positions cost nothing. Inert when the tree is not the
+   * manual-order surface (a tag filter or a saved view derives its own order).
+   */
+  const dragFor = (rowKey: string, containerPath: string | null) => {
     if (!reorderableTree) return undefined;
-    // The folder's container is its PARENT (null for a top-level folder).
-    const anc = ancestorPaths(path);
-    const containerPath = anc.length >= 2 ? anc[anc.length - 2]! : null;
-    const { index, count } = childOrderIndex({
-      tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: path,
-    });
-    if (index < 0) return undefined;
-    const nudge = (delta: -1 | 1) =>
-      persistItemOrder(reorderChildOrder({
-        tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: path, delta,
-      }));
-    return { key: folderKey(path), canUp: index > 0, canDown: index < count - 1, onUp: () => nudge(-1), onDown: () => nudge(1) };
+    return {
+      onStart: () => {
+        const boxes = new Map<string, { top: number; bottom: number }>();
+        const root = treeScrollRef.current;
+        if (root !== null) {
+          for (const el of root.querySelectorAll("[data-reorder-key]")) {
+            const key = el.getAttribute("data-reorder-key");
+            if (key === null) continue;
+            const r = el.getBoundingClientRect();
+            boxes.set(key, { top: r.top, bottom: r.bottom });
+          }
+        }
+        dragBoxes.current = boxes;
+        setDragRowKey(rowKey);
+      },
+      // No per-move work: the lifted row is the feedback while the finger moves,
+      // and the drop decides where it lands. Calling setState per move would
+      // re-render the whole tree on every pointer event.
+      onMove: () => undefined,
+      onEnd: (point: { x: number; y: number }, moved: boolean) => {
+        setDragRowKey(null);
+        // A hold that never moved is the action sheet's, which `useHold` fires.
+        if (!moved) return;
+        const hit = [...dragBoxes.current.entries()]
+          .filter(([key]) => key !== rowKey)
+          .find(([, box]) => point.y >= box.top && point.y <= box.bottom);
+        if (hit === undefined) return;
+        const [targetKey, box] = hit;
+        const place = point.y < (box.top + box.bottom) / 2 ? "above" : "below";
+        persistItemOrder(
+          reorderChildBeside({
+            tree: fullTree,
+            itemOrder: prefs.item_order,
+            cache: orderCache,
+            containerPath,
+            rowKey,
+            targetKey,
+            place,
+          }),
+        );
+      },
+    };
   };
 
   // Honor the default-view-mode pref when entering the editor for an EXISTING
@@ -2771,7 +2823,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * Write the open buffer if disk does not already have it, WITHOUT leaving the
    * note. `saveNote` is the EXIT path (it calls `exitEditor`), so anything that
    * replaces the buffer while a list is reachable owes this first: this client
-   * has no autosave and no snapshot, so a replaced buffer exists nowhere
+   * keeps no snapshot history, so a replaced buffer exists nowhere
    * (mobile/AGENTS.md). Returns false when the write failed, and every caller
    * then stays put rather than navigating away from text nobody can recover.
    *
@@ -2806,6 +2858,46 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     }
   }
 
+  // The latest `persistOpenBuffer` for the timers above. A ref rather than a
+  // dependency: the function closes over the current buffer and re-creating the
+  // timers on every keystroke would reset the idle window to infinity, so
+  // autosave would only ever fire when the user stopped typing for good.
+  const persistOpenBufferRef = useRef(persistOpenBuffer);
+  persistOpenBufferRef.current = persistOpenBuffer;
+
+  /**
+   * AUTOSAVE (owner, 2026-11-08: "sync feels slow — I type and it saves much
+   * later"). The gap was not the sync loop: this client had no autosave, so the
+   * buffer reached disk only on an exit or a backgrounding, and a sync cannot push
+   * a write that does not exist. Same cadence as the desktop writer
+   * (`src/notes/saveNote.ts`), and the same non-exit writer the background flush
+   * uses, so one writer produces one set of bytes.
+   */
+  useEffect(() => {
+    if (view !== "editor" || editing === null) return;
+    // Nothing to autosave yet: an empty note that has never been created belongs
+    // to nobody, and `persistOpenBuffer` would refuse it anyway.
+    if (editing.id === null && editorText.trim() === "") return;
+    const timer = window.setTimeout(() => {
+      void persistOpenBufferRef.current();
+    }, AUTOSAVE_IDLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [editorText, view, editing]);
+
+  // The ceiling half: one interval per open note, so a user typing without a
+  // pause still has the text on disk `AUTOSAVE_MAX_MS` after the last write.
+  useEffect(() => {
+    if (view !== "editor" || editing === null) return;
+    const interval = window.setInterval(() => {
+      void persistOpenBufferRef.current();
+    }, AUTOSAVE_MAX_MS);
+    return () => window.clearInterval(interval);
+  }, [view, editing]);
+
+  /**
+   * A list row's open: persist the open buffer first (mobile/AGENTS.md). A failed
+   * write keeps the user where the text is rather than navigating away from it.
+   */
   async function openFromList(id: string) {
     if (!(await persistOpenBuffer())) return;
     await openRelated(id);
@@ -3478,7 +3570,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * one undoable change and takes the normal note-save route (MY01). `new`
    * creates a titled note through the same helper the saved-transcript path
    * uses, honours the user's new-note location, then opens it with `openFromList`
-   * rather than `openNote`: mobile has no autosave, and switching buffers
+   * rather than `openNote`: "autosave" is an idle debounce, and switching buffers
    * without flushing first silently discards whatever is in the editor.
    */
   async function commitPhotoNote(text: string, destination: PhotoNoteDestination) {
@@ -3680,7 +3772,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             ),
           )
         : folderOf;
-    const titleOf = new Map(notes.map((n) => [n.id, n.title]));
+    // An untitled note is `null` here, not `""`: a title that came back empty is
+    // the absence of one (the body's first line is a SNIPPET, not the name —
+    // desktop parity, owner 2026-11-08), and a wikilink resolver that took `""`
+    // for a title would match nothing while looking like it had a target.
+    const titleOf = new Map(notes.map((n) => [n.id, n.title || null]));
     // MYND-596: folders and notes interleave in ONE display-ordered list PER
     // container (shared `orderedChildren`) - a note can now sit above a folder,
     // the same list desktop renders from the same synced `item_order`. The tree
@@ -3804,6 +3900,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   color={prefs.item_colors[f.key]}
                   onToggle={() => toggleFolder(f.key)}
                   onHold={() => setFolderActions({ path: f.path, name: f.name })}
+                  reorderKey={f.path}
+                  drag={dragFor(f.path, current)}
+                  dragging={dragRowKey === f.path}
                 />
               </div>
               {!isCollapsed && (
@@ -3831,6 +3930,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               onHold={() => setRowActions(n)}
               favorited={favSet.has(n.id)}
               onToggleFavorite={() => toggleFavorite(n.id)}
+              reorderKey={n.id}
+              drag={dragFor(n.id, current)}
+              dragging={dragRowKey === n.id}
             />,
           );
         }
@@ -4093,7 +4195,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 testId="editor.list-empty"
               />
             ) : treeMode ? (
-              <ScreenScroll style={{ marginTop: 4 }}>
+              <ScreenScroll style={{ marginTop: 4 }} ref={treeScrollRef}>
                 {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} onHold={setRowActions} />}
                 {renderTree(null, 0)}
               </ScreenScroll>
@@ -4287,7 +4389,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onClose={() => setTab("notes")}
             // Saving a transcript from the Files tab creates a note and opens
             // it, so the action lands somewhere the user can see. `openFromList`
-            // flushes the in-progress buffer first (mobile has no autosave), so
+            // flushes the in-progress buffer first (the autosave is a debounce, so
+            // the last keystrokes may still be pending), so
             // the switch cannot discard typed text.
             onSavedNote={(id) => {
               setTab("notes");
@@ -4590,7 +4693,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               setRowActions(null);
               void organizeRow(trashNote, id);
             }}
-            reorder={noteReorder(rowActions.id)}
           />
         )}
 
@@ -4606,7 +4708,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onDecorate={() => openFolderDecoration(folderActions.path)}
             onArchive={() => void archiveFolderFromMenu(folderActions.path)}
             onTrash={() => requestFolderTrash(folderActions.path, folderActions.name)}
-            reorder={folderReorder(folderActions.path)}
           />
         )}
 
@@ -5072,7 +5173,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           onSavedNote={(id) => {
             // Saving a transcript from the in-editor sheet hands back the new
             // note. `openFromList` rather than `openNote`: the editor may hold
-            // unsaved typing, and mobile has no autosave, so switching buffers
+            // unsaved typing, and autosave is a debounce, so switching buffers
             // without flushing first silently discards it.
             setManageAttachments(false);
             void openFromList(id);

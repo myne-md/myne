@@ -147,6 +147,30 @@ export async function applyEventMove(args: {
 
   // Flush BEFORE reading: a pane holding unsaved keystrokes has a newer body than
   // disk, and writing over the stale copy would be undone by the flush.
+  const source = await openEventWrite({ noteId, rendered, io });
+
+  if (next.start === rendered.start && next.end === rendered.end) return;
+
+  let bytes = patchFrontmatterField(encoder.encode(source), "start", next.start);
+  if (next.end !== null) bytes = patchFrontmatterField(bytes, "end", next.end);
+  await commitEventWrite({ noteId, source, body: decoder.decode(bytes), io });
+}
+
+/**
+ * Read the note and refuse unless it still says what the row was drawn from.
+ *
+ * The two writers in this directory (a drag and a form edit) patch different
+ * fields but owe the same three steps before they may: flush the panes holding
+ * unsaved keystrokes, read, and verify the value-anchor. Kept here rather than
+ * copied, because a second copy of "check the anchor" is a second place the check
+ * can be dropped.
+ */
+export async function openEventWrite(args: {
+  readonly noteId: string;
+  readonly rendered: EventSpan;
+  readonly io: EventWriteIo;
+}): Promise<string> {
+  const { noteId, rendered, io } = args;
   await io.flushDirtyPanes?.();
 
   const source = await io.readNote(noteId);
@@ -154,19 +178,27 @@ export async function applyEventMove(args: {
   if (range === null) throw new EventWriteRefused("start-missing", noteId);
   const read = readEventFromFmBody(source.slice(range.bodyStart, range.bodyEnd));
   if (read.state !== "ok") throw new EventWriteRefused("start-missing", noteId);
-
   if (formatEventInstant(read.event.start) !== rendered.start) {
     throw new EventWriteRefused("value-changed", noteId);
   }
-  if (read.event.end === null && next.end === null && next.start === rendered.start) {
-    return; // nothing to do
-  }
-  if (next.start === rendered.start && next.end === rendered.end) return;
+  return source;
+}
 
-  let bytes = patchFrontmatterField(encoder.encode(source), "start", next.start);
-  if (next.end !== null) bytes = patchFrontmatterField(bytes, "end", next.end);
-  const body = decoder.decode(bytes);
-
+/**
+ * Write `body` over `source`, refusing when disk moved past `source`.
+ *
+ * `source` is the pre-image the patches were computed from, so its hash is the
+ * expected-base guard: a pull-apply between the read and this write turns the
+ * write into a named refusal instead of an overwrite.
+ */
+export async function commitEventWrite(args: {
+  readonly noteId: string;
+  readonly source: string;
+  readonly body: string;
+  readonly io: EventWriteIo;
+}): Promise<void> {
+  const { noteId, source, body, io } = args;
+  if (body === source) return;
   try {
     await io.writeNote(noteId, body, await sha256Hex(source));
   } catch (err) {

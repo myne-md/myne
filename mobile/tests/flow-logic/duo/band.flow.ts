@@ -140,8 +140,10 @@ test.describe("the unfolded band", () => {
     await page.locator(".cm-content").click();
     await page.keyboard.type("this must reach disk before it is replaced");
 
-    // "+ New note" inside the drawer replaces the open buffer. This client has
-    // no autosave and no snapshot, so a replace with no write is unrecoverable.
+    // "+ New note" inside the drawer replaces the open buffer. This client keeps
+    // no snapshot history, and the autosave is an idle debounce that this click
+    // can beat, so a replace with no write is still unrecoverable in practice —
+    // the flush the control owes is what this scenario is about.
     await page.getByTestId("editor.back").click();
     await expect(page.getByTestId("notes.list-drawer")).toBeVisible();
     await page.getByTestId("notes.new-note").click();

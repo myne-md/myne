@@ -241,40 +241,35 @@ function HideVaultNamesRow() {
       testId="settings.hide-vault-names"
       stateAttrs={{ "data-hidden": String(hidden), "data-keychain": keychain }}
       label={t("settings.privacy.hideVaultNamesLabel")}
-      // The critical sentence, and ONLY it (myne-md/myne#885). The row used to
-      // render 776 characters across four paragraphs under this label; the
-      // helper's own paragraph and the two that followed it move behind the
-      // question mark beside the label, unchanged, and this is the one sentence
-      // the row needs.
+      // ONE sentence on the row, and nothing behind a question mark (owner,
+      // 2026-11-08). The row used to carry 776 characters across four paragraphs,
+      // then (myne-md/myne#885) one sentence plus three behind the `?` beside the
+      // label; the owner's report is that the popover itself is the noise, so the
+      // `?` is gone too.
       //
-      // **The sentence kept is the DESTRUCTIVE one**, and the choice is the
-      // point rather than a preference. The three moved paragraphs include the
-      // residue caveat and the placeholder explanation, which are qualifications;
-      // this one is the act. `hideVaultNamesRow.test.tsx` has held since #411
+      // **The sentence kept is the DESTRUCTIVE one**, and that is the point
+      // rather than a preference: `hideVaultNamesRow.test.tsx` has held since #411
       // that a bound on a destructive switch may not be hidden behind an
-      // interaction, and the move does not overturn that: the warning stays on
-      // the row, and what goes behind the question mark is the detail around it.
+      // interaction, and the warning is the ACT. What left the screen are the
+      // qualifications around it, and every one of them is still stated in the
+      // record a security reader goes to: the threat model's §5 hide-vault-names
+      // bullet carries all four limits verbatim, including the residue caveat ("a
+      // full-system snapshot taken while names were enabled carries both the
+      // ciphertext and the keychain"). **That file says the four
+      // limits are "stated to the user", and after this change they are stated to
+      // the reader of the threat model instead** — an amendment owed to the
+      // companion, tracked in the branch's own report rather than dropped.
       helper={t("settings.privacy.hideVaultNamesInline")}
-      // The moved paragraphs, verbatim: the same keys and the same English in a
-      // different slot, so nothing here went stale in translation.
-      explanation={[
-        t("settings.privacy.hideVaultNamesHelper"),
-        t("settings.privacy.hideVaultNamesErases"),
-        t("settings.privacy.hideVaultNamesResidue"),
-      ]}
       control={(helperId, explanationId) => (
         <Switch
           checked={hidden}
           onChange={busy ? undefined : (next) => void toggle(next)}
           ariaLabel={t("settings.privacy.hideVaultNamesLabel")}
-          // Both descriptions: the sentence on the row and the copy behind the
-          // question mark. A screen reader reads the whole explanation without
-          // the disclosure ever being opened.
-          ariaDescribedBy={
-            explanationId === undefined
-              ? helperId
-              : `${helperId} ${explanationId}`
-          }
+          // The row's one sentence, and only that: the explanation slot this
+          // control used to concatenate is gone with the `?`. `explanationId` is
+          // still accepted by the row's contract and is now undefined here, which
+          // is why the platform is spelled out rather than defaulted.
+          ariaDescribedBy={explanationId === undefined ? helperId : `${helperId} ${explanationId}`}
           testId="settings.hide-vault-names-toggle"
         />
       )}
