@@ -63,11 +63,12 @@
 // Self-skips without the tauri-driver harness AND the `myne-server` binary, the
 // gate every two-device scenario here carries.
 
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { closeSettings, openSyncDevices } from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
+import { describeE2E } from "./support/scenario";
 // The fleet steps and the phrase vectors live in `support/member-fleet.ts`, shared
 // with `member-devices.e2e.ts` rather than copied: the parts that matter are the
 // parts a copy loses silently, and two of those (the two phrases must be two
@@ -99,7 +100,7 @@ if (!ready) {
   );
 }
 
-const describeCanary = ready ? describeE2E.flaky : describe.skip;
+const describeCanary = ready ? describeE2E : describe.skip;
 
 /** Every rendered `member-roster.name`. A row renders its display name there, and
  *  an UNNAMED self row renders the you-badge through the same testid; a COUNT of
@@ -227,16 +228,14 @@ async function withAcceptedMember(
   }
 }
 
-// **QUARANTINED as a CONTENTION victim, with the measurement that says so.** In
-// a full run this scenario wedges on a WebDriver call (`element/value`, then
-// `execute/sync`, then the retries) while the same scenario passes alone: measured
-// 2026-11-08 on this Linux seat, `member-onboarding` 98-101 s standalone and three
-// wedged attempts of 60 s each in the suite, with the page-alive probe answering on
-// some attempts and not others. The steps themselves are not wrong; the WebView
-// stalls for minutes under the accumulated load of a long run, which is what
-// `describeE2E.flaky` exists for (see `e2e/support/scenario.ts`). The normal lane
-// SKIPS it and `MYNE_E2E_QUARANTINE=1` runs it, so it keeps being exercised
-// without reddening the suite until the stall itself is understood.
+// **BACK IN THE STABLE LANE, because the stall was found and removed.** This file
+// was quarantined on 2026-11-08 as a contention victim: it wedged on a WebDriver
+// call (`element/value`, then `execute/sync`, then the retries) in a full run and
+// passed alone at 98-101 s. The cause was not contention. `replaceText` replayed
+// its argument as one real keystroke per character, and the invite code is 730 of
+// them, which no budget covers; `Element.replaceText` now sets long text page-side
+// in one act. Measured 2026-11-09 on the same seat: 2 passed of 2 in 133 s
+// standalone, no wedge. `member-devices` stays quarantined for its own reason.
 describeCanary("MO-1 member onboarding (myne-md/myne#851)", () => {
   // The accept gate's whole claim: an accepted vault cannot reach the editor
   // unnamed, and the name the gate saved is what the other members read.

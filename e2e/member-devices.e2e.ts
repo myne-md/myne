@@ -95,7 +95,7 @@
 // SYNC-13: the passwords and the phrase are in-source scenario constants, and no
 // `expect` below prints one or a phrase-word length.
 
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
@@ -112,6 +112,7 @@ import {
   waitForSaved,
 } from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
+import { describeE2E } from "./support/scenario";
 import {
   MEMBER_NAME,
   MEMBER_PASSWORD,
@@ -325,16 +326,15 @@ async function publishPresence(
   );
 }
 
-// **QUARANTINED as a CONTENTION victim, with the measurement that says so.** In
-// a full run this scenario wedges on a WebDriver call (`element/value`, then
-// `execute/sync`, then the retries) while the same scenario passes alone: measured
-// 2026-11-08 on this Linux seat, `member-onboarding` 98-101 s standalone and three
-// wedged attempts of 60 s each in the suite, with the page-alive probe answering on
-// some attempts and not others. The steps themselves are not wrong; the WebView
-// stalls for minutes under the accumulated load of a long run, which is what
-// `describeE2E.flaky` exists for (see `e2e/support/scenario.ts`). The normal lane
-// SKIPS it and `MYNE_E2E_QUARANTINE=1` runs it, so it keeps being exercised
-// without reddening the suite until the stall itself is understood.
+// **QUARANTINED, and the reason is the FLEET, not this scenario's steps.**
+// Measured 2026-11-09 on this Linux seat, run alone, 323 s to a red: the first
+// device's accept reached `invalid session id` (404) and the third `launchApp`
+// then never got a session at all - `POST /session` unanswered for 60 s three
+// times while the same driver still answered `execute`. Two devices on one host
+// are stable since each driver got its own D-Bus session bus; the THIRD is what
+// is left. The steps are not wrong and this is not a stale assertion, so it stays
+// a debt rather than a deletion: `describeE2E.flaky` keeps it out of the stable
+// lane and `MYNE_E2E_QUARANTINE=1` keeps it exercised.
 describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
   // Vault-count precondition: 1 seeded vault on the owner, 0 on each member device.
   it("joins the same vault from the phrase alone, and both devices' revisions and presence name the member", async () => {
