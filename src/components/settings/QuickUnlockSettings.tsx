@@ -245,7 +245,9 @@ export function QuickUnlockSettings() {
                   onClick={() => void onSetupBiometric()}
                   data-testid="settings.quick-unlock-setup-biometric"
                 >
-                  {t("settings.quickUnlock.useTouchId")}
+                  {t("settings.quickUnlock.useBiometric", {
+                    method: t("settings.quickUnlock.methodTouchId"),
+                  })}
                 </Button>
               )}
           </div>

@@ -77,56 +77,65 @@ test.describe("biometric quick-unlock — unlock screen", () => {
 });
 
 test.describe("biometric quick-unlock — settings", () => {
-  async function openQuickUnlockPanel(page: import("@playwright/test").Page) {
+  /** Settings → Vault → the quick-unlock row, switched ON, which is what opens
+   *  the setup inline. The row is the desktop's: a switch with its setup beneath
+   *  it, not a drill-down panel, so the biometric affordance is a button in that
+   *  setup rather than a second switch. */
+  async function openQuickUnlockSetup(page: import("@playwright/test").Page) {
     await page.goto("/");
     await page.getByRole("button", { name: "Settings" }).first().click();
     // Quick unlock lives in the `vault` category since myne-md/myne#880 task 12.
     await page.getByTestId("settings.category-vault").click();
-    await page.getByTestId("settings.quick-unlock-row").click();
+    await page.getByTestId("settings.quick-unlock-row").getByRole("switch").click();
   }
 
-  test("Face ID toggle enables biometric quick unlock", async ({ page }) => {
+  test("the Face ID button sets the credential up, and the row says so", async ({ page }) => {
     await installMockIpc(page, {});
-    await openQuickUnlockPanel(page);
+    await openQuickUnlockSetup(page);
 
-    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
-    await expect(toggle).toHaveAttribute("aria-checked", "false");
-    await toggle.click();
+    await page.getByTestId("settings.quick-unlock-setup-biometric").click();
 
-    // The mock setup mutates the canned status; the refreshed read flips the
-    // toggle on and the confirmation toast names the platform biometric.
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByText("Face ID quick unlock is on")).toBeVisible();
+    // No toast: the row's own sentence is the confirmation, and it names the
+    // method the credential uses. A toast said the same thing twice, and on this
+    // screen the row is never out of view when it fires.
+    await expect(
+      page.getByTestId("settings.quick-unlock-row").getByText("Configured via Face ID"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("settings.quick-unlock-row").getByRole("switch"),
+    ).toHaveAttribute("aria-checked", "true");
   });
 
-  test("toggle off disables the credential in place", async ({ page }) => {
+  test("switching the row off disables the credential in place", async ({ page }) => {
     await installMockIpc(page, {
       quickUnlock: { configured: true, method: "biometric", available: true },
     });
-    await openQuickUnlockPanel(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Settings" }).first().click();
+    await page.getByTestId("settings.category-vault").click();
 
-    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
+    const toggle = page.getByTestId("settings.quick-unlock-row").getByRole("switch");
     await expect(toggle).toHaveAttribute("aria-checked", "true");
     await toggle.click();
 
     await expect(toggle).toHaveAttribute("aria-checked", "false");
-    await expect(page.getByText("Quick unlock turned off")).toBeVisible();
+    await expect(
+      page.getByTestId("settings.quick-unlock-row").getByText("Re-enter after auto-lock"),
+    ).toBeVisible();
   });
 
-  test("HardwareUnavailable surfaces an honest error, toggle stays off", async ({ page }) => {
+  test("HardwareUnavailable surfaces an honest error", async ({ page }) => {
     await installMockIpc(page, {
       biometricSetupError: { kind: "HardwareUnavailable" },
     });
-    await openQuickUnlockPanel(page);
+    await openQuickUnlockSetup(page);
 
-    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
-    await toggle.click();
+    await page.getByTestId("settings.quick-unlock-setup-biometric").click();
 
     await expect(page.getByText("Face ID isn't available on this device.")).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-checked", "false");
   });
 
-  test("BiometricAuthFailed names the real cause, toggle stays off", async ({ page }) => {
+  test("BiometricAuthFailed names the real cause", async ({ page }) => {
     // iOS reports errSecAuthFailed from SecItemAdd when it cannot create the
     // biometric item, most often because no Face ID / Touch ID is enrolled.
     // Before myne-md/myne#830 that fell through to the generic "Couldn't set up
@@ -134,16 +143,14 @@ test.describe("biometric quick-unlock — settings", () => {
     await installMockIpc(page, {
       biometricSetupError: { kind: "BiometricAuthFailed" },
     });
-    await openQuickUnlockPanel(page);
+    await openQuickUnlockSetup(page);
 
-    const toggle = page.getByTestId("settings.quick-unlock-biometric-toggle").getByRole("switch");
-    await toggle.click();
+    await page.getByTestId("settings.quick-unlock-setup-biometric").click();
 
     await expect(
       page.getByText(
         "Face ID couldn't be set up. Make sure it is enabled in your device settings, or use a PIN instead.",
       ),
     ).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-checked", "false");
   });
 });
