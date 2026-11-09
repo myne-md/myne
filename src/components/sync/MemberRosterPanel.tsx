@@ -474,7 +474,7 @@ export function MemberRosterPanel({
               }}
             >
               <p data-testid="member-roster.forget-warning" style={{ ...STATUS_STYLE, margin: 0 }}>
-                {t("sync.memberRoster.identityForgetWarning")}
+                {`${t("identityForget.body")} ${t("identityForget.rosterTail")}`}
               </p>
               <label
                 style={{

@@ -813,7 +813,7 @@ function ForgetIdentityDialog({
     >
       <div style={DIALOG_BODY_STYLE}>
         <p data-testid="identity-home.forget-warning" style={BODY_SMALL_STYLE}>
-          {t("identityHome.forgetWarning")}
+          {`${t("identityForget.body")} ${t("identityForget.savedPhraseTail")}`}
         </p>
         <label style={CHECKBOX_LABEL_STYLE}>
           <input
