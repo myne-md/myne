@@ -35,6 +35,9 @@ export const ICON_PATHS = {
     '<path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  // The stepper's other half (myne-md/myne#1037): `plus` had no counterpart in
+  // the set, so the repeat rules' count had no shape to decrement with.
+  minus: '<path d="M5 12h14"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   check: '<polyline points="20 6 9 17 4 12"/>',
   "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',

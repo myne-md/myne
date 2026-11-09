@@ -342,12 +342,17 @@ describe("starting an event from the grid", () => {
     expect(host.querySelector('[data-testid="calendar.form"]')).not.toBeNull();
     // Seeded with THAT day's date, not today's: the note must land where the user
     // pointed, which is the bug a dateless "new event" button has.
-    const dateInputs = Array.from(host.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
-    expect(dateInputs.some((input) => input.value === "2026-11-06")).toBe(true);
+    //
+    // Read off the field's own trigger rather than an `<input type="date">`: the
+    // native control is gone (myne-md/myne#1037), so the value lives in the
+    // button's accessible name and the raw date in `data-value` on the panel's
+    // cells. `title` is what the form's `DateField` always renders.
+    const startField = host.querySelector('[data-testid="calendar.form.startDate"]');
+    expect(startField?.getAttribute("data-value")).toBe("2026-11-06");
     cleanup();
   });
 
-  it("does not open it when the click landed on a row instead", async () => {
+  it("opens the event's own form on a chip, never the markdown note", async () => {
     const { host, cleanup } = await renderPane(
       <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
@@ -357,9 +362,19 @@ describe("starting an event from the grid", () => {
       chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await act(async () => {});
-    // Clicking a chip opens the NOTE. A form opening on top of it would be the pane
-    // fighting itself, and the user would see a new note instead of the one they hit.
-    expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
+    // The chip opens the SAME designed form a cell click opens, prefilled, and
+    // never the note: an event's markdown is not part of the notes UI (owner,
+    // 2026-11-08). Prefilled is the half a create-form would also satisfy, so the
+    // assertion is on the values the row carries.
+    const form = host.querySelector('[data-testid="calendar.form"]');
+    expect(form).not.toBeNull();
+    expect(form?.textContent).toMatch(/Edit event/);
+    expect(
+      host.querySelector('[data-testid="calendar.form.startDate"]')?.getAttribute("data-value"),
+    ).toBe("2026-11-05");
+    expect(
+      host.querySelector('[data-testid="calendar.form.startTime"]')?.getAttribute("data-value"),
+    ).toBe("09:00");
     cleanup();
   });
 });

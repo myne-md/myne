@@ -906,6 +906,14 @@ const CAT_GLYPH: Record<string, ReactNode> = {
       <circle cx="12" cy="8" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   ),
+  // A pulse in a circle: the desktop's `circle-help` in this sheet's own drawing,
+  // because a question mark would read as "help" rather than a paste-able report.
+  diagnostics: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M7.5 12h2l1.5-3 2 6 1.5-3h2" />
+    </svg>
+  ),
 };
 
 /** A helper line under a settings group, in the sheet's own geometry.
@@ -1300,6 +1308,9 @@ export type Panel =
   // another category would say the opposite of what that tab says.
   | "ai"
   | "about"
+  // Its own category, as on the desktop since 2026-10-25: "what is this build"
+  // and "what is going wrong" are asked at different moments.
+  | "diagnostics"
   // deeper action panels (nested under a category)
   | "change-password"
   | "delete-vault"
@@ -1470,6 +1481,7 @@ const PANEL_PARENT: Record<Panel, Panel> = {
   data: "root",
   ai: "root",
   about: "root",
+  diagnostics: "root",
   rename: "vault",
   "change-password": "vault",
   "quick-unlock": "vault",
@@ -1495,6 +1507,7 @@ const PANEL_DEPTH: Record<Panel, number> = {
   data: 1,
   ai: 1,
   about: 1,
+  diagnostics: 1,
   rename: 2,
   "change-password": 2,
   "quick-unlock": 2,
@@ -1530,6 +1543,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   data: "settings.shell.panels.data",
   ai: "settings.shell.panels.ai",
   about: "settings.shell.panels.about",
+  diagnostics: "settings.shell.panels.diagnostics",
   rename: "settings.panelTitle.vaultName",
   "change-password": "settings.changePassword.title",
   "quick-unlock": "settings.quickUnlock.title",
@@ -1719,6 +1733,12 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   // `ai_provider_consent` is that screen's accept path: so there is no route
   // to a recorded consent that skips the disclosure.
   const [aiConsentFor, setAiConsentFor] = useState<string | null>(null);
+  /**
+   * Whether the AI panel's secondary blocks are open. Closed on arrival (owner,
+   * 2026-11-08: "simplify the mobile AI section"). Nothing is removed: the egress
+   * exclusion list and the limits stay one press away.
+   */
+  const [aiAdvancedOpen, setAiAdvancedOpen] = useState(false);
   const [aiModels, setAiModels] = useState<string[]>([]);
   const [aiModelsState, setAiModelsState] = useState<"idle" | "loading" | "failed">("idle");
 
@@ -2289,6 +2309,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               <CategoryRow glyph="appearance" label={t("settings.shell.panels.appearance")} onClick={() => setPanel("appearance")} />
               <CategoryRow glyph="data" label={t("settings.shell.panels.data")} onClick={() => setPanel("data")} />
               <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value={__APP_VERSION__} onClick={() => setPanel("about")} />
+              {/* Desktop rail order: About, then Diagnostics. The glyph is this
+                  sheet's own drawing (`CAT_GLYPH`) of the desktop's `circle-help`;
+                  names, order and grouping are what the two clients share. */}
+              <CategoryRow glyph="diagnostics" label={t("settings.shell.panels.diagnostics")} onClick={() => setPanel("diagnostics")} />
               {/* Value column carries the CURRENT state rather than a badge:
                   "Off" is the shipped default and the honest thing to show, and
                   a named provider tells the user where their notes would go
@@ -2468,11 +2492,16 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 })}
               </div>
             </div>
-            <CustomThemesBlock
-              entries={customThemes}
-              selected={eff.custom_theme}
-              onPick={(entry) => void pickCustomTheme(entry)}
-            />
+            {/* Only when there IS one (owner, 2026-11-08): themes are authored on
+                a computer, so an empty block here was three lines of apology for
+                an absence. */}
+            {customThemes.length > 0 && (
+              <CustomThemesBlock
+                entries={customThemes}
+                selected={eff.custom_theme}
+                onPick={(entry) => void pickCustomTheme(entry)}
+              />
+            )}
             <LanguageBlock />
             <SegmentBlock
               label={t("settings.typography.textSizeLabel")}
@@ -2797,12 +2826,35 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           />
         )}
 
+        {panel === "diagnostics" && (
+          <div style={PANEL_STACK}>
+            {/* Same block, same allowlist and field order as the desktop panel, so
+                a maintainer can diff a phone's paste against a computer's. */}
+            <DiagnosticsBlock />
+          </div>
+        )}
+
         {/* The AI egress control (myne-md/myne#880). Below the provider rows
             rather than above them: it bounds what any of them may read, so it
             reads as the limit on the choices above rather than as a gate in
             front of them. This client already ENFORCED this list and reported
             its count; it could not author it. */}
         {panel === "ai" && (
+          <div style={{ marginTop: 18 }}>
+            <Group>
+              <Row
+                first
+                onClick={() => setAiAdvancedOpen((open) => !open)}
+                testId="settings.ai.advanced-row"
+              >
+                <span style={rowLabel}>{t("settings.ai.groupAdvanced")}</span>
+                <RowChevron />
+              </Row>
+            </Group>
+          </div>
+        )}
+
+        {panel === "ai" && aiAdvancedOpen && (
           <AiExcludedFoldersBlock folders={eff.ai_excluded_folders} onToast={setToast} />
         )}
 
@@ -2810,7 +2862,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             myne-md/myne#880): the device-local chat-history budget the shared
             core already enforced, and the shared meeting prompt for the device
             that actually captures meetings. */}
-        {panel === "ai" && (
+        {panel === "ai" && aiAdvancedOpen && (
           <AiLimitsBlock
             budget={eff.chat_history_budget}
             meetingPrompt={eff.meeting_ai_prompt}
@@ -2923,8 +2975,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 the desktop panel, so a maintainer can diff a phone's paste against a computer's;
                 the reader and the copy live in `components/DiagnosticsBlock.tsx`. It sits above
                 the legal links because it is the thing a user in a bug thread is asked for. */}
-            <SectionLabel>{t("settings.about.diagnostics")}</SectionLabel>
-            <DiagnosticsBlock />
 
             <SectionLabel>{t("settings.about.legalLabel")}</SectionLabel>
             <Group>
@@ -2971,20 +3021,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 {pinError}
               </Banner>
             )}
-            <div
-              style={{
-                marginTop: 4,
-                background: "var(--warning-soft)",
-                border: "1px solid color-mix(in srgb, var(--warning) 28%, transparent)",
-                borderRadius: 8,
-                padding: "11px 13px",
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: "var(--warning)",
-              }}
-            >
-              {t("settings.quickUnlock.warningBanner")}
-            </div>
+            {/* No banner and no paragraph (owner, 2026-11-08): both restated the
+                row's own subtitle. What remains is the row — the method's name and
+                "Unlock with <method> after auto-lock". */}
             {!isAndroid && (
               <div style={{ marginTop: 12 }}>
                 <Group>
@@ -3019,9 +3058,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               // already set up, so DON'T show a "Set up" PIN form (setting a PIN
               // would silently overwrite the biometric credential). Reflect the
               // state + point to the toggle above as the explicit way to switch.
-              <div data-testid="settings.quick-unlock-biometric-configured" style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-                {t("settings.quickUnlock.helperConfigured", { method: biometric })}
-              </div>
+              // Configured: the toggle above IS the state and the way out, so this
+              // branch draws nothing. It used to print `helperConfigured`, the
+              // same sentence the removed banner carried in other words.
+              <div data-testid="settings.quick-unlock-biometric-configured" style={{ display: "none" }} />
             ) : (
               <>
                 {/* Observability only (`src/AGENTS.md` "Test observability"): the

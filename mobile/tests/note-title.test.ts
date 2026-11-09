@@ -7,8 +7,11 @@ describe("deriveTitleSnippet", () => {
     expect(deriveTitleSnippet(t)).toEqual({ title: "Hello", snippet: "First line" });
   });
 
-  it("falls back to the body's first line when there is no fm title", () => {
-    expect(deriveTitleSnippet("# My Note\n\nbody here")).toEqual({ title: "My Note", snippet: "body here" });
+  it("does NOT fall back to the body's first line (desktop parity, owner 2026-11-08)", () => {
+    // The body's first line is a SNIPPET, never the name: desktop settled that on
+    // 2026-05-28 (`title:` is frontmatter-only, no first-H1 fallback), and mobile
+    // drifting from it is why one vault listed one note under two names.
+    expect(deriveTitleSnippet("# My Note\n\nbody here")).toEqual({ title: "", snippet: "My Note" });
   });
 
   it("does NOT throw on a frontmatter-title note with an EMPTY body (the daily-note regression)", () => {
@@ -24,6 +27,9 @@ describe("deriveTitleSnippet", () => {
   });
 
   it("handles a note that is only a title line (no snippet)", () => {
-    expect(deriveTitleSnippet("# Only a heading")).toEqual({ title: "Only a heading", snippet: "" });
+    // The single line is the snippet and there is nothing after it, so the note
+    // reads as untitled with its first line as the second line — which is what
+    // desktop shows for the same bytes.
+    expect(deriveTitleSnippet("# Only a heading")).toEqual({ title: "", snippet: "Only a heading" });
   });
 });

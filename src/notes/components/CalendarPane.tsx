@@ -38,6 +38,9 @@ import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
 import { usePrefs } from "../../hooks/usePrefs";
 import { createEvent } from "../createEvent";
 import { importIcsIntoVault } from "../calendar/icsImport";
+import { TimeField } from "../calendar/fields";
+import { applyEventEdit, editFromPlan } from "../calendar/updateEvent";
+import { reindexNote } from "../vaultIndices";
 import {
   canImportIcs,
   exportIcsFile,
@@ -72,7 +75,7 @@ import {
   type WorkspaceItem,
 } from "../workspaceState";
 import { WEEKDAY_HEADERS, dayCells, monthGrid, shiftAnchor, weekRow, windowForView } from "../calendar/grid";
-import { CalendarEventForm, emptyEventForm } from "./CalendarEventForm";
+import { CalendarEventForm, emptyEventForm, formFromRow, planEventForm } from "./CalendarEventForm";
 import { calendarColour } from "../calendar/colour";
 import {
   isProjected,
@@ -150,6 +153,12 @@ export function CalendarPane({
    * `createEvent`, so the two paths produce the same record.
    */
   const [composing, setComposing] = useState<string | null>(null);
+  /**
+   * The event whose form is open for EDITING, or `null`. A chip used to open the
+   * markdown note; it opens the same form a cell click opens, prefilled (owner:
+   * the markdown should only be visible when exporting).
+   */
+  const [editing, setEditing] = useState<DisplayRow | null>(null);
   /** The time the user typed for a retimed occurrence, held per row. */
   const [retime, setRetime] = useState<string>("");
   const [reload, setReload] = useState(0);
@@ -349,6 +358,14 @@ export function CalendarPane({
             flushDirtyPanes: ws.flushAll,
           },
         });
+        // Re-index before reloading, or the fresh read returns the OLD `start` and
+        // the row snaps back to where it was dragged from.
+        await reindexNote(gesture.row.noteId);
+        setOptimistic((current) => {
+          const rest = { ...current };
+          delete rest[gesture.row.noteId];
+          return rest;
+        });
         setReload((n) => n + 1);
       } catch (err) {
         setOptimistic((current) => {
@@ -461,7 +478,29 @@ export function CalendarPane({
           rendered: { start: row.start, end: row.end, allDay: row.allDay },
         });
       }}
-      onClick={() => ws.openNewTabInFocused(row.noteId)}
+      // An event opens its own form; a task opens the note it lives on, because a
+      // task is a line inside a document the user wrote.
+      onClick={() => {
+        if (row.task !== undefined) {
+          ws.openNewTabInFocused(row.noteId);
+          return;
+        }
+        if (isProjected(row)) {
+          // An appearance has no note of its own, so there is nothing to edit; the
+          // panel names the series and offers the three legal answers.
+          setOccurrence({
+            refusal: {
+              reason: "belongs-to-series",
+              seriesNoteId: seriesNoteId(row),
+              occurrenceDate: occurrenceDate(row),
+              title: row.title,
+            },
+            row,
+          });
+          return;
+        }
+        setEditing(row);
+      }}
       onContextMenu={
         isProjected(row)
           ? (event) => {
@@ -891,7 +930,14 @@ export function CalendarPane({
 
   return (
     <div
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, gap: "var(--space-2)", padding: "var(--space-3) 0" }}
+      // The pane is granted no gutters (`PaneView`'s calendar branch), so the inset
+      // this surface keeps is its own and symmetric: `space-2` all round, which is
+      // what puts the grid's outer cells the same distance from the window edge as
+      // they are from each other. The vertical half used to be `space-3` top and
+      // bottom with nothing on the sides, which is what a body inside a 24px
+      // gutter wanted — with the gutter gone it read as a strip pressed to the
+      // edges.
+      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, gap: "var(--space-2)", padding: "var(--space-2)" }}
       data-testid="calendar.pane"
       data-pane={paneId}
       tabIndex={0}
@@ -1042,12 +1088,11 @@ export function CalendarPane({
           >
             {t("calendar.occurrence.addOneOff")}
           </Button>
-          <Input
-            type="time"
-            aria-label={t("calendar.occurrence.retime")}
-            value={retime}
-            onChange={(event) => setRetime(event.target.value)}
-            data-testid="calendar.occurrence.retime-field"
+          <TimeField
+            label={t("calendar.occurrence.retime")}
+            value={retime === "" ? null : retime}
+            onChange={(next) => setRetime(next ?? "")}
+            testId="calendar.occurrence.retime-field"
           />
           <Button
             variant="ghost"
@@ -1070,6 +1115,39 @@ export function CalendarPane({
           onClose={() => {
             setComposing(null);
             setReload((n) => n + 1);
+          }}
+        />
+      )}
+
+      {editing !== null && (
+        <CalendarEventForm
+          mode="edit"
+          initial={formFromRow(editing)}
+          onClose={() => setEditing(null)}
+          onSubmit={async (values) => {
+            const plan = planEventForm(values);
+            if (!plan.ok) return;
+            setFailure(null);
+            try {
+              await applyEventEdit({
+                noteId: editing.noteId,
+                rendered: { start: editing.start, end: editing.end, allDay: editing.allDay },
+                next: editFromPlan(plan.input),
+                io: {
+                  readNote: noteRead,
+                  writeNote: (id, body, base) => noteUpdate(id, body, base),
+                  flushDirtyPanes: ws.flushAll,
+                },
+              });
+              // `note_update` does not touch the index, and the index is what this
+              // pane reads: without this the grid keeps the old row.
+              await reindexNote(editing.noteId);
+            } catch (err) {
+              setFailure(err instanceof EventWriteRefused ? err.reason : null);
+            } finally {
+              setEditing(null);
+              setReload((n) => n + 1);
+            }
           }}
         />
       )}

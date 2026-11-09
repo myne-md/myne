@@ -2261,12 +2261,15 @@ export function PaneView({
       };
     }
     if (isCalendar && leaf.activeTab !== null) {
-      // The calendar fills its pane and takes gutters like the task list: it is a
-      // dense schedule, not prose, so the reading measure would leave a month grid
-      // narrower than the window it sits in.
+      // The calendar fills its pane and takes NO gutters: a month grid is the
+      // widest surface in the product, and `tabKinds` gives it the whole surface
+      // on entry (both sidebars close) so the reading measure would only take
+      // width back off it — 48px of a layout that is already all grid. The task
+      // list keeps its gutters because it is a list of lines; this is the second
+      // full-bleed body beside the graph.
       return {
         fill: true,
-        gutters: true,
+        gutters: false,
         el: (
           <CalendarPane
             paneId={leaf.id}

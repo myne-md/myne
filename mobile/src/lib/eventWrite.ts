@@ -20,10 +20,6 @@ import { noteCreate } from "./notes";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-/** Where a new event lands when the user has not said otherwise. A default
- *  LOCATION only: `kind` is an event's identity, never its folder. */
-export const DEFAULT_CALENDAR_FOLDER = "Calendar/";
-
 /** What the composer supplies. */
 export type NewMobileEvent = {
   readonly title: string;
@@ -60,8 +56,11 @@ function buildEventNote(input: NewMobileEvent): string {
 
 /** Create the note and return its id. */
 export async function createEventNote(input: NewMobileEvent): Promise<string> {
+  // The vault root, like the desktop (owner, 2026-11-08): a default of
+  // `Calendar/` created a folder nobody asked for, and kept it alive through
+  // the deliberate-folder registry after the last event in it was deleted.
   const folder = normalizeFolderPath(
-    input.folder === undefined ? DEFAULT_CALENDAR_FOLDER : input.folder,
+    input.folder === undefined ? null : input.folder,
   );
   let body = buildEventNote(input);
   if (folder !== null) {

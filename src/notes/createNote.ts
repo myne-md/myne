@@ -38,6 +38,7 @@ import { invoke } from "../platform/core";
 import { buildInitialPlaintext, patchTitleField } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { mutateDeliberateFolders } from "../lib/prefs";
+import { reindexNoteFromBody } from "./vaultIndices";
 
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder();
@@ -72,6 +73,19 @@ export async function noteCreate(
   folder: string | null,
 ): Promise<string> {
   const id = await invoke<string>("plugin:notes|note_create", { plaintext });
+  // **Registered in the index HERE, because this is the one line every create
+  // path crosses** (myne-md/myne#1037). `note_create` upserts the SEARCH index
+  // and nothing else, so a note nobody opens had no property row until some
+  // later reconcile — and the note that is never opened is exactly what the
+  // calendar writes into: a cell click produced a note the grid could not see,
+  // and it stayed invisible until the app was restarted. The three call sites
+  // that did remember (`sidebarState`'s new note and its duplicate) were doing
+  // this by hand, which is how the calendar's path came to miss it.
+  //
+  // The body is already in hand, so this takes the decrypt-free half of the
+  // pair; the apply bumps the index nonce, which is what re-queries the readers
+  // that were mounted while the note appeared.
+  void reindexNoteFromBody(id, plaintext);
   const norm = normalizeFolderPath(folder);
   if (norm !== null) {
     void mutateDeliberateFolders({ add: [norm] }).catch(() => {});

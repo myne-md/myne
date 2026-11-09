@@ -46,6 +46,7 @@ import { Input } from "../../components/primitives/Input";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { Segmented } from "../../components/primitives/Segmented";
 import { Select } from "../../components/primitives/Select";
+import { CountField, DateField, TimeField } from "../calendar/fields";
 import { REMINDER_HORIZON_DAYS } from "../../lib/reminderSchedule";
 import { createEvent, type NewEventInput } from "../createEvent";
 
@@ -132,6 +133,35 @@ function parseRepeat(raw: string): RecurrenceRule | null {
   return parsed.ok ? parsed.rule : null;
 }
 
+/**
+ * The form's values for a row the calendar is already showing. A row carries the
+ * emitted forms, so this reads the values the note holds rather than interpreting
+ * the vocabulary a second time.
+ */
+export function formFromRow(row: {
+  readonly title: string | null;
+  readonly start: string;
+  readonly end?: string | null;
+  readonly calendar?: string | null;
+  readonly repeat?: string | null;
+  readonly remind?: string | null;
+}): EventFormValues {
+  const start = parseEventInstant(row.start);
+  const end = row.end == null ? null : parseEventInstant(row.end);
+  return {
+    title: row.title ?? "",
+    startDate: start === null ? row.start.slice(0, 10) : formatCivilDate(start.date),
+    startTime: start === null ? null : start.time,
+    endDate: end === null ? null : formatCivilDate(end.date),
+    endTime: end === null ? null : end.time,
+    calendar: row.calendar ?? null,
+    // `== null` rather than `=== null`: a row from an older host, and every
+    // fixture written before a field existed, carries `undefined` here.
+    repeat: row.repeat == null ? null : parseRepeat(row.repeat),
+    remind: row.remind == null ? null : parseReminderLead(row.remind),
+  };
+}
+
 /** The instant a form's date and optional time denote, or `null`. */
 function instantOf(date: string, time: string | null): EventInstant | null {
   return parseEventInstant(time === null ? date : `${date} ${time}`);
@@ -212,10 +242,14 @@ export const LEAD_CHOICES: readonly string[] = ["1m", "10m", "30m", "1h", "2h", 
  */
 export function CalendarEventForm({
   initial,
+  mode = "create",
   onSubmit,
   onClose,
 }: {
   readonly initial: EventFormValues;
+  /** Heading only: both modes write through the same plan, so an edit cannot
+   *  produce a record a create would not. */
+  readonly mode?: "create" | "edit";
   readonly onSubmit?: (values: EventFormValues) => Promise<void> | void;
   readonly onClose: () => void;
 }) {
@@ -249,7 +283,7 @@ export function CalendarEventForm({
   const allDay = values.startTime === null;
 
   return (
-    <ModalShell open title={t("calendar.form.title")} labelId={titleId} onClose={onClose} testId="calendar.form">
+    <ModalShell open title={t(mode === "edit" ? "calendar.form.editTitle" : "calendar.form.title")} labelId={titleId} onClose={onClose} testId="calendar.form">
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         <label htmlFor={titleId} style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
           <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.eventTitle")}</span>
@@ -264,11 +298,17 @@ export function CalendarEventForm({
         <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <legend style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.when")}</legend>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            <Input
-              type="date"
-              aria-label={t("calendar.form.startDate")}
+            {/* Every control in this fieldset is the app's own (myne-md/myne#1037):
+                the platform's date, time and number widgets ignore the tokens, so
+                they were the one surface where a custom palette reached nothing
+                and every OS drew the form differently. */}
+            <DateField
+              label={t("calendar.form.startDate")}
               value={values.startDate}
-              onChange={(event) => patch({ startDate: event.target.value })}
+              onChange={(next) => {
+                if (next !== null) patch({ startDate: next });
+              }}
+              testId="calendar.form.startDate"
             />
             <Segmented
               ariaLabel={t("calendar.form.allDay")}
@@ -283,27 +323,28 @@ export function CalendarEventForm({
               testId="calendar.form.allDayToggle"
             />
             {!allDay && (
-              <Input
-                type="time"
-                aria-label={t("calendar.form.startTime")}
-                value={values.startTime ?? ""}
-                onChange={(event) => patch({ startTime: event.target.value === "" ? null : event.target.value })}
+              <TimeField
+                label={t("calendar.form.startTime")}
+                value={values.startTime}
+                onChange={(next) => patch({ startTime: next })}
+                testId="calendar.form.startTime"
               />
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            <Input
-              type="date"
-              aria-label={t("calendar.form.endDate")}
-              value={values.endDate ?? ""}
-              onChange={(event) => patch({ endDate: event.target.value === "" ? null : event.target.value })}
+            <DateField
+              label={t("calendar.form.endDate")}
+              value={values.endDate}
+              allowEmpty
+              onChange={(next) => patch({ endDate: next })}
+              testId="calendar.form.endDate"
             />
             {!allDay && values.endDate !== null && (
-              <Input
-                type="time"
-                aria-label={t("calendar.form.endTime")}
-                value={values.endTime ?? values.startTime ?? ""}
-                onChange={(event) => patch({ endTime: event.target.value === "" ? null : event.target.value })}
+              <TimeField
+                label={t("calendar.form.endTime")}
+                value={values.endTime ?? values.startTime}
+                onChange={(next) => patch({ endTime: next })}
+                testId="calendar.form.endTime"
               />
             )}
           </div>
@@ -330,18 +371,18 @@ export function CalendarEventForm({
           />
           {values.repeat?.kind === "interval" && (
             <div style={{ display: "flex", gap: "var(--space-2)" }}>
-              <Input
-                type="number"
+              <CountField
+                label={t("calendar.form.repeatCount")}
+                value={values.repeat.count}
                 min={1}
                 max={99}
-                aria-label={t("calendar.form.repeatCount")}
-                value={String(values.repeat.count)}
-                onChange={(event) =>
+                testId="calendar.form.repeatCount"
+                onChange={(count) =>
                   patch({
                     repeat: {
                       kind: "interval",
                       unit: values.repeat?.kind === "interval" ? values.repeat.unit : "week",
-                      count: Math.max(1, Math.min(99, Number(event.target.value) || 1)),
+                      count,
                     },
                   })
                 }
@@ -372,20 +413,16 @@ export function CalendarEventForm({
           )}
           {values.repeat?.kind === "dayOfMonth" && (
             <div style={{ display: "flex", gap: "var(--space-2)" }}>
-              <Input
-                type="number"
+              <CountField
+                label={t("calendar.form.repeatDay")}
+                // A "last day" rule has no number to step. The control shows 31
+                // and a step turns it back into a numbered rule, which is what
+                // the button beside it toggles to anyway.
+                value={values.repeat.day === "last" ? 31 : values.repeat.day}
                 min={1}
                 max={31}
-                aria-label={t("calendar.form.repeatDay")}
-                value={values.repeat.day === "last" ? "31" : String(values.repeat.day)}
-                onChange={(event) =>
-                  patch({
-                    repeat: {
-                      kind: "dayOfMonth",
-                      day: Math.max(1, Math.min(31, Number(event.target.value) || 1)),
-                    },
-                  })
-                }
+                testId="calendar.form.repeatDay"
+                onChange={(day) => patch({ repeat: { kind: "dayOfMonth", day } })}
               />
               <Button
                 variant="ghost"

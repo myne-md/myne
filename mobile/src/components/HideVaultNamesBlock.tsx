@@ -59,7 +59,6 @@ import {
   type KeychainStatus,
 } from "../lib/vault-label";
 import { Switch } from "./inputs";
-import { InfoNote } from "./InfoNote";
 
 const rowLabel: CSSProperties = { fontSize: "var(--text-md)", color: "var(--fg-1)" };
 
@@ -208,29 +207,19 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
           }}
         >
           <div style={{ minWidth: 0 }}>
-            {/* The trigger rides on the title line, not under the row.
-                A bare `?` needs the thing it annotates beside it, the way the
-                desktop settings rows place theirs directly after the setting's
-                title; parked under the card it read as belonging to whatever sat
-                below it instead. */}
+            {/* The label, and ONE sentence under it (owner, 2026-11-08). The
+                info sheet that used to hang off the title is gone on BOTH clients
+                on the same day and for the same reason: three qualifying
+                paragraphs behind a `?` are the noise, not the wording. Nothing is
+                lost from the record either — the threat model's §5
+                hide-vault-names bullet states all four limits verbatim, and it is
+                the place a security claim is read.
+                `tests/hide-vault-names.test.ts` pins that this row and the
+                desktop panel name the SAME locale keys, so a client that kept the
+                sheet would fail there rather than drift. */}
             <div style={TITLE_ROW_STYLE}>
               <div style={rowLabel}>{t("settings.privacy.hideVaultNamesLabel")}</div>
-              <InfoNote
-                testId="settings.hide-vault-names"
-                paragraphs={[
-                  t("settings.privacy.hideVaultNamesHelper"),
-                  t("settings.privacy.hideVaultNamesErases"),
-                  t("settings.privacy.hideVaultNamesResidue"),
-                ]}
-              />
             </div>
-            {/* The critical sentence, and only it, on the row (myne-md/myne#885).
-                Desktop split this row's 776 characters across four paragraphs:
-                the destructive sentence stays beside the switch and the detail
-                moves behind the question mark. Mobile has no disclosure
-                primitive, so the same keys render as paragraphs below the row
-                rather than collapsed; the COPY is byte-identical, which is what
-                `tests/hide-vault-names.test.ts` pins across the two clients. */}
             <div style={subtitle}>{t("settings.privacy.hideVaultNamesInline")}</div>
           </div>
           {/* `disabled` while the erase runs, NOT a dropped `onToggle`.

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
@@ -33,12 +33,17 @@ export function Screen({
 export function ScreenScroll({
   children,
   style,
+  ref,
 }: {
   children: ReactNode;
   style?: CSSProperties;
+  /** The scroll element itself, for a caller that has to MEASURE inside it (the
+   *  note tree's drag measures its rows' boxes against the scroller's viewport).
+   *  React 19 passes `ref` as a prop, the same shape `Button`/`Input` declare. */
+  ref?: Ref<HTMLDivElement>;
 }) {
   return (
-    <div className="m-scroll" style={style}>
+    <div ref={ref} className="m-scroll" style={style}>
       {children}
     </div>
   );

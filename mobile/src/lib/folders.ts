@@ -185,6 +185,38 @@ export function reorderChildOrder(params: {
   });
 }
 
+/**
+ * The same rewrite for a row DROPPED onto another (owner, 2026-11-08: the arrows
+ * became a press-and-hold drag). Shares one splice and one container rule with the
+ * nudge, so a drag never touches a sibling container's order. `null` for a drop
+ * onto itself or onto a row outside this container: moving a note between folders
+ * is a `folder:` write, not an ordering one.
+ */
+export function reorderChildBeside(params: {
+  tree: FolderTree;
+  itemOrder: ItemOrderMap;
+  cache: ReadonlyMap<string, OrderedNoteRecord>;
+  containerPath: string | null;
+  rowKey: string;
+  targetKey: string;
+  place: "above" | "below";
+}): Record<string, string[]> | null {
+  const { tree, itemOrder, cache, containerPath, rowKey, targetKey, place } = params;
+  const keys = orderedChildKeys(tree, containerPath, itemOrder, cache);
+  const folded = (k: string) => itemOrderKey(k);
+  const index = keys.findIndex((k) => folded(k) === folded(rowKey));
+  const targetIndex = keys.findIndex((k) => folded(k) === folded(targetKey));
+  if (index < 0 || targetIndex < 0 || index === targetIndex) return null;
+  return computeItemOrderAfterReorder({
+    itemOrder,
+    container: containerKeyOf(containerPath),
+    containerChildKeys: keys.filter((_, i) => i !== index),
+    draggedKey: rowKey,
+    targetKey,
+    place,
+  });
+}
+
 /** Note ids at-or-below `path` (subtree; the `inFolder` view resolver). A root
  *  path (null / "") matches every note. Fold-insensitive prefix match. */
 export function notesInSubtree(

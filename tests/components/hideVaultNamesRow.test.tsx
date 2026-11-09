@@ -176,33 +176,15 @@ describe("hide vault names: the disclosure", () => {
     );
   });
 
-  it("moves the qualifying paragraphs behind the question mark without losing them", async () => {
-    // The moved copy is present in the document while collapsed, so a screen
-    // reader reads it whether or not the disclosure is ever opened, and it is
-    // the control's description rather than a floating aside.
+  it("draws no question mark and no popover at all", () => {
+    // The `?` and its three paragraphs are GONE (owner, 2026-11-08): the popover
+    // was the noise, not its wording. What left the screen is stated verbatim in
+    // `myne-agents/docs/threat-model.md` §5's hide-vault-names bullet, which is
+    // where a security claim is read; the row keeps the one sentence that is the
+    // ACT (asserted right below, and required since #411).
     mountPanel();
-    const disclosure = await screen.findByTestId("settings.hide-vault-names-explanation");
-    expect(disclosure.textContent).toContain(t("settings.privacy.hideVaultNamesHelper"));
-    expect(disclosure.textContent).toContain(t("settings.privacy.hideVaultNamesErases"));
-    expect(disclosure.textContent).toContain(t("settings.privacy.hideVaultNamesResidue"));
-    const describedBy = screen
-      .getByTestId("settings.hide-vault-names-toggle")
-      .getAttribute("aria-describedby");
-    expect(describedBy).toContain(disclosure.id);
-  });
-
-  it("reveals the moved copy on KEYBOARD focus, not on hover alone", async () => {
-    // The half a hover-only implementation gets wrong. jsdom resolves the inline
-    // `display`, so "not shown" and "shown" are readable here.
-    mountPanel();
-    const disclosure = await screen.findByTestId("settings.hide-vault-names-explanation");
-    const trigger = await screen.findByTestId("settings.hide-vault-names-explain");
-    expect(window.getComputedStyle(disclosure).display).toBe("none");
-    fireEvent.focus(trigger);
-    expect(window.getComputedStyle(disclosure).display).not.toBe("none");
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    fireEvent.blur(trigger);
-    expect(window.getComputedStyle(disclosure).display).toBe("none");
+    expect(screen.queryByTestId("settings.hide-vault-names-explain")).toBeNull();
+    expect(screen.queryByTestId("settings.hide-vault-names-explanation")).toBeNull();
   });
 
   it("says what enabling destroys and that nothing further is written", () => {
