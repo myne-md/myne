@@ -3067,7 +3067,6 @@
       "buildChannelDevelopment": "Development build",
       "buildLabel": "Build",
       "buildChannelLabel": "Build channel",
-      "buildChannelStable": "Stable",
       "developerModeInline": "Shows the settings Myne keeps out of the way by default.",
       "developerModeHelper": "The ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
@@ -3123,7 +3122,6 @@
       "updateFlushFailed": "Could not save every open note, so Myne did not restart to update. Try again in a moment.",
       "updateLabel": "Updates",
       "updateUpToDate": "You're on the latest version.",
-      "version": "Version",
       "dev": "Dev",
       "sections": {
         "version": "Version",
@@ -3517,7 +3515,8 @@
       "saveError": "Could not save the focus-mode setting.",
       "typewriterAria": "Typewriter scroll",
       "typewriterHelper": "In focus mode (⇧⌘F), keep the active line vertically centered as you type.",
-      "typewriterLabel": "Typewriter scroll"
+      "typewriterLabel": "Typewriter scroll",
+      "typewriterHelperMobile": "Keep the caret vertically centered"
     },
     "hotkeys": {
       "addBindingAria": "Add a shortcut for {{command}}",
@@ -4053,7 +4052,6 @@
       "setupHelper": "Touch ID is macOS-only and currently experimental (pending hardware verification). PIN works everywhere.",
       "title": "Quick unlock",
       "useTouchId": "Use Touch ID",
-      "pinTooShort": "PIN must be at least 6 digits.",
       "pinMismatch": "PINs don't match.",
       "pinOnToast": "PIN quick unlock is on",
       "setupError": "Couldn't set up quick unlock.",
@@ -4069,7 +4067,6 @@
       "turnOffPin": "Turn off PIN",
       "pinSetupHelper": "Set a 6+ digit PIN to re-unlock quickly after auto-lock. The PIN wraps a device-local key: it never leaves this device and never touches your recovery phrase.",
       "pinReplacesBiometric": " Setting a PIN replaces {{method}} unlock.",
-      "pinPlaceholder6": "At least 6 digits",
       "confirmPin": "Confirm PIN",
       "reenterPin": "Re-enter PIN",
       "setupButton": "Set up quick unlock"
@@ -4225,10 +4222,6 @@
         "taskSampleOpen": "Send the quarterly report",
         "taskSampleDone": "Book the venue"
       },
-      "defaultView": "Default view",
-      "typewriter": "Typewriter scrolling",
-      "typewriterSubtitle": "Keep the caret vertically centered",
-      "enableArchiving": "Enable archiving",
       "taskChipColor": {
         "accent": "Accent",
         "danger": "Red",

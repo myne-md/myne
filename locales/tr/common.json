@@ -3003,7 +3003,6 @@
       "buildChannelDevelopment": "Geliştirme yapısı",
       "buildLabel": "Yapı",
       "buildChannelLabel": "Yapı kanalı",
-      "buildChannelStable": "Kararlı",
       "developerModeHelper": "Myne'in kefil olduğu yolun dışına çıktığınız ayarlar ve çoğu kişinin hiç ihtiyaç duymadığı ileri düzey araçlar. Kapatmak onları yalnızca yeniden gizler. Açtığınız şey açık kalır ve onu kapatacağınız yer kendi denetimidir.",
       "developerModeLabel": "Geliştirici modu",
       "legalLabel": "Yasal",
@@ -3014,7 +3013,6 @@
       "tagline": "Pre-alpha",
       "threatModelHelper": "Tarayıcınızda aç.",
       "threatModelLabel": "Tehdit modeli",
-      "version": "Sürüm",
       "dev": "Geliştirme",
       "updateAutoCheckHelper": "Myne, daha yeni bir sürüm olup olmadığını görmek için myne.md adresinden küçük ve imzalı bir dosya indirir ve size söyler. Yalnızca geçerli sürümünüzü ve platformunuzu gönderir.",
       "updateAutoCheckLabel": "Güncellemeleri otomatik kontrol et",
@@ -3416,7 +3414,8 @@
       "saveError": "Odak modu ayarı kaydedilemedi.",
       "typewriterAria": "Daktilo kaydırması",
       "typewriterHelper": "Odak modunda (⇧⌘F), siz yazarken etkin satırı dikey olarak ortalanmış tutar.",
-      "typewriterLabel": "Daktilo kaydırma"
+      "typewriterLabel": "Daktilo kaydırma",
+      "typewriterHelperMobile": "İmleci dikey olarak ortalanmış tutar"
     },
     "hotkeys": {
       "addBindingAria": "{{command}} için bir kısayol ekle",
@@ -3796,7 +3795,6 @@
       "setupHelper": "Touch ID yalnızca macOS’tedir ve şu an deneyseldir (donanım doğrulaması bekleniyor). PIN her yerde çalışır.",
       "title": "Hızlı kilit açma",
       "useTouchId": "Touch ID kullan",
-      "pinTooShort": "PIN en az 6 haneli olmalı.",
       "pinMismatch": "PIN’ler eşleşmiyor.",
       "pinOnToast": "PIN ile hızlı kilit açma açık",
       "setupError": "Hızlı kilit açma kurulamadı.",
@@ -3811,7 +3809,6 @@
       "turnOffPin": "PIN’i kapat",
       "pinSetupHelper": "Otomatik kilit sonrasında hızlıca yeniden açmak için 6+ rakamlı bir PIN belirleyin. PIN, cihaza özel bir anahtarı sarmalar: bu cihazdan asla çıkmaz ve kurtarma ifadenize asla dokunmaz.",
       "pinReplacesBiometric": " Bir PIN belirlemek, {{method}} ile kilit açmanın yerini alır.",
-      "pinPlaceholder6": "En az 6 rakam",
       "confirmPin": "PIN’i doğrula",
       "reenterPin": "PIN’i tekrar girin",
       "setupButton": "Hızlı kilit açmayı ayarla",
@@ -3947,10 +3944,6 @@
         "taskSampleOpen": "Üç aylık raporu gönder",
         "taskSampleDone": "Mekânı ayırt"
       },
-      "defaultView": "Varsayılan görünüm",
-      "typewriter": "Daktilo kaydırması",
-      "typewriterSubtitle": "İmleci dikey olarak ortalanmış tutar",
-      "enableArchiving": "Arşivlemeyi etkinleştir",
       "taskChipColor": {
         "accent": "Vurgu",
         "danger": "Kırmızı",
