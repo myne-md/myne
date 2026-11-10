@@ -1,6 +1,6 @@
 # Maintainer: Ömer Duran <me@omerduran.dev>
 pkgname=myne
-pkgver=0.11.4
+pkgver=0.17.0
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search"
 arch=('x86_64')
@@ -35,7 +35,7 @@ options=('!lto')
 # Bump BOTH this and `myne-bin/PKGBUILD`'s `pkgver` together with `flake.nix`'s
 # two release URLs. The guard compares all three, because that is the drift this
 # lead found: this recipe was one stable release behind the other two.
-source=("$pkgname::git+https://github.com/myne-md/myne.git#commit=2a40fe4082cb991803483dd2156cecff4c0fc16f")
+source=("$pkgname::git+https://github.com/myne-md/myne.git#commit=47fc0d020a4a74d0e809b76c32dbcb8c13178fe4")
 sha256sums=('SKIP')
 
 prepare() {
