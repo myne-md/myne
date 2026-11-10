@@ -5871,7 +5871,9 @@
       "noTime": "No time",
       "hour": "Hour",
       "minute": "Minute",
-      "editTitle": "Edit event"
+      "editTitle": "Edit event",
+      "calendarLabel": "Calendar",
+      "noCalendar": "No calendar"
     },
     "occurrenceOf": "One occurrence of a series, on {{date}}",
     "occurrence": {
@@ -5923,7 +5925,9 @@
     },
     "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
     "taskRow": "A task due {date}",
-    "composeOn": "Add an event on {date}"
+    "composeOn": "Add an event on {date}",
+    "calendarsToggle": "Calendars shown",
+    "calendarsToggleHelper": "Untick one to take it off this view. Nothing is deleted."
   },
   "identityForget": {
     "body": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device.",

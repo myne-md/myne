@@ -27,7 +27,7 @@
 // owner looking at their own calendar, so it asks for the whole window, the same way
 // the desktop pane does.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { parseCivilDate, weekdayOf } from "@myne/dialect-civil-date";
 import { Button, Segmented, Sheet, Spinner, TextField } from "../../components";
@@ -49,6 +49,8 @@ import {
   rowHour,
 } from "@myne/calendar-layout";
 import { beginCreateGesture, beginMoveGesture, beginResizeGesture } from "@myne/calendar-gesture";
+import { calendarColour } from "@myne/calendar-colour";
+import { visibleRows } from "@myne/calendar-visibility";
 import { EventWriteRefused, applyEventMove, type EventSpan } from "@myne/calendar-drag-write";
 import type { CivilDate } from "@myne/dialect-civil-date";
 import type { CalendarRow } from "@myne/vault-indices";
@@ -60,6 +62,7 @@ import { overrideOccurrence } from "@myne/calendar-override";
 import { noteRead, noteUpdate } from "../../lib/notes";
 import { formatLocalDate } from "../../lib/localDateTime";
 import { homeClockFor } from "@myne/home-zone";
+import { usePrefs } from "../../lib/use-prefs";
 
 type ViewName = "month" | "week" | "day";
 
@@ -120,6 +123,12 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
   const [creating, setCreating] = useState<{ date: string; from: number; to: number } | null>(null);
   /** The row whose start time is being changed, and the time typed for it. */
   const [retiming, setRetiming] = useState<{ row: CalendarRow; time: string } | null>(null);
+
+  // The same prefs the desktop reads: which calendars are switched off and what
+  // colour each one draws in. `usePrefs` is the phone's reader over the one prefs
+  // command, so this is a read of the vault's own settings and not a copy of them.
+  const { prefs } = usePrefs();
+  const calendarSettings = prefs.calendar_settings ?? {};
 
   const load = useCallback(() => {
     const window = windowForView(view, anchor, 0);
@@ -294,9 +303,12 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
     });
   };
 
-  const cells = rows === null ? [] : view === "week" ? weekRow(anchor, rows) : dayCells(anchor, rows);
+  // A calendar switched off on any client is off here too: the filter runs on the rows
+  // as the host returned them, so it applies to the month grid, the axis and the list.
+  const shown = rows === null ? null : visibleRows(calendarSettings, rows);
+  const cells = shown === null ? [] : view === "week" ? weekRow(anchor, shown) : dayCells(anchor, shown);
   const dayRows =
-    selected === null ? [] : (rows ?? []).filter((row) => row.start.slice(0, 10) === selected);
+    selected === null ? [] : (shown ?? []).filter((row) => row.start.slice(0, 10) === selected);
 
   /** The chip both the axis and the all-day band draw: one row, one look. */
   const chip = (row: CalendarRow, showTime: boolean) => (
@@ -305,6 +317,8 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
       className="myne-calendar__chip"
       data-testid={`calendar.chip.${row.noteId}`}
       data-conflicts={row.conflicts ? "true" : undefined}
+      // One variable for the spine and the wash, exactly as the desktop chip does.
+      style={{ "--calendar-colour": calendarColour(calendarSettings, row.calendar) } as CSSProperties}
     >
       {showTime && (
         <span className="myne-calendar__time">
@@ -507,7 +521,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
               </span>
             ))}
           </div>
-          {monthGrid(anchor, rows).map((week, wi) => (
+          {monthGrid(anchor, shown ?? []).map((week, wi) => (
             <div key={wi} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
               {week.map((cell) => {
                 const dayNumber = cell.date.slice(8, 10).replace(/^0/, "");

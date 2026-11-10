@@ -18,12 +18,21 @@
 // locked vault gets a refusal rather than content; the pane says so instead of
 // rendering an empty grid that reads as "nothing scheduled".
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Input } from "../../components/primitives/Input";
+import { SearchableSelect } from "../../components/primitives/SearchableSelect";
 import { Segmented } from "../../components/primitives/Segmented";
 import {
   vaultIndicesCalendarRange,
@@ -91,6 +100,14 @@ import {
   type EventFormValues,
 } from "./CalendarEventForm";
 import { beginCreateGesture, beginMoveGesture, beginResizeGesture } from "../calendar/gesture";
+import {
+  hiddenSettingFor,
+  isCalendarVisible,
+  knownCalendars,
+  visibleRows,
+} from "../calendar/visibility";
+import { CALENDAR_COLOUR_SETTING_PREFIX } from "../calendar/colour";
+import { setCalendarSetting } from "../../lib/prefs";
 import { calendarColour } from "../calendar/colour";
 import {
   isProjected,
@@ -284,7 +301,10 @@ export function CalendarPane({
     })
     .filter((row) => row.start !== "");
 
-  const rows: DisplayRow[] = [
+  // Harvest once, over the rows as the host returned them: a calendar switched off
+  // must not reach the month grid, the axis or the agenda, and it must not count as a
+  // conflict either.
+  const allRows: DisplayRow[] = [
     ...(range?.rows ?? []).map((row) => {
       const span = optimistic[row.noteId];
       if (span === undefined) return row as DisplayRow;
@@ -292,6 +312,8 @@ export function CalendarPane({
     }),
     ...taskRows,
   ];
+  const rows: DisplayRow[] = visibleRows(settings, allRows);
+  const calendars = knownCalendars(settings, allRows, CALENDAR_COLOUR_SETTING_PREFIX);
   const unreadable = range?.unreadable ?? [];
 
   /**
@@ -643,8 +665,10 @@ export function CalendarPane({
           : undefined
       }
       className="myne-calendar__chip"
-      // The row's colour is the user's own token choice, so it comes per row.
-      style={{ borderInlineStartColor: calendarColour(settings, row.calendar) }}
+      // The row's colour is the user's own token choice, so it comes per row, and it
+      // arrives as ONE variable: the spine and the wash are the same value or they
+      // drift the first time one of them is edited.
+      style={{ "--calendar-colour": calendarColour(settings, row.calendar) } as CSSProperties}
     >
       {showTime && (
         <span className="myne-calendar__time">
@@ -1151,6 +1175,30 @@ export function CalendarPane({
           onClick={() => setAnchor(parseCivilDate(today) ?? todayCivilDate())}
         />
         <span style={{ flex: "1 1 auto" }} />
+        {/* Which calendars this view draws (owner, 2026-11-10). A multi-select rather
+            than a bespoke menu: it is the primitive that already answers "many things,
+            each on or off", with search for a vault with a dozen calendars. Unticking
+            writes `hidden.<name>` into the same prefs map the colours use, so the
+            choice survives a restart and a second device merges its own. */}
+        {calendars.length > 0 && (
+          <SearchableSelect
+            multiple
+            aria-label={t("calendar.calendarsToggle")}
+            testId="calendar.calendars"
+            options={calendars.map((name) => ({ value: name, label: name }))}
+            selected={calendars.filter((name) => isCalendarVisible(settings, name))}
+            onChange={(next: string[]) => {
+              const shown = new Set(next);
+              for (const name of calendars) {
+                if (shown.has(name) !== isCalendarVisible(settings, name)) {
+                  const entry = hiddenSettingFor(name, !shown.has(name));
+                  void setCalendarSetting(entry.key, entry.value);
+                }
+              }
+              setReload((n) => n + 1);
+            }}
+          />
+        )}
         <IconButton
           icon="calendar-plus"
           label={t("calendar.form.title")}
@@ -1285,6 +1333,7 @@ export function CalendarPane({
       {composing !== null && (
         <CalendarEventForm
           initial={composing}
+          calendars={calendars}
           onClose={() => {
             setComposing(null);
             setReload((n) => n + 1);
@@ -1296,6 +1345,7 @@ export function CalendarPane({
         <CalendarEventForm
           mode="edit"
           initial={formFromRow(editing)}
+          calendars={calendars}
           onClose={() => setEditing(null)}
           onSubmit={async (values) => {
             const plan = planEventForm(values);

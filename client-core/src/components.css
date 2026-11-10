@@ -1964,7 +1964,13 @@
 
 /* An event row: a calendar-coloured spine, then the clock and the title. The
    spine is the chip's own left border, bleeding to the cell's edge so a day's
-   events read as one column of colour. */
+   events read as one column of colour.
+
+   The SURFACE is tinted from the same colour and nowhere else: the caller sets
+   `--calendar-colour` (a token's `var(--…)`, never a literal) and both the spine and
+   the wash come from it. Without the wash an event reads as transparent text
+   floating in a cell (owner, 2026-11-10), and a tint computed from a second value
+   is a spine and a body that disagree the first time one of them is edited. */
 .myne-btn.myne-calendar__chip {
   width: 100%;
   min-width: 0;
@@ -1972,8 +1978,13 @@
   gap: var(--space-1);
   padding: var(--space-0) var(--space-1);
   border: 0;
-  border-inline-start: 3px solid var(--line-2);
+  border-inline-start: 3px solid var(--calendar-colour, var(--line-2));
   border-radius: 0;
+  background: color-mix(
+    in srgb,
+    var(--calendar-colour, var(--line-2)) var(--calendar-wash, 12%),
+    transparent
+  );
   font-size: var(--text-xs);
   font-weight: var(--weight-regular);
   line-height: 1.3;

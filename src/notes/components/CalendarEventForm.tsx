@@ -52,6 +52,16 @@ import { REMINDER_HORIZON_DAYS } from "../../lib/reminderSchedule";
 import { createEvent, type NewEventInput } from "../createEvent";
 
 /**
+ * The two `Select` values the calendar row owns.
+ *
+ * Prefixed rather than raw, because a calendar name is user text and the empty
+ * string is what "no calendar" already means: `c:Work` cannot collide with that
+ * option, and the branch that reads it slices by the prefix's own length.
+ */
+const NO_CALENDAR = "";
+const CALENDAR_PREFIX = "c:";
+
+/**
  * A chosen reminder lead: the bytes plus their length.
  *
  * Deliberately narrower than the reader's `ReminderLead`, whose `beyondHorizon`
@@ -262,6 +272,7 @@ function plusHour(time: string): string {
  */
 export function CalendarEventForm({
   initial,
+  calendars = [],
   mode = "create",
   onSubmit,
   onClose,
@@ -271,6 +282,10 @@ export function CalendarEventForm({
    *  a create would not. */
   readonly mode?: "create" | "edit";
   readonly onSubmit?: (values: EventFormValues) => Promise<void> | void;
+  /** The calendar names the vault knows: the ones with a colour, plus the ones an
+   *  event already carries. The form offers these rather than a free-text box, so a
+   *  typo cannot invent a seventh calendar nobody assigned a colour to. */
+  readonly calendars?: readonly string[];
   readonly onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -457,6 +472,29 @@ export function CalendarEventForm({
               {t("calendar.form.endBeforeStart")}
             </p>
           )}
+        </div>
+
+        <span className="myne-event-form__label">{t("calendar.form.calendarLabel")}</span>
+        <div className="myne-event-form__controls">
+          <Select
+            aria-label={t("calendar.form.calendarLabel")}
+            value={values.calendar === null ? NO_CALENDAR : CALENDAR_PREFIX + values.calendar}
+            options={[
+              { value: NO_CALENDAR, label: t("calendar.form.noCalendar") },
+              // The row's own name first when the vault does not know it (a note
+              // hand-written elsewhere), so opening this form cannot silently
+              // reassign an event to a different calendar.
+              ...(values.calendar !== null && !calendars.includes(values.calendar)
+                ? [{ value: CALENDAR_PREFIX + values.calendar, label: values.calendar }]
+                : []),
+              ...calendars.map((name) => ({ value: CALENDAR_PREFIX + name, label: name })),
+            ]}
+            onChange={(chosen) =>
+              patch({ calendar: chosen === NO_CALENDAR ? null : chosen.slice(CALENDAR_PREFIX.length) })
+            }
+            testId="calendar.form.calendar"
+            style={{ minWidth: "12.5em" }}
+          />
         </div>
 
         <span className="myne-event-form__label myne-event-form__group">

@@ -48,6 +48,10 @@ export default defineConfig(async () => ({
       // The two hour-axis gestures: where a drag landed. One implementation, because
       // two copies is how a phone and a laptop start disagreeing about 10:30.
       { find: "@myne/calendar-gesture", replacement: sib("../src/notes/calendar/gesture.ts") },
+      // Which colour a calendar draws in, and which calendars a view shows: the same
+      // answers the desktop pane uses, so an event cannot be one colour on each.
+      { find: "@myne/calendar-colour", replacement: sib("../src/notes/calendar/colour.ts") },
+      { find: "@myne/calendar-visibility", replacement: sib("../src/notes/calendar/visibility.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
       // The one reader of `skip:`, and the one writer of it (decisions/storage/0795).
       // Aliased rather than reimplemented: the field's bytes are a function of its
