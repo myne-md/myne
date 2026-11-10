@@ -18,7 +18,7 @@
 // locked vault gets a refusal rather than content; the pane says so instead of
 // rendering an empty grid that reads as "nothing scheduled".
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
@@ -104,7 +104,7 @@ import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { skipOccurrence } from "../calendar/skipWrite";
 import { overrideOccurrence } from "../calendar/overrideWrite";
-import { homeClockFor } from "../../lib/homeZone";
+import { homeClockFor, readHomeZone, subscribeHomeZone } from "../../lib/homeZone";
 
 /** A row the pane draws: an event's occurrence, or a due-bearing task. */
 type DisplayRow = CalendarRow & { readonly task?: VaultTask };
@@ -667,6 +667,14 @@ export function CalendarPane({
     />
   );
 
+  // The preference lives in `localStorage` and Settings writes it from another screen,
+  // so the calendar SUBSCRIBES: reading it once during render left an open calendar on
+  // one clock until something unrelated forced a re-render, which is what made the
+  // second clock look like a feature that does nothing.
+  const homeZone = useSyncExternalStore(subscribeHomeZone, readHomeZone);
+  const homeFor = (row: DisplayRow) =>
+    row.allDay ? null : homeClockFor(row.start.replace(" ", "T"), homeZone);
+
   const chip = (row: DisplayRow, showTime: boolean, showGrip = showTime, dragToMove = true) => (
     <Button
       key={`${row.noteId}-${row.start}`}
@@ -730,23 +738,26 @@ export function CalendarPane({
       {showTime && (
         <span className="myne-calendar__time">
           {row.allDay ? t("calendar.allDay") : formatWallClockTime(row.start.slice(11), display)}
-          {(() => {
-            // The second clock (decisions/storage/0797): the note's time is a wall
-            // clock and stays one, so this is an addition to the READING rather
-            // than anything stored. `homeClockFor` answers null when the preference
-            // is unset or is the device's own zone, which is the common case and
-            // must cost the row nothing.
-            const home = homeClockFor(row.start.replace(" ", "T"));
-            if (home === null) return null;
-            const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
-            return (
-              <span data-testid="calendar.row.home-clock" style={{ marginLeft: "var(--space-1)" }}>
-                {`· ${home.time}${day}`}
-              </span>
-            );
-          })()}
         </span>
       )}
+      {/* The second clock (decisions/storage/0797): the note's time is a wall clock
+          and stays one, so this is an addition to the READING and nothing stored.
+          Its OWN line rather than a suffix on the clock: a block in a week column is
+          narrow enough to cut "09:00 · 17:00" mid-string, and a reading nobody can
+          finish is a reading that is not there. `homeClockFor` answers null when the
+          preference is unset or is the device's own zone, so the common case costs
+          the row nothing. */}
+      {showTime &&
+        (() => {
+          const home = homeFor(row);
+          if (home === null) return null;
+          const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
+          return (
+            <span className="myne-calendar__home" data-testid="calendar.row.home-clock">
+              {`${home.time}${day}`}
+            </span>
+          );
+        })()}
       <span className="myne-calendar__title">{row.title ?? t("calendar.untitled")}</span>
       {row.task !== undefined && <Icon name="check" size={10} />}
       {row.occurrenceOf !== null && <Icon name="rotate-ccw" size={10} />}
