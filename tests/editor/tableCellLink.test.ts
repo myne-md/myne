@@ -25,8 +25,8 @@ import {
   cellSuggestionText,
   cellSuggestions,
   CELL_SUGGEST_CAP,
-} from "../../src/editor/decorations/tableCellLink";
-import type { ResolverNote } from "../../src/editor/host/notes/resolveWikilink";
+} from "@myne/editor/decorations/tableCellLink";
+import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 const NOTES: readonly ResolverNote[] = [
   { noteUuid: "id-1", title: "Roadmap", folder: "Projects/" },
