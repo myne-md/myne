@@ -3,10 +3,22 @@
 # remove it — which it refuses to do without a TTY
 # (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Excluding it is both correct and
 # far faster.
+#
+# The nested copies repeat the two heaviest of those exclusions: `target` and
+# `dist` were only excluded at the repository root, so `mobile/src-tauri/target`
+# and `stories/dist` still travelled with every build. Measured: a 3.5 GB context
+# transfer before this line, for an image built from source on every push by
+# `web-container-check`.
 node_modules
 **/node_modules
 target
+**/target
+# Generated mobile build output: a measured build failed while copying
+# mobile/src-tauri/gen/apple/build/arm64/Myne.ipa into the image, an artefact
+# that has nothing to do with the web client being built.
+**/gen/**/build
 dist
+**/dist
 web/dist
 .git
 e2e/artifacts
