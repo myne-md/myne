@@ -5,7 +5,7 @@
   "src/components/settings/VaultPanel.tsx": 2,
   "src/notes/components/ArchivePanel.tsx": 5,
   "src/notes/components/ChatHistoryModal.tsx": 1,
-  "src/notes/components/ColorGroupEditor.tsx": 4,
+  "src/notes/components/ColorGroupEditor.tsx": 3,
   "src/notes/components/DecorationPopover.tsx": 4,
   "src/notes/components/FolderRow.tsx": 2,
   "src/notes/components/GraphSettingsPanel.tsx": 1,

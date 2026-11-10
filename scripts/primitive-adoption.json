@@ -115,7 +115,6 @@
   "mobile/src/app/flows/editor/sheets/FolderActionsSheet.tsx": 1,
   "mobile/src/app/flows/editor/sheets/NoteActionsSheet.tsx": 2,
   "mobile/src/app/flows/editor/sheets/NoteRowActionsSheet.tsx": 1,
-  "mobile/src/app/flows/editor/sheets/ReorderRow.tsx": 1,
   "mobile/src/app/flows/editor/sheets/SortSheet.tsx": 1,
   "mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx": 9,
   "mobile/src/app/flows/editor/sheets/VaultSwitcher.tsx": 3,
