@@ -89,14 +89,19 @@ export function EventComposerSheet({
   const [repeat, setRepeat] = useState(REPEAT_VALUES.indexOf(edit?.repeat ?? ""));
   const [remind, setRemind] = useState(REMIND_VALUES.indexOf(edit?.remind ?? ""));
   const [calendar, setCalendar] = useState(edit?.calendar ?? "");
+  // The DAY is editable too. Dragging a block is the fast way to move an event, and
+  // this field is the way that does not need a pointer (WCAG 2.5.7): without it a
+  // keyboard or switch user could change an event's clock but never its day.
+  const [day, setDay] = useState(date);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const startInstant = allDay ? instantFor(date, null) : instantFor(date, start);
-  const endInstant = allDay || end.trim() === "" ? null : instantFor(date, end);
+  const startInstant = allDay ? instantFor(day, null) : instantFor(day, start);
+  const endInstant = allDay || end.trim() === "" ? null : instantFor(day, end);
   const startInvalid = startInstant === null;
+  const dayInvalid = parseCivilDate(day) === null;
   const endInvalid = !allDay && end.trim() !== "" && endInstant === null;
-  const canCreate = title.trim() !== "" && !startInvalid && !endInvalid && !busy;
+  const canCreate = title.trim() !== "" && !dayInvalid && !startInvalid && !endInvalid && !busy;
 
   async function create() {
     if (startInstant === null) return;
@@ -170,6 +175,15 @@ export function EventComposerSheet({
             onToggle={() => setAllDay((current) => !current)}
           />
         </div>
+
+        <TextField
+          label={t("calendar.composer.date")}
+          value={day}
+          onChange={setDay}
+          testId="calendar.composer.date-field"
+          mono
+        />
+        {dayInvalid && <p role="alert" style={{ margin: "var(--space-0)", fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="calendar.composer.badDate">{t("calendar.composer.badDate")}</p>}
 
         {!allDay && (
           <div style={{ display: "flex", gap: "var(--space-3)" }}>

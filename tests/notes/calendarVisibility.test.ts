@@ -81,13 +81,13 @@ describe("hiding a calendar", () => {
 
 describe("the event form's calendar row", () => {
   it("emits the chosen calendar", () => {
-    const plan = planEventForm({ ...emptyEventForm("2026-11-05", "Work", "09:00"), title: "Standup" });
+    const plan = planEventForm({ ...emptyEventForm("2026-11-05", "Work"), startTime: "09:00", title: "Standup" });
     expect(plan.ok).toBe(true);
     expect(plan.ok && plan.input.calendar).toBe("Work");
   });
 
   it("emits no calendar at all when the row is left on 'no calendar'", () => {
-    const plan = planEventForm({ ...emptyEventForm("2026-11-05", null, "09:00"), title: "Standup" });
+    const plan = planEventForm({ ...emptyEventForm("2026-11-05", null), startTime: "09:00", title: "Standup" });
     expect(plan.ok && plan.input.calendar).toBeNull();
   });
 
