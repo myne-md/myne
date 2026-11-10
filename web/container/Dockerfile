@@ -43,10 +43,25 @@ RUN ./scripts/build-wasm.sh
 # form and is replaced by the reproducible-build pipeline.
 FROM node:25-slim AS build
 WORKDIR /src
-COPY . .
-COPY --from=wasm /src/web/wasm/pkg ./web/wasm/pkg
+# Manifests first, install second, source tree third. The order is the cache:
+# `web-container-check` rebuilds this image on every push, and `COPY . .` ahead
+# of the install meant any source edit invalidated the pnpm layer and reinstalled
+# the whole workspace. Every workspace member's manifest has to be here, because
+# `pnpm install --frozen-lockfile` resolves the workspace from them.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY mobile/package.json ./mobile/
+COPY dialect/package.json ./dialect/
+COPY editor/package.json ./editor/
+COPY copy/package.json ./copy/
+COPY client-core/package.json ./client-core/
+COPY ornaments/package.json ./ornaments/
+COPY preview/package.json ./preview/
 RUN corepack enable pnpm || npm install -g pnpm@11.8.0
 RUN pnpm install --frozen-lockfile --ignore-scripts
+# node_modules is excluded from the build context, so this copy adds the source
+# without touching the tree the install just produced.
+COPY . .
+COPY --from=wasm /src/web/wasm/pkg ./web/wasm/pkg
 # `.git` is excluded from the build context (it is large and carries nothing the
 # bundle needs), so `emit-web-version.mjs` cannot read the commit from git here.
 # Passed in instead — still the COMMIT's identity and its own timestamp, never a
