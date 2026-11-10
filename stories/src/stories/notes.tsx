@@ -461,6 +461,23 @@ const CALENDAR_FIXTURE: Fixture = {
           repeatUnrecognized: false,
         },
         {
+          // The owner's own report, kept as a specimen: nine till ten has to LOOK
+          // like one hour of the axis, and it did not while a row was drawn inside
+          // the hour it started in.
+          noteId: "n6",
+          title: "Fransaya gidis",
+          folder: "Travel/",
+          calendar: "Personal",
+          start: "2026-11-05 09:00",
+          end: "2026-11-05 10:00",
+          allDay: false,
+          occurrenceOf: null,
+          occurrenceDate: null,
+          conflicts: false,
+          repeat: null,
+          repeatUnrecognized: false,
+        },
+        {
           noteId: "n5",
           title: "Design review",
           folder: "Projects/",
@@ -1512,7 +1529,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "week",
     description:
-      "The week view around 5 November 2026: seven columns on ONE hour axis, so 10:00 is the same line across the week and an empty hour is a place a pointer can put something. The three-day trip draws in the all-day band above the axis rather than at a made-up midnight, overlapping rows are tinted, and each row carries its calendar's colour on its spine.",
+      "The week view around 5 November 2026: seven columns on ONE hour axis, so 10:00 is the same line across the week and an empty hour is a place a pointer can put something. A timed event is a BLOCK over the minutes it spans rather than a row pinned inside the hour it starts in, so nine till ten covers the hour after nine; two rows sharing minutes split the column's width instead of one covering the other. Pressing empty space and dragging draws a range that opens the form in it, and dragging an event's top or bottom edge moves that instant. The three-day trip draws in the all-day band above the axis rather than at a made-up midnight, overlapping rows are tinted, and each row carries its calendar's colour on its spine.",
     tags: ["notes", "calendar", "pane", "week", "hour-axis", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
@@ -1531,7 +1548,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "day",
     description:
-      "The day view: one column with the hours named down its axis, opened where the day starts rather than at midnight, so a 14:00 event sits level with the label that says so and an empty hour is a target. Each hour offers capture at itself; an all-day event sits in the band above the axis rather than at a made-up hour.",
+      "The day view: one column with the hours named down its axis, opened where the day starts rather than at midnight, so a 14:00 event starts level with the label that says so, covers its own hour of the axis, and an empty hour is a target. Each hour offers capture at itself; a drag down the column draws a range and opens the form in it, and an all-day event sits in the band above the axis rather than at a made-up hour.",
     tags: ["notes", "calendar", "pane", "day", "hour-axis", "capture", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (

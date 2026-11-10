@@ -1730,6 +1730,10 @@
 }
 
 .myne-calendar__column {
+  /* The containing block for this day's block layer: a block's `top`/`height` are
+     percentages of THIS column, which is why an event can be 1.5 hours tall while
+     the slot it starts in is not. */
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1737,12 +1741,96 @@
 }
 
 /* An hour, and a place to put something in it. The tint on hover is the whole
-   affordance: the row is what you click to add at that hour. */
+   affordance: the row is what you click (or drag) to add at that hour. It is a
+   RULE and a target, never a container - a row inside it could not be taller than
+   the hour, which is the defect the block layer exists for. */
 .myne-calendar__slot {
   position: relative;
   min-height: var(--space-7);
   padding: var(--space-0) var(--space-1);
   border-block-start: 1px solid var(--line-1);
+  cursor: pointer;
+}
+
+/* Where the timed rows live: over the hours, not inside them, so an event occupies
+   the minutes it actually spans. `pointer-events: none` because the layer covers
+   the whole day - a press must reach the slot below it to start a create-drag -
+   and each block and its grips turn it back on for themselves. */
+.myne-calendar__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.myne-calendar__block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-height: var(--space-4);
+  pointer-events: auto;
+  overflow: hidden;
+  border-radius: var(--radius-1);
+}
+
+/* The chip fills its block: the block owns the geometry, the chip owns the row's
+   own look (spine, time, title) so a month cell and an hour axis draw one chip.
+
+   Inside a block the row has HEIGHT, so the clock and the title stack rather than
+   sharing one ellipsised line: `9:00 AM Fransaya gid…` is what an inline pair
+   produces in a 200px column, and the whole point of a spanning block is that the
+   hour has room to say what is in it. */
+.myne-calendar__block > .myne-calendar__chip {
+  flex: 1 1 auto;
+  height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-0);
+  white-space: normal;
+  text-align: start;
+}
+
+.myne-calendar__block > .myne-calendar__chip .myne-calendar__title {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* The edge you drag to move one instant. Invisible until the pointer is on the
+   block, because a hairline on every event in a week is a ladder, and 6px is the
+   band a pointer has to land in. */
+.myne-calendar__grip {
+  position: absolute;
+  inset-inline: 0;
+  height: 6px;
+  z-index: var(--z-local);
+  cursor: ns-resize;
+}
+
+.myne-calendar__grip[data-edge="start"] {
+  top: 0;
+}
+
+.myne-calendar__grip[data-edge="end"] {
+  bottom: 0;
+}
+
+.myne-calendar__grip:hover {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+/* The range a create-drag is drawing: an empty outline, because nothing exists
+   until the form is saved, and a filled one would claim it does. */
+.myne-calendar__ghost {
+  position: absolute;
+  inset-inline: var(--space-0);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-1);
+  background: var(--accent-soft);
+  pointer-events: none;
 }
 
 .myne-calendar__slot:hover {
