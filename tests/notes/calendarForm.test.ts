@@ -117,6 +117,15 @@ describe("the form and the note are the same record", () => {
     expect(roundTrip(form)).toEqual(form);
   });
 
+  it("ends a timed event at its own start when the end carries no hour", () => {
+    // A date-only end on a 09:00 event: the field prints 09:00, so the note has to
+    // carry 09:00. Storing midnight instead was a refusal the user could not see
+    // the cause of, on a value they never typed.
+    const plan = planEventForm(values({ startTime: "09:00", endDate: "2026-11-05" }));
+    if (!plan.ok) throw new Error("refused");
+    expect(plan.input.end?.time).toBe("09:00");
+  });
+
   it("round-trips a multi-day span", () => {
     const form = values({ startDate: "2026-11-05", endDate: "2026-11-07" });
     expect(roundTrip(form)).toEqual(form);

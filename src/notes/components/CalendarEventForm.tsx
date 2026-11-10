@@ -42,6 +42,7 @@ import {
   type EventInstant,
 } from "@myne/dialect/event";
 import { Button } from "../../components/primitives/Button";
+import { IconButton } from "../../components/primitives/IconButton";
 import { Input } from "../../components/primitives/Input";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { Segmented } from "../../components/primitives/Segmented";
@@ -190,10 +191,13 @@ export function planEventForm(
 
   let end: EventInstant | null = null;
   if (values.endDate !== null) {
-    // An end that carries a time while the start does not is the shape §3.10.2
-    // refuses, so the end's time follows the start's: an all-day event ends at the
-    // end of its last day, never at an hour nobody chose.
-    end = instantOf(values.endDate, values.startTime === null ? null : values.endTime);
+    // The end's time follows the start's: an all-day event ends at the end of its
+    // last day, never at an hour nobody chose, and a timed one with no hour of its
+    // own ends when the start does - which is what the field prints for it.
+    end = instantOf(
+      values.endDate,
+      values.startTime === null ? null : (values.endTime ?? values.startTime),
+    );
     if (end === null) return { ok: false, refusal: { field: "end", reason: "end-before-start" } };
     if (compareInstants(end, start) < 0) {
       return { ok: false, refusal: { field: "end", reason: "end-before-start" } };
@@ -237,15 +241,17 @@ function compareInstants(a: EventInstant, b: EventInstant): number {
 }
 
 /**
- * The relative leads the control offers.
- *
- * **One minute is the floor**, because that is the grammar's own floor
- * (`parseReminderLead` refuses a count below 1, so a file cannot carry `0m`). An
- * option the writer cannot express is an option that silently becomes "no
- * reminder", and `tests/notes/calendarForm.test.ts` parses every entry here
- * precisely so a future addition cannot reintroduce one.
+ * The relative leads the control offers. **One minute is the floor**: that is the
+ * grammar's own (`parseReminderLead` refuses a count below 1), and an option the
+ * writer cannot express silently becomes "no reminder". `tests/notes/calendarForm.test.ts`
+ * parses every entry here so a future addition cannot reintroduce one.
  */
 export const LEAD_CHOICES: readonly string[] = ["1m", "10m", "30m", "1h", "2h", "1d", "2d", "7d"];
+
+function plusHour(time: string): string {
+  const minutes = Math.min(23 * 60 + 59, Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5)) + 60);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
 
 /**
  * The event form.
@@ -296,26 +302,90 @@ export function CalendarEventForm({
 
   const allDay = values.startTime === null;
 
+  const removeEnd = useCallback(() => patch({ endDate: null, endTime: null }), [patch]);
+
+  // An end equal to the start draws nothing, so the offer seeds an hour later.
+  const addEnd = useCallback(
+    () =>
+      patch({
+        endDate: values.startDate,
+        endTime: allDay ? null : plusHour(values.startTime ?? "09:00"),
+      }),
+    [patch, values.startDate, values.startTime, allDay],
+  );
+
+  // The clock coming back has to reach the END too: a `null` there is midnight.
+  const setAllDay = useCallback(
+    (next: string) => {
+      if (next === "all-day") {
+        patch({ startTime: null, endTime: null });
+        return;
+      }
+      const startTime = values.startTime ?? "09:00";
+      patch({
+        startTime,
+        ...(values.endDate === null ? {} : { endTime: values.endTime ?? plusHour(startTime) }),
+      });
+    },
+    [patch, values.startTime, values.endDate, values.endTime],
+  );
+
+  const repeatKind = values.repeat === null ? "never" : values.repeat.kind;
+  const ordinal = values.repeat?.kind === "ordinal" ? values.repeat : null;
+  const repeatOptions = [
+    { value: "never", label: t("calendar.form.repeatNever") },
+    { value: "interval", label: t("calendar.form.repeatInterval") },
+    { value: "weekdays", label: t("calendar.form.repeatWeekdays") },
+    { value: "dayOfMonth", label: t("calendar.form.repeatDayOfMonth") },
+    // A rule the picker cannot CREATE but can EDIT - and printed "Never" without it.
+    ...(ordinal === null
+      ? []
+      : [
+          {
+            value: "ordinal",
+            label: t("recurrence.ordinalOfMonth", {
+              ordinal: t(`recurrence.ordinal.${ordinal.ordinal}`),
+              weekday: t(`recurrence.weekday.${ordinal.weekday}`),
+            }),
+          },
+        ]),
+  ];
+
   return (
-    <ModalShell open title={t(mode === "edit" ? "calendar.form.editTitle" : "calendar.form.title")} labelId={titleId} onClose={onClose} testId="calendar.form">
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-        <label htmlFor={titleId} style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.eventTitle")}</span>
+    <ModalShell
+      open
+      width={520}
+      title={t(mode === "edit" ? "calendar.form.editTitle" : "calendar.form.title")}
+      labelId={titleId}
+      onClose={onClose}
+      testId="calendar.form"
+    >
+      <div className="myne-event-form">
+        <label htmlFor={titleId} className="myne-event-form__label">
+          {t("calendar.form.eventTitle")}
+        </label>
+        <div className="myne-event-form__controls">
           <Input
             id={titleId}
+            style={{ flex: "1 1 auto" }}
             value={values.title}
             onChange={(event) => patch({ title: event.target.value })}
+            invalid={refusal?.field === "title"}
             aria-invalid={refusal?.field === "title" ? true : undefined}
           />
-        </label>
+          {refusal?.field === "title" && (
+            <p role="alert" className="myne-event-form__alert">
+              {t("calendar.form.titleRequired")}
+            </p>
+          )}
+        </div>
 
-        <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <legend style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.when")}</legend>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            {/* Every control in this fieldset is the app's own (myne-md/myne#1037):
-                the platform's date, time and number widgets ignore the tokens, so
-                they were the one surface where a custom palette reached nothing
-                and every OS drew the form differently. */}
+        <span className="myne-event-form__label">{t("calendar.form.starts")}</span>
+        <div className="myne-event-form__controls myne-event-form__controls--stacked">
+          <div className="myne-event-form__line">
+            {/* Every control here is the app's own (myne-md/myne#1037): the
+                platform's date and time widgets ignore the tokens, so they were
+                the one surface where a custom palette reached nothing. */}
             <DateField
               label={t("calendar.form.startDate")}
               value={values.startDate}
@@ -324,67 +394,85 @@ export function CalendarEventForm({
               }}
               testId="calendar.form.startDate"
             />
-            <Segmented
-              ariaLabel={t("calendar.form.allDay")}
-              value={allDay ? "all-day" : "timed"}
-              options={[
-                { value: "all-day", label: t("calendar.form.allDay") },
-                { value: "timed", label: t("calendar.form.timed") },
-              ]}
-              onChange={(next) =>
-                patch({ startTime: next === "all-day" ? null : (values.startTime ?? "09:00"), endTime: null })
-              }
-              testId="calendar.form.allDayToggle"
-            />
             {!allDay && (
               <TimeField
                 label={t("calendar.form.startTime")}
                 value={values.startTime}
                 onChange={(next) => patch({ startTime: next })}
                 testId="calendar.form.startTime"
+                allowEmpty={false}
               />
             )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            <DateField
-              label={t("calendar.form.endDate")}
-              value={values.endDate}
-              allowEmpty
-              onChange={(next) => patch({ endDate: next })}
-              testId="calendar.form.endDate"
-            />
-            {!allDay && values.endDate !== null && (
-              <TimeField
-                label={t("calendar.form.endTime")}
-                value={values.endTime ?? values.startTime}
-                onChange={(next) => patch({ endTime: next })}
-                testId="calendar.form.endTime"
+          {/* Under the pair it modifies: wrapping in ONE state moves the target. */}
+          <Segmented
+            ariaLabel={t("calendar.form.allDay")}
+            size="sm"
+            value={allDay ? "all-day" : "timed"}
+            options={[
+              { value: "all-day", label: t("calendar.form.allDay") },
+              { value: "timed", label: t("calendar.form.timed") },
+            ]}
+            onChange={setAllDay}
+            testId="calendar.form.allDayToggle"
+          />
+        </div>
+
+        <span className="myne-event-form__label">{t("calendar.form.ends")}</span>
+        <div className="myne-event-form__controls">
+          {values.endDate === null ? (
+            <Button variant="ghost" icon="plus" data-testid="calendar.form.endAdd" onClick={addEnd}>
+              {t("calendar.form.addEnd")}
+            </Button>
+          ) : (
+            <>
+              <DateField
+                label={t("calendar.form.endDate")}
+                value={values.endDate}
+                onChange={(next) => {
+                  if (next !== null) patch({ endDate: next });
+                }}
+                testId="calendar.form.endDate"
               />
-            )}
-          </div>
+              {!allDay && (
+                <TimeField
+                  label={t("calendar.form.endTime")}
+                  value={values.endTime ?? values.startTime}
+                  onChange={(next) => patch({ endTime: next })}
+                  testId="calendar.form.endTime"
+                  allowEmpty={false}
+                />
+              )}
+              <IconButton
+                icon="x"
+                label={t("calendar.form.clearEnd")}
+                iconSize={12}
+                testId="calendar.form.endClear"
+                onClick={removeEnd}
+              />
+            </>
+          )}
           {refusal?.field === "end" && (
-            <p role="alert" style={{ color: "var(--danger)", fontSize: "var(--text-xs)" }}>
+            <p role="alert" className="myne-event-form__alert">
               {t("calendar.form.endBeforeStart")}
             </p>
           )}
-        </fieldset>
+        </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.repeat")}</span>
-          <Segmented
-            ariaLabel={t("calendar.form.repeat")}
-            value={values.repeat === null ? "never" : values.repeat.kind}
-            options={[
-              { value: "never", label: t("calendar.form.repeatNever") },
-              { value: "interval", label: t("calendar.form.repeatInterval") },
-              { value: "weekdays", label: t("calendar.form.repeatWeekdays") },
-              { value: "dayOfMonth", label: t("calendar.form.repeatDayOfMonth") },
-            ]}
-            onChange={(next) => patch({ repeat: defaultRuleFor(next) })}
+        <span className="myne-event-form__label myne-event-form__group">
+          {t("calendar.form.repeat")}
+        </span>
+        <div className="myne-event-form__controls myne-event-form__group">
+          <Select
+            aria-label={t("calendar.form.repeat")}
+            value={repeatKind}
+            options={repeatOptions}
+            onChange={(next) => patch({ repeat: defaultRuleFor(next), repeatUntouched: false })}
             testId="calendar.form.repeatKind"
+            style={{ minWidth: "15em" }}
           />
           {values.repeat?.kind === "interval" && (
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <>
               <CountField
                 label={t("calendar.form.repeatCount")}
                 value={values.repeat.count}
@@ -415,7 +503,7 @@ export function CalendarEventForm({
                   })
                 }
               />
-            </div>
+            </>
           )}
           {values.repeat?.kind === "weekdays" && (
             <Select
@@ -426,7 +514,7 @@ export function CalendarEventForm({
             />
           )}
           {values.repeat?.kind === "dayOfMonth" && (
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <>
               <CountField
                 label={t("calendar.form.repeatDay")}
                 // A "last day" rule has no number to step; stepping makes it
@@ -443,10 +531,10 @@ export function CalendarEventForm({
               >
                 {t("calendar.form.repeatLastDay")}
               </Button>
-            </div>
+            </>
           )}
           {values.repeat?.kind === "ordinal" && (
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <>
               <Select
                 aria-label={t("calendar.form.repeatOrdinal")}
                 value={values.repeat.ordinal}
@@ -475,39 +563,36 @@ export function CalendarEventForm({
                   })
                 }
               />
-            </div>
+            </>
           )}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>
-            {t("calendar.form.remind", { days: REMINDER_HORIZON_DAYS })}
-          </span>
+        <span className="myne-event-form__label">{t("calendar.form.remindLabel")}</span>
+        <div className="myne-event-form__controls">
           <Select
-            aria-label={t("calendar.form.remind")}
+            aria-label={t("calendar.form.remind", { days: REMINDER_HORIZON_DAYS })}
             value={values.remind?.raw ?? "none"}
             options={[
               { value: "none", label: t("calendar.form.remindNone") },
               ...LEAD_CHOICES.map((lead) => ({ value: lead, label: t(`calendar.form.lead.${lead}`) })),
             ]}
             onChange={(lead) =>
-              patch({ remind: lead === "none" ? null : (parseReminderLead(lead) ?? null) })
+              patch({
+                remind: lead === "none" ? null : (parseReminderLead(lead) ?? null),
+                remindUntouched: false,
+              })
             }
+            testId="calendar.form.remind"
+            style={{ minWidth: "12.5em" }}
           />
           {refusal?.field === "remind" && (
-            <p role="alert" style={{ color: "var(--danger)", fontSize: "var(--text-xs)" }}>
+            <p role="alert" className="myne-event-form__alert">
               {t("calendar.form.leadBeyondHorizon", { days: refusal.horizonDays ?? REMINDER_HORIZON_DAYS })}
             </p>
           )}
         </div>
 
-        {refusal?.field === "title" && (
-          <p role="alert" style={{ color: "var(--danger)", fontSize: "var(--text-xs)" }}>
-            {t("calendar.form.titleRequired")}
-          </p>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
+        <div className="myne-event-form__footer">
           <Button variant="ghost" onClick={onClose}>
             {t("common.cancel")}
           </Button>
