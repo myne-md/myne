@@ -2160,11 +2160,22 @@ steps:
       - apk add --no-cache curl
       - |
         if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover secret absent; skipping"; exit 0; fi
-        curl -fsS -m 15 \
+        # The message field is capped at 1024 characters by the API and this step
+        # sent the whole commit body. Measured on pipeline 1596: the commit it
+        # reported (aedbfa235) has a 3208-byte body, and every failure pipeline
+        # before it failed this step the same way — `curl: (22) The requested URL
+        # returned error: 400` — so no failure notification has ever reached the
+        # phone. Truncate to fit, and keep the response body (`--fail-with-body`)
+        # so the next rejection names the field it did not like. The doubled dollar
+        # in the length test is the escape Woodpecker's envsubst needs: it rewrites
+        # the whole file before the shell sees it, and a single one fails compile.
+        BODY="$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE"
+        if [ "$${#BODY}" -gt 1000 ]; then BODY="$(printf '%s' "$BODY" | cut -c1-997)..."; fi
+        curl -sS -m 15 --fail-with-body \
           --data-urlencode "token=$PUSHOVER_TOKEN" \
           --data-urlencode "user=$PUSHOVER_GROUP" \
           --data-urlencode "title=❌ $CI_REPO_NAME failed · $CI_COMMIT_BRANCH" \
-          --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
+          --data-urlencode "message=$BODY" \
           --data-urlencode "url=$CI_PIPELINE_URL" \
           https://api.pushover.net/1/messages.json
     # ─── The org-wide notify rule, stated because it was not (myne-md/myne#584) ──

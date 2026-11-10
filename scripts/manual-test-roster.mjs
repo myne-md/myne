@@ -7732,7 +7732,7 @@ export const ROSTER = Object.freeze([
       "mobile/src/app/flows/editor/sheets/FolderActionsSheet.tsx",
       "mobile/src/app/flows/editor/sheets/NoteActionsSheet.tsx",
       "mobile/src/app/flows/editor/sheets/NoteRowActionsSheet.tsx",
-      "mobile/src/app/flows/editor/sheets/SortSheet.tsx",
+      "mobile/src/app/flows/editor/sheets/ActionRow.tsx",
       "mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",
       "mobile/src/app/flows/editor/sheets/VaultSwitcher.tsx",
       "mobile/src/app/flows/editor/sheets/ViewsSheet.tsx",

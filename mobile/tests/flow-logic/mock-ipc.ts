@@ -475,20 +475,22 @@ export interface MockConfig {
    *  instantaneous, which makes the running state unobservable. */
   transcribeDelayMs?: number;
   /** Whether the device-local `myne.aiOnboardingSeen` flag is set before boot.
-   *  Defaults to `true`, so the first-run `AiOnboardingSheet` stays closed and
-   *  its full-viewport scrim cannot swallow the clicks of every editor-mounted
-   *  spec (myne#805). Set `false` to assert the onboarding itself. */
+   *  Defaults to `true`, so a spec that walks into Settings → AI meets the panel
+   *  itself rather than the first-run explainer over it. Set `false` to assert the
+   *  onboarding; note it is offered from that row now, never on unlock (owner,
+   *  2026-11-10), so the flag no longer decides whether an editor-mounted spec has a
+   *  scrim swallowing its clicks. */
   aiOnboardingSeen?: boolean;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
 export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<void> {
   await page.addInitScript((config: MockConfig) => {
-    // Device-local first-run surfaces are seeded SEEN by default (myne#805).
-    // `AiOnboardingSheet` opens whenever `myne.aiOnboardingSeen` is absent and
-    // its full-viewport scrim then intercepts every click, which took out the
-    // whole editor-mounted flow tier. A spec that actually exercises onboarding
-    // opts out with `aiOnboardingSeen: false`.
+    // Device-local first-run surfaces are seeded SEEN by default (myne#805):
+    // `AiOnboardingSheet` is offered from Settings → AI whenever
+    // `myne.aiOnboardingSeen` is absent, and its full-viewport scrim would
+    // intercept the panel clicks the AI specs make. A spec that exercises the
+    // onboarding opts out with `aiOnboardingSeen: false`.
     try {
       if (config.aiOnboardingSeen === false) {
         localStorage.removeItem("myne.aiOnboardingSeen");

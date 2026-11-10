@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
+import { ActionRow, ActionRowSeparator } from "./ActionRow";
 
 /** Long-press action sheet for a note-list ROW (distinct from NoteActionsSheet,
  *  which acts on the open note). Star/unstar lives here — for non-favorited rows
@@ -31,35 +31,40 @@ export function NoteRowActionsSheet({
    *  outside the plain notes tree (where `item_order` is the active ordering). */
 }) {
   const { t } = useTranslation();
-  // Rows sit flush inside the Sheet — separated by hairlines WITHIN a logical
-  // group, and by a heavier group separator BETWEEN groups (open / organize /
-  // destructive, Obsidian-style), the mobile twin of the desktop ContextMenu's
-  // `group` dividers. `groupTop` drops a row's top hairline when a separator
-  // already precedes it (no double line).
-  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean; testId?: string }): ReactNode => (
-    <button
-      onClick={onClick}
-      data-testid={opts?.testId}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: opts?.groupTop ? "none" : "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: opts?.danger ? "var(--danger)" : "var(--fg-1)" }}
-    >
-      {text}
-    </button>
-  );
-  const sep: ReactNode = <div aria-hidden style={{ height: 1, background: "var(--line-2)", margin: "7px 0" }} />;
   return (
     <Sheet onClose={onClose} padded={false}>
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-          {row(t("notes.cardMenu.open"), onOpen)}
-          {sep}
-          {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite, { groupTop: true, testId: "notes.favorite-action" })}
-          {row(t("editor.noteMenu.moveToFolder"), onMove)}
-          {row(t("notes.list.color"), onColor, { testId: "notes.note-color-action" })}
+          <ActionRow icon="file-text" label={t("notes.cardMenu.open")} onClick={onOpen} />
+          <ActionRowSeparator />
+          <ActionRow
+            icon="star"
+            label={favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites")}
+            onClick={onToggleFavorite}
+            groupTop
+            testId="notes.favorite-action"
+          />
+          {/* The glyph is the desktop note menu's `folder`, on its own "Move to…"
+              row: the picture is shared even though this client's label is its own
+              key. */}
+          <ActionRow icon="folder" label={t("editor.noteMenu.moveToFolder")} onClick={onMove} />
+          <ActionRow
+            icon="palette"
+            label={t("notes.list.color")}
+            onClick={onColor}
+            testId="notes.note-color-action"
+          />
 
-          {row(t("notes.archive.title"), onArchive)}
-          {sep}
-          {row(t("common.movetotrash"), onTrash, { danger: true, groupTop: true })}
+          <ActionRow icon="archive" label={t("notes.archive.title")} onClick={onArchive} />
+          <ActionRowSeparator />
+          <ActionRow
+            icon="trash"
+            label={t("common.movetotrash")}
+            onClick={onTrash}
+            danger
+            groupTop
+          />
         </>
       )}
     </Sheet>

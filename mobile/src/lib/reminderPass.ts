@@ -95,6 +95,16 @@ export function boundedReminders(
   return [...target].sort(bySoonest).slice(0, max);
 }
 
+/** Whether these sources would register anything at all — the question the
+ *  permission prompt must answer before it may interrupt anybody. */
+export function hasPendingReminders(
+  sources: { tasks: readonly VaultTask[]; events?: readonly EventReminderSource[]; dayAnchor?: string },
+  clock: ReminderClock,
+  horizonDays: number = REMINDER_HORIZON_DAYS,
+): boolean {
+  return targetRemindersFor({ ...sources, events: sources.events ?? [] }, clock(), horizonDays).length > 0;
+}
+
 export type BoundedReminderPassOptions = {
   tasks: readonly VaultTask[];
   /**

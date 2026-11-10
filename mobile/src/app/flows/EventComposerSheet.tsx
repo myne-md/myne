@@ -89,14 +89,19 @@ export function EventComposerSheet({
   const [repeat, setRepeat] = useState(REPEAT_VALUES.indexOf(edit?.repeat ?? ""));
   const [remind, setRemind] = useState(REMIND_VALUES.indexOf(edit?.remind ?? ""));
   const [calendar, setCalendar] = useState(edit?.calendar ?? "");
+  // The DAY is editable too. Dragging a block is the fast way to move an event, and
+  // this field is the way that does not need a pointer (WCAG 2.5.7): without it a
+  // keyboard or switch user could change an event's clock but never its day.
+  const [day, setDay] = useState(date);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const startInstant = allDay ? instantFor(date, null) : instantFor(date, start);
-  const endInstant = allDay || end.trim() === "" ? null : instantFor(date, end);
+  const startInstant = allDay ? instantFor(day, null) : instantFor(day, start);
+  const endInstant = allDay || end.trim() === "" ? null : instantFor(day, end);
   const startInvalid = startInstant === null;
+  const dayInvalid = parseCivilDate(day) === null;
   const endInvalid = !allDay && end.trim() !== "" && endInstant === null;
-  const canCreate = title.trim() !== "" && !startInvalid && !endInvalid && !busy;
+  const canCreate = title.trim() !== "" && !dayInvalid && !startInvalid && !endInvalid && !busy;
 
   async function create() {
     if (startInstant === null) return;
@@ -149,12 +154,22 @@ export function EventComposerSheet({
   }
 
   return (
-    <Sheet onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }} data-testid="calendar.composer">
-        <h2 style={{ margin: "var(--space-0)", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>
-          {edit === undefined ? t("calendar.composer.title") : t("common.edit")}
-        </h2>
-
+    // The sheet is TALLER than a phone, and it used to be unbounded: nine fields,
+    // two of them segmented rows, pushed Create and Cancel off the bottom edge — and
+    // the part that fell off was under the tab bar besides (owner, 2026-11-10). So the
+    // card caps its height, the FIELDS scroll inside it, and the two buttons stay
+    // pinned at the bottom where a thumb expects them.
+    <Sheet
+      onClose={onClose}
+      style={{ maxHeight: "88%", display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
+      <h2 style={{ margin: "var(--space-0) 0 var(--space-3)", flex: "none", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>
+        {edit === undefined ? t("calendar.composer.title") : t("common.edit")}
+      </h2>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", overflowY: "auto", minHeight: 0, flex: "1 1 auto" }}
+        data-testid="calendar.composer"
+      >
         <TextField
           label={t("calendar.composer.titleLabel")}
           value={title}
@@ -171,7 +186,20 @@ export function EventComposerSheet({
           />
         </div>
 
+        <TextField
+          label={t("calendar.composer.date")}
+          value={day}
+          onChange={setDay}
+          testId="calendar.composer.date-field"
+          mono
+        />
+        {dayInvalid && <p role="alert" style={{ margin: "var(--space-0)", fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="calendar.composer.badDate">{t("calendar.composer.badDate")}</p>}
+
         {!allDay && (
+          // Two fields, one row: each takes an equal share and is allowed to shrink.
+          // `TextField`'s wrapper has no `flex`, so without this the pair claimed
+          // their intrinsic ~20-character width in a row narrower than that and the
+          // END field hung off the right edge (owner, 2026-11-10).
           <div style={{ display: "flex", gap: "var(--space-3)" }}>
             <TextField
               label={t("calendar.composer.start")}
@@ -179,6 +207,7 @@ export function EventComposerSheet({
               onChange={setStart}
               testId="calendar.composer.start-field"
               mono
+              style={{ flex: "1 1 0", minWidth: 0 }}
             />
             <TextField
               label={t("calendar.composer.end")}
@@ -186,6 +215,7 @@ export function EventComposerSheet({
               onChange={setEnd}
               testId="calendar.composer.end-field"
               mono
+              style={{ flex: "1 1 0", minWidth: 0 }}
             />
           </div>
         )}
@@ -248,6 +278,8 @@ export function EventComposerSheet({
           autoCapitalize="words"
         />
 
+      </div>
+      <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "var(--space-2)", paddingTop: "var(--space-4)" }}>
         <Button disabled={!canCreate} onClick={() => void create()} data-testid="calendar.composer.create">
           {edit === undefined ? t("calendar.composer.create") : t("calendar.form.save")}
         </Button>

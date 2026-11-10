@@ -15,11 +15,14 @@
 //
 // # Gestures are pointer gestures, never HTML5 drag
 //
-// `draggable` does not fire on touch, so every move here is `pointerdown` ->
-// `pointermove` -> `pointerup` on the element or its window, exactly as the desktop
-// pane does it: press and drag empty space to draw a range, drag a block's body to
-// reschedule it, drag its ends to change one instant. A press that does not move is a
-// tap and opens the form, so neither gesture is a mode the user has to know about.
+// The HTML5 drag attribute does not fire on touch, so every move here is
+// `pointerdown` -> `pointermove` -> `pointerup` on the element or its window, exactly
+// as the desktop pane does it: press and drag empty space to draw a range, drag a
+// block's body to reschedule it, drag its ends to change one instant. A press that
+// does not move is a tap and opens the form, so neither gesture is a mode the user
+// has to know about — and every one of those changes is also reachable by TYPING in
+// the event sheet (its date, start and end fields), which is the alternative WCAG
+// 2.5.7 asks for: the drag is an accelerator, never the only path.
 //
 // # Why the read is not bounded
 //
@@ -33,7 +36,6 @@ import { parseCivilDate, weekdayOf } from "@myne/dialect-civil-date";
 import { Button, Segmented, Sheet, Spinner, TextField } from "../../components";
 import { vaultIndicesCalendarRange } from "../../lib/calendar";
 import {
-  WEEKDAY_HEADERS,
   dayCells,
   monthGrid,
   shiftAnchor,
@@ -60,7 +62,6 @@ import { EventComposerSheet } from "./EventComposerSheet";
 import { skipOccurrence } from "@myne/calendar-skip";
 import { overrideOccurrence } from "@myne/calendar-override";
 import { noteRead, noteUpdate } from "../../lib/notes";
-import { formatLocalDate } from "../../lib/localDateTime";
 import { homeClockFor } from "@myne/home-zone";
 import { usePrefs } from "../../lib/use-prefs";
 
@@ -99,11 +100,32 @@ function todayCivil(): CivilDate {
   return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() } as CivilDate;
 }
 
+/**
+ * The seven column headers, Monday first, in the reader's language.
+ *
+ * `WEEKDAY_HEADERS` is the shared dialect's list of full names — `monday` …
+ * `sunday` — which the desktop's wider columns can print. Seven of them across a
+ * 390px phone is about 55px each, so they ran together as one word
+ * ("MONDAYTUESDAYWEDNESDAY…", owner 2026-11-10). `Intl` already knows the short
+ * form for every locale the app ships, so there is no new catalogue key to
+ * translate and the header cannot drift from the rest of the date formatting.
+ */
+function shortWeekdays(locale: string): string[] {
+  const format = new Intl.DateTimeFormat(locale, { weekday: "short" });
+  // 2024-01-01 was a Monday, which is the grid's first column.
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(2024, 0, 1 + index);
+    return format.format(date);
+  });
+}
+
 /** The weekday header for a `YYYY-MM-DD`, Monday first like the grid. */
-function weekdayHeader(date: string): string {
+function weekdayHeader(date: string, locale: string): string {
   const civil = parseCivilDate(date);
   if (civil === null) return "";
-  return WEEKDAY_HEADERS[["mon", "tue", "wed", "thu", "fri", "sat", "sun"].indexOf(weekdayOf(civil))] ?? "";
+  const index = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].indexOf(weekdayOf(civil));
+  if (index < 0) return "";
+  return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(2024, 0, 1 + index));
 }
 
 /** Where a create gesture or a tap opened the composer. */
@@ -382,7 +404,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
           <span aria-hidden="true" />
           {cells.map((cell) => (
             <div key={cell.date} className="myne-calendar__dayhead" data-testid={`calendar.dayhead.${cell.date}`}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{weekdayHeader(cell.date)}</span>{" "}
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{weekdayHeader(cell.date, i18n.language)}</span>{" "}
               <span style={{ fontSize: "var(--text-sm)" }}>{cell.date.slice(8, 10).replace(/^0/, "")}</span>
             </div>
           ))}
@@ -437,7 +459,19 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
     <div
       style={{
         position: "absolute",
-        inset: "var(--space-0)",
+        // Three sides at zero and the BOTTOM inset by the tab bar: this surface
+        // draws over the list, the header and the editor (it has to), and the
+        // TabBar is deliberately one z-level above it — the bar is the only way
+        // back to Notes while the calendar is open. With `inset: 0` the last
+        // ~56px of this surface therefore sat UNDER the bar: the day and week
+        // axes could scroll to 23:00 and still not show it, and a sheet opened
+        // here lost its own bottom row to the same band (owner, 2026-11-10).
+        // Stopping the surface above the bar fixes both without touching the
+        // bar's own layering.
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: "calc(52px + env(safe-area-inset-bottom, 0px))",
         display: "flex",
         flexDirection: "column",
         background: "var(--bg-1)",
@@ -445,14 +479,21 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
       }}
       data-testid="calendar.surface"
     >
-      {/* Header: month, paging, the way out, and the view switch below it. */}
+      {/* Two rows, because one row was four jobs wide (owner, 2026-11-10).
+          It carried paging, the month, Today, a create button and the way out on a
+          390px line, so the month — the thing the screen is named after — was the
+          one that gave way and rendered as "N". Now the month gets a row to itself, and
+          the three controls that act sit on the row below beside the view switch.
+          The "+" is gone: tapping a day cell or an hour already opens the composer,
+          and a button that duplicates the surface's main gesture is the one that
+          makes the header look crowded. */}
       <div
         style={{
           flex: "none",
           display: "flex",
           alignItems: "center",
           gap: "var(--space-2)",
-          padding: "var(--space-7) var(--space-4) var(--space-2)",
+          padding: "var(--space-7) var(--space-4) var(--space-1)",
           borderBottom: "1px solid var(--line-1)",
         }}
       >
@@ -466,7 +507,21 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
         >
           ‹
         </Button>
-        <span style={{ flex: "1 1 auto", fontSize: "var(--text-md)", fontWeight: "var(--weight-semibold, 600)" as unknown as number }} data-testid="calendar.heading">
+        <span
+          // Centred between the paging arrows, and the only thing in this row
+          // allowed to shrink.
+          style={{
+            textAlign: "center",
+            flex: "1 1 auto",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontSize: "var(--text-md)",
+            fontWeight: "var(--weight-semibold, 600)" as unknown as number,
+          }}
+          data-testid="calendar.heading"
+        >
           {monthLabel(anchor, i18n.language)}
         </span>
         <Button
@@ -479,35 +534,36 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
         >
           ›
         </Button>
+      </div>
+
+      {/* Today · the view switch · the way out. Month / Week / Day are the desktop's
+          three views with the desktop's semantics (week moves by seven days, day by
+          one) because `shiftAnchor` owns them. */}
+      <div
+        style={{
+          flex: "none",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-2)",
+          padding: "var(--space-2) var(--space-4)",
+        }}
+      >
         <Button variant="ghost" full={false} {...tappable} data-testid="calendar.today" onClick={() => setAnchor(todayCivil())}>
           {t("common.today")}
         </Button>
-        <Button
-          variant="ghost"
-          full={false}
-          {...tappable}
-          aria-label={t("calendar.composer.title")}
-          data-testid="calendar.add"
-          onClick={() => setComposing({ date: selected ?? formatLocalDate(new Date()) })}
-        >
-          +
-        </Button>
+        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+          <Segmented
+            ariaLabel={t("calendar.view")}
+            options={[t("calendar.view.month"), t("calendar.view.week"), t("calendar.view.day")]}
+            active={VIEWS.indexOf(view)}
+            onChange={(index) => setView(VIEWS[index] ?? "month")}
+            testIdPrefix="calendar.view"
+            optionValues={[...VIEWS]}
+          />
+        </div>
         <Button variant="ghost" full={false} {...tappable} aria-label={t("calendar.close")} data-testid="calendar.close" onClick={onClose}>
-          ✕
+          {t("common.done")}
         </Button>
-      </div>
-
-      {/* Month / Week / Day: the desktop's three views, with the desktop's semantics
-          (week moves by seven days, day by one) because `shiftAnchor` owns them. */}
-      <div style={{ flex: "none", padding: "var(--space-2) var(--space-4)" }}>
-        <Segmented
-          ariaLabel={t("calendar.view")}
-          options={[t("calendar.view.month"), t("calendar.view.week"), t("calendar.view.day")]}
-          active={VIEWS.indexOf(view)}
-          onChange={(index) => setView(VIEWS[index] ?? "month")}
-          testIdPrefix="calendar.view"
-          optionValues={[...VIEWS]}
-        />
       </div>
 
       {rows === null ? (
@@ -515,16 +571,24 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
           <Spinner />
         </div>
       ) : view === "month" ? (
-        <div style={{ flex: "1 1 auto", overflowY: "auto", padding: "var(--space-0) var(--space-2) var(--space-3)" }} data-testid="calendar.grid">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "var(--space-2)" }}>
-            {WEEKDAY_HEADERS.map((label) => (
-              <span key={label} style={{ textAlign: "center", fontSize: "var(--text-xs)", fontWeight: "var(--weight-semibold, 600)" as unknown as number, letterSpacing: "var(--tracking-caps)", color: "var(--fg-3)", textTransform: "uppercase" }}>
+        // The month FILLS the screen it was given, through the shared stylesheet's
+        // own grid (`.myne-calendar__month` → weekday strip + `minmax(0, 1fr)`
+        // weeks, `client-core/src/components.css`). It used to be rebuilt inline
+        // with a fixed `--target-min` per cell, so six weeks ended a third of the
+        // way down the screen and the rest was empty paper (owner, 2026-11-10).
+        // The same sheet is what the desktop pane draws, so the two clients now
+        // share the layout arithmetic rather than agreeing by eye.
+        <div className="myne-calendar__month" style={{ flex: "1 1 auto", padding: "var(--space-0) var(--space-2) var(--space-3)" }} data-testid="calendar.grid">
+          <div className="myne-calendar__weekdays">
+            {shortWeekdays(i18n.language).map((label) => (
+              <span key={label} className="myne-calendar__weekday" style={{ textAlign: "center" }}>
                 {label}
               </span>
             ))}
           </div>
+          <div className="myne-calendar__weeks" style={{ gridTemplateRows: `repeat(${monthGrid(anchor, shown ?? []).length}, minmax(0, 1fr))` }}>
           {monthGrid(anchor, shown ?? []).map((week, wi) => (
-            <div key={wi} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+            <div key={wi} className="myne-calendar__week">
               {week.map((cell) => {
                 const dayNumber = cell.date.slice(8, 10).replace(/^0/, "");
                 const chosen = selected === cell.date;
@@ -536,7 +600,6 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
                     data-testid={`calendar.cell.${cell.date}`}
                     aria-pressed={chosen}
                     style={{
-                      minHeight: "var(--target-min)",
                       border: "none",
                       background: chosen ? "var(--accent-soft, var(--bg-3))" : "transparent",
                       color: cell.inMonth ? "var(--fg-1)" : "var(--fg-3)",
@@ -561,6 +624,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
               })}
             </div>
           ))}
+          </div>
         </div>
       ) : (
         renderAxis()

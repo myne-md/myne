@@ -5,6 +5,7 @@
 // real data. Mirrors the desktop `src/notes/snapshots.ts` arg convention.
 
 import { invoke } from "../platform/core";
+import type { ResolvedIdentity } from "@myne/resolved-identity";
 
 /** One snapshot row — mirror of the Rust `SnapshotMeta` (derived from filename +
  *  stat, decrypt-free). */
@@ -13,6 +14,13 @@ export interface SnapshotMeta {
   /** Capture time (UNIX ms) — the snapshot UUIDv7's embedded clock. */
   captured_at_ms: number;
   size_bytes: number;
+  /**
+   * Who made this revision, as the backend resolved it (`collab-provenance` task
+   * 2/3). This binding dropped the field while the desktop's mirror carried it, so
+   * the phone's version history could not say whose change a row was — one of the
+   * reasons the two clients did not show the same history of the same note.
+   */
+  resolved_author: ResolvedIdentity;
 }
 
 /** A note's snapshots, newest-first. `[]` when none. Decrypt-free. */
