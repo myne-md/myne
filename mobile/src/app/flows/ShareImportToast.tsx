@@ -63,7 +63,7 @@ export function ShareImportToast({ onOpenLibrary }: { onOpenLibrary?: () => void
         bottom: 24,
         display: "flex",
         justifyContent: "center",
-        zIndex: 50,
+        zIndex: "var(--z-overlay)",
         // This wrapper is a full-width fixed band; keep it click-through so its
         // transparent left/right regions never swallow taps meant for the
         // TabBar/FormatBar beneath it (a handler-less div with pointerEvents:

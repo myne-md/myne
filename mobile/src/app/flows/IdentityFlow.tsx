@@ -30,6 +30,9 @@ import {
   BlockingOverlay,
   Icon,
   ListGroup,
+  ListRow,
+  InfoNote,
+  Sheet,
 } from "../../components";
 import { HAS_TAURI } from "../../lib/app-window";
 import {
@@ -420,6 +423,15 @@ export function IdentityFlow({
   const [step, setStep] = useState<Step>(unaskedStep);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Where the create step's Back goes.
+   *
+   * A mount that OPENED on create came from the first-run screen, which already
+   * carries both doors, so its Back is the way out of the flow. Any other mount
+   * reached create through the gate — a device with no identity that arrived from
+   * a scanned code — and there the gate is the menu Back belongs to.
+   */
+  const backFromCreate = () => (unaskedStep === "create" ? onCancel() : setStep("gate"));
 
   // NO server step (myne-md/myne#911 task 12). It used to gate the create door,
   // which made an offline first run impossible on this client, and the endpoint it
@@ -1716,9 +1728,6 @@ export function IdentityFlow({
             </div>
           </>
         ) : null}
-        <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.fork-skip">
-          {t("identityFlow.skip")}
-        </Button>
       </FooterBar>
     </Screen>
   );
@@ -1741,16 +1750,15 @@ export function IdentityFlow({
         <Button onClick={() => setStep("create")} data-testid="identity-flow.start">
           {t("common.createanidentity")}
         </Button>
-        {/* The third door, between the two that were already here. A device that
-            has never held this identity can bring an EXISTING one across with its
-            24-word phrase; without it the gate could only mint a new person id,
-            which is what made the scanned-QR path a dead end (see
-            `recoverIdentity`). */}
+        {/* The two credentials this device can continue with, and nothing else:
+            a device that has never held this identity can bring an EXISTING one
+            across with its 24-word phrase, otherwise this gate could only mint a
+            new person id (see `recoverIdentity`). It used to carry a third row,
+            "use this device only", which described a state this client does not
+            offer — a vault needs an identity — so all it did was close the
+            overlay. */}
         <Button variant="secondary" onClick={openRecover} data-testid="identity-flow.recover-open">
           {t("identityFlow.recover.open")}
-        </Button>
-        <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.skip">
-          {t("identityFlow.skip")}
         </Button>
       </FooterBar>
     </Screen>
@@ -1758,7 +1766,7 @@ export function IdentityFlow({
 
   const renderCreate = () => (
     <Screen>
-      <FlowHeader onBack={() => setStep("gate")} />
+      <FlowHeader onBack={backFromCreate} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.create.title")}</Title>
         <Lead>{t("identityFlow.create.lead")}</Lead>
@@ -1769,7 +1777,7 @@ export function IdentityFlow({
         ) : null}
       </ScreenScroll>
       <FooterBar>
-        <Button variant="secondary" full={false} onClick={() => setStep("gate")}>
+        <Button variant="secondary" full={false} onClick={backFromCreate}>
           {t("common.back")}
         </Button>
         <Button onClick={() => void createIdentity()} disabled={busy} data-testid="identity-flow.create">
@@ -2494,6 +2502,14 @@ export function IdentityFlow({
     // filtered again at each use (myne-md/myne#852 task 7).
     const pending = (invites ?? []).filter((i) => !i.claimed);
     const claimed = (invites ?? []).filter((i) => i.claimed);
+    // One card frame for both codes, and one for the whole invitation story: the
+    // screen used to be nine vertical bands — two lead paragraphs, two bordered code
+    // cards with a paragraph under each, an uppercase section label, an empty-state
+    // line, a button floating outside every card, a second label with its own
+    // paragraph, and a rule before the forget row (owner, 2026-11-10). The structure
+    // below is what that screen was trying to say: one action, one card of things
+    // you can share, one card of things people can send you, one status card, and a
+    // destructive row that opens its own confirmation.
     return (
       <Screen>
         <FlowHeader onBack={onCancel} />
@@ -2522,13 +2538,6 @@ export function IdentityFlow({
               </Banner>
             </div>
           ) : null}
-          {/* **The action comes first** (myne-md/myne#970 item 22). This block
-              used to sit fourth, under the account number, the identity code and
-              the invitation list: a person who arrived here from onboarding
-              scrolled past three blocks of material they had not asked for to
-              reach the one thing the screen exists to offer. The material is
-              still on the screen, and it is what makes this identity usable, but
-              it is below, in the grouped cards the rest of the app uses. */}
           {/* **The unlock door does not depend on the create action**
               (myne-md/myne#1029). It used to live inside the `onCreateVault`
               block, and the shell passes that only on the first-run door: so a
@@ -2549,11 +2558,16 @@ export function IdentityFlow({
               )}
             </div>
           ) : null}
+
+          {/* **The action comes first, and it is the only filled button on the
+              screen** (myne-md/myne#970 item 22). Its explaining sentence lives
+              behind the ⓘ beside it rather than above it: "your identity can own as
+              many vaults as you like" is the answer to a question this button raises,
+              so it belongs on the button's line, not in front of it. The element that
+              carries `identity-flow.home-vault-hint` stays the same, which is what
+              the repair-door specs assert on. */}
           {onCreateVault ? (
-            <div style={{ marginTop: "var(--space-4)" }}>
-              <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
-                {t("identityFlow.home.vaultHint")}
-              </div>
+            <div style={{ marginTop: "var(--space-4)", display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
               {/* The action is WITHHELD while the identity is sealed, not shown
                   disabled: creating a vault signs its first member list with the
                   identity, so the sealed state makes the command answer
@@ -2563,81 +2577,90 @@ export function IdentityFlow({
               {identityUnlocked ? (
                 <Button
                   onClick={onCreateVault}
-                  style={{ marginTop: "var(--space-3)" }}
+                  style={{ flex: "1 1 auto" }}
                   data-testid="identity-flow.home-create-vault"
                 >
                   {t("identityHome.createVaultCta")}
                 </Button>
               ) : null}
+              <span data-testid="identity-flow.home-vault-hint" style={{ display: "flex", flex: "none" }}>
+                <InfoNote
+                  paragraphs={[t("identityFlow.home.vaultHint")]}
+                  testId="identity-flow.home-vault-hint-note"
+                />
+              </span>
             </div>
           ) : null}
 
-          {/* The identity material, as the grouped cards every other screen on
-              this client uses (`ListGroup`: a header, an inset card, a footer).
-              It used to be four consecutive `FieldLabel` + box + grey sentence
-              stacks, which on a phone is one undifferentiated column where the
-              least-used values take the most height. Same content, same
-              testids, same hints: grouped, and below the action.
-
-              The account number is rendered in its DISPLAY form, not the
-              canonical body: the command answers the body on purpose
-              (`core/src/plugins/sync/person_account.rs`) and the grouping lives
-              in `@myne/client-core`, which is where the desktop takes it from.
-              Rendering the raw 20 characters here showed the number without its
-              `MY-` prefix or its dash groups (myne-md/myne#932). */}
-          {accountNumber ? (
+          {/* The identity material: ONE card, because it is one idea — these are the
+              two values you may hand out, and neither is a secret. The account
+              number is rendered in its DISPLAY form, not the canonical body: the
+              command answers the body on purpose
+              (`core/src/plugins/sync/person_account.rs`) and the grouping lives in
+              `@myne/client-core`, which is where the desktop takes it from
+              (myne-md/myne#932). Its explanation sits behind the row's ⓘ, the
+              identity code keeps the shared `shareCodeHint` line under the card,
+              which is the sentence that says what sharing one is for. */}
+          {(identityCode !== null || accountNumber !== null) ? (
             <div style={{ marginTop: "var(--space-5)" }}>
               <ListGroup
-                header={t("common.accountnumber")}
-                footer={t("identityHome.accountNumberHint")}
-              >
-                <div style={{ padding: "14px 16px" }}>
-                  <MonoBox
-                    value={formatPersonAccountNumber(accountNumber)}
-                    testId="identity-flow.home-account-number"
-                  />
-                </div>
-              </ListGroup>
-            </div>
-          ) : null}
-
-          {identityCode ? (
-            <div style={{ marginTop: "var(--space-4)" }}>
-              {/* What the code is, beside the code (myne-md/myne-ops#54). The
-                  desktop identity home carried this sentence and the phone did
-                  not, so a reader was shown a long string with a copy button and
-                  nothing telling them whether sending it is safe. Same key as
-                  the desktop: one sentence, one meaning. */}
-              <ListGroup
                 header={t("common.youridentitycode")}
-                footer={t("identityHome.shareCodeHint")}
+                footer={identityCode !== null ? t("identityHome.shareCodeHint") : undefined}
               >
-                <div style={{ padding: "14px 16px" }}>
-                  <MonoBox value={identityCode} testId="identity-flow.home-code" />
-                </div>
+                {identityCode !== null ? (
+                  <div style={{ padding: "14px 16px" }}>
+                    <MonoBox value={identityCode} testId="identity-flow.home-code" />
+                  </div>
+                ) : null}
+                {accountNumber !== null ? (
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      borderTop: identityCode !== null ? "1px solid var(--line-1)" : undefined,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", marginBottom: "var(--space-2)" }}>
+                      <FieldLabel>{t("common.accountnumber")}</FieldLabel>
+                      <InfoNote
+                        paragraphs={[t("identityHome.accountNumberHint")]}
+                        testId="identity-flow.home-account-number-note"
+                      />
+                    </div>
+                    <MonoBox
+                      value={formatPersonAccountNumber(accountNumber)}
+                      testId="identity-flow.home-account-number"
+                    />
+                  </div>
+                ) : null}
               </ListGroup>
             </div>
           ) : null}
 
+          {/* One card for everything the mail slot does: what is waiting, what this
+              identity has already claimed, and the scanner that opens an invite
+              handed over in person. The scanner used to be a button floating below
+              the card, unrelated to the list it belongs to (myne-md/myne#932). */}
           <div style={{ marginTop: "var(--space-5)" }}>
-            <FieldLabel>{t("identityFlow.home.invitesHeading")}</FieldLabel>
-            {invites === null ? (
-              <Spinner />
-            ) : pending.length === 0 && claimed.length === 0 ? (
-              <div style={HINT_STYLE} data-testid="identity-flow.home-empty">
-                {t("common.noinvitationsyet")}
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-                {pending.map((inv) => (
+            <ListGroup header={t("identityFlow.home.invitesHeading")}>
+              {invites === null ? (
+                <div style={{ padding: "14px 16px" }}>
+                  <Spinner />
+                </div>
+              ) : pending.length === 0 && claimed.length === 0 ? (
+                <div
+                  data-testid="identity-flow.home-empty"
+                  style={{ padding: "14px 16px", fontSize: "var(--text-sm)", color: "var(--fg-3)" }}
+                >
+                  {t("common.noinvitationsyet")}
+                </div>
+              ) : (
+                pending.map((inv, index) => (
                   <div
                     key={inv.invite_id_hex}
                     data-testid="identity-flow.invite-row"
                     style={{
-                      background: "var(--bg-1)",
-                      border: "1px solid var(--line-1)",
-                      borderRadius: "var(--radius-2)",
-                      padding: "var(--space-3)",
+                      padding: "14px 16px",
+                      borderTop: index === 0 ? undefined : "1px solid var(--line-1)",
                     }}
                   >
                     <div
@@ -2667,121 +2690,143 @@ export function IdentityFlow({
                       {t("identityHome.accept")}
                     </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              )}
 
-          {/* The second device (myne-md/myne#852 task 7). A claimed invite is a
-              vault this identity is already a member of, and before this block
-              existed it was filtered out of the list above altogether, so a phone
-              had no way to add one: the vault simply never appeared, and the
-              "No invitations yet" empty state is what a member looking at their
-              own claimed invite saw. */}
-          {claimed.length > 0 ? (
-            <div style={{ marginTop: "var(--space-5)" }}>
-              <FieldLabel>{t("identityHome.claimedHeading")}</FieldLabel>
-              <div data-testid="identity-flow.claimed-hint" style={HINT_STYLE}>
-                {t("identityHome.claimedHint")}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
-                {claimed.map((inv) => (
-                  <div
-                    key={inv.invite_id_hex}
-                    data-testid="identity-flow.claimed-row"
-                    style={{
-                      background: "var(--bg-1)",
-                      border: "1px solid var(--line-1)",
-                      borderRadius: "var(--radius-2)",
-                      padding: "var(--space-3)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: "var(--text-xs)",
-                        color: "var(--fg-3)",
-                        wordBreak: "break-all",
-                        userSelect: "all",
-                      }}
-                    >
-                      {inv.vault_account_hash_hex}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      full={false}
-                      onClick={() => openJoin(inv)}
-                      style={{ marginTop: "var(--space-3)" }}
-                      data-testid="identity-flow.join-open"
-                    >
-                      {t("identityHome.join")}
-                    </Button>
+              {/* The second device (myne-md/myne#852 task 7). A claimed invite is a
+                  vault this identity is already a member of, and before this block
+                  existed it was filtered out of the list above altogether, so a phone
+                  had no way to add one: the vault simply never appeared, and the
+                  "No invitations yet" empty state is what a member looking at their
+                  own claimed invite saw. */}
+              {claimed.length > 0 ? (
+                <div style={{ borderTop: "1px solid var(--line-1)", padding: "14px 16px" }}>
+                  <FieldLabel>{t("identityHome.claimedHeading")}</FieldLabel>
+                  <div data-testid="identity-flow.claimed-hint" style={HINT_STYLE}>
+                    {t("identityHome.claimedHint")}
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+                    {claimed.map((inv) => (
+                      <div key={inv.invite_id_hex} data-testid="identity-flow.claimed-row">
+                        <div
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: "var(--text-xs)",
+                            color: "var(--fg-3)",
+                            wordBreak: "break-all",
+                            userSelect: "all",
+                          }}
+                        >
+                          {inv.vault_account_hash_hex}
+                        </div>
+                        <Button
+                          variant="secondary"
+                          full={false}
+                          onClick={() => openJoin(inv)}
+                          style={{ marginTop: "var(--space-3)" }}
+                          data-testid="identity-flow.join-open"
+                        >
+                          {t("identityHome.join")}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
+              {/* Scanning a code from the identity home (myne-md/myne#932). This
+                  screen is where an invitee waits, and the scanner used to be
+                  reachable only through the welcome screen's join door: a device that
+                  already held the identity landed here and had nowhere to scan the
+                  code an owner had just shown it. Same handler the fork's code row
+                  uses, so there is one scanner rather than two. In the card now,
+                  because scanning IS how an invitation arrives. */}
+              {onScanCode ? (
+                // A row in the card, drawn by the shared `ListRow` primitive like
+                // every other list row on this client: the number of hand-rolled
+                // buttons is a ratchet (`check-primitive-adoption`), and this one had
+                // no reason to be the exception.
+                <div style={{ borderTop: "1px solid var(--line-1)" }}>
+                  <ListRow
+                    title={t("identityFlow.fork.code")}
+                    onClick={onScanCode}
+                    chevron
+                    isLast
+                    testID="identity-flow.home-scan"
+                  />
+                </div>
+              ) : null}
+            </ListGroup>
+          </div>
 
           {/* A `reserved` identity is one created with no server account: sealed,
               usable, and not reachable by anybody else. Registration is the act
               that makes it invitable, and it asks for the phrase because the
-              phrase is the proof of possession. */}
-          {/* Scanning a code from the identity home (myne-md/myne#932). This
-              screen is where an invitee waits, and the scanner used to be
-              reachable only through the welcome screen's join door: a device that
-              already held the identity landed here and had nowhere to scan the
-              code an owner had just shown it. Same handler the fork's code row
-              uses, so there is one scanner rather than two. */}
-          {onScanCode ? (
-            <div style={{ marginTop: "var(--space-5)" }}>
-              <Button
-                variant="secondary"
-                full={false}
-                onClick={onScanCode}
-                data-testid="identity-flow.home-scan"
-              >
-                {t("identityFlow.fork.code")}
-              </Button>
-            </div>
-          ) : null}
+              phrase is the proof of possession.
 
+              It renders as a STATUS row rather than a section with a heading, a
+              paragraph and a button: it is a fact about this identity that happens
+              to have one remedy, so the fact is the row and the remedy is its action. */}
           {accountState === "reserved" ? (
             <div style={{ marginTop: "var(--space-5)" }}>
-              <FieldLabel>{t("identityFlow.home.registerHeading")}</FieldLabel>
-              <div data-testid="identity-flow.home-register-hint" style={HINT_STYLE}>
-                {t("identityFlow.home.registerHint")}
-              </div>
-              <Button
-                variant="secondary"
-                full={false}
-                onClick={() => setStep("register")}
-                style={{ marginTop: "var(--space-3)" }}
-                data-testid="identity-flow.home-register-open"
-              >
-                {t("common.registerthisidentity")}
-              </Button>
+              <ListGroup header={t("identityFlow.home.registerHeading")}>
+                <div style={{ padding: "14px 16px" }}>
+                  <div data-testid="identity-flow.home-register-hint" style={HINT_STYLE}>
+                    {t("identityFlow.home.registerHint")}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    full={false}
+                    onClick={() => setStep("register")}
+                    style={{ marginTop: "var(--space-3)" }}
+                    data-testid="identity-flow.home-register-open"
+                  >
+                    {t("common.registerthisidentity")}
+                  </Button>
+                </div>
+              </ListGroup>
             </div>
           ) : null}
 
-          {/* Forget this identity on this device (myne-md/myne#782). Device-local:
-              the server account survives and is recoverable with the phrase.
+          {error ? (
+            <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
+              {error}
+            </Banner>
+          ) : null}
 
-              **The acknowledgement sits BEHIND the trigger** (myne-md/myne#932).
-              It used to render permanently, with the destructive button disabled
-              until it was ticked, so anyone merely visiting this screen was shown
-              a statement about an act they had not started. The desktop puts the
-              same checkbox inside the confirmation for the act
-              (`MemberRosterPanel`'s `identityForget*`); this is that shape. */}
+          {/* This device. One destructive row, and it opens a SHEET: the
+              acknowledgement and the destructive button used to expand inside the
+              screen, which pushed the last card around and left a warning sitting on
+              a page nobody had started acting on. The desktop puts the same act in
+              its own dialog (`MemberRosterPanel`'s `identityForget*`). */}
           <div style={{ marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--line-1)" }}>
-            <FieldLabel>{t("common.thisdevice")}</FieldLabel>
-            {error ? (
-              <Banner kind="warning" style={{ marginBottom: "var(--space-3)" }}>
-                {error}
-              </Banner>
-            ) : null}
-            {forgetOpen ? (
+            <ListRow
+              title={t("common.forgetthisidentityonthisdevice")}
+              leading={<Icon name="trash" size={18} color="var(--danger)" />}
+              onClick={() => {
+                setError(null);
+                setForgetOpen(true);
+              }}
+              isLast
+              testID="identity-flow.home-forget-open"
+              style={{ color: "var(--danger)", padding: 0 }}
+            />
+          </div>
+        </ScreenScroll>
+
+        {forgetOpen ? (
+          <Sheet onClose={() => { setForgetOpen(false); setForgetAck(false); }}>
+            {(close) => (
               <div data-testid="identity-flow.home-forget-confirm" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                <h2 style={{ margin: "var(--space-0)", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>
+                  {t("common.forgetthisidentityonthisdevice")}
+                </h2>
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", lineHeight: 1.55, color: "var(--fg-2)" }}>
+                  {t("identityForget.body")}
+                </p>
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", lineHeight: 1.55, color: "var(--fg-2)" }}>
+                  {t("identityForget.savedPhraseTail")}
+                </p>
                 <AckRow
                   checked={forgetAck}
                   onToggle={() => setForgetAck((v) => !v)}
@@ -2789,40 +2834,34 @@ export function IdentityFlow({
                 >
                   {t("identityFlow.home.forgetCheckbox")}
                 </AckRow>
-                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                {error ? <Banner kind="warning">{error}</Banner> : null}
+                <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", flexWrap: "wrap" }}>
                   <Button
-                    variant="ghost"
+                    variant="secondary"
+                    full={false}
+                    onClick={() => {
+                      setForgetOpen(false);
+                      setForgetAck(false);
+                      close();
+                    }}
+                    data-testid="identity-flow.home-forget-cancel"
+                  >
+                    {t("common.keepit")}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    full={false}
                     disabled={!forgetAck || busy}
                     onClick={() => void forgetHeld()}
-                    style={{ color: "var(--danger)" }}
                     data-testid="identity-flow.home-forget"
                   >
                     {t("common.forgetthisidentityonthisdevice")}
                   </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setForgetOpen(false);
-                      setForgetAck(false);
-                    }}
-                    data-testid="identity-flow.home-forget-cancel"
-                  >
-                    {t("common.cancel")}
-                  </Button>
                 </div>
               </div>
-            ) : (
-              <Button
-                variant="ghost"
-                onClick={() => setForgetOpen(true)}
-                style={{ color: "var(--danger)" }}
-                data-testid="identity-flow.home-forget-open"
-              >
-                {t("common.forgetthisidentityonthisdevice")}
-              </Button>
             )}
-          </div>
-        </ScreenScroll>
+          </Sheet>
+        ) : null}
       </Screen>
     );
   };

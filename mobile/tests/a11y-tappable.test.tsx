@@ -288,8 +288,6 @@ describe("no clickable element in the mobile flows is left unannounced", () => {
     const BOTH_IS_FINE: Record<string, string> = {
       "mobile/src/app/flows/SnapshotsSheet.tsx":
         "The Restore button lives in the expanded preview block, which is a SIBLING of the tappable summary row rather than inside it.",
-      "mobile/src/app/flows/editor/sheets/SortSheet.tsx":
-        "The only button is the sheet header's Done; the tappable rows hold a check glyph and nothing else.",
       "mobile/src/app/flows/editor/sheets/VaultSwitcher.tsx":
         "Close, Create and Join are sheet-level buttons outside the vault rows; each row's tappable contains only its label and icon.",
       "mobile/src/app/flows/editor/sheets/ViewsSheet.tsx":

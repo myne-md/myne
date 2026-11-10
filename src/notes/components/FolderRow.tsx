@@ -370,6 +370,18 @@ export function FolderRow({
         ? "var(--bg-3)"
         : "transparent";
 
+  // A coloured folder washes its row the same way a coloured note does
+  // (`NoteRow`'s `colorWash`, owner 2026-11-10). It used to tint only the glyph,
+  // so the same colour meant "this row is marked" on a note and "this icon is
+  // drawn in red" on a folder. A gradient layer rather than the `background`, so
+  // the hover / press / drop-target fills below do not erase it.
+  const colorWash = colorSlot
+    ? (() => {
+        const wash = `color-mix(in srgb, ${labelColorVar(colorSlot)} 22%, transparent)`;
+        return { backgroundImage: `linear-gradient(${wash}, ${wash})` };
+      })()
+    : {};
+
   return (
     <div
       style={{
@@ -377,6 +389,7 @@ export function FolderRow({
         position: "relative",
         paddingInlineStart: paddingLeft,
         background,
+        ...colorWash,
         boxShadow: dropTarget ? "inset 0 0 0 1px var(--accent)" : undefined,
       }}
       draggable={!renaming}

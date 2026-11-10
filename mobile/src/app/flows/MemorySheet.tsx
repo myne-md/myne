@@ -21,7 +21,7 @@ import { memoryDelete, memoryList, memoryRead, type MemoryListRow } from "../../
 const SCRIM: CSSProperties = {
   position: "fixed",
   inset: 0,
-  zIndex: 40,
+  zIndex: "var(--z-modal)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "flex-end",

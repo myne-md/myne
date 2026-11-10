@@ -1722,12 +1722,6 @@
       "title": "Filtrele",
       "status": "Durum"
     },
-    "sortSheet": {
-      "title": "Sırala",
-      "titleAsc": "Başlık · A → Z",
-      "titleDesc": "Başlık · Z → A",
-      "arrangement": "Benim sıralamam"
-    },
     "noteMenu": {
       "emptyNote": "Boş not",
       "wordCount_one": "{{count}} sözcük · {{minutes}} dk okuma",
@@ -2541,8 +2535,7 @@
       "confirmBody": "Mevcut notunuz önce bir anlık görüntü olarak kaydedilir, böylece bunu geri alabilirsiniz.",
       "confirmTitle": "Bu anlık görüntü geri yüklensin mi?",
       "decrypting": "Şifre çözülüyor…",
-      "emptyState": "Henüz anlık görüntü yok. Anlık görüntüler siz düzenledikçe otomatik olarak kaydedilir ve yaklaşık 7 gün saklanır. Şifrelidirler ve not kalıcı olarak silindiğinde kaybolurlar.",
-      "encryptedSize": "Şifreli · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Bu anlık görüntünün şifresi çözülemedi.",
       "errorGeneric": "Bir şeyler ters gitti. Tekrar deneyin.",
       "errorIo": "Bir disk hatası oluştu. Disk dolu veya yazılamaz olabilir.",
@@ -5289,16 +5282,6 @@
     "addCondition": "+ Koşul ekle",
     "createView": "Görünüm oluştur"
   },
-  "snapshots": {
-    "today": "Bugün {{time}}",
-    "readError": "Sürüm geçmişi okunamadı.",
-    "decryptError": "Bu sürümün şifresi çözülemedi.",
-    "restoreError": "Bu sürüm geri yüklenemedi.",
-    "emptyState": "Henüz eski sürüm yok. Anlık görüntüler siz düzenledikçe otomatik olarak kaydedilir.",
-    "hide": "Gizle",
-    "empty": "(boş)",
-    "restoreThisVersion": "Bu sürümü geri yükle"
-  },
   "restoreBackup": {
     "title": "Mobilde henüz kullanılamıyor",
     "body": "Yedekleme dosyasından geri yükleme mobilde henüz kullanılamıyor. Bir kasa oluşturun ya da kurtarma ifadenizle kurtarın."
@@ -5394,7 +5377,6 @@
     "unlockingSubtitle": "Kasanız açılıyor.",
     "readyTitle": "Kasanız hazır",
     "readyBody": "Buradan yazdığınız her şey, saklanmadan veya eşitlenmeden önce bu cihazda şifrelenir.",
-    "personalLabel": "Kişisel",
     "openVault": "Kasayı aç",
     "backUpNow": "Şimdi yedekle"
   },

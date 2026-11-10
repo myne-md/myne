@@ -79,6 +79,30 @@ describe("NoteRow — title rendering branches", () => {
     const { container } = renderRow();
     expect(container.querySelector("[data-color-slot]")).toBeNull();
   });
+
+  it("washes the ROW with its colour, and keeps the wash under hover and selection", () => {
+    // Owner, 2026-11-10: a coloured note changed only the viewer's icon, so the
+    // sidebar row said nothing. The wash used to be the row's `background`, which
+    // hover and selection then replaced — the tint vanished exactly when the eye
+    // was on the row. It is a gradient LAYER now, so it paints over whichever
+    // solid fill wins, and the assertion is the layer's presence in both states.
+    const plain = renderRow({ colorSlot: "rose" });
+    const plainRow = screen.getByTestId("notes.row");
+    expect(plainRow.style.backgroundImage).toContain("color-mix(");
+    expect(plainRow.style.backgroundImage).toContain("rose");
+    plain.unmount();
+
+    for (const state of [{ selected: true }, { multiSelected: true }]) {
+      renderRow({ colorSlot: "rose", ...state });
+      const row = screen.getByTestId("notes.row");
+      // Still there while the row carries its own fill. (`style.background` is not
+      // asserted: a `var()` SHORTHAND cannot be read back from jsdom, which is
+      // exactly why the wash had to become a layer rather than a second `background`
+      // candidate.)
+      expect(row.style.backgroundImage).toContain("color-mix(");
+      cleanup();
+    }
+  });
 });
 
 describe("NoteRow — subtitle / timestamps", () => {

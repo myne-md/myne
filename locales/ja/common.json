@@ -1743,12 +1743,6 @@
       "title": "フィルター",
       "status": "ステータス"
     },
-    "sortSheet": {
-      "title": "並べ替え",
-      "manual": "手動の順序",
-      "titleAsc": "タイトル · A → Z",
-      "titleDesc": "タイトル · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "空のノート",
       "wordCount_one": "{{count}}語 · 読了{{minutes}}分",
@@ -2623,8 +2617,7 @@
       "confirmBody": "現在のノートはまずスナップショットとして保存されるため、この操作は元に戻せます。",
       "confirmTitle": "このスナップショットを復元しますか？",
       "decrypting": "復号中…",
-      "emptyState": "スナップショットはまだありません。スナップショットは編集中に自動的に保存され、約7日間保持されます。暗号化されており、ノートが完全に削除されると消えます。",
-      "encryptedSize": "暗号化済み · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "このスナップショットを復号できませんでした。",
       "errorGeneric": "問題が発生しました。もう一度お試しください。",
       "errorIo": "ディスクエラーが発生しました。ディスクの空き容量が不足しているか、書き込みできない可能性があります。",
@@ -5564,17 +5557,6 @@
     "addCondition": "+ 条件を追加",
     "createView": "ビューを作成"
   },
-  "snapshots": {
-    "today": "今日 {{time}}",
-    "readError": "バージョン履歴を読み取れませんでした。",
-    "decryptError": "そのバージョンを復号できませんでした。",
-    "restoreError": "そのバージョンを復元できませんでした。",
-    "title": "バージョン履歴",
-    "emptyState": "以前のバージョンはまだありません。スナップショットは編集中に自動的に記録されます。",
-    "hide": "非表示",
-    "empty": "（空）",
-    "restoreThisVersion": "このバージョンを復元"
-  },
   "restoreBackup": {
     "title": "モバイルではまだ利用できません",
     "body": "バックアップファイルからの復元はモバイルではまだ利用できません。保管庫を作成するか、フレーズで復元してください。"
@@ -5672,7 +5654,6 @@
     "unlockingSubtitle": "ボールトを開いています。",
     "readyTitle": "ボールトの準備ができました",
     "readyBody": "ここから書くものはすべて、保存または同期される前にこのデバイス上で暗号化されます。",
-    "personalLabel": "個人",
     "openVault": "ボールトを開く",
     "backUpNow": "今すぐバックアップ"
   },

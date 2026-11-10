@@ -1743,12 +1743,6 @@
       "title": "Filter",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sortieren",
-      "manual": "Manuelle Reihenfolge",
-      "titleAsc": "Titel · A → Z",
-      "titleDesc": "Titel · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Leere Notiz",
       "wordCount_one": "{{count}} Wort · {{minutes}} Min. Lesezeit",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Ihre aktuelle Notiz wird zuerst als Schnappschuss gespeichert, sodass Sie dies rückgängig machen können.",
       "confirmTitle": "Diesen Schnappschuss wiederherstellen?",
       "decrypting": "Wird entschlüsselt…",
-      "emptyState": "Noch keine Schnappschüsse. Schnappschüsse werden beim Bearbeiten automatisch gespeichert und etwa 7 Tage lang aufbewahrt. Sie sind verschlüsselt und verschwinden, wenn die Notiz endgültig gelöscht wird.",
-      "encryptedSize": "Verschlüsselt · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Dieser Schnappschuss konnte nicht entschlüsselt werden.",
       "errorGeneric": "Etwas ist schiefgelaufen. Versuchen Sie es erneut.",
       "errorIo": "Ein Festplattenfehler ist aufgetreten. Die Festplatte könnte voll oder nicht beschreibbar sein.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Bedingung hinzufügen",
     "createView": "Ansicht erstellen"
   },
-  "snapshots": {
-    "today": "Heute {{time}}",
-    "readError": "Der Versionsverlauf konnte nicht gelesen werden.",
-    "decryptError": "Diese Version konnte nicht entschlüsselt werden.",
-    "restoreError": "Diese Version konnte nicht wiederhergestellt werden.",
-    "title": "Versionsverlauf",
-    "emptyState": "Noch keine früheren Versionen. Snapshots werden automatisch erfasst, während du bearbeitest.",
-    "hide": "Ausblenden",
-    "empty": "(leer)",
-    "restoreThisVersion": "Diese Version wiederherstellen"
-  },
   "restoreBackup": {
     "title": "Auf Mobilgeräten noch nicht verfügbar",
     "body": "Das Wiederherstellen aus einer Backup-Datei ist auf Mobilgeräten noch nicht verfügbar. Erstelle einen Tresor oder stelle mit deiner Phrase wieder her."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Dein Tresor wird geöffnet.",
     "readyTitle": "Dein Tresor ist bereit",
     "readyBody": "Alles, was du ab hier schreibst, wird auf diesem Gerät verschlüsselt, bevor es gespeichert oder synchronisiert wird.",
-    "personalLabel": "Persönlich",
     "openVault": "Tresor öffnen",
     "backUpNow": "Jetzt sichern"
   },

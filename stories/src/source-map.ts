@@ -207,7 +207,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "Skeleton": { file: "src/components/primitives/Skeleton.tsx", line: 31 },
   "SkipToContent": { file: "src/components/SkipToContent.tsx", line: 63 },
   "SnapshotFailedIndicator": { file: "src/notes/components/SnapshotFailedIndicator.tsx", line: 52 },
-  "SnapshotsPanel": { file: "src/notes/components/SnapshotsPanel.tsx", line: 267 },
+  "SnapshotsPanel": { file: "src/notes/components/SnapshotsPanel.tsx", line: 268 },
   "SpellSettings": { file: "src/components/settings/SpellSettings.tsx", line: 73 },
   "Spinner": { file: "src/components/Spinner.tsx", line: 29 },
   "StartupOpenSettings": { file: "src/components/settings/StartupOpenSettings.tsx", line: 36 },

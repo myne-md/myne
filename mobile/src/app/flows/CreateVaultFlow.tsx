@@ -56,6 +56,12 @@ const PLACEHOLDER_ACCOUNT = "MY-4F2A-9C17-8E2D-1B5F-K";
 const PLACEHOLDER_SESSION = "dev-session-token";
 const PLACEHOLDER_VAULT_ID = "dev-vault";
 
+/** The three briefing statements, by the shared ids the desktop briefing uses
+ *  (`src/screens/vault-creation/BriefingStep.tsx`). The copy is resolved per render
+ *  through `vaultCreation.briefing.statements.<id>` so a language switch re-renders
+ *  it, and the two clients cannot state the same contract in different words. */
+const BRIEFING_STATEMENT_IDS = ["no-store", "phrase-backup", "no-email"] as const;
+
 type Step =
   | "briefing"
   /** What to call this vault (myne-md/myne#468 K10). Desktop's twin: `name`. */
@@ -323,6 +329,7 @@ function AckRow({
   whyOpen,
   onToggleWhy,
   last,
+  ackId,
 }: {
   checked: boolean;
   onToggle: () => void;
@@ -331,6 +338,11 @@ function AckRow({
   whyOpen?: boolean;
   onToggleWhy?: () => void;
   last?: boolean;
+  /** The shared statement id (`no-store` / `phrase-backup` / `no-email`), carried
+   *  as `data-ack-id` the way the desktop row carries it. The copy is localised
+   *  now, so a spec that found these rows by their English text would break on the
+   *  first translation; the id is the row's stable name. */
+  ackId: string;
 }) {
   const { t } = useTranslation();
   // The curve follows the direction, as it does on the desktop row and in
@@ -343,6 +355,8 @@ function AckRow({
   const ackLabelId = useId();
   return (
     <div
+      data-testid="create-vault.ack"
+      data-ack-id={ackId}
       style={{
         display: "flex",
         gap: 12,
@@ -381,6 +395,7 @@ function AckRow({
               onClick={onToggleWhy}
               aria-expanded={whyOpen}
               data-testid="create-vault.briefing-why"
+              data-ack-id={ackId}
               style={{
                 marginTop: 8,
                 display: "inline-flex",
@@ -598,10 +613,11 @@ export function CreateVaultFlow({
     setFileMsg(null);
   }, [step]);
 
-  // OB-01 acknowledgements
-  const [acks, setAcks] = useState<boolean[]>([false, false, false]);
-  const [why2Open, setWhy2Open] = useState(false);
-  const [why3Open, setWhy3Open] = useState(false);
+  // OB-01 acknowledgements. Keyed by the shared statement id (`no-store` /
+  // `phrase-backup` / `no-email`) rather than by position, so a row and its
+  // acknowledgement cannot part company when one is edited.
+  const [acks, setAcks] = useState<Record<string, boolean>>({});
+  const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({});
 
   // OB-02 password (authoritative secret in pwdRef; `pwd` mirrors for render).
   const pwdRef = useRef("");
@@ -879,8 +895,10 @@ export function CreateVaultFlow({
         {/* No number. The briefing is first-run only, so counting it promises a
             length the flow does not have on the picker's "create another" entry
             (myne-md/myne#468). The four steps the user ALWAYS walks are numbered;
-            this one and the three waits are not. */}
-        <FlowHeader label={t("createVault.briefingTitle")} />
+            this one and the three waits are not. No label either: the eyebrow
+            used to print `briefingTitle` and the `<Title>` below printed it again
+            (myne-md/myne#945 item 02 — the header does not repeat the heading). */}
+        <FlowHeader />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("createVault.briefingTitle")}</Title>
           <Lead>
@@ -889,36 +907,48 @@ export function CreateVaultFlow({
           <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
             {LOST_BOTH_SECRETS_SENTENCE}
           </Banner>
+          {/* One source for the three statements: the desktop briefing's own keys
+              (`vaultCreation.briefing.statements.*`), each with the `why` its row
+              opens (myne-md/myne#945 review). The rows used to carry mobile-only
+              English sentences hard-coded in this JSX, and the first of them had
+              no `why` at all while the desktop's three each have one — so the two
+              clients stated the same contract in different words and only one of
+              them explained every line. `phrase-backup` interpolates the
+              load-bearing sentence verbatim, exactly as the desktop does. */}
           <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 2 }}>
-            <AckRow checked={acks[0]} onToggle={() => setAcks([!acks[0], acks[1], acks[2]])}>
-              Myne has no access to my notes and cannot read or recover them.
-            </AckRow>
-            <AckRow
-              checked={acks[1]}
-              onToggle={() => setAcks([acks[0], !acks[1], acks[2]])}
-              why="Your password and phrase never leave this device. Nothing on our servers can decrypt them, so there is nothing for us to reset."
-              whyOpen={why2Open}
-              onToggleWhy={() => setWhy2Open((v) => !v)}
-            >
-              There is no password reset and no email recovery.
-            </AckRow>
-            <AckRow
-              checked={acks[2]}
-              onToggle={() => setAcks([acks[0], acks[1], !acks[2]])}
-              why={LOST_BOTH_SECRETS_SENTENCE}
-              whyOpen={why3Open}
-              onToggleWhy={() => setWhy3Open((v) => !v)}
-              last
-            >
-              My 24-word recovery phrase is the only way back into my vault.
-            </AckRow>
+            {BRIEFING_STATEMENT_IDS.map((id, index) => {
+              const open = whyOpen[id] === true;
+              return (
+                <AckRow
+                  key={id}
+                  ackId={id}
+                  checked={acks[id] === true}
+                  onToggle={() => setAcks((prev) => ({ ...prev, [id]: prev[id] !== true }))}
+                  why={
+                    id === "phrase-backup"
+                      ? t(`vaultCreation.briefing.statements.${id}.why`, {
+                          lostBothSecrets: LOST_BOTH_SECRETS_SENTENCE,
+                        })
+                      : t(`vaultCreation.briefing.statements.${id}.why`)
+                  }
+                  whyOpen={open}
+                  onToggleWhy={() => setWhyOpen((prev) => ({ ...prev, [id]: prev[id] !== true }))}
+                  last={index === BRIEFING_STATEMENT_IDS.length - 1}
+                >
+                  {t(`vaultCreation.briefing.statements.${id}.statement`)}
+                </AckRow>
+              );
+            })}
           </div>
         </ScreenScroll>
         <FooterBar>
           <Button variant="secondary" full={false} onClick={onCancel}>
             {t("common.back")}
           </Button>
-          <Button disabled={!acks.every(Boolean)} onClick={() => setStep("name")}>
+          <Button
+            disabled={!BRIEFING_STATEMENT_IDS.every((id) => acks[id] === true)}
+            onClick={() => setStep("name")}
+          >
             {t("common.continue")}
           </Button>
         </FooterBar>
@@ -1266,7 +1296,10 @@ export function CreateVaultFlow({
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)" }} />
-          <span style={{ fontSize: 13, color: "var(--fg-2)" }}>{t("createVault.personalLabel")} · </span>
+          {/* The vault's own name, not a label and a number: this screen is reached
+              before the vault is open, so it has no name to print yet, and "Personal"
+              was a specimen value from the design gallery rather than anything the
+              user chose (owner, 2026-11-10). */}
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-2)" }}>{account}</span>
         </div>
       </div>

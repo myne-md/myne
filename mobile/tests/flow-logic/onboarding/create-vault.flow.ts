@@ -21,13 +21,12 @@ import { createIdentityToHome, startVaultFromIdentityHome, IDENTITY_SETUP_RESULT
 const PHRASE_WORD = "ribbon";
 
 async function ackBriefing(page: Page): Promise<void> {
-  // Three acknowledgement rows must all be checked before Continue enables.
-  for (const fragment of [
-    "Myne has no access to my notes",
-    "There is no password reset",
-    "recovery phrase is the only way back",
-  ]) {
-    await page.getByText(fragment, { exact: false }).first().click();
+  // Three acknowledgement rows must all be checked before Continue enables. They
+  // are found by `data-ack-id` — the shared statement ids — rather than by their
+  // text: the copy comes from the same catalogue keys the desktop briefing uses
+  // now, so an English fragment would break on the first translation.
+  for (const id of ["no-store", "phrase-backup", "no-email"]) {
+    await page.locator(`[data-ack-id="${id}"]`).first().click();
   }
   await page.getByRole("button", { name: "Continue" }).click();
 }
