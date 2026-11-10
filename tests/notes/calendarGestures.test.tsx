@@ -69,7 +69,9 @@ import { CalendarPane } from "../../src/notes/components/CalendarPane";
 import { WorkspaceProvider } from "../../src/notes/workspaceContext";
 import { calendarItem, emptyWorkspace } from "../../src/notes/workspaceState";
 
-async function renderPane(): Promise<{ host: HTMLElement; cleanup: () => void }> {
+async function renderPane(
+  view: "day" | "week" = "day",
+): Promise<{ host: HTMLElement; cleanup: () => void }> {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -78,7 +80,7 @@ async function renderPane(): Promise<{ host: HTMLElement; cleanup: () => void }>
       <WorkspaceProvider initialState={emptyWorkspace("pane-1")}>
         <CalendarPane
           paneId="pane-1"
-          item={calendarItem("day")}
+          item={calendarItem(view)}
           initialAnchor={{ year: 2026, month: 11, day: 5 }}
         />
       </WorkspaceProvider>,
@@ -86,10 +88,24 @@ async function renderPane(): Promise<{ host: HTMLElement; cleanup: () => void }>
   });
   // The pane's range read is a promise; the rows do not exist until it settles.
   await act(async () => {});
-  // One pixel per minute: the pane maps a pointer through this box.
-  const column = host.querySelector<HTMLElement>(".myne-calendar__column")!;
-  column.getBoundingClientRect = () =>
-    ({ top: 0, left: 0, bottom: 1440, right: 200, width: 200, height: 1440, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+  // One pixel per minute, and 200 wide per column, so a pointer's y IS its minute
+  // and its x names the day: jsdom computes no layout, so both are stubbed here.
+  const columns = host.querySelectorAll<HTMLElement>(".myne-calendar__column");
+  columns.forEach((column, index) => {
+    const left = index * 200;
+    column.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        left,
+        bottom: 1440,
+        right: left + 200,
+        width: 200,
+        height: 1440,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+  });
   return {
     host,
     cleanup: () => {
@@ -99,11 +115,18 @@ async function renderPane(): Promise<{ host: HTMLElement; cleanup: () => void }>
   };
 }
 
-/** A pointer event at minute `minutes` past midnight, on `target`. */
-function pointer(target: EventTarget, type: string, minutes: number): void {
+/** A pointer event at minute `minutes` past midnight, on `target`, at x `clientX`. */
+function pointer(target: EventTarget, type: string, minutes: number, clientX = 0): void {
   act(() => {
     target.dispatchEvent(
-      new PointerEvent(type, { bubbles: true, cancelable: true, clientY: minutes, button: 0, pointerId: 1 }),
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+        clientY: minutes,
+        button: 0,
+        pointerId: 1,
+      }),
     );
   });
 }
@@ -217,6 +240,79 @@ describe("dragging an event's edge", () => {
     await vi.waitFor(() =>
       expect(host.querySelector('[data-testid="calendar.block"]')!.getAttribute("data-end-minute")).toBe("570"),
     );
+    cleanup();
+  });
+});
+
+describe("dragging an event's body", () => {
+  it("moves the whole span to the minute the pointer reached, and writes once", async () => {
+    rangeRows = [standup];
+    const { host, cleanup } = await renderPane();
+    const block = host.querySelector<HTMLElement>('[data-testid="calendar.block"]')!;
+
+    pointer(block, "pointerdown", 540);
+    pointer(window, "pointermove", 600);
+    // An hour later while the write is still pending: BOTH edges moved, because a
+    // move is one shift and not two edits of a duration nobody touched. Re-queried
+    // because the preview re-renders the block into a new node.
+    const moved = host.querySelector<HTMLElement>('[data-testid="calendar.block"]')!;
+    expect(moved.getAttribute("data-start-minute")).toBe("600");
+    expect(moved.getAttribute("data-end-minute")).toBe("630");
+
+    pointer(window, "pointerup", 600);
+    await vi.waitFor(() => expect(written).toHaveLength(1));
+    expect(written[0]).toContain("start: 2026-11-05 10:00");
+    expect(written[0]).toContain("end: 2026-11-05 10:30");
+    cleanup();
+  });
+
+  it("keeps the point that was grabbed under the pointer", async () => {
+    rangeRows = [standup];
+    const { host, cleanup } = await renderPane();
+    // Pressed 15 minutes INTO the block and dragged to 10:15: the start lands on
+    // 10:00, not on 10:15 - grabbing a block near its bottom must not slide it.
+    pointer(host.querySelector('[data-testid="calendar.block"]')!, "pointerdown", 555);
+    pointer(window, "pointermove", 615);
+    pointer(window, "pointerup", 615);
+
+    await vi.waitFor(() => expect(written).toHaveLength(1));
+    expect(written[0]).toContain("start: 2026-11-05 10:00");
+    cleanup();
+  });
+
+  it("carries the event into another day's column", async () => {
+    rangeRows = [standup];
+    const { host, cleanup } = await renderPane("week");
+    const block = host.querySelector<HTMLElement>('[data-testid="calendar.block"]')!;
+    const own = block.closest<HTMLElement>(".myne-calendar__column")!;
+    const columns = [...host.querySelectorAll<HTMLElement>(".myne-calendar__column")];
+    const next = columns[columns.indexOf(own) + 1];
+    expect(next.getAttribute("data-date")).toBe("2026-11-06");
+
+    pointer(block, "pointerdown", 540);
+    // Same minute, one column to the right: the day follows the pointer's x.
+    pointer(window, "pointermove", 540, next.getBoundingClientRect().left + 100);
+    pointer(window, "pointerup", 540, next.getBoundingClientRect().left + 100);
+
+    await vi.waitFor(() => expect(written).toHaveLength(1));
+    expect(written[0]).toContain("start: 2026-11-06 09:00");
+    expect(written[0]).toContain("end: 2026-11-06 09:30");
+    cleanup();
+  });
+
+  it("refuses an occurrence with the two honest alternatives, and writes nothing", async () => {
+    // An occurrence is an appearance of a series, not a note: there is no write a
+    // move on it could perform, so the refusal has to arrive before any planner.
+    rangeRows = [{ ...standup, occurrenceOf: "series-1", occurrenceDate: "2026-11-05" }];
+    const { host, cleanup } = await renderPane();
+    const block = host.querySelector<HTMLElement>('[data-testid="calendar.block"]')!;
+
+    pointer(block, "pointerdown", 540);
+    expect(host.querySelector('[data-testid="calendar.occurrenceRefused"]')).not.toBeNull();
+    pointer(window, "pointermove", 600);
+    pointer(window, "pointerup", 600);
+
+    expect(written).toHaveLength(0);
     cleanup();
   });
 });

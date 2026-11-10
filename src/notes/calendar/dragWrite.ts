@@ -88,6 +88,42 @@ function shiftInstant(value: string, days: number): string | null {
   return formatEventInstant(shifted);
 }
 
+/** Move one instant by minutes, rolling the date at midnight. A clock-less value
+ *  has only whole days to move by, so the remainder is dropped. */
+function shiftInstantMinutes(value: string, minutes: number): string | null {
+  const instant = parseEventInstant(value);
+  if (instant === null) return null;
+  if (instant.time === null) return shiftInstant(value, Math.trunc(minutes / 1440));
+  let day = instant.date;
+  let clock = Number(instant.time.slice(0, 2)) * 60 + Number(instant.time.slice(3, 5)) + minutes;
+  while (clock < 0) {
+    clock += 1440;
+    day = addDays(day, -1);
+  }
+  while (clock >= 1440) {
+    clock -= 1440;
+    day = addDays(day, 1);
+  }
+  const hh = String(Math.floor(clock / 60)).padStart(2, "0");
+  const mm = String(clock % 60).padStart(2, "0");
+  return formatEventInstant({ date: day, time: `${hh}:${mm}` });
+}
+
+/**
+ * Both edges move by the same minutes, so the duration survives. Minutes rather
+ * than days because the hour axis is a grid of them: 10:30 must land on 10:30, and
+ * a day boundary is the same shift with a larger number. `planDrag` stays whole-day
+ * for the month grid.
+ */
+export function planMoveTo(span: EventSpan, minutes: number): EventSpan | null {
+  if (minutes === 0) return span;
+  const start = shiftInstantMinutes(span.start, minutes);
+  if (start === null) return null;
+  const end = span.end === null ? null : shiftInstantMinutes(span.end, minutes);
+  if (span.end !== null && end === null) return null;
+  return { start, end, allDay: span.allDay };
+}
+
 /**
  * The span a drag of `days` produces: `start` and `end` move together, so a
  * two-hour meeting stays two hours and a three-day trip stays three days.

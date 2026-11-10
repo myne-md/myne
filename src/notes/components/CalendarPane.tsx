@@ -53,6 +53,7 @@ import {
   applyEventMove,
   planDrag,
   planEdgeResize,
+  planMoveTo,
   planResize,
   type EventSpan,
   type EventWriteRefusal,
@@ -132,6 +133,20 @@ function rowHour(row: CalendarRow): number | null {
   if (row.start.length <= 10) return null;
   const hour = Number(row.start.slice(11, 13));
   return Number.isFinite(hour) ? hour : null;
+}
+
+/** The day column under a pointer's x, so a drag can change the DAY as well as the
+ *  hour. `null` outside the grid, which the gesture reads as "stay on this day". */
+function columnUnder(clientX: number, from: HTMLElement | null): { column: HTMLElement; date: string } | null {
+  const grid = from?.closest<HTMLElement>(".myne-calendar__hours") ?? null;
+  if (grid === null) return null;
+  for (const column of grid.querySelectorAll<HTMLElement>(".myne-calendar__column")) {
+    const rect = column.getBoundingClientRect();
+    if (rect.width > 0 && clientX >= rect.left && clientX <= rect.right) {
+      return { column, date: column.getAttribute("data-date") ?? "" };
+    }
+  }
+  return null;
 }
 
 /** Minutes past midnight for a pointer over `column`, snapped; `null` when the
@@ -478,6 +493,57 @@ export function CalendarPane({
     host.addEventListener("pointerup", up);
   };
 
+  /** Drag an event's body: the whole span moves by the pointer, so the day and the
+   *  time both follow it. The point inside the block that was grabbed stays under
+   *  the pointer, so grabbing near its bottom does not slide the start. */
+  const beginMove = (
+    event: React.PointerEvent<HTMLElement>,
+    row: DisplayRow,
+    date: string,
+    drawnStartMin: number,
+  ) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    if (row.task !== undefined) return;
+    if (isProjected(row)) {
+      refuseOccurrence(row);
+      return;
+    }
+    const origin = event.currentTarget.closest<HTMLElement>(".myne-calendar__column");
+    const host = event.currentTarget.ownerDocument.defaultView;
+    if (host === null || origin === null) return;
+    const grabAt = minuteAt(event.clientY, origin);
+    if (grabAt === null) return;
+    const grabOffset = grabAt - drawnStartMin;
+
+    const rendered: EventSpan = { start: row.start, end: row.end, allDay: row.allDay };
+    let preview: EventSpan | null = null;
+
+    const move = (next: PointerEvent) => {
+      const under = columnUnder(next.clientX, origin) ?? { column: origin, date };
+      const minute = minuteAt(next.clientY, under.column);
+      if (minute === null) return;
+      const targetStart = snapMinute(minute - grabOffset);
+      const dayDelta = daysBetween(parseCivilDate(date)!, parseCivilDate(under.date) ?? parseCivilDate(date)!);
+      const planned = planMoveTo(rendered, dayDelta * DAY_MINUTES + (targetStart - drawnStartMin));
+      if (planned === null) return;
+      draggedRef.current = true;
+      preview = planned;
+      setOptimistic((current) => ({ ...current, [row.noteId]: planned }));
+    };
+
+    const up = () => {
+      host.removeEventListener("pointermove", move);
+      host.removeEventListener("pointerup", up);
+      const next = preview;
+      if (next === null) return;
+      void commitSpan(row, rendered, next, next.start !== rendered.start || next.end !== rendered.end);
+    };
+
+    host.addEventListener("pointermove", move);
+    host.addEventListener("pointerup", up);
+  };
+
   /** Drag an edge to move that instant. ONE write on release, never per move. */
   const beginResize = (
     event: React.PointerEvent<HTMLElement>,
@@ -601,7 +667,7 @@ export function CalendarPane({
     />
   );
 
-  const chip = (row: DisplayRow, showTime: boolean, showGrip = showTime) => (
+  const chip = (row: DisplayRow, showTime: boolean, showGrip = showTime, dragToMove = true) => (
     <Button
       key={`${row.noteId}-${row.start}`}
       variant="ghost"
@@ -619,9 +685,9 @@ export function CalendarPane({
       // A task is not draggable: its date is a `due:` field on a line (or on the
       // note's frontmatter), not an event `start`, and the move writer would patch a
       // field no reader of that line agrees about.
-      draggable={row.task === undefined}
+      draggable={dragToMove && row.task === undefined}
       onDragStart={(event) => {
-        if (row.task !== undefined) {
+        if (!dragToMove || row.task !== undefined) {
           event.preventDefault();
           return;
         }
@@ -854,6 +920,10 @@ export function CalendarPane({
         key={block.key}
         className="myne-calendar__block"
         data-testid="calendar.block"
+        // The body is the MOVE target; the grips inside it are the edges. A press
+        // that does not move still opens the form, which is what the chip's own
+        // click does - the drag suppresses it.
+        onPointerDown={(event) => beginMove(event, block.row, date, block.startMin)}
         // The span as NUMBERS, so a scenario (and a test in jsdom, which computes
         // no layout) can assert what the block covers instead of reading pixels.
         data-start-minute={block.startMin}
@@ -872,7 +942,7 @@ export function CalendarPane({
           title={t("calendar.resize", { title })}
           onPointerDown={(event) => beginResize(event, block.row, date, "start")}
         />
-        {chip(block.row, true, false)}
+        {chip(block.row, true, false, false)}
         <span
           aria-hidden="true"
           className="myne-calendar__grip"
@@ -922,14 +992,7 @@ export function CalendarPane({
               data-testid="calendar.cell"
               data-date={cell.date}
               className="myne-calendar__column"
-              onDragOver={(event) => {
-                if (drag !== null) event.preventDefault();
-              }}
-              // A drop still moves by the DAY: an hour-precision move is a different write.
-              onDrop={(event) => {
-                event.preventDefault();
-                void dropOn(cell.date);
-              }}
+              // A block moves by the POINTER here: the hour axis can express 10:30.
             >
               {HOURS.map((hour) => {
                 const open = capturing === cell.date && captureHour === hourValue(hour);

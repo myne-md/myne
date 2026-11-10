@@ -105,10 +105,15 @@ beforeEach(() => {
   rangeRows = defaultRows;
 });
 
+// These drags run in the MONTH view, where the gesture is still the native one
+// (dragstart, then a drop on a cell). The hour axis moves a block by the POINTER
+// instead, because a day-granular drop cannot say "10:30"; that path is
+// `calendarGestures.test.tsx`. Both run through one writer, so the rollback this
+// file is about is the same code either way.
 describe("dragging an event", () => {
   it("draws the row where it was dropped, then writes the note once", async () => {
     const { host, cleanup } = await renderPane(
-      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+      <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
     const chip = host.querySelector('[data-testid="calendar.row"]');
     expect(chip).not.toBeNull();
@@ -134,7 +139,7 @@ describe("dragging an event", () => {
   it("puts the row back and names the reason when the host refuses", async () => {
     refuseWith = Object.assign(new Error("base mismatch"), { kind: "BaseMismatch" });
     const { host, cleanup } = await renderPane(
-      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+      <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
     const chip = host.querySelector('[data-testid="calendar.row"]');
     const target = host.querySelector('[data-date="2026-11-06"]');
@@ -175,7 +180,7 @@ describe("dragging an occurrence of a series", () => {
   it("refuses with both affordances, and writes nothing at all", async () => {
     rangeRows = [projected];
     const { host, cleanup } = await renderPane(
-      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+      <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
     const chip = host.querySelector('[data-testid="calendar.row"]');
     expect(chip!.getAttribute("data-occurrence")).toBe("true");
@@ -203,7 +208,7 @@ describe("dragging an occurrence of a series", () => {
   it("creates a separate one-off note, leaving the series bytes untouched", async () => {
     rangeRows = [projected];
     const { host, cleanup } = await renderPane(
-      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+      <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
     const chip = host.querySelector('[data-testid="calendar.row"]');
     const target = host.querySelector('[data-date="2026-11-06"]');

@@ -1770,6 +1770,13 @@
   pointer-events: auto;
   overflow: hidden;
   border-radius: var(--radius-1);
+  /* The body is the move target: a block travels by the pointer, and its edge
+     grips say so with their own cursor. */
+  cursor: grab;
+}
+
+.myne-calendar__block:active {
+  cursor: grabbing;
 }
 
 /* The chip fills its block: the block owns the geometry, the chip owns the row's
