@@ -537,16 +537,48 @@ async function startAndroid() {
   });
 }
 
+// `tauri ios dev` with no device name PROMPTS on stdin, and `spawnTarget` hands a
+// child no stdin at all: it then reprints "Not to be pushy, but you need to pick a
+// device." until it is killed (measured: 1.3M lines in five minutes). So a device is
+// always resolved here and passed as the argument instead.
+function pickIosSimulator() {
+  const chosen = process.env.MYNE_IOS_DEVICE?.trim();
+  if (chosen) return chosen;
+  try {
+    const listed = execFileSync("xcrun", ["simctl", "list", "devices", "available", "-j"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const all = Object.values(JSON.parse(listed).devices ?? {}).flat();
+    // A booted simulator starts in seconds and is the one a person was last using;
+    // otherwise the alphabetically first iPhone beats an iPad for a phone layout.
+    const booted = all.find((device) => device.state === "Booted");
+    if (booted) return booted.name;
+    const iphone = all.find((device) => device.isAvailable && /^iPhone/.test(device.name));
+    if (iphone) return iphone.name;
+  } catch {
+    /* no xcrun, or no runtime installed: the warning below names the override */
+  }
+  return null;
+}
+
 function startIos() {
   if (!IS_MAC) {
     warn("!! the iOS client needs Xcode, so it only runs on macOS.");
     return;
   }
+  const device = pickIosSimulator();
+  if (!device) {
+    warn("!! no iOS simulator is installed, so the iOS client is not started:");
+    warn("    open one in Xcode, or set MYNE_IOS_DEVICE to a name from");
+    warn("    `xcrun simctl list devices available`.");
+    return;
+  }
   // The simulator shares the host network stack, so a loopback endpoint works as
   // typed. A physical iPhone does not, and would need an https endpoint.
   mobileEndpointHint();
-  log("==> starting the iOS client in the simulator");
-  const child = spawnTarget("ios", PNPM, ["mobile:ios"]);
+  log(`==> starting the iOS client in the simulator (${device})`);
+  const child = spawnTarget("ios", PNPM, ["mobile:ios", device]);
   session.last = child;
   child.on("exit", (code) => {
     if (!shuttingDown) log(`==> the iOS client exited (${code ?? "signal"})`);
