@@ -29,9 +29,9 @@ export interface WelcomeFlowProps {
   onJoin?: () => void;
   /**
    * The one create door (myne-md/myne#768, narrowed by myne-md/myne#911 task 12).
-   * Opens the mobile identity flow, which fronts the sync-server step when none is
-   * configured, creates the identity, and lands on the identity home whose
-   * create-vault action is the next step of the same chain.
+   * Opens the mobile identity flow AT ITS CREATE STEP — not its gate, whose menu
+   * re-asked this screen's own two choices — creates the identity, and lands on the
+   * identity home whose create-vault action is the next step of the same chain.
    */
   onIdentity: () => void;
   /**

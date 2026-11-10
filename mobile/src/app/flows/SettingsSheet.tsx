@@ -9,6 +9,7 @@ import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, InfoNote, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
 import { remindersReachTheOs } from "../../lib/reminders";
+import { readAiOnboardingSeen } from "../../components/AiOnboardingSheet";
 import { spellCheckingAvailable } from "../../lib/spellSupport";
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import {
@@ -1578,9 +1579,21 @@ export interface SettingsSheetProps {
    *  while a sealed identity is what blocks the cycle, and this opens the phone's
    *  one surface that can perform it. Passed straight through to `SyncHubPanel`. */
   onUnlockIdentity?: () => void;
+  /**
+   * Offer the first-run AI onboarding, ONCE per device — from the AI row, not on
+   * unlock (owner, 2026-11-10).
+   *
+   * It used to open itself when the editor mounted, so the second the vault
+   * unlocked a sheet about a feature the user had not asked for covered their
+   * notes. The row below is the moment the offer has a subject: the reader has just
+   * chosen to look at AI settings, and the sheet explains what turning it on means
+   * before the panel's own consent step. Once the device has seen it, the row opens
+   * the panel alone.
+   */
+  onAiOnboarding?: () => void;
 }
 
-export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel, onShowApprovalCode, onUnlockIdentity }: SettingsSheetProps) {
+export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel, onShowApprovalCode, onUnlockIdentity, onAiOnboarding }: SettingsSheetProps) {
   const { t, i18n } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
   const [panel, setPanel] = useState<Panel>(initialPanel ?? "root");
@@ -2317,7 +2330,12 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 label={t("settings.shell.panels.ai")}
                 value={aiSummary(eff, t)}
                 testId="settings.category-ai"
-                onClick={() => setPanel("ai")}
+                onClick={() => {
+                  setPanel("ai");
+                  // The first visit is offered the explainer (see `onAiOnboarding`);
+                  // every later one goes straight to the panel.
+                  if (!readAiOnboardingSeen()) onAiOnboarding?.();
+                }}
               />
             </Group>
 

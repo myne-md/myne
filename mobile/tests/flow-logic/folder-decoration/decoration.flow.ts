@@ -41,10 +41,15 @@ test.describe("folder icon + color decoration", () => {
     await expect(page.getByTestId("notes.folder-row")).toBeVisible();
     await expect(page.getByTestId("notes.folder-glyph")).toHaveCount(0);
 
-    // Long-press the folder row → action sheet → "Icon…" → the picker.
+    // Long-press the folder row → action sheet → "Customize" → the picker. The
+    // sheet used to offer "Icon…" and "Color…" as two rows that both opened this
+    // one surface; the desktop has always had the single row they are.
     await longPress(page, '[data-testid="notes.folder-row"]');
-    await page.getByTestId("notes.folder-icon-action").click();
+    await page.getByTestId("notes.folder-decorate-action").click();
     await expect(page.getByTestId("notes.decoration-sheet")).toBeVisible();
+    // It carries BOTH halves, which is what the one row stands for.
+    await expect(page.getByTestId("notes.decoration-icon").first()).toBeVisible();
+    await expect(page.getByTestId("notes.decoration-color").first()).toBeVisible();
 
     // Pick the "book" glyph.
     await page.locator('[data-testid="notes.decoration-icon"][data-icon-name="book"]').click();
@@ -87,7 +92,7 @@ test.describe("folder icon + color decoration", () => {
 
     await expect(page.getByTestId("notes.folder-row")).toBeVisible();
     await longPress(page, '[data-testid="notes.folder-row"]');
-    await page.getByTestId("notes.folder-color-action").click();
+    await page.getByTestId("notes.folder-decorate-action").click();
     await expect(page.getByTestId("notes.decoration-sheet")).toBeVisible();
     await page.locator('[data-testid="notes.decoration-color"][data-color-slot="none"]').click();
 

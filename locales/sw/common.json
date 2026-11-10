@@ -1743,12 +1743,6 @@
       "title": "Chuja",
       "status": "Hali"
     },
-    "sortSheet": {
-      "title": "Panga",
-      "manual": "Mpangilio wa mkono",
-      "titleAsc": "Kichwa · A → Z",
-      "titleDesc": "Kichwa · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Dokezo tupu",
       "wordCount_one": "neno {{count}} · dakika {{minutes}} za kusoma",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Dokezo lako la sasa litahifadhiwa kama toleo kwanza, ili uweze kutendua hili.",
       "confirmTitle": "Rejesha toleo hili?",
       "decrypting": "Inasimbua…",
-      "emptyState": "Bado hakuna matoleo. Matoleo huhifadhiwa kiotomatiki unapohariri na kuwekwa kwa takriban siku 7. Yamesimbwa kwa njia fiche, na hutoweka dokezo linapofutwa kabisa.",
-      "encryptedSize": "Imesimbwa · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Toleo hili halikuweza kusimbuliwa.",
       "errorGeneric": "Kuna kilichoenda vibaya. Jaribu tena.",
       "errorIo": "Hitilafu ya diski imetokea. Diski huenda imejaa au haiandikiki.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Ongeza sharti",
     "createView": "Unda mwonekano"
   },
-  "snapshots": {
-    "today": "Leo {{time}}",
-    "readError": "Imeshindwa kusoma historia ya matoleo.",
-    "decryptError": "Imeshindwa kusimbua toleo hilo.",
-    "restoreError": "Imeshindwa kurejesha toleo hilo.",
-    "title": "Historia ya matoleo",
-    "emptyState": "Hakuna matoleo ya awali bado. Matoleo hunaswa kiotomatiki unapohariri.",
-    "hide": "Ficha",
-    "empty": "(tupu)",
-    "restoreThisVersion": "Rejesha toleo hili"
-  },
   "restoreBackup": {
     "title": "Bado haipatikani kwenye simu",
     "body": "Kurejesha kutoka kwenye faili la hifadhi rudufu bado hakupatikani kwenye simu. Unda kasha au urejeshe kwa kifungu chako."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Inafungua kasha lako.",
     "readyTitle": "Kasha lako liko tayari",
     "readyBody": "Kila unachoandika kuanzia sasa husimbwa kwenye kifaa hiki kabla ya kuhifadhiwa au kusawazishwa.",
-    "personalLabel": "Binafsi",
     "openVault": "Fungua kasha",
     "backUpNow": "Hifadhi rudufu sasa"
   },

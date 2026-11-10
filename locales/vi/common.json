@@ -1743,12 +1743,6 @@
       "title": "Lọc",
       "status": "Trạng thái"
     },
-    "sortSheet": {
-      "title": "Sắp xếp",
-      "manual": "Thứ tự thủ công",
-      "titleAsc": "Tiêu đề · A → Z",
-      "titleDesc": "Tiêu đề · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Ghi chú trống",
       "wordCount_one": "{{count}} từ · đọc {{minutes}} phút",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Ghi chú hiện tại của bạn sẽ được lưu thành một ảnh chụp trước, nên bạn có thể hoàn tác việc này.",
       "confirmTitle": "Khôi phục ảnh chụp này?",
       "decrypting": "Đang giải mã…",
-      "emptyState": "Chưa có ảnh chụp nào. Ảnh chụp được lưu tự động khi bạn chỉnh sửa và được giữ khoảng 7 ngày. Chúng được mã hóa và biến mất khi ghi chú bị xóa vĩnh viễn.",
-      "encryptedSize": "Đã mã hóa · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Không thể giải mã ảnh chụp này.",
       "errorGeneric": "Đã xảy ra lỗi. Hãy thử lại.",
       "errorIo": "Đã xảy ra lỗi ổ đĩa. Ổ đĩa có thể đã đầy hoặc không ghi được.",
@@ -5564,17 +5557,6 @@
     "addCondition": "+ Thêm điều kiện",
     "createView": "Tạo chế độ xem"
   },
-  "snapshots": {
-    "today": "Hôm nay {{time}}",
-    "readError": "Không thể đọc lịch sử phiên bản.",
-    "decryptError": "Không thể giải mã phiên bản đó.",
-    "restoreError": "Không thể khôi phục phiên bản đó.",
-    "title": "Lịch sử phiên bản",
-    "emptyState": "Chưa có phiên bản trước đó. Bản chụp nhanh được ghi lại tự động khi bạn chỉnh sửa.",
-    "hide": "Ẩn",
-    "empty": "(trống)",
-    "restoreThisVersion": "Khôi phục phiên bản này"
-  },
   "restoreBackup": {
     "title": "Chưa khả dụng trên di động",
     "body": "Khôi phục từ tệp sao lưu chưa khả dụng trên di động. Hãy tạo một kho hoặc khôi phục bằng cụm từ của bạn."
@@ -5672,7 +5654,6 @@
     "unlockingSubtitle": "Đang mở kho lưu trữ của bạn.",
     "readyTitle": "Kho lưu trữ của bạn đã sẵn sàng",
     "readyBody": "Mọi thứ bạn viết từ đây đều được mã hóa trên thiết bị này trước khi được lưu hoặc đồng bộ.",
-    "personalLabel": "Cá nhân",
     "openVault": "Mở kho lưu trữ",
     "backUpNow": "Sao lưu ngay"
   },

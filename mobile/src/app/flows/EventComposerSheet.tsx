@@ -154,12 +154,22 @@ export function EventComposerSheet({
   }
 
   return (
-    <Sheet onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }} data-testid="calendar.composer">
-        <h2 style={{ margin: "var(--space-0)", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>
-          {edit === undefined ? t("calendar.composer.title") : t("common.edit")}
-        </h2>
-
+    // The sheet is TALLER than a phone, and it used to be unbounded: nine fields,
+    // two of them segmented rows, pushed Create and Cancel off the bottom edge — and
+    // the part that fell off was under the tab bar besides (owner, 2026-11-10). So the
+    // card caps its height, the FIELDS scroll inside it, and the two buttons stay
+    // pinned at the bottom where a thumb expects them.
+    <Sheet
+      onClose={onClose}
+      style={{ maxHeight: "88%", display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
+      <h2 style={{ margin: "var(--space-0) 0 var(--space-3)", flex: "none", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>
+        {edit === undefined ? t("calendar.composer.title") : t("common.edit")}
+      </h2>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", overflowY: "auto", minHeight: 0, flex: "1 1 auto" }}
+        data-testid="calendar.composer"
+      >
         <TextField
           label={t("calendar.composer.titleLabel")}
           value={title}
@@ -186,6 +196,10 @@ export function EventComposerSheet({
         {dayInvalid && <p role="alert" style={{ margin: "var(--space-0)", fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="calendar.composer.badDate">{t("calendar.composer.badDate")}</p>}
 
         {!allDay && (
+          // Two fields, one row: each takes an equal share and is allowed to shrink.
+          // `TextField`'s wrapper has no `flex`, so without this the pair claimed
+          // their intrinsic ~20-character width in a row narrower than that and the
+          // END field hung off the right edge (owner, 2026-11-10).
           <div style={{ display: "flex", gap: "var(--space-3)" }}>
             <TextField
               label={t("calendar.composer.start")}
@@ -193,6 +207,7 @@ export function EventComposerSheet({
               onChange={setStart}
               testId="calendar.composer.start-field"
               mono
+              style={{ flex: "1 1 0", minWidth: 0 }}
             />
             <TextField
               label={t("calendar.composer.end")}
@@ -200,6 +215,7 @@ export function EventComposerSheet({
               onChange={setEnd}
               testId="calendar.composer.end-field"
               mono
+              style={{ flex: "1 1 0", minWidth: 0 }}
             />
           </div>
         )}
@@ -262,6 +278,8 @@ export function EventComposerSheet({
           autoCapitalize="words"
         />
 
+      </div>
+      <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "var(--space-2)", paddingTop: "var(--space-4)" }}>
         <Button disabled={!canCreate} onClick={() => void create()} data-testid="calendar.composer.create">
           {edit === undefined ? t("calendar.composer.create") : t("calendar.form.save")}
         </Button>

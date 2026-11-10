@@ -106,7 +106,7 @@ export function AiScopeSheet({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 40,
+        zIndex: "var(--z-modal)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",

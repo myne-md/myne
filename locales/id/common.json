@@ -1743,12 +1743,6 @@
       "title": "Filter",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Urutkan",
-      "manual": "Urutan manual",
-      "titleAsc": "Judul · A → Z",
-      "titleDesc": "Judul · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Catatan kosong",
       "wordCount_one": "{{count}} kata · {{minutes}} mnt baca",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Catatan Anda saat ini akan disimpan sebagai snapshot terlebih dahulu, sehingga Anda dapat mengurungkannya.",
       "confirmTitle": "Pulihkan snapshot ini?",
       "decrypting": "Mendekripsi…",
-      "emptyState": "Belum ada snapshot. Snapshot disimpan otomatis saat Anda menyunting dan disimpan selama sekitar 7 hari. Snapshot dienkripsi, dan hilang saat catatan dihapus permanen.",
-      "encryptedSize": "Dienkripsi · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Snapshot ini tidak dapat didekripsi.",
       "errorGeneric": "Terjadi kesalahan. Coba lagi.",
       "errorIo": "Terjadi galat disk. Disk mungkin penuh atau tidak dapat ditulis.",
@@ -5564,17 +5557,6 @@
     "addCondition": "+ Tambah kondisi",
     "createView": "Buat tampilan"
   },
-  "snapshots": {
-    "today": "Hari ini {{time}}",
-    "readError": "Tidak dapat membaca riwayat versi.",
-    "decryptError": "Tidak dapat mendekripsi versi itu.",
-    "restoreError": "Tidak dapat memulihkan versi itu.",
-    "title": "Riwayat versi",
-    "emptyState": "Belum ada versi sebelumnya. Cuplikan diambil secara otomatis saat Anda mengedit.",
-    "hide": "Sembunyikan",
-    "empty": "(kosong)",
-    "restoreThisVersion": "Pulihkan versi ini"
-  },
   "restoreBackup": {
     "title": "Belum tersedia di seluler",
     "body": "Memulihkan dari berkas cadangan belum tersedia di seluler. Buat brankas atau pulihkan dengan frasa Anda."
@@ -5672,7 +5654,6 @@
     "unlockingSubtitle": "Membuka brankas Anda.",
     "readyTitle": "Brankas Anda siap",
     "readyBody": "Semua yang Anda tulis mulai dari sini dienkripsi di perangkat ini sebelum disimpan atau disinkronkan.",
-    "personalLabel": "Pribadi",
     "openVault": "Buka brankas",
     "backUpNow": "Cadangkan sekarang"
   },

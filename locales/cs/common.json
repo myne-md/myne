@@ -1879,12 +1879,6 @@
       "title": "Filtr",
       "status": "Stav"
     },
-    "sortSheet": {
-      "title": "Řazení",
-      "manual": "Ruční pořadí",
-      "titleAsc": "Název · A → Z",
-      "titleDesc": "Název · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Prázdná poznámka",
       "wordCount_one": "{{count}} slovo · {{minutes}} min čtení",
@@ -2837,8 +2831,7 @@
       "confirmBody": "Vaše současná poznámka se nejprve uloží jako snímek, takže tuto akci budete moci vrátit zpět.",
       "confirmTitle": "Obnovit tento snímek?",
       "decrypting": "Dešifruje se…",
-      "emptyState": "Zatím žádné snímky. Snímky se ukládají automaticky během úprav a uchovávají se přibližně 7 dní. Jsou zašifrované a zmizí, když je poznámka trvale smazána.",
-      "encryptedSize": "Zašifrováno · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Tento snímek se nepodařilo dešifrovat.",
       "errorGeneric": "Něco se pokazilo. Zkuste to znovu.",
       "errorIo": "Došlo k chybě disku. Disk může být plný nebo do něj nelze zapisovat.",
@@ -5883,17 +5876,6 @@
     "addCondition": "+ Přidat podmínku",
     "createView": "Vytvořit pohled"
   },
-  "snapshots": {
-    "today": "Dnes {{time}}",
-    "readError": "Nepodařilo se načíst historii verzí.",
-    "decryptError": "Tuto verzi se nepodařilo dešifrovat.",
-    "restoreError": "Tuto verzi se nepodařilo obnovit.",
-    "title": "Historie verzí",
-    "emptyState": "Zatím žádné dřívější verze. Snímky se pořizují automaticky během úprav.",
-    "hide": "Skrýt",
-    "empty": "(prázdné)",
-    "restoreThisVersion": "Obnovit tuto verzi"
-  },
   "restoreBackup": {
     "title": "Zatím není k dispozici v mobilní verzi",
     "body": "Obnovení ze záložního souboru zatím není v mobilní verzi k dispozici. Vytvořte trezor nebo jej obnovte pomocí své fráze."
@@ -6003,7 +5985,6 @@
     "unlockingSubtitle": "Otevírám váš trezor.",
     "readyTitle": "Váš trezor je připraven",
     "readyBody": "Vše, co odsud napíšete, je zašifrováno na tomto zařízení dříve, než se uloží nebo synchronizuje.",
-    "personalLabel": "Osobní",
     "openVault": "Otevřít trezor",
     "backUpNow": "Zálohovat nyní"
   },

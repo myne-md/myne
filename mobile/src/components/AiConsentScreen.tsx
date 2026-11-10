@@ -123,7 +123,7 @@ export function AiConsentScreen({
         // any non-empty box and `.click()` scrolls to its target first.
         position: "fixed",
         inset: 0,
-        zIndex: 50,
+        zIndex: "var(--z-modal)",
         display: "flex",
         flexDirection: "column",
         minHeight: 0,

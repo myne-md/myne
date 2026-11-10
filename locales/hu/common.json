@@ -1743,12 +1743,6 @@
       "title": "Szűrés",
       "status": "Állapot"
     },
-    "sortSheet": {
-      "title": "Rendezés",
-      "manual": "Kézi sorrend",
-      "titleAsc": "Cím · A → Z",
-      "titleDesc": "Cím · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Üres jegyzet",
       "wordCount_one": "{{count}} szó · {{minutes}} perc olvasás",
@@ -2623,8 +2617,7 @@
       "confirmBody": "A jelenlegi jegyzeted először pillanatképként lesz elmentve, így ez visszavonható.",
       "confirmTitle": "Visszaállítod ezt a pillanatképet?",
       "decrypting": "Visszafejtés…",
-      "emptyState": "Még nincs pillanatkép. A pillanatképek szerkesztés közben automatikusan mentődnek, és körülbelül 7 napig megmaradnak. Titkosítva vannak, és eltűnnek, amikor a jegyzetet véglegesen törlöd.",
-      "encryptedSize": "Titkosítva · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Ezt a pillanatképet nem sikerült visszafejteni.",
       "errorGeneric": "Valami hiba történt. Próbáld újra.",
       "errorIo": "Lemezhiba történt. Lehet, hogy a lemez megtelt vagy nem írható.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Feltétel hozzáadása",
     "createView": "Nézet létrehozása"
   },
-  "snapshots": {
-    "today": "Ma {{time}}",
-    "readError": "Nem sikerült beolvasni a verzióelőzményeket.",
-    "decryptError": "Nem sikerült visszafejteni azt a verziót.",
-    "restoreError": "Nem sikerült visszaállítani azt a verziót.",
-    "title": "Verzióelőzmények",
-    "emptyState": "Még nincsenek korábbi verziók. A pillanatképek szerkesztés közben automatikusan készülnek.",
-    "hide": "Elrejtés",
-    "empty": "(üres)",
-    "restoreThisVersion": "Ezen verzió visszaállítása"
-  },
   "restoreBackup": {
     "title": "Mobilon még nem érhető el",
     "body": "Biztonsági mentésből való visszaállítás mobilon még nem érhető el. Hozz létre egy széfet, vagy állítsd helyre a helyreállító mondatoddal."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "A széf megnyitása.",
     "readyTitle": "A széfje készen áll",
     "readyBody": "Minden, amit innentől ír, titkosítva lesz ezen az eszközön, mielőtt tárolásra vagy szinkronizálásra kerülne.",
-    "personalLabel": "Személyes",
     "openVault": "Széf megnyitása",
     "backUpNow": "Biztonsági mentés most"
   },

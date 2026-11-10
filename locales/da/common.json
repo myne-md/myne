@@ -1743,12 +1743,6 @@
       "title": "Filter",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sortér",
-      "manual": "Manuel rækkefølge",
-      "titleAsc": "Titel · A → Å",
-      "titleDesc": "Titel · Å → A"
-    },
     "noteMenu": {
       "emptyNote": "Tom note",
       "wordCount_one": "{{count}} ord · {{minutes}} min læsning",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Din nuværende note gemmes som et øjebliksbillede først, så du kan fortryde dette.",
       "confirmTitle": "Gendan dette øjebliksbillede?",
       "decrypting": "Dekrypterer…",
-      "emptyState": "Ingen øjebliksbilleder endnu. Øjebliksbilleder gemmes automatisk, mens du redigerer, og opbevares i omkring 7 dage. De er krypterede og forsvinder, når noten slettes permanent.",
-      "encryptedSize": "Krypteret · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Dette øjebliksbillede kunne ikke dekrypteres.",
       "errorGeneric": "Noget gik galt. Prøv igen.",
       "errorIo": "Der opstod en diskfejl. Disken kan være fuld eller skrivebeskyttet.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Tilføj betingelse",
     "createView": "Opret visning"
   },
-  "snapshots": {
-    "today": "I dag {{time}}",
-    "readError": "Kunne ikke læse versionshistorik.",
-    "decryptError": "Kunne ikke dekryptere den version.",
-    "restoreError": "Kunne ikke gendanne den version.",
-    "title": "Versionshistorik",
-    "emptyState": "Ingen tidligere versioner endnu. Øjebliksbilleder tages automatisk, mens du redigerer.",
-    "hide": "Skjul",
-    "empty": "(tom)",
-    "restoreThisVersion": "Gendan denne version"
-  },
   "restoreBackup": {
     "title": "Endnu ikke tilgængelig på mobil",
     "body": "Gendannelse fra en sikkerhedskopifil er endnu ikke tilgængelig på mobil. Opret en boks, eller gendan med din sætning."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Åbner din boks.",
     "readyTitle": "Din boks er klar",
     "readyBody": "Alt, hvad du skriver herfra, krypteres på denne enhed, før det gemmes eller synkroniseres.",
-    "personalLabel": "Personlig",
     "openVault": "Åbn boks",
     "backUpNow": "Sikkerhedskopiér nu"
   },

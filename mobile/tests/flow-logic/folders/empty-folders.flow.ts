@@ -103,7 +103,7 @@ test.describe("empty folders in the mobile folder tree", () => {
 
     // Long-press → the folder action sheet offers the normal folder actions.
     await longPress(page, '[data-testid="notes.folder-row"][data-folder-path="Ideas"]');
-    await expect(page.getByTestId("notes.folder-icon-action")).toBeVisible();
+    await expect(page.getByTestId("notes.folder-decorate-action")).toBeVisible();
 
     // Creating a subfolder under it nests correctly and keeps the parent visible.
     await page.getByTestId("notes.folder-new-subfolder").click();

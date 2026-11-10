@@ -1811,12 +1811,6 @@
       "title": "Filtrar",
       "status": "Estado"
     },
-    "sortSheet": {
-      "title": "Ordenar",
-      "manual": "Ordem manual",
-      "titleAsc": "Título · A → Z",
-      "titleDesc": "Título · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Nota vazia",
       "wordCount_one": "{{count}} palavra · {{minutes}} min de leitura",
@@ -2730,8 +2724,7 @@
       "confirmBody": "A sua nota atual será guardada primeiro como um instantâneo, para que possa anular esta ação.",
       "confirmTitle": "Restaurar este instantâneo?",
       "decrypting": "A desencriptar…",
-      "emptyState": "Ainda não há instantâneos. Os instantâneos são guardados automaticamente à medida que edita e mantidos durante cerca de 7 dias. São encriptados e desaparecem quando a nota é apagada permanentemente.",
-      "encryptedSize": "Encriptado · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Não foi possível desencriptar este instantâneo.",
       "errorGeneric": "Algo correu mal. Tente novamente.",
       "errorIo": "Ocorreu um erro de disco. O disco pode estar cheio ou não gravável.",
@@ -5726,17 +5719,6 @@
     "addCondition": "+ Adicionar condição",
     "createView": "Criar vista"
   },
-  "snapshots": {
-    "today": "Hoje {{time}}",
-    "readError": "Não foi possível ler o histórico de versões.",
-    "decryptError": "Não foi possível desencriptar essa versão.",
-    "restoreError": "Não foi possível restaurar essa versão.",
-    "title": "Histórico de versões",
-    "emptyState": "Ainda não há versões anteriores. Os instantâneos são captados automaticamente à medida que edita.",
-    "hide": "Ocultar",
-    "empty": "(vazio)",
-    "restoreThisVersion": "Restaurar esta versão"
-  },
   "restoreBackup": {
     "title": "Ainda não disponível no telemóvel",
     "body": "A restauração a partir de um ficheiro de backup ainda não está disponível no telemóvel. Crie um cofre ou recupere com a sua frase."
@@ -5840,7 +5822,6 @@
     "unlockingSubtitle": "A abrir o seu cofre.",
     "readyTitle": "O seu cofre está pronto",
     "readyBody": "Tudo o que escrever a partir de agora é encriptado neste dispositivo antes de ser armazenado ou sincronizado.",
-    "personalLabel": "Pessoal",
     "openVault": "Abrir cofre",
     "backUpNow": "Fazer backup agora"
   },

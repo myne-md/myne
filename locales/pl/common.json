@@ -1879,12 +1879,6 @@
       "title": "Filtruj",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sortuj",
-      "manual": "Kolejność ręczna",
-      "titleAsc": "Tytuł · A → Z",
-      "titleDesc": "Tytuł · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Pusta notatka",
       "wordCount_one": "{{count}} słowo · {{minutes}} min czytania",
@@ -2837,8 +2831,7 @@
       "confirmBody": "Twoja obecna notatka zostanie najpierw zapisana jako migawka, więc możesz to cofnąć.",
       "confirmTitle": "Przywrócić tę migawkę?",
       "decrypting": "Odszyfrowywanie…",
-      "emptyState": "Brak migawek. Migawki są zapisywane automatycznie podczas edycji i przechowywane przez około 7 dni. Są zaszyfrowane i znikają, gdy notatka zostaje trwale usunięta.",
-      "encryptedSize": "Zaszyfrowane · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Nie udało się odszyfrować tej migawki.",
       "errorGeneric": "Coś poszło nie tak. Spróbuj ponownie.",
       "errorIo": "Wystąpił błąd dysku. Dysk może być pełny lub niezapisywalny.",
@@ -5883,17 +5876,6 @@
     "addCondition": "+ Dodaj warunek",
     "createView": "Utwórz widok"
   },
-  "snapshots": {
-    "today": "Dzisiaj {{time}}",
-    "readError": "Nie udało się odczytać historii wersji.",
-    "decryptError": "Nie udało się odszyfrować tej wersji.",
-    "restoreError": "Nie udało się przywrócić tej wersji.",
-    "title": "Historia wersji",
-    "emptyState": "Brak wcześniejszych wersji. Migawki są przechwytywane automatycznie podczas edycji.",
-    "hide": "Ukryj",
-    "empty": "(pusto)",
-    "restoreThisVersion": "Przywróć tę wersję"
-  },
   "restoreBackup": {
     "title": "Jeszcze niedostępne na urządzeniach mobilnych",
     "body": "Przywracanie z pliku kopii zapasowej nie jest jeszcze dostępne na urządzeniach mobilnych. Utwórz skarbiec lub odzyskaj go za pomocą frazy."
@@ -6003,7 +5985,6 @@
     "unlockingSubtitle": "Otwieranie sejfu.",
     "readyTitle": "Twój sejf jest gotowy",
     "readyBody": "Wszystko, co napiszesz od teraz, jest szyfrowane na tym urządzeniu, zanim zostanie zapisane lub zsynchronizowane.",
-    "personalLabel": "Osobisty",
     "openVault": "Otwórz sejf",
     "backUpNow": "Utwórz kopię zapasową teraz"
   },

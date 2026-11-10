@@ -60,7 +60,15 @@ export type IconName =
   | "link"
   | "columns-2"
   | "rotate-ccw"
-  | "archive";
+  | "archive"
+  // The action-sheet glyphs the desktop `ContextMenu` already draws
+  // (myne-md/myne#1042). The `d` strings are the desktop registry's own
+  // (`editor/src/host/lib/icons.ts`), so the same action is the same picture on
+  // both clients — the reason the `archive` entry below spells its paths out too.
+  | "file-plus"
+  | "image-plus"
+  | "folder-plus"
+  | "palette";
 
 // Stroke-based 24×24 paths (Lucide-style), drawn with currentColor so callers
 // set colour via `color`. Matches the design's thin-stroke icon language.
@@ -117,6 +125,17 @@ const PATHS: Record<IconName, string> = {
   // box's rounded `<rect>` is expressed as its four sides. Same shape, same
   // 24-grid, so the two clients name the absent thing with the same glyph.
   archive: "M3 6h18|M8 6V4h8v2|M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8|M10 12h4",
+  "file-plus":
+    "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z|M14 2v4a2 2 0 0 0 2 2h4|M9 15h6|M12 18v-6",
+  "image-plus":
+    "M16 5h6|M19 2v6|M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5|m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21|M9 9h.01",
+  "folder-plus":
+    "M12 10v6|M9 13h6|M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z",
+  // Lucide's palette: the body plus five paint wells. The wells are drawn as tiny
+  // circles, so each is a one-pixel dot rather than a filled shape — this registry
+  // carries stroke `d` strings only, and a `d` can say `M13.5 6.5h.01`.
+  palette:
+    "M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z|M13.5 6.5h.01|M17.5 10.5h.01|M8.5 7.5h.01|M6.5 12.5h.01",
 };
 
 export function Icon({

@@ -1743,12 +1743,6 @@
       "title": "Suodata",
       "status": "Tila"
     },
-    "sortSheet": {
-      "title": "Lajittele",
-      "manual": "Manuaalinen järjestys",
-      "titleAsc": "Otsikko · A → Ö",
-      "titleDesc": "Otsikko · Ö → A"
-    },
     "noteMenu": {
       "emptyNote": "Tyhjä muistiinpano",
       "wordCount_one": "{{count}} sana · {{minutes}} min lukuaika",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Nykyinen muistiinpanosi tallennetaan ensin tilannekuvaksi, joten voit kumota tämän.",
       "confirmTitle": "Palautetaanko tämä tilannekuva?",
       "decrypting": "Puretaan salausta…",
-      "emptyState": "Ei vielä tilannekuvia. Tilannekuvat tallennetaan automaattisesti muokatessasi ja säilytetään noin 7 päivän ajan. Ne ovat salattuja ja katoavat, kun muistiinpano poistetaan pysyvästi.",
-      "encryptedSize": "Salattu · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Tämän tilannekuvan salausta ei voitu purkaa.",
       "errorGeneric": "Jokin meni pieleen. Yritä uudelleen.",
       "errorIo": "Tapahtui levyvirhe. Levy voi olla täynnä tai kirjoitussuojattu.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Lisää ehto",
     "createView": "Luo näkymä"
   },
-  "snapshots": {
-    "today": "Tänään {{time}}",
-    "readError": "Versiohistorian lukeminen epäonnistui.",
-    "decryptError": "Version salauksen purkaminen epäonnistui.",
-    "restoreError": "Version palauttaminen epäonnistui.",
-    "title": "Versiohistoria",
-    "emptyState": "Ei vielä aiempia versioita. Tilannekuvat tallentuvat automaattisesti muokatessasi.",
-    "hide": "Piilota",
-    "empty": "(tyhjä)",
-    "restoreThisVersion": "Palauta tämä versio"
-  },
   "restoreBackup": {
     "title": "Ei vielä käytettävissä mobiilissa",
     "body": "Varmuuskopiotiedostosta palauttaminen ei ole vielä käytettävissä mobiilissa. Luo holvi tai palauta lauseellasi."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Avataan holviasi.",
     "readyTitle": "Holvisi on valmis",
     "readyBody": "Kaikki, mitä kirjoitat tästä eteenpäin, salataan tällä laitteella ennen tallennusta tai synkronointia.",
-    "personalLabel": "Henkilökohtainen",
     "openVault": "Avaa holvi",
     "backUpNow": "Varmuuskopioi nyt"
   },

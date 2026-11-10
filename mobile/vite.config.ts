@@ -53,6 +53,12 @@ export default defineConfig(async () => ({
       { find: "@myne/calendar-colour", replacement: sib("../src/notes/calendar/colour.ts") },
       { find: "@myne/calendar-visibility", replacement: sib("../src/notes/calendar/visibility.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
+      // The version-history surface: the diff RENDERER and the author-label rule are
+      // one implementation each on the desktop, and the phone reads them rather than
+      // growing twins — a diff drawn two ways is two answers to "what changed", and
+      // `identityLabel.ts` exists BECAUSE two surfaces had already drifted on how an
+      // unattributed device is named (myne-md/myne#1042).
+      { find: "@myne/diff-view", replacement: sib("../src/notes/components/DiffView.tsx") },
       // The one reader of `skip:`, and the one writer of it (decisions/storage/0795).
       // Aliased rather than reimplemented: the field's bytes are a function of its
       // set, so two writers would be two orderings and every sync would see a

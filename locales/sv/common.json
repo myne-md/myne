@@ -1743,12 +1743,6 @@
       "title": "Filter",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sortera",
-      "manual": "Manuell ordning",
-      "titleAsc": "Titel · A → Ö",
-      "titleDesc": "Titel · Ö → A"
-    },
     "noteMenu": {
       "emptyNote": "Tom anteckning",
       "wordCount_one": "{{count}} ord · {{minutes}} min läsning",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Din nuvarande anteckning sparas som en ögonblicksbild först, så att du kan ångra detta.",
       "confirmTitle": "Återställ den här ögonblicksbilden?",
       "decrypting": "Dekrypterar…",
-      "emptyState": "Inga ögonblicksbilder ännu. Ögonblicksbilder sparas automatiskt medan du redigerar och behålls i ungefär 7 dagar. De är krypterade och försvinner när anteckningen tas bort permanent.",
-      "encryptedSize": "Krypterad · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Den här ögonblicksbilden kunde inte dekrypteras.",
       "errorGeneric": "Något gick fel. Försök igen.",
       "errorIo": "Ett diskfel uppstod. Disken kan vara full eller skrivskyddad.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Lägg till villkor",
     "createView": "Skapa vy"
   },
-  "snapshots": {
-    "today": "Idag {{time}}",
-    "readError": "Det gick inte att läsa versionshistoriken.",
-    "decryptError": "Det gick inte att dekryptera den versionen.",
-    "restoreError": "Det gick inte att återställa den versionen.",
-    "title": "Versionshistorik",
-    "emptyState": "Inga tidigare versioner ännu. Ögonblicksbilder tas automatiskt medan du redigerar.",
-    "hide": "Dölj",
-    "empty": "(tom)",
-    "restoreThisVersion": "Återställ den här versionen"
-  },
   "restoreBackup": {
     "title": "Inte tillgängligt på mobil ännu",
     "body": "Att återställa från en säkerhetskopiefil är inte tillgängligt på mobil ännu. Skapa ett valv eller återställ med din fras."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Öppnar ditt valv.",
     "readyTitle": "Ditt valv är klart",
     "readyBody": "Allt du skriver härifrån krypteras på den här enheten innan det lagras eller synkroniseras.",
-    "personalLabel": "Personligt",
     "openVault": "Öppna valv",
     "backUpNow": "Säkerhetskopiera nu"
   },
