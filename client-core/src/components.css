@@ -1982,7 +1982,7 @@
   border-radius: 0;
   background: color-mix(
     in srgb,
-    var(--calendar-colour, var(--line-2)) var(--calendar-wash, 12%),
+    var(--calendar-colour, var(--line-2)) var(--calendar-wash, 22%),
     transparent
   );
   font-size: var(--text-xs);
