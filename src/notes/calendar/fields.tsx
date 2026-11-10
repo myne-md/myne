@@ -1,12 +1,9 @@
 // The calendar's date, time and count fields (myne-md/myne#1037).
 //
-// `<input type="date">` and its siblings are WebView widgets: they ignore every
-// design token, a custom palette reaches none of them, and they differ between the
-// desktop app, the browser client and the phone. They live here rather than in
-// `primitives/` because this form is their only caller. They reuse `grid.ts` for the
-// month matrix and `datetimeFormat` for what the user reads, so a picker cannot
-// disagree with the pane about which day is which (`decisions/clients/0801`: not
-// the task-field picker).
+// `<input type="date">` and its siblings ignore every design token and differ
+// between the three clients, so each is rebuilt here over `grid.ts` for the month
+// matrix and `datetimeFormat` for what the user reads: a picker cannot disagree
+// with the pane about which day is which (`decisions/clients/0801`).
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,18 +17,15 @@ import {
 import { Button } from "../../components/primitives/Button";
 import { IconButton } from "../../components/primitives/IconButton";
 import { AnchoredPanel } from "../../components/primitives/AnchoredPanel";
+import { Select } from "../../components/primitives/Select";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
-import {
-  formatCivilDate as formatStoredDate,
-  formatWallClockTime,
-} from "@myne/editor/host/lib/datetimeFormat";
+import type { DateTimeDisplay } from "../../lib/datetimeFormat";
+import { formatCivilDate as formatStoredDate } from "@myne/editor/host/lib/datetimeFormat";
 import { monthLabel } from "./format";
 import { monthGrid } from "./grid";
 import { useLocalToday } from "../useLocalToday";
 
-/** The shared skin of a field's trigger: our `Button`, in the ghost variant, with
- *  the value as its label. `min-width` keeps a short date from making the row
- *  jump as the user moves between months with different name lengths. */
+/** The date trigger's skin; `min-width` keeps a short month name from moving the row. */
 const TRIGGER_STYLE = { minWidth: "9.5em", justifyContent: "flex-start" } as const;
 
 const PANEL_STYLE = {
@@ -57,18 +51,21 @@ const WEEK_STYLE = {
   gap: "var(--space-0)",
 } as const;
 
-function cellStyle(selected: boolean, today: boolean): Record<string, string> {
+/** One day of the month: a square a number, a ring or a fill sits in. */
+function cellStyle(selected: boolean, today: boolean, inMonth = true): Record<string, string> {
   return {
-    minWidth: "2em",
+    minWidth: "var(--space-0)",
+    height: "var(--space-6)",
+    padding: "var(--space-0)",
     justifyContent: "center",
     fontWeight: selected ? "var(--weight-medium, 500)" : "var(--weight-regular, 400)",
-    color: selected ? "var(--accent)" : "var(--fg-1)",
-    background: selected ? "var(--accent-soft)" : "transparent",
-    // Today is a RING rather than a fill: the fill is the selection's, and a day
-    // that is both would otherwise have to pick one of the two facts to show.
-    outline: today ? "1px solid var(--accent)" : "none",
+    color: selected ? "var(--accent-on)" : inMonth ? (today ? "var(--accent)" : "var(--fg-1)") : "var(--fg-3)",
+    background: selected ? "var(--accent)" : "transparent",
+    // The selection is the FILL; today is a ring, so a day that is both still
+    // reads as chosen first and today second.
+    outline: today && !selected ? "1px solid var(--accent)" : "none",
     outlineOffset: "-1px",
-    borderRadius: "var(--radius-1)",
+    borderRadius: "var(--radius-pill)",
   };
 }
 
@@ -147,16 +144,22 @@ export function DateField({
         aria-haspopup="dialog"
         aria-expanded={open}
         data-testid={testId}
-        // The canonical value, unformatted: the trigger's own text follows the
-        // user's date-format preference, so a test or a scenario that read it
-        // would depend on a setting. Same reason the grid cells carry
-        // `data-date`.
+        // Unformatted, so a test or a scenario does not depend on the user's
+        // date-format preference. The cells carry `data-date` for the same reason.
         data-value={value ?? ""}
         onClick={() => (open ? setOpen(false) : openPicker())}
       >
         {shown === "" ? t("common.nodate") : shown}
       </Button>
-      <AnchoredPanel open={open} onClose={() => setOpen(false)} anchorRef={triggerRef} minWidth={252} style={PANEL_STYLE}>
+      <AnchoredPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+        // Under the field: the default `end` hangs a 252px panel to the LEFT of it.
+        align="start"
+        minWidth={252}
+        style={PANEL_STYLE}
+      >
         <div role="dialog" aria-label={label}>
           <div style={HEADER_STYLE}>
             <IconButton
@@ -205,10 +208,7 @@ export function DateField({
                     dayRefs.current[index] = el;
                   }}
                   variant="ghost"
-                  style={{
-                    ...cellStyle(isSelected, isToday),
-                    color: cell.inMonth ? cellStyle(isSelected, isToday)["color"] : "var(--fg-3)",
-                  }}
+                  style={cellStyle(isSelected, isToday, cell.inMonth)}
                   aria-label={date === null ? cell.date : new Intl.DateTimeFormat(i18n.language, {
                     weekday: "long",
                     day: "numeric",
@@ -243,7 +243,9 @@ export function DateField({
                         return;
                     }
                   }}
-                />
+                >
+                  {String(Number(cell.date.slice(8)))}
+                </Button>
               );
             })}
           </div>
@@ -292,14 +294,30 @@ function minuteOptions(current: string | null): readonly string[] {
   return out;
 }
 
+const HOUR_VALUES = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+
+/** `9 AM` / `09` - the hour alone, because `formatWallClockTime` always prints
+ *  minutes and `9:00 AM : 30` is not a clock. Same three modes it switches on, so
+ *  the two cannot disagree about 12 versus 24. */
+function hourLabel(hour: string, display: DateTimeDisplay): string {
+  const h = Number(hour);
+  if (display.timeFormat === "24h") return hour;
+  if (display.timeFormat === "12h") return `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? "AM" : "PM"}`;
+  return new Intl.DateTimeFormat(display.locale, { hour: "numeric", timeZone: "UTC" }).format(
+    new Date(Date.UTC(2000, 0, 1, h)),
+  );
+}
+
 /**
- * A wall-clock time, picked from two columns.
+ * A wall-clock time, from two of the app's own dropdowns.
  *
- * Wall clock, not an instant (`markdown-dialect.md` §3.10.2): there is no zone in
- * the value and none in this control, so `09:00` means 09:00 wherever the note is
- * read. The hours are 24 because the stored form is, and the READ form goes
- * through `formatWallClockTime`, so a 12-hour reader sees `9:00 AM` in the
- * trigger while the file keeps `09:00`.
+ * Wall clock, not an instant (`markdown-dialect.md` §3.10.2): `09:00` means 09:00
+ * wherever the note is read. The stored 24 hours are labelled in the reader's own
+ * clock, so a 12-hour reader picks `2:00 PM` and the file keeps `14:00`.
+ *
+ * Two `Select`s, INLINE, replacing a popover of two scrolling number columns. A
+ * `Select` inside an `AnchoredPanel` opens its menu in a portal, where the panel's
+ * outside-click handler closes the panel on the very click meant to choose.
  */
 export function TimeField({
   label,
@@ -316,97 +334,58 @@ export function TimeField({
 }) {
   const { t } = useTranslation();
   const display = useDateTimeDisplay();
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const hour = value?.slice(0, 2) ?? "09";
   const minute = value?.slice(3, 5) ?? "00";
-
-  const commitTime = (nextHour: string, nextMinute: string): void => {
-    onChange(`${nextHour}:${nextMinute}`);
-  };
+  const hours = HOUR_VALUES.map((h) => ({ value: h, label: hourLabel(h, display) }));
+  const minutes = minuteOptions(value).map((m) => ({ value: m, label: m }));
 
   return (
-    <>
-      <Button
-        ref={triggerRef}
-        variant="ghost"
-        icon="clock"
-        style={TRIGGER_STYLE}
-        aria-label={label}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        data-testid={testId}
-        data-value={value ?? ""}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        {value === null ? t("calendar.form.noTime") : formatWallClockTime(value, display)}
-      </Button>
-      <AnchoredPanel open={open} onClose={() => setOpen(false)} anchorRef={triggerRef} minWidth={188} style={PANEL_STYLE}>
-        <div role="dialog" aria-label={label} style={{ display: "flex", gap: "var(--space-2)" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-0)", maxHeight: "14em", overflowY: "auto" }}>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{t("calendar.form.hour")}</span>
-            {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")).map((h) => (
-              <Button
-                key={h}
-                variant="ghost"
-                style={cellStyle(h === hour, false)}
-                data-testid={`${testId}-hour`}
-                data-hour={h}
-                onClick={() => {
-                  commitTime(h, minute);
-                  setOpen(false);
-                }}
-              >
-                {h}
-              </Button>
-            ))}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-0)", maxHeight: "14em", overflowY: "auto" }}>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{t("calendar.form.minute")}</span>
-            {minuteOptions(value).map((m) => (
-              <Button
-                key={m}
-                variant="ghost"
-                style={cellStyle(m === minute, false)}
-                data-testid={`${testId}-minute`}
-                data-minute={m}
-                onClick={() => {
-                  commitTime(hour, m);
-                  setOpen(false);
-                }}
-              >
-                {m}
-              </Button>
-            ))}
-          </div>
-          {allowEmpty && value !== null && (
-            <div style={{ display: "flex", alignItems: "flex-end" }}>
-              <Button
-                variant="ghost"
-                data-testid={`${testId}-clear`}
-                onClick={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-              >
-                {t("common.clear")}
-              </Button>
-            </div>
-          )}
-        </div>
-      </AnchoredPanel>
-    </>
+    <div
+      role="group"
+      aria-label={label}
+      data-testid={testId}
+      // The canonical value, unformatted, for the same reason the date field's
+      // trigger carries it: the labels follow the time-format preference.
+      data-value={value ?? ""}
+      style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}
+    >
+      <Select
+        aria-label={t("calendar.form.hour")}
+        value={hour}
+        options={hours}
+        onChange={(next) => onChange(`${next}:${minute}`)}
+        testId={`${testId}-hour`}
+        style={{ minWidth: "6.5em" }}
+      />
+      <span aria-hidden="true" style={{ color: "var(--fg-3)" }}>
+        :
+      </span>
+      <Select
+        aria-label={t("calendar.form.minute")}
+        value={minute}
+        options={minutes}
+        onChange={(next) => onChange(`${hour}:${next}`)}
+        testId={`${testId}-minute`}
+      />
+      {allowEmpty && value !== null && (
+        <IconButton
+          icon="x"
+          label={t("common.clear")}
+          iconSize={12}
+          testId={`${testId}-clear`}
+          onClick={() => onChange(null)}
+        />
+      )}
+    </div>
   );
 }
 
 /**
  * A small whole number with a stepper, for the repeat rules.
  *
- * `<input type="number">` is the other native control this form carried, and it
- * brings the platform's spinner, its own invalid states and a locale-dependent
- * separator. A rule's count is 1..99 and a day of the month is 1..31, so a pair of
- * buttons around the value says everything the number input did, in the app's own
- * chrome.
+ * `<input type="number">` brings the platform's spinner, its own invalid states
+ * and a locale-dependent separator. A count is 1..99, so a pair of buttons around
+ * the value says everything it did, in the app's own chrome.
  */
 export function CountField({
   label,

@@ -328,27 +328,35 @@ describe("the pane as a calendar", () => {
 });
 
 describe("starting an event from the grid", () => {
-  it("opens the composer for the day whose empty space was clicked", async () => {
+  it("captures on the day and hour whose empty space was clicked", async () => {
     const { host, cleanup } = await renderPane(
       <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
-    const cell = host.querySelector('[data-date="2026-11-06"]') as HTMLElement;
+    // The week view is an hour axis, so the target is one cell of it: the 6th at
+    // 11:00. The claim is the same one this test has always made - the note lands
+    // where the user pointed rather than on today - and it now holds for the hour
+    // as well as the day.
+    const slot = host.querySelector('[data-date="2026-11-06"] [data-hour="11"]') as HTMLElement;
     act(() => {
-      cell.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      slot.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await act(async () => {});
-    // The composer is seeded from the day, so the note lands where the user pointed
-    // rather than on today, which is the bug a "new event" button without a date has.
-    expect(host.querySelector('[data-testid="calendar.form"]')).not.toBeNull();
-    // Seeded with THAT day's date, not today's: the note must land where the user
-    // pointed, which is the bug a dateless "new event" button has.
-    //
-    // Read off the field's own trigger rather than an `<input type="date">`: the
-    // native control is gone (myne-md/myne#1037), so the value lives in the
-    // button's accessible name and the raw date in `data-value` on the panel's
-    // cells. `title` is what the form's `DateField` always renders.
-    const startField = host.querySelector('[data-testid="calendar.form.startDate"]');
-    expect(startField?.getAttribute("data-value")).toBe("2026-11-06");
+    const field = host.querySelector(".myne-calendar__slotform input") as HTMLInputElement;
+    expect(field).not.toBeNull();
+
+    await act(async () => {
+      // React tracks the value through its own setter, so the field is driven the
+      // way a person drives it rather than by assigning `.value`.
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(field, "Coffee");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+
+    await vi.waitFor(() => expect(created).toHaveLength(1));
+    expect(created[0]).toContain("start: 2026-11-06 11:00");
     cleanup();
   });
 
