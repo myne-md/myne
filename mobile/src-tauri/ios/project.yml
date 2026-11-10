@@ -128,7 +128,15 @@ targets:
         # this stable path (the tauri-<hash> build dir is not addressable from
         # the pbxproj). `-force_load` then pulls the globalized definitions in.
         # See myne-ops/runbooks/ios-app-store-release.md §4b.
-        OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver", "-Wl,-force_load,$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)/libTauri.globalized.a"]
+        OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]
+        # PER PLATFORM, and that is the fix for a real failure: a device build and a
+        # simulator build are both arm64 and both write `Externals/arm64/<cfg>/`, so
+        # one stable path made whichever ran last win, and the next link of the other
+        # kind died with `ld: building for 'iOS-simulator', but linking in object file
+        # ... built for 'iOS'` (owner, 2026-11-10: the simulator opened with no app on
+        # it). `ios-link.sh` stages into `sim/` or `ios/` by the target it is linking.
+        OTHER_LDFLAGS[sdk=iphonesimulator*]: ["$(inherited)", "-Wl,-force_load,$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)/sim/libTauri.globalized.a"]
+        OTHER_LDFLAGS[sdk=iphoneos*]: ["$(inherited)", "-Wl,-force_load,$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)/ios/libTauri.globalized.a"]
       groups: [app]
     dependencies:
       - framework: libapp.a

@@ -91,8 +91,18 @@ case "$out" in
           # build dir is not addressable from the pbxproj). $(CONFIGURATION) is
           # `release` for a release build; both are staged so either config
           # resolves.
+          # Stage under a PER-PLATFORM directory (`sim/` or `ios/`), because a
+          # device build and a simulator build are both arm64 and both stage into
+          # `Externals/arm64/<config>/`: with one path, whichever ran last won and the
+          # next link of the other kind failed with `ld: building for 'iOS-simulator',
+          # but linking in object file ... built for 'iOS'`. `project.yml` force-loads
+          # the matching one through `OTHER_LDFLAGS[sdk=...]`.
+          if [ "$sim" = "1" ]; then plat="sim"; else plat="ios"; fi
           for cfg in release debug; do
-            dest="$REPO_ROOT/mobile/src-tauri/gen/apple/Externals/arm64/$cfg/libTauri.globalized.a"
+            dest="$REPO_ROOT/mobile/src-tauri/gen/apple/Externals/arm64/$cfg/$plat/libTauri.globalized.a"
+            # Drop the OLD shared path if a previous run left one: it is a wrong
+            # platform archive for one of the two links, and nothing references it.
+            rm -f "$REPO_ROOT/mobile/src-tauri/gen/apple/Externals/arm64/$cfg/libTauri.globalized.a" 2>/dev/null || true
             mkdir -p "$(dirname "$dest")" 2>/dev/null || true
             cp -f "$FIXED" "$dest" 2>/dev/null || true
           done

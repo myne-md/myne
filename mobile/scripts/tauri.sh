@@ -22,6 +22,24 @@ run_tauri() { exec pnpm exec tauri "$@"; }
 # lines in five minutes, which reads as tool spam and never starts the app. So a device
 # is named HERE, once, for every entry point: MYNE_IOS_DEVICE when set, else a booted
 # simulator, else the first available iPhone.
+# Xcode treats a `-force_load` path as a REQUIRED build input: the file has to exist
+# before xcodebuild starts. The real archive is produced DURING the build, by the Rust
+# link (`ios-link.sh` globalizes the swift-rs symbols and stages a copy), so a build
+# whose cache is cold fails with `error: Build input file cannot be found:
+# .../Externals/arm64/debug/sim/libTauri.globalized.a`. A valid empty archive is the
+# 8-byte `!<arch>` magic; the Rust link replaces it with the real one before the app
+# link runs, and an empty one links as a no-op rather than as a wrong-platform object.
+stage_ios_link_placeholder() {
+  for cfg in debug release; do
+    for plat in sim ios; do
+      dest="$PWD/src-tauri/gen/apple/Externals/arm64/$cfg/$plat/libTauri.globalized.a"
+      [ -f "$dest" ] && continue
+      mkdir -p "$(dirname "$dest")" 2>/dev/null || true
+      printf '!<arch>\n' > "$dest" 2>/dev/null || true
+    done
+  done
+}
+
 pick_ios_device() {
   if [ -n "${MYNE_IOS_DEVICE:-}" ]; then
     printf '%s\n' "$MYNE_IOS_DEVICE"
@@ -65,6 +83,7 @@ case "${2:-}" in
     # A device is a positional BEFORE `--`: after it, tauri hands the argument to the
     # runner instead, which is how `pnpm mobile:ios -- "iPhone 18 Pro"` reached the CLI
     # as runtime args and still prompted.
+    stage_ios_link_placeholder
     if [ -z "${3:-}" ] || [ "${3:-}" = "--" ]; then
       case "${2:-}" in
         dev|run)
