@@ -7,6 +7,11 @@
 // day (clamped, never trusted), how overlapping rows share the width, and what a
 // pointer position means (a pixel is a quarter hour).
 //
+// The pointer half (`minuteAt`, `columnUnder`) is here rather than in each client
+// for the same reason: a finger on a phone and a mouse on a laptop have to resolve
+// to the same minute and the same day column, and two copies of that arithmetic is
+// two chances to disagree about where a drag landed.
+//
 // Minutes past midnight, never a date-time: the axis is a wall clock
 // (`markdown-dialect.md` §3.10.2), so nothing here converts a zone.
 
@@ -15,6 +20,9 @@ export const DAY_MINUTES = 24 * 60;
 
 /** The grain a gesture snaps to: small enough that a deliberate 09:15 is reachable. */
 export const SNAP_MINUTES = 15;
+
+/** The shortest a block may be drawn: 18 minutes keeps a point event clickable. */
+export const MIN_BLOCK_MINUTES = 18;
 
 /** A row's share of one day, in minutes past that day's midnight. */
 export type MinuteSpan = {
@@ -163,4 +171,37 @@ export function blockGeometry(span: MinuteSpan, minMinutes: number = 0): {
     top: `${(span.startMin / DAY_MINUTES) * 100}%`,
     height: `${(height / DAY_MINUTES) * 100}%`,
   };
+}
+
+/** Minutes past midnight for a pointer over `column`, snapped; `null` when the
+ *  column has no measured height (jsdom, and a view that has not laid out yet). */
+/** The hour of a row's start, or `null` when it carries no clock at all. */
+export function rowHour(row: { readonly start: string }): number | null {
+  if (row.start.length <= 10) return null;
+  const hour = Number(row.start.slice(11, 13));
+  return Number.isFinite(hour) ? hour : null;
+}
+
+export function minuteAt(clientY: number, column: HTMLElement | null): number | null {
+  if (column === null) return null;
+  const rect = column.getBoundingClientRect();
+  if (!Number.isFinite(rect.height) || rect.height <= 0) return null;
+  return snapMinute(((clientY - rect.top) / rect.height) * DAY_MINUTES);
+}
+
+/** The day column under a pointer's x, so a drag can change the DAY as well as the
+ *  hour. `null` outside the grid, which a gesture reads as "stay on this day". */
+export function columnUnder(
+  clientX: number,
+  from: HTMLElement | null,
+): { column: HTMLElement; date: string } | null {
+  const grid = from?.closest<HTMLElement>(".myne-calendar__hours") ?? null;
+  if (grid === null) return null;
+  for (const column of grid.querySelectorAll<HTMLElement>(".myne-calendar__column")) {
+    const rect = column.getBoundingClientRect();
+    if (rect.width > 0 && clientX >= rect.left && clientX <= rect.right) {
+      return { column, date: column.getAttribute("data-date") ?? "" };
+    }
+  }
+  return null;
 }

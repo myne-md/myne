@@ -4467,6 +4467,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onTasks={() => setTab("tasks")}
             onGraph={() => setTab("graph")}
             onAttachments={() => setTab("files")}
+            onCalendar={() => setTab("calendar")}
             onChat={() => setTab("chat")}
           />
         )}
@@ -5495,6 +5496,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           onTasks={() => setTab("tasks")}
           onGraph={() => setTab("graph")}
           onAttachments={() => setTab("files")}
+          onCalendar={() => setTab("calendar")}
           onChat={() => setTab("chat")}
         />
       )}

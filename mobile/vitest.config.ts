@@ -36,6 +36,9 @@ export default defineConfig({
       // the desktop pane and the agent tool's answers, so a cell and a row cannot
       // disagree about which day a span falls on.
       { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      { find: "@myne/calendar-layout", replacement: sib("../src/notes/calendar/layout.ts") },
+      { find: "@myne/calendar-update", replacement: sib("../src/notes/calendar/updateEvent.ts") },
+      { find: "@myne/calendar-gesture", replacement: sib("../src/notes/calendar/gesture.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
       // Same alias as the build config; vitest resolves through this file, so an
       // alias added only to vite.config.ts passes the build and fails every suite.
