@@ -1250,7 +1250,7 @@ describe("AiPanel: the panel's grouping (myne-md/myne#867, topics since #885)", 
    *  and Privacy's topics too. The exhaustiveness worth keeping is "every AI
    *  topic is listed", which is what this names, and the test below holds it to
    *  the roster so the two cannot drift. */
-  type AiTopicId = "answering" | "models" | "limits" | "advanced";
+  type AiTopicId = "answering" | "models" | "limits" | "externalAccess" | "advanced";
 
   /** Which controls a topic must contain, asserted one topic at a time on the
    *  RENDERED tree. A panel whose JSX sits in the old sequence and is composed
@@ -1274,6 +1274,10 @@ describe("AiPanel: the panel's grouping (myne-md/myne#867, topics since #885)", 
       "ai.model-choose-tag",
     ],
     limits: ["ai.excluded-folders", "ai.history-budget-input"],
+    // Its own topic since the rework (myne-md/myne#1052). The section itself is
+    // absent wherever `externalMcp` is absent, which is why the membership here is
+    // the master switch rather than a connection row.
+    externalAccess: ["settings.mcp-enable"],
     advanced: ["ai.meeting-prompt"],
   };
 

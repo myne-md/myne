@@ -24,7 +24,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 type Verdict =
-  | { kind: "fixed"; why: string }
+  // `edge` is the side the sticky is pinned to, because the clearance is spelled
+  // `scroll-padding-top` for a header and `scroll-padding-bottom` for a footer. A
+  // verdict that names the wrong side would pass while the focused row stayed
+  // covered.
+  | { kind: "fixed"; edge: "top" | "bottom"; why: string }
   | { kind: "not-applicable"; why: string };
 
 /**
@@ -36,11 +40,17 @@ type Verdict =
 const STICKY_VERDICTS: Record<string, Verdict> = {
   "src/components/attachments/AttachmentsLibrary.tsx": {
     kind: "fixed",
+    edge: "top",
     why: "A sticky top list header over rows whose preview target is tabIndex 0. The scroller carries scroll-padding-top.",
   },
   "src/components/settings/EditorPanel.tsx": {
     kind: "not-applicable",
     why: "The sticky is a right-hand preview COLUMN, a flex sibling of the controls column rather than an overlay on it, so it is never between the viewport and a focused control.",
+  },
+  "src/components/settings/McpSection.tsx": {
+    kind: "fixed",
+    edge: "bottom",
+    why: "The wizard's action row is pinned to the bottom of the step scroller, and the scroller carries scroll-padding-bottom so a focused switch stops above the row rather than behind it.",
   },
   "src/notes/components/DiffView.tsx": {
     kind: "not-applicable",
@@ -149,7 +159,9 @@ describe("every sticky has a 2.4.11 verdict", () => {
     // a scroller that does not is worse than no verdict.
     for (const [file, verdict] of Object.entries(STICKY_VERDICTS)) {
       if (verdict.kind !== "fixed") continue;
-      expect(code(file), file).toContain("scrollPaddingTop");
+      expect(code(file), file).toContain(
+        verdict.edge === "top" ? "scrollPaddingTop" : "scrollPaddingBottom",
+      );
     }
   });
 

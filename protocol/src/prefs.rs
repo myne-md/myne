@@ -253,6 +253,48 @@ impl McpScopeModel {
     }
 }
 
+/// What a queued request asks the person to decide
+/// (mcp external access rework, myne-md/myne#1052).
+///
+/// Two kinds, and they move the grant in OPPOSITE directions: accepting a write
+/// request adds a folder to the write allow list, and accepting a read request
+/// removes a folder from the read deny list. Both are one folder, both re-read the
+/// grant at the moment of acceptance, and neither is authority the queue holds.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum McpRequestKind {
+    /// The client tried to write into a folder it may read but was not granted for
+    /// writing. This is every row written before the read kind existed, so it is
+    /// the default and carries no token.
+    #[default]
+    Write,
+    /// The client named a folder the user left out, and asked to read it.
+    Read,
+}
+
+impl McpRequestKind {
+    /// The canonical JSON token, or `None` for the default (a write request),
+    /// which is omitted so a row written before this member existed re-encodes byte
+    /// for byte.
+    pub fn canonical_token(self) -> Option<&'static str> {
+        match self {
+            McpRequestKind::Write => None,
+            McpRequestKind::Read => Some("read"),
+        }
+    }
+
+    /// Parse the canonical token. `None` is an unknown kind, refused rather than
+    /// defaulted: a future kind read as `Write` would widen where it meant to
+    /// narrow.
+    pub fn from_canonical_token(token: &str) -> Option<Self> {
+        match token {
+            "write" => Some(McpRequestKind::Write),
+            "read" => Some(McpRequestKind::Read),
+            _ => None,
+        }
+    }
+}
+
 /// One external MCP connection's grant: what a named client may read, when the
 /// user approved it, and when it last ran a tool (external-mcp-connection,
 /// myne-md/myne#923).
@@ -343,6 +385,31 @@ pub struct McpConnectionGrant {
     /// which is why the write scope is the one that stays a list of names.
     #[serde(default)]
     pub write_folders: Vec<alloc::string::String>,
+    /// The verbs this connection may NOT call, as wire identifiers
+    /// (`note_edit`, `note_move`, …), which is the switch bank on the approval
+    /// screen (mcp external access rework, myne-md/myne#1052).
+    ///
+    /// **Absent or empty means every verb the catalog names is available.** That
+    /// is the reading every grant written before this member existed must keep,
+    /// and it is the opposite of [`write_folders`](Self::write_folders), where
+    /// empty means "nowhere": a verb set that defaulted to "nothing enabled"
+    /// would turn an upgrade into a revocation.
+    ///
+    /// **A name this build does not know is inert.** The catalog is the roster
+    /// (`mcp/src/tool_list.rs`, nine verbs, all of them static literals), and a
+    /// verb missing from it is not callable in the first place, so an unknown
+    /// entry narrows nothing and widens nothing.
+    ///
+    /// **Set semantics**: lexicographically sorted and exact-deduplicated by the
+    /// encoder, like every other set in this record.
+    ///
+    /// Omitted from the canonical JSON when empty, so a grant that disables
+    /// nothing re-encodes byte for byte. Note the asymmetry with the parser, which
+    /// REFUSES the member on a legacy ([`McpScopeModel::Folders`]) grant: such a
+    /// grant serves nothing until it is approved again, so a verb set beside one
+    /// would be a restriction nothing enforces.
+    #[serde(default)]
+    pub disabled_verbs: Vec<alloc::string::String>,
 }
 
 /// One write a connection attempted into a folder it may READ but not WRITE
@@ -387,6 +454,11 @@ pub struct McpWriteRequest {
     /// what was attempted rather than only where.
     #[serde(default)]
     pub verb: alloc::string::String,
+    /// Which direction accepting this row moves the grant. Omitted from the
+    /// canonical JSON for [`McpRequestKind::Write`], which is what every row
+    /// written before the member existed already means.
+    #[serde(default)]
+    pub kind: McpRequestKind,
 }
 
 /// serde-derive default for a `bool` field whose logical default is `true`
@@ -2758,6 +2830,20 @@ fn canonical_folder_list(folders: &[String]) -> Vec<String> {
     v
 }
 
+/// Canonical form of a verb set: sorted and exact-deduplicated.
+///
+/// NFC is applied for the same reason [`canonical_folder_list`] applies it, even
+/// though every verb this build writes is lowercase ASCII: the canonical bytes
+/// must be a function of the LOGICAL value, so a hand-edited or future-translated
+/// entry normalises before it sorts rather than producing a second spelling of one
+/// set. Sorting is what makes two spellings of the same set one set of bytes.
+fn canonical_verb_list(verbs: &[String]) -> Vec<String> {
+    let mut v: Vec<String> = verbs.iter().map(|s| s.nfc().collect::<String>()).collect();
+    v.sort();
+    v.dedup();
+    v
+}
+
 /// Append an ORDER-PRESERVING canonical JSON string array (surrounding
 /// `[` / `]`, comma-joined, each element a `push_json_string` literal).
 /// Unlike [`canonical_folder_list`] (which sorts + dedupes for `set`
@@ -3027,6 +3113,14 @@ fn push_mcp_connections_map(
         out.push(b'{');
         out.extend_from_slice(b"\"approved_at\":");
         push_json_uint64(out, grant.approved_at);
+        // Sorts before `excluded_folders` (`app` < `dis` < `exc`) and omitted
+        // when empty, which keeps a grant written before the verb switches
+        // existed round-tripping byte for byte.
+        if !grant.disabled_verbs.is_empty() {
+            out.push(b',');
+            out.extend_from_slice(b"\"disabled_verbs\":");
+            push_ordered_string_array(out, &canonical_verb_list(&grant.disabled_verbs));
+        }
         if matches!(grant.model, McpScopeModel::Exclude) {
             if !grant.excluded_folders.is_empty() {
                 out.push(b',');
@@ -4344,6 +4438,11 @@ fn push_mcp_write_requests(out: &mut Vec<u8>, requests: &[McpWriteRequest]) {
         out.push(b',');
         out.extend_from_slice(b"\"folder\":");
         push_json_string(out, &request.folder);
+        if let Some(token) = request.kind.canonical_token() {
+            out.push(b',');
+            out.extend_from_slice(b"\"kind\":");
+            push_json_string(out, token);
+        }
         out.push(b',');
         out.extend_from_slice(b"\"requested_at\":");
         push_json_uint64(out, request.requested_at);
@@ -4435,7 +4534,7 @@ pub fn parse_mcp_write_request(bytes: &[u8]) -> Option<(McpWriteRequest, usize)>
     }
     let mut i = 1;
     let mut request = McpWriteRequest::default();
-    let mut seen: [bool; 5] = [false; 5];
+    let mut seen: [bool; 6] = [false; 6];
     if bytes.get(i) == Some(&b'}') {
         return None;
     }
@@ -4452,6 +4551,7 @@ pub fn parse_mcp_write_request(bytes: &[u8]) -> Option<(McpWriteRequest, usize)>
         let slot = match key.as_str() {
             "connection" => 0,
             "folder" => 1,
+            "kind" => 5,
             "requested_at" => 2,
             "summary" => 3,
             "verb" => 4,
@@ -4481,9 +4581,14 @@ pub fn parse_mcp_write_request(bytes: &[u8]) -> Option<(McpWriteRequest, usize)>
                 request.summary = value;
                 i += consumed;
             }
-            _ => {
+            4 => {
                 let (value, consumed) = parse_json_string(&bytes[i..])?;
                 request.verb = value;
+                i += consumed;
+            }
+            _ => {
+                let (value, consumed) = parse_json_string(&bytes[i..])?;
+                request.kind = McpRequestKind::from_canonical_token(&value)?;
                 i += consumed;
             }
         }
@@ -4531,6 +4636,7 @@ pub fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, u
     let mut seen_approved_at = false;
     let mut seen_model = false;
     let mut seen_write_folders = false;
+    let mut seen_disabled_verbs = false;
     if bytes.get(i) == Some(&b'}') {
         return None;
     }
@@ -4553,6 +4659,15 @@ pub fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, u
                 i += consumed;
                 grant.approved_at = value;
                 seen_approved_at = true;
+            }
+            "disabled_verbs" => {
+                if seen_disabled_verbs {
+                    return None;
+                }
+                let (verbs, consumed) = parse_json_string_array(&bytes[i..])?;
+                i += consumed;
+                grant.disabled_verbs = canonical_verb_list(&verbs);
+                seen_disabled_verbs = true;
             }
             "excluded_folders" => {
                 if seen_excluded_folders {
@@ -4617,7 +4732,11 @@ pub fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, u
                     // refused: the grant itself is unreadable to this build, so a
                     // write scope beside it would be a promise nothing serves.
                     McpScopeModel::Folders => {
-                        if !seen_folders || seen_excluded_folders || seen_write_folders {
+                        if !seen_folders
+                            || seen_excluded_folders
+                            || seen_write_folders
+                            || seen_disabled_verbs
+                        {
                             return None;
                         }
                     }

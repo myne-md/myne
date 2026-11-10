@@ -29,6 +29,7 @@ fn request(
         requested_at,
         summary: alloc::string::String::from(summary),
         verb: alloc::string::String::from(verb),
+        kind: McpRequestKind::Write,
     }
 }
 

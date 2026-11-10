@@ -1064,12 +1064,6 @@
         "sites": 4,
         "verdict": "consolidate",
         "reason": "The same small local name on surfaces that share nothing else. One owner is a refactor rather than a rename that saves a line, so this is recorded as owed work."
-      },
-      {
-        "name": "name",
-        "sites": 3,
-        "verdict": "consolidate",
-        "reason": "The same small local name on surfaces that share nothing else. One owner is a refactor rather than a rename that saves a line, so this is recorded as owed work."
       }
     ],
     "baseline": [

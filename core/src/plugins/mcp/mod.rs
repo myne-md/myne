@@ -56,6 +56,10 @@
 /// and the closed reasons: a second anchored-edit implementation is where the
 /// exactly-once rule and the frontmatter clamps would quietly diverge.
 pub mod anchor;
+/// How many notes one connection may take out per window, held in process state
+/// (mcp external access rework, myne-md/myne#1052). The unit is notes rather than
+/// calls, because one search is one call and fifty notes.
+pub mod budget;
 pub mod error;
 /// The write verbs, as host-validated intents with a restore point taken before
 /// every change. The read tools clamp and answer; these decide, queue or refuse,
@@ -88,6 +92,8 @@ pub mod commands;
 
 #[cfg(test)]
 mod anchor_test;
+#[cfg(test)]
+mod budget_test;
 #[cfg(test)]
 mod intent_test;
 #[cfg(test)]

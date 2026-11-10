@@ -32,6 +32,7 @@ fn grant(excluded: &[&str], write: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: write.iter().map(|f| f.to_string()).collect(),
+        disabled_verbs: Vec::new(),
     }
 }
 

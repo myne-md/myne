@@ -283,6 +283,7 @@ impl Fixture {
                 CONNECTION.to_string(),
                 excluded_folders,
                 write_folders,
+                Vec::new(),
                 &io,
             )
             .await

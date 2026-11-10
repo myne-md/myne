@@ -304,10 +304,10 @@ pub use prefs::{
     canonical_clock_member_cost, canonical_encode_mcp_connection_grant, canonical_plaintext_len,
     canonical_set_entry_cost, decode_prefs_blob, decode_prefs_blob_versioned, encode_prefs_blob,
     encode_prefs_blob_raw, encode_prefs_blob_versioned, parse_mcp_connection_grant,
-    parse_mcp_write_request, EditorLayout, McpConnectionGrant, McpScopeModel, McpWriteRequest,
-    PrefsBlobError, PrefsView, ThemeChoice, MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN,
-    PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC, PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED,
-    PREFS_BLOB_V0_2_MAGIC,
+    parse_mcp_write_request, EditorLayout, McpConnectionGrant, McpRequestKind, McpScopeModel,
+    McpWriteRequest, PrefsBlobError, PrefsView, ThemeChoice, MAX_PREFS_PLAINTEXT_LEN,
+    PREFS_BLOB_ACCOUNT_HASH_LEN, PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC,
+    PREFS_BLOB_PROTOCOL_VERSION, PREFS_BLOB_RESERVED, PREFS_BLOB_V0_2_MAGIC,
 };
 pub use saved_view::{
     canonical_decode_saved_view, canonical_encode_saved_view, canonical_encode_saved_views,

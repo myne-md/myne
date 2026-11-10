@@ -598,6 +598,9 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // consent is not already recorded routes HERE first; nothing is stored until
   // the dialog is accepted.
   const [pendingProvider, setPendingProvider] = useState<string | null>(null);
+  // The external-access setup runs in its own modal, so it owes the shell the
+  // same Esc gate the provider consent does.
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   // Tell the Settings shell a modal of ours is up (see `onDialogOpenChange`).
   // The cleanup is load-bearing: the shell's flag outlives this panel, so
   // unmounting with the dialog open — Settings closed by its own × — would
@@ -609,7 +612,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // The external-access approval dialog is a second modal of ours, so the gate is
   // the OR of the two. Its own effect reports into the same state, and both reset
   // on unmount because the shell's flag outlives this panel.
-  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   useEffect(() => {
     onDialogOpenChange?.(pendingProvider !== null || mcpDialogOpen);
     return () => onDialogOpenChange?.(false);
@@ -1944,21 +1946,26 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       />
       </SettingsSection>
 
-      {/* **External access** (external-mcp-connection, myne-md/myne#923): the
-          third answer to what this panel's Limits topic asks, and the only one
-          that is about a program other than Myne. Absent rather than disabled
-          where `externalMcp` is missing (`decisions.md` 2026-07-26): no client but
-          desktop can host the sidecar the section describes. */}
-      {has("externalMcp") && (
-        <McpSection
-          enabled={prefs.cli_enabled}
-          onSetEnabled={(next) => {
-            void setCliEnabled(next);
-          }}
-          onShowToast={onShowToast}
-          onDialogOpenChange={setMcpDialogOpen}
-        />
-      )}
+      </SettingsTopicPanel>
+
+      {/* **External access** has its own topic rather than living inside Limits
+          (mcp external access rework, myne-md/myne#1052). It is the one answer in
+          this panel that is about a program other than Myne, and burying it two
+          levels down was the complaint. Absent rather than disabled where
+          `externalMcp` is missing (`decisions.md` 2026-07-26): no client but
+          desktop can host the sidecar it configures, and a greyed tab would be an
+          offer the platform cannot honour. */}
+      <SettingsTopicPanel panelId="ai" topicId="externalAccess">
+        {has("externalMcp") && (
+          <McpSection
+            onDialogOpenChange={setMcpDialogOpen}
+            enabled={prefs.cli_enabled}
+            onSetEnabled={(next) => {
+              void setCliEnabled(next);
+            }}
+            onShowToast={onShowToast}
+          />
+        )}
       </SettingsTopicPanel>
 
       {/* **Advanced**: the knobs a user reaches for once the rest works: the

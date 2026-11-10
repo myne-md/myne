@@ -108,6 +108,7 @@ permissions = [
   "allow-set-mcp-connection-grant",
   "allow-rewrite-mcp-folder-paths",
   "allow-revoke-mcp-connection",
+  "allow-accept-mcp-read-request",
   "allow-accept-mcp-write-request",
   "allow-dismiss-mcp-write-request",
 ]
@@ -745,6 +746,11 @@ commands.allow = ["rewrite_mcp_folder_paths"]
 identifier = "allow-accept-mcp-write-request"
 description = "Allow invoking prefs:accept_mcp_write_request (Slot::Unlocked-gated accept of one queued out-of-scope external MCP write: extends that connection's write grant by exactly the folder it named, refuses to go past the read scope, drops the row; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2; returns false when nothing was widened, which is what a stale row reports)."
 commands.allow = ["accept_mcp_write_request"]
+
+[[permission]]
+identifier = "allow-accept-mcp-read-request"
+description = "Allow invoking prefs:accept_mcp_read_request (Slot::Unlocked-gated accept of one queued external MCP read request: removes exactly the folder it named from that connection's read exclusion list, so the folder stops being left out; refuses when the folder is already readable, when a PARENT is the stored exclusion, or when another surface (Myne's own AI, the terminal client) is what excluded it; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2; returns false when nothing was widened, which is what a stale row reports)."
+commands.allow = ["accept_mcp_read_request"]
 
 [[permission]]
 identifier = "allow-dismiss-mcp-write-request"
