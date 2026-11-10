@@ -10,6 +10,16 @@ import { renderHook, waitFor } from "@testing-library/react";
 
 const calls: unknown[] = [];
 const permission = { asked: 0, status: "not-determined" as string, requested: 0 };
+/** Whether the mocked vault holds anything a reminder would be registered for. The
+ *  permission prompt turns on this, so a test has to be able to turn it off — and the
+ *  rows have to be FUTURE-dated, because a reminder that has already passed is not
+ *  registered and would answer the wrong question. */
+const localCivil = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const inAnHour = (): Date => new Date(Date.now() + 3_600_000);
+const data = { withReminders: true, eventStart: "" };
 
 vi.mock("../../src/lib/reminderPass", async (importActual) => {
   const actual = await importActual<typeof import("../../src/lib/reminderPass")>();
@@ -48,17 +58,18 @@ vi.mock("../../src/lib/calendar", async (importActual) => {
   return {
     ...actual,
     vaultIndicesCalendarRange: async () => ({
-      rows: [
+      rows: data.withReminders
+        ? [
         {
           noteId: "standup",
           title: "Standup",
           folder: "Calendar/",
           calendar: null,
-          start: "2026-11-10 09:15",
+          start: data.eventStart,
           end: null,
           allDay: false,
           occurrenceOf: "standup",
-          occurrenceDate: "2026-11-10",
+          occurrenceDate: data.eventStart.slice(0, 10),
           conflicts: false,
           repeat: "every tuesday",
           remind: "10m",
@@ -69,7 +80,7 @@ vi.mock("../../src/lib/calendar", async (importActual) => {
           title: "No reminder",
           folder: "Calendar/",
           calendar: null,
-          start: "2026-11-11 09:15",
+          start: data.eventStart,
           end: null,
           allDay: false,
           occurrenceOf: null,
@@ -79,7 +90,8 @@ vi.mock("../../src/lib/calendar", async (importActual) => {
           remind: null,
           repeatUnrecognized: false,
         },
-      ],
+          ]
+        : [],
     }),
   };
 });
@@ -99,7 +111,8 @@ vi.mock("../../src/lib/tasks", async (importActual) => {
   return {
     ...actual,
     useVaultTasks: () => ({
-      tasks: [
+      tasks: data.withReminders
+        ? [
         {
           noteId: "task-note",
           noteTitle: "Weekly review",
@@ -110,19 +123,23 @@ vi.mock("../../src/lib/tasks", async (importActual) => {
           oversized: false,
           due: "2026-11-06",
         },
-      ],
+      ]
+        : [],
       reload: () => undefined,
     }),
   };
 });
 
 import { resetPermissionAsk, useMobileReminderPass } from "../../src/lib/useMobileReminderPass";
+import { TASK_WRITE_EVENT } from "../../src/lib/tasks";
 
 beforeEach(() => {
   resetPermissionAsk();
   calls.length = 0;
   permission.status = "not-determined";
   permission.requested = 0;
+  data.withReminders = true;
+  data.eventStart = localCivil(inAnHour());
 });
 
 describe("useMobileReminderPass", () => {
@@ -137,19 +154,41 @@ describe("useMobileReminderPass", () => {
     expect(options.dayAnchor).toBe("08:00");
   });
 
-  it("asks for the notification permission once, and only when it has never been decided", async () => {
-    const first = renderHook(() => useMobileReminderPass());
-    await waitFor(() => expect(calls.length).toBeGreaterThan(0));
-    first.unmount();
-    // A second mount inside one app run must not ask again: the prompt is a question,
-    // not a habit.
-    const second = renderHook(() => useMobileReminderPass());
+  it("asks for the notification permission once, and never on the pass that opens the app", async () => {
+    const mounted = renderHook(() => useMobileReminderPass());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    // The MOUNT pass is the unlock, and it must ask nothing: that launch-time prompt
+    // is what the owner reported, and Apple's guidance is to avoid requesting
+    // permission at launch.
+    expect(permission.requested).toBe(0);
+
+    // A write is the moment the dialog explains itself: the user has just made
+    // something a reminder would be registered for.
+    window.dispatchEvent(new Event(TASK_WRITE_EVENT));
     await waitFor(() => expect(calls.length).toBeGreaterThan(1));
-    second.unmount();
-    // EXACTLY once: 0 is the defect this change exists to fix (a permission never
+    await waitFor(() => expect(permission.requested).toBe(1));
+
+    // A second write in the same app run asks nothing more: the prompt is a question,
+    // not a habit.
+    window.dispatchEvent(new Event(TASK_WRITE_EVENT));
+    await waitFor(() => expect(calls.length).toBeGreaterThan(2));
+    mounted.unmount();
+    // EXACTLY once: 0 is the defect the previous change fixed (a permission never
     // requested, so a notification is registered and never delivered) and 2 is the
-    // opposite (a prompt a user meets on every unlock).
+    // opposite (a prompt a user meets over and over).
     expect(permission.requested).toBe(1);
+  });
+
+  it("never asks a device that has no reminder to register", async () => {
+    // The other half of the launch prompt: `reminders_enabled` defaults ON, so the
+    // first pass always ran and the old code always asked. A device with nothing due
+    // has no reminder for the dialog to be about.
+    data.withReminders = false;
+    renderHook(() => useMobileReminderPass());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    window.dispatchEvent(new Event(TASK_WRITE_EVENT));
+    await waitFor(() => expect(calls.length).toBeGreaterThan(1));
+    expect(permission.requested).toBe(0);
   });
 
   it("hands the pass only the events that carry a lead", async () => {

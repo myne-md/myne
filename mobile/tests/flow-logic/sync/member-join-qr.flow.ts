@@ -213,9 +213,12 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
 
     await openJoinDoor(page);
 
-    // The gate, with the third door on it. Before the arm landed this screen had
-    // `Create an identity` and `Not now…` and nothing else, and neither can put an
-    // identity on this device that the scanned vault has ever heard of.
+    // The gate, with both doors on it: create, and the 24-word recover. It used to
+    // carry a third row, "use this device only", which described a state this
+    // client does not offer — a vault needs an identity — so pressing it only
+    // closed the overlay. What a device with no identity can actually do here is
+    // create one or bring an existing one across, and the scanned vault has heard
+    // of neither until the second of those lands.
     await expect(page.getByTestId("identity-flow.recover-open")).toBeVisible();
     // …and the wizard has NOT opened yet, which is the state the code alone cannot
     // get past: the vault can only be added by an identity that holds it.

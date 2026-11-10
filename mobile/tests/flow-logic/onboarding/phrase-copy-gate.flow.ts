@@ -39,14 +39,11 @@ async function reachKitStep(page: import("@playwright/test").Page): Promise<void
   await createIdentityToHome(page);
   await startVaultFromIdentityHome(page);
 
-  // The briefing's three acknowledgements, clicked by TEXT: the rows are labels
-  // wrapping a checkbox, and checking the input alone does not enable Continue.
-  for (const fragment of [
-    "Myne has no access to my notes",
-    "There is no password reset",
-    "recovery phrase is the only way back",
-  ]) {
-    await page.getByText(fragment, { exact: false }).first().click();
+  // The briefing's three acknowledgements, clicked through `data-ack-id`: the rows
+  // are labels wrapping a checkbox, and checking the input alone does not enable
+  // Continue. The id is the row's stable name; the copy is localised.
+  for (const id of ["no-store", "phrase-backup", "no-email"]) {
+    await page.locator(`[data-ack-id="${id}"]`).first().click();
   }
   await page.getByRole("button", { name: "Continue" }).click();
 

@@ -28,7 +28,6 @@ import {
   SyncBanners,
   ConflictsSheet,
   AiOnboardingSheet,
-  readAiOnboardingSeen,
 } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted, createTitledNote } from "../../lib/notes";
 import {
@@ -221,7 +220,6 @@ import {
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
 import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
 import { DecorationSheet } from "./editor/sheets/DecorationSheet";
-import { SortSheet } from "./editor/sheets/SortSheet";
 import { TagBrowserSheet } from "./editor/sheets/TagBrowserSheet";
 import { VaultSwitcher } from "./editor/sheets/VaultSwitcher";
 import { ViewsSheet } from "./editor/sheets/ViewsSheet";
@@ -1159,11 +1157,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * mounted, and `.m-screen` is `position: relative`, so `inset: 0` covers it.
    */
   const [identityDoorOpen, setIdentityDoorOpen] = useState(false);
-  // First-run AI onboarding (myne-md/myne#805): offered once per device after
-  // the first unlock. The localStorage flag is written when the sheet closes.
-  const [aiOnboardingOpen, setAiOnboardingOpen] = useState<boolean>(
-    () => !readAiOnboardingSeen(),
-  );
+  // First-run AI onboarding (myne-md/myne#805): offered once per device, from the
+  // Settings AI row rather than on unlock (owner, 2026-11-10). It used to open on
+  // the editor's mount, so the second a vault unlocked a sheet about AI covered the
+  // notes; the localStorage flag is still written when the sheet closes, and the row
+  // is what decides whether to offer it (`SettingsSheet`'s `onAiOnboarding`).
+  const [aiOnboardingOpen, setAiOnboardingOpen] = useState(false);
   // Panel the next SettingsSheet opens on; the onboarding's provider button
   // routes straight to `ai`, the bar entry leaves it `root`.
   const [settingsPanel, setSettingsPanel] = useState<Panel | undefined>(undefined);
@@ -1174,8 +1173,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   // Active `#tag` filter on the notes list (folded/lowercase key), or null.
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  // Notes-list sort: backend order ("none") / title A-Z / Z-A.
-  const [sortMode, setSortMode] = useState<"none" | "az" | "za">("none");
+
   // Which slice of the notes tab is shown: live notes / archive / trash.
   const [listView, setListView] = useState<"notes" | "archive" | "trash">("notes");
 
@@ -1243,7 +1241,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // Filter sheet (the single home for Tags / Views / Archive / Trash).
   const [filterOpen, setFilterOpen] = useState(false);
   // Sort sheet - the sort-order picker (same modal treatment as Filter).
-  const [sortOpen, setSortOpen] = useState(false);
+
   // Views sheet - browse/activate saved views + create a new one.
   const [viewsOpen, setViewsOpen] = useState(false);
   // Inline note-list search (filters THIS page's list; NOT the command palette).
@@ -3730,10 +3728,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             ),
           )
         : folderOf;
-    // `null`, not `""`: the body's first line is a SNIPPET, never a name (desktop
-    // parity), and a resolver taking `""` for a title matches nothing while
-    // looking like it had a target.
-    const titleOf = new Map(notes.map((n) => [n.id, n.title || null]));
     // MYND-596: folders and notes interleave in ONE display-ordered list PER
     // container (shared `orderedChildren`) - a note can now sit above a folder,
     // the same list desktop renders from the same synced `item_order`. The tree
@@ -3743,18 +3737,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       prefs.deliberate_folders,
       prefs.archived_folders,
     );
-    const childName = (c: Child): string =>
-      c.kind === "folder" ? c.node.name : (titleOf.get(c.id) ?? "");
-    // A→Z / Z→A is an explicit override on top of the manual interleave: it
-    // reorders the whole child list (folders AND notes) by display name, since
-    // notes are no longer a separately-sorted group. "none" keeps the manual
-    // `item_order` interleave (folders/notes unlisted → name / recency).
-    const orderChildren = (containerPath: string | null): Child[] => {
-      const children = orderedChildren(tree, containerPath, prefs.item_order, orderCache);
-      if (sortMode === "none") return children;
-      const dir = sortMode === "az" ? 1 : -1;
-      return [...children].sort((a, b) => dir * childName(a).localeCompare(childName(b)));
-    };
+    // The tree renders the manual `item_order` interleave and nothing else, which
+    // is the desktop's own model: the arrangement IS the order, and a row moves by
+    // being dragged. An A→Z / Z→A override used to sit on top of this, chosen from a
+    // toolbar button and a sheet; it was the one place either client offered a sort
+    // the other did not, and it described a mode the user then had to remember they
+    // were in (owner, 2026-11-10).
+    const orderChildren = (containerPath: string | null): Child[] =>
+      orderedChildren(tree, containerPath, prefs.item_order, orderCache);
     // Tree emptiness (no notes in the tree map + no VISIBLE deliberate empty
     // folder) is cheaper than materializing the whole flattened tree just to ask
     // its length. The deliberate set is archive-filtered for the same reason the
@@ -3795,12 +3785,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               n.title.toLowerCase().includes(searchNeedle) ||
               (bodies.get(n.id) ?? "").toLowerCase().includes(searchNeedle),
           );
-    const sorted =
-      sortMode === "az"
-        ? [...searched].sort((a, b) => a.title.localeCompare(b.title))
-        : sortMode === "za"
-          ? [...searched].sort((a, b) => b.title.localeCompare(a.title))
-          : searched;
+    const sorted = searched;
     // Flat filtered list floats favourites to the top (trash/archive use plain order).
     const orderedNotes =
       listView === "notes"
@@ -4034,15 +4019,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                       <path d="M3 5h18l-7 8v6l-4-2v-6z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setSortOpen(true)}
-                    aria-label={t("editor.sortSheet.title")}
-                    style={{ flexShrink: 0, width: 44, display: "flex", alignItems: "center", justifyContent: "center", height: 38, border: "1px solid var(--line-2)", borderRadius: 10, background: sortMode !== "none" ? "var(--accent-soft)" : "var(--bg-2)", color: sortMode !== "none" ? "var(--accent)" : "var(--fg-2)", cursor: "pointer" }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M8 20V4M8 4 5 7M8 4l3 3M16 4v16M16 20l-3-3M16 20l3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 </div>
@@ -4500,14 +4476,25 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         )}
 
         {aiOnboardingOpen && (
-          <AiOnboardingSheet
-            onClose={() => setAiOnboardingOpen(false)}
-            onOpenProviderSetup={() => {
-              setAiOnboardingOpen(false);
-              setSettingsPanel("ai");
-              setSettingsOpen(true);
-            }}
-          />
+          // Above the Settings sheet, which is what offers it (the AI row), so
+          // `--z-overlay` rather than `--z-modal`: this IS a surface opened from
+          // inside a modal, which is the level the ladder names for that. At the
+          // sheet's own `--z-modal` the panel behind it painted over its buttons and
+          // swallowed the clicks, because the panel mounts later in the tree than
+          // this fragment does.
+          <div
+            data-testid="editor.ai-onboarding"
+            style={{ position: "absolute", inset: 0, zIndex: "var(--z-overlay)" }}
+          >
+            <AiOnboardingSheet
+              onClose={() => setAiOnboardingOpen(false)}
+              // The AI panel is ALREADY open behind this sheet — the row that
+              // offered the explainer set it — so the provider button only needs to
+              // get out of the way. Reopening Settings here would remount the panel
+              // underneath and lose the reader's place.
+              onOpenProviderSetup={() => setAiOnboardingOpen(false)}
+            />
+          </div>
         )}
 
         {conflictsOpen && (
@@ -4558,14 +4545,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             }}
             tagCount={tagIndex.tags.length}
             onOpenTags={() => setTagBrowserOpen(true)}
-          />
-        )}
-
-        {sortOpen && (
-          <SortSheet
-            mode={sortMode}
-            onPick={setSortMode}
-            onClose={() => setSortOpen(false)}
           />
         )}
 
@@ -5156,6 +5135,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       {historyOpen && editing?.id && (
         <SnapshotsSheet
           noteId={editing.id}
+          // The note's own name under the sheet's title, the same subtitle the
+          // desktop panel renders: the history belongs to a NOTE, and a sheet
+          // opened from the ⋯ menu should say which one.
+          noteTitle={deriveTitleSnippet(editorText).title || null}
           onClose={() => setHistoryOpen(false)}
           onRestored={() => {
             // The live note was overwritten on disk - re-read it into the editor.
@@ -5211,6 +5194,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             setSettingsPanel(undefined);
             setIdentityDoorOpen(true);
           }}
+          // Offered over the AI panel, once per device (see the sheet's state above).
+          onAiOnboarding={() => setAiOnboardingOpen(true)}
         />
       )}
       {/* The identity repair, over the editor (myne-md/myne#1029). Above the

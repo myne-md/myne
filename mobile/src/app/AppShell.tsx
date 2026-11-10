@@ -93,7 +93,7 @@ function StageSwitch() {
   // screen has two doors and they lead to different steps: create, or the fork
   // that brings an existing identity across. Reset by the overlay's own exit so a
   // later Settings entry lands on the gate it has always used.
-  const [identityStart, setIdentityStart] = useState<"gate" | "join-fork" | "create">("gate");
+  const [identityStart, setIdentityStart] = useState<"gate" | "join-fork" | "create">("create");
   /**
    * A scanned member-vault QR awaiting the identity flow's join step. Held here
    * rather than inside `JoinFlow` because the join overlay CLOSES when it hands
@@ -461,7 +461,6 @@ function StageSwitch() {
               }}
               onCancel={() => {
                 setIdentityOpen(false);
-                setIdentityStart("gate");
               }}
               // The identity home's create-vault action, and the exit of the
               // first run (myne-md/myne#911 task 12): the identity exists by the
@@ -495,16 +494,17 @@ function StageSwitch() {
         <PhoneColumn>
           <WelcomeFlow
             // Both doors open the identity flow, at different steps
-            // (myne-md/myne#932). The create door keeps the gate it has always
-            // had, because the gate is also the only path to "use this device
-            // only"; the second door opens the fork that offers the two
-            // credentials an existing identity comes with (24 words, or a code
-            // from a device that has it). What changed is the LABEL on that second
-            // door: it used to say "Connect to my account" and open the QR scanner
-            // alone, so a returning user had to walk into the create flow to find
-            // their own identity.
+            // (myne-md/myne#932), and neither lands on the gate: this screen IS
+            // the fork, so the gate's menu one tap in repeated the same two
+            // choices and added a third that could not go anywhere ("use this
+            // device only" — no identity means no vault, so it only closed the
+            // overlay). The create door lands straight on the create step and the
+            // second door on the fork that offers the two credentials an existing
+            // identity comes with (24 words, or a code from a device that has it).
+            // The gate is still the flow's fallback for a device with no identity
+            // that arrives from a scanned code.
             onIdentity={() => {
-              setIdentityStart("gate");
+              setIdentityStart("create");
               setIdentityOpen(true);
             }}
             onHaveIdentity={() => {

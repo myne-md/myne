@@ -39,16 +39,17 @@ const CONFIGURED_ELSEWHERE = {
 };
 
 test.describe("mobile AI tab", () => {
-  test("is absent with the opt-in off, and the bar keeps its four columns", async ({ page }) => {
+  test("is absent with the opt-in off, and adds no column to the bar", async ({ page }) => {
     await installMockIpc(page, { prefs: { ai_enabled: false } });
     await page.goto("/");
 
     await expect(page.getByTestId("workspace.tab-bar")).toBeVisible();
     await expect(page.getByTestId("workspace.tab-chat")).toHaveCount(0);
-    // The four that were always there are untouched. An exact count rather than
-    // a presence check: "AI off returns exactly today's layout" is the claim,
-    // and a bar with a reserved gap would pass a presence check.
-    await expect(page.getByTestId("workspace.tab-bar").locator("button")).toHaveCount(4);
+    // An exact count rather than a presence check: "AI off returns exactly today's
+    // layout" is the claim, and a bar with a reserved gap would pass a presence
+    // check. The number is the bar's own roster — notes, tasks, graph, files,
+    // calendar — so a new destination moves it, which is the point.
+    await expect(page.getByTestId("workspace.tab-bar").locator("button")).toHaveCount(5);
   });
 
   test("is present with the opt-in on, and is the last column", async ({ page }) => {
@@ -56,14 +57,14 @@ test.describe("mobile AI tab", () => {
     await page.goto("/");
 
     await expect(page.getByTestId("workspace.tab-chat")).toBeVisible();
-    await expect(page.getByTestId("workspace.tab-bar").locator("button")).toHaveCount(5);
+    await expect(page.getByTestId("workspace.tab-bar").locator("button")).toHaveCount(6);
     // Last, so no existing column moves. Reordering top-level navigation is the
     // one change a user cannot be told about.
     const ids = await page
       .getByTestId("workspace.tab-bar")
       .locator("button")
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
-    expect(ids[4]).toBe("workspace.tab-chat");
+    expect(ids[ids.length - 1]).toBe("workspace.tab-chat");
   });
 });
 
@@ -213,5 +214,30 @@ test.describe("consent does not arrive with the key", () => {
       () => (window as unknown as { __aiConsentWrites?: unknown[] }).__aiConsentWrites ?? [],
     );
     expect(writes).toEqual([]);
+  });
+  test("the first-run AI sheet is offered from the AI row, never on unlock", async ({
+    page,
+  }) => {
+    // Owner, 2026-11-10: "uygulamayı açtığım anda set up AI dialogu gelmesin".
+    // It used to open itself when the editor mounted, so the sheet about a feature
+    // nobody had asked for landed over the notes at the first unlock. The offer now
+    // waits for the row that has AI as its subject.
+    await installMockIpc(page, { aiOnboardingSeen: false });
+    await page.goto("/");
+
+    // Unlocked and in the editor: no sheet.
+    await expect(page.getByTestId("aiOnboarding.screen")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Settings" }).first().click();
+    // Still nothing while the sheet is on its root: the offer belongs to the AI row,
+    // not to Settings as a whole.
+    await expect(page.getByTestId("aiOnboarding.screen")).toHaveCount(0);
+
+    await page.getByTestId("settings.category-ai").click();
+    await expect(page.getByTestId("aiOnboarding.screen")).toBeVisible();
+    // Its provider button closes the explainer onto the panel that is already
+    // open behind it, which is where the consent step lives.
+    await page.getByTestId("aiOnboarding.chat.setup").click();
+    await expect(page.getByTestId("aiOnboarding.screen")).toHaveCount(0);
   });
 });

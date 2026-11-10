@@ -1783,12 +1783,6 @@
       "title": "Filter",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sort",
-      "titleAsc": "Title · A → Z",
-      "titleDesc": "Title · Z → A",
-      "arrangement": "My arrangement"
-    },
     "noteMenu": {
       "emptyNote": "Empty note",
       "wordCount_one": "{{count}} word · {{minutes}} min read",
@@ -2549,8 +2543,7 @@
       "confirmTitle": "Restore this snapshot?",
       "decrypting": "Decrypting…",
       "deviceFallback": "Device {{code}}",
-      "emptyState": "No snapshots yet. Snapshots are saved automatically as you edit and kept for about 7 days. They’re encrypted, and disappear when the note is permanently deleted.",
-      "encryptedSize": "Encrypted · {{size}}",
+      "emptyState": "No snapshots yet. Snapshots are saved automatically as you edit, kept for about 7 days, and gone for good when the note is permanently deleted.",
       "errorCannotDecrypt": "This snapshot couldn't be decrypted.",
       "errorGeneric": "Something went wrong. Try again.",
       "errorIo": "A disk error occurred. The disk may be full or unwritable.",
@@ -5352,7 +5345,6 @@
     },
     "forget": {},
     "lead": "An identity lets people invite you to a vault, and lets one identity own many vaults. It needs a sync server to hold your encrypted notes and reach you.",
-    "skip": "Not now, use this device only",
     "createFailed": "Could not create the identity. Check the sync server and try again.",
     "held": {
       "title": "An identity is already on this device",
@@ -5610,16 +5602,6 @@
     "addCondition": "+ Add condition",
     "createView": "Create view"
   },
-  "snapshots": {
-    "today": "Today {{time}}",
-    "readError": "Couldn't read version history.",
-    "decryptError": "Couldn't decrypt that version.",
-    "restoreError": "Couldn't restore that version.",
-    "emptyState": "No earlier versions yet. Snapshots are captured automatically as you edit.",
-    "hide": "Hide",
-    "empty": "(empty)",
-    "restoreThisVersion": "Restore this version"
-  },
   "restoreBackup": {
     "title": "Not available on mobile yet",
     "body": "Restoring from a backup file is not available on mobile yet. Create a vault or recover with your phrase."
@@ -5703,7 +5685,6 @@
     "unlockingSubtitle": "Opening your vault.",
     "readyTitle": "Your vault is ready",
     "readyBody": "Everything you write from here is encrypted on this device before it's stored or synced.",
-    "personalLabel": "Personal",
     "openVault": "Open vault"
   },
   "web": {
@@ -5926,7 +5907,9 @@
       "repeatMonthly": "Monthly",
       "remindNone": "No reminder",
       "calendarLabel": "Calendar (a name)",
-      "refused": "This event changed elsewhere, so nothing was saved. Reopen it."
+      "refused": "This event changed elsewhere, so nothing was saved. Reopen it.",
+      "date": "Date",
+      "badDate": "Use YYYY-MM-DD."
     },
     "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
     "taskRow": "A task due {date}",

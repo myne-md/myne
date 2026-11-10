@@ -377,6 +377,11 @@ steps:
         optional: true
     failure: ignore
     environment:
+      # Shared across workflow containers, so the flock in scripts/ci-e2e-lane.sh
+      # excludes a neighbouring run: `/cache` itself is not a mount, only its
+      # subdirectories are, so the default `/cache/myne-e2e.lock` lived in each
+      # container's own filesystem.
+      E2E_LOCK: /cache/locks/myne-e2e.lock
       CI: "true"
       # No `MYNE_E2E_TIMEOUT_SCALE` here, deliberately. It exists and is honoured
       # (`e2e/support/webdriver.ts`), but doubling it was MEASURED to make things
@@ -417,6 +422,11 @@ steps:
         optional: true
     failure: ignore
     environment:
+      # Shared across workflow containers, so the flock in scripts/ci-e2e-lane.sh
+      # excludes a neighbouring run: `/cache` itself is not a mount, only its
+      # subdirectories are, so the default `/cache/myne-e2e.lock` lived in each
+      # container's own filesystem.
+      E2E_LOCK: /cache/locks/myne-e2e.lock
       CI: "true"
     commands:
       - bash scripts/ci-e2e-lane.sh quarantine
@@ -458,6 +468,11 @@ steps:
         optional: true
     failure: ignore
     environment:
+      # Shared across workflow containers, so the flock in scripts/ci-e2e-lane.sh
+      # excludes a neighbouring run: `/cache` itself is not a mount, only its
+      # subdirectories are, so the default `/cache/myne-e2e.lock` lived in each
+      # container's own filesystem.
+      E2E_LOCK: /cache/locks/myne-e2e.lock
       CI: "true"
     commands:
       - bash scripts/ci-e2e-lane.sh ai
@@ -577,11 +592,18 @@ steps:
       - apk add --no-cache curl
       - |
         if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover secret absent; skipping"; exit 0; fi
-        curl -fsS -m 15 \
+        # Same 1024-character cap as the main pipeline's notifier: the commit body
+        # alone is routinely several times that, so the POST is rejected with 400
+        # and the notification never arrives. Truncate, and keep the response body
+        # (`--fail-with-body`) so a rejection names the field next time. The doubled
+        # dollar in the length test is the escape Woodpecker's envsubst needs.
+        BODY="$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE"
+        if [ "$${#BODY}" -gt 1000 ]; then BODY="$(printf '%s' "$BODY" | cut -c1-997)..."; fi
+        curl -sS -m 15 --fail-with-body \
           --data-urlencode "token=$PUSHOVER_TOKEN" \
           --data-urlencode "user=$PUSHOVER_GROUP" \
           --data-urlencode "title=❌ $CI_REPO_NAME E2E failed · $CI_COMMIT_BRANCH" \
-          --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
+          --data-urlencode "message=$BODY" \
           --data-urlencode "url=$CI_PIPELINE_URL" \
           https://api.pushover.net/1/messages.json
     # No `event:` here: the workflow-level `when` above is where admission is

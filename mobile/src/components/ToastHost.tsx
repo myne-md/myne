@@ -90,7 +90,7 @@ export function ToastHost() {
         bottom: 24,
         display: "flex",
         justifyContent: "center",
-        zIndex: 50,
+        zIndex: "var(--z-overlay)",
         // Click-through band. See the header: a transparent element with no
         // handler still captures taps, so without this the empty regions either
         // side of the pill swallow taps meant for the bars underneath.

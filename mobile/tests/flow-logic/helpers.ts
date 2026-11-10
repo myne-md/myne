@@ -219,10 +219,10 @@ export async function fillPhraseField(
  * Caller owes `installMockIpc(page, { personSetupResult: IDENTITY_SETUP_RESULT })`.
  */
 export async function createIdentityToHome(page: Page): Promise<void> {
+  // One click, one landing: the first-run create door opens the create step
+  // directly, because this screen already carries both of the choices a gate in
+  // front of it used to re-ask.
   await page.getByTestId("welcome.create-cta").click();
-  // The gate's one create door, which no longer fronts a server step: creating an
-  // identity is network-free.
-  await page.getByTestId("identity-flow.start").click();
   await page.getByTestId("identity-flow.create").click();
 
   // Step 1: the phrase, which must be REVEALED before Continue enables.
