@@ -101,6 +101,15 @@ export function TabBar({
         display: "flex",
         borderTop: "1px solid var(--line-1)",
         background: "var(--bg-1)",
+        // The bar is TOP-LEVEL NAVIGATION and no destination may cover it. The
+        // calendar draws itself as a full-screen surface at `--z-dropdown` (it has to
+        // cover the list, the header and the editor), so on a phone opening the
+        // calendar used to hide the only way back except its own ✕ — owner,
+        // 2026-11-10: "takvimi açınca geri gidemiyorum, bottom bar yok oluyor".
+        // One step above that surface, and still far below a modal or a sheet, which
+        // is what those levels are for.
+        position: "relative",
+        zIndex: "calc(var(--z-dropdown) + 1)",
         // Height matched to the editor FormatBar (~52px + safe-area) so the two
         // bottom bars line up on the tablet split — was taller via an 8px top +
         // 30px floor.

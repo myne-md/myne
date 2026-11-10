@@ -466,7 +466,21 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
         >
           ‹
         </Button>
-        <span style={{ flex: "1 1 auto", fontSize: "var(--text-md)", fontWeight: "var(--weight-semibold, 600)" as unknown as number }} data-testid="calendar.heading">
+        <span
+          // The heading is the only thing in this row allowed to shrink: seven
+          // controls on a 390px phone leave it about a hundred pixels, and a heading
+          // that pushes the close control off the screen is a surface with no way out.
+          style={{
+            flex: "1 1 auto",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontSize: "var(--text-md)",
+            fontWeight: "var(--weight-semibold, 600)" as unknown as number,
+          }}
+          data-testid="calendar.heading"
+        >
           {monthLabel(anchor, i18n.language)}
         </span>
         <Button

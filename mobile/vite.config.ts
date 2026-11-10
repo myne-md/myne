@@ -383,7 +383,17 @@ export default defineConfig(async () => ({
   server: {
     port: 1422,
     strictPort: true,
-    host: host || false,
+    // `"::"` rather than `false`, and that is what makes the iOS development client
+    // able to load at all. `false` binds whichever stack `localhost` happens to
+    // resolve to first (measured both ways on this Mac: `127.0.0.1` on one run,
+    // `[::1]` on the next), and the app reaches the server through Tauri's custom
+    // protocol handler in Rust, which does NOT fall back to the other stack: a
+    // mismatched run fails every module with `Failed to request
+    // http://localhost:1422/src/...: error sending request` while the server is
+    // plainly up. `"::"` listens on both (macOS leaves IPV6_V6ONLY off), so the
+    // devUrl name resolves either way. It is a DEV-only bind and it covers the LAN,
+    // which is also what a physical iPhone needs.
+    host: host || "::",
     hmr: host
       ? {
           protocol: "ws",
