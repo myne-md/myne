@@ -377,6 +377,11 @@ steps:
         optional: true
     failure: ignore
     environment:
+      # Shared across workflow containers, so the flock in scripts/ci-e2e-lane.sh
+      # excludes a neighbouring run: `/cache` itself is not a mount, only its
+      # subdirectories are, so the default `/cache/myne-e2e.lock` lived in each
+      # container's own filesystem.
+      E2E_LOCK: /cache/locks/myne-e2e.lock
       CI: "true"
       # No `MYNE_E2E_TIMEOUT_SCALE` here, deliberately. It exists and is honoured
       # (`e2e/support/webdriver.ts`), but doubling it was MEASURED to make things
@@ -417,6 +422,11 @@ steps:
         optional: true
     failure: ignore
     environment:
+      # Shared across workflow containers, so the flock in scripts/ci-e2e-lane.sh
+      # excludes a neighbouring run: `/cache` itself is not a mount, only its
+      # subdirectories are, so the default `/cache/myne-e2e.lock` lived in each
+      # container's own filesystem.
+      E2E_LOCK: /cache/locks/myne-e2e.lock
       CI: "true"
     commands:
       - bash scripts/ci-e2e-lane.sh quarantine
@@ -458,6 +468,11 @@ steps:
         optional: true
     failure: ignore
     environment:
+      # Shared across workflow containers, so the flock in scripts/ci-e2e-lane.sh
+      # excludes a neighbouring run: `/cache` itself is not a mount, only its
+      # subdirectories are, so the default `/cache/myne-e2e.lock` lived in each
+      # container's own filesystem.
+      E2E_LOCK: /cache/locks/myne-e2e.lock
       CI: "true"
     commands:
       - bash scripts/ci-e2e-lane.sh ai
