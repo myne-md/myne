@@ -241,7 +241,7 @@ describe("the field marks (myne-md/myne#884 task 6)", () => {
     // The note's chip announces `<field name>, <what it shows>`; the row says the
     // same two things.
     expect(byTestId(host, "task-row.priority")?.getAttribute("aria-label")).toBe(
-      `${i18n.t("editor.taskField.title.priority")}, high`,
+      `${i18n.t("common.priority")}, high`,
     );
     expect(byTestId(host, "task-row.repeat")?.getAttribute("aria-label")).toBe(
       `${i18n.t("editor.taskField.title.repeat")}, every weekday`,

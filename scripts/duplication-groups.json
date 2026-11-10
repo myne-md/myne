@@ -730,11 +730,11 @@
         "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
       },
       {
-        "id": "mobile/src/lib/eventWrite.ts + src/notes/createEvent.ts",
-        "lines": 10,
+        "id": "src/notes/agent/AgentHubList.tsx + src/notes/components/ChatHistoryModal.tsx",
+        "lines": 40,
         "copies": 2,
-        "verdict": "consolidate",
-        "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
+        "verdict": "justified",
+        "reason": "The two 40-line windows the detector pairs are not the same fragment: the AgentHubList window is the conversation-title state machine (one `case` per outcome, each setting its own notice) and the ChatHistoryModal window is the error/loading/empty trio of `<EmptyState>`s. They read as one skeleton only after the vocabulary pass because both now call the same `common.*` keys and the same `setState` shape. Extracting a component would need the title machine and three empty states under one interface, whose only shared part is i18n keys, and that hides which outcome sets which notice. myne-md/myne#1049 review pass."
       }
     ],
     "baseline": [
@@ -893,7 +893,6 @@
       "mobile/src/app/flows/IdentityFlow.tsx",
       "mobile/src/app/flows/MemorySheet.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx",
-      "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/app/flows/editor/sheets/ReorderRow.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/SyncSettingsPanels.tsx",
       "mobile/src/app/flows/UnlockFlow.tsx + mobile/src/screens/unlock/index.tsx",
       "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/SortSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",

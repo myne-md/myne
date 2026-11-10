@@ -47,11 +47,13 @@ import { installMockIpc } from "../mock-ipc";
 
 /** Settings → Vault → Quick unlock (myne-md/myne#880 task 12 moved quick unlock
  *  out of Privacy into the vault-scoped group). */
-async function openQuickUnlockPanel(page: import("@playwright/test").Page) {
+async function openQuickUnlockSetup(page: import("@playwright/test").Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings" }).first().click();
   await page.getByTestId("settings.category-vault").click();
-  await page.getByTestId("settings.quick-unlock-row").click();
+  // The row is a switch, as on desktop: turning it on is what opens the setup
+  // inline. It used to open a panel one level deeper.
+  await page.getByTestId("settings.quick-unlock-row").getByRole("switch").click();
 }
 
 /** A real Android Chrome user agent — what `detectPlatform()` sniffs. */
@@ -62,13 +64,13 @@ const ANDROID_UA =
 test.describe("Android: the biometric affordance is absent, not disabled", () => {
   test.use({ userAgent: ANDROID_UA });
 
-  test("no biometric toggle renders in any state", async ({ page }) => {
+  test("no biometric affordance renders in any state", async ({ page }) => {
     await installMockIpc(page, {
       devicePlatform: "android",
       // The honest Android backend: no provider, so setup would refuse.
       biometricSetupError: { kind: "HardwareUnavailable" },
     });
-    await openQuickUnlockPanel(page);
+    await openQuickUnlockSetup(page);
 
     // The panel itself is open — otherwise every absence below is trivially
     // true because nothing rendered at all.
@@ -77,7 +79,7 @@ test.describe("Android: the biometric affordance is absent, not disabled", () =>
     // Absent from the DOM, not merely hidden or disabled. `count()` rather than
     // a visibility assertion, because a disabled-but-present control is exactly
     // what this must fail on.
-    await expect(page.getByTestId("settings.quick-unlock-biometric-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("settings.quick-unlock-setup-biometric")).toHaveCount(0);
   });
 
   test("the PIN path is untouched — this is a difference, not a removal", async ({ page }) => {
@@ -86,7 +88,7 @@ test.describe("Android: the biometric affordance is absent, not disabled", () =>
     // why the two are separate capabilities. Collapsing them would have made a
     // working feature look impossible on Android.
     await installMockIpc(page, { devicePlatform: "android" });
-    await openQuickUnlockPanel(page);
+    await openQuickUnlockSetup(page);
 
     // The PIN setup form is what the panel offers when quick-unlock is not yet
     // configured, and it is present on the platform with no biometric provider.
@@ -101,8 +103,8 @@ test.describe("iOS DOES offer it, so the absence above is not vacuous", () => {
   // iOS arm as far as `detectPlatform()` is concerned.
   test("the biometric toggle renders", async ({ page }) => {
     await installMockIpc(page, { devicePlatform: "ios" });
-    await openQuickUnlockPanel(page);
-    await expect(page.getByTestId("settings.quick-unlock-biometric-toggle")).toHaveCount(1);
+    await openQuickUnlockSetup(page);
+    await expect(page.getByTestId("settings.quick-unlock-setup-biometric")).toHaveCount(1);
   });
 });
 

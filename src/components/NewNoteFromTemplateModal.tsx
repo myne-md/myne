@@ -128,7 +128,7 @@ const LOADING_STYLE: CSSProperties = {
 };
 
 function displayName(rec: TitleRecord, t: TFunction): string {
-  return rec.title?.trim() || t("notes.newFromTemplate.untitledTemplate");
+  return rec.title?.trim() || t("common.untitledtemplate");
 }
 
 type Step =
@@ -205,7 +205,7 @@ export function NewNoteFromTemplateModal({
       bodyBleed
     >
       {templates === null ? (
-        <div style={LOADING_STYLE}>{t("notes.newFromTemplate.loading")}</div>
+        <div style={LOADING_STYLE}>{t("common.loading")}</div>
       ) : step.kind === "name" ? (
         <div style={NAME_STEP_STYLE}>
           <label htmlFor="new-from-template-name" style={LABEL_STYLE}>
@@ -225,12 +225,12 @@ export function NewNoteFromTemplateModal({
                 confirmName();
               }
             }}
-            placeholder={t("notes.newFromTemplate.namePlaceholder")}
+            placeholder={t("common.untitled")}
             style={INPUT_STYLE}
           />
           <div style={ACTIONS_STYLE}>
             <Button variant="ghost" onClick={() => setStep({ kind: "pick" })}>
-              {t("notes.newFromTemplate.back")}
+              {t("common.back")}
             </Button>
             <Button
               variant="primary"

@@ -54,7 +54,7 @@ export function PersonRegisterDialog({
   return (
     <ModalShell
       open={open}
-      title={t("identityHome.registerCta")}
+      title={t("common.registerthisidentity")}
       labelId={`${testIdPrefix.replace(/\./g, "-")}-title`}
       closeLabel={t("common.close")}
       onClose={onClose}

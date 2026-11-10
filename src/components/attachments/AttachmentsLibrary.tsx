@@ -1238,7 +1238,7 @@ function LibraryEmpty(props: LibraryEmptyProps) {
             onClick={props.onClearSearch}
             data-testid="attachments.empty-clear-search"
           >
-            {t("attachments.library.emptyClearSearch")}
+            {t("common.clearsearch")}
           </Button>
         }
       />
@@ -1256,7 +1256,7 @@ function LibraryEmpty(props: LibraryEmptyProps) {
         fill
         action={
           <Button variant="secondary" icon="refresh-cw" onClick={props.onRetry}>
-            {t("attachments.library.emptyRetry")}
+            {t("common.tryagain")}
           </Button>
         }
       />
@@ -1697,8 +1697,8 @@ function ItemMenu({
           },
         ]
       : []),
-    { id: "export", label: t("attachments.library.menuExport"), onSelect: onExport },
-    { id: "rename", label: t("attachments.library.menuRename"), onSelect: onStartRename },
+    { id: "export", label: t("common.export"), onSelect: onExport },
+    { id: "rename", label: t("common.rename"), onSelect: onStartRename },
     {
       id: "delete",
       label: t("attachments.library.menuDelete"),

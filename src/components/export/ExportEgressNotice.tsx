@@ -110,7 +110,7 @@ export function ExportEgressNotice({
             onClick={onCancel}
             data-testid="export.egress-cancel"
           >
-            {t("export.egress.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button
             variant="primary"

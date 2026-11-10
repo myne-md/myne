@@ -214,7 +214,7 @@ export function McpGrantDialog({
   // The folder options, with the root named rather than rendered as an empty row.
   const options: SelectOption<string>[] = folders.map((folder) => ({
     value: folder,
-    label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
+    label: folder === "" ? t("common.vaultroot") : folder,
   }));
 
   // The WRITE candidates are the readable set under the CURRENT exclusion
@@ -223,7 +223,7 @@ export function McpGrantDialog({
   const writeOptions: SelectOption<string>[] = (preview?.folders ?? []).map(
     (folder) => ({
       value: folder,
-      label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
+      label: folder === "" ? t("common.vaultroot") : folder,
     }),
   );
 
@@ -251,7 +251,7 @@ export function McpGrantDialog({
       open={open}
       title={
         connection === null
-          ? t("settings.ai.externalAccess.dialogTitleNew")
+          ? t("settings.ai.externalAccess.addConnection")
           : t("settings.ai.externalAccess.dialogTitle", { name: connection.name })
       }
       onClose={onClose}

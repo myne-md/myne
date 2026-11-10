@@ -370,7 +370,7 @@ export function mapBaseView(
   }
 
   const warnings: BaseImportWarning[] = [];
-  const name = view.name ?? i18n.t("notes.import.base.untitledView");
+  const name = view.name ?? i18n.t("common.untitledview");
 
   const filter = mapBaseFilter(view.filters);
   warnings.push(...filter.warnings);

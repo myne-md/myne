@@ -116,7 +116,7 @@ import {
   unarchiveNote,
   type NoteFlags,
 } from "../../lib/note-organize";
-import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChildOrder, notesInSubtree } from "../../lib/folders";
+import { deriveTree, subtreeCount, orderedChildren, reorderChildBeside, notesInSubtree } from "../../lib/folders";
 import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
@@ -189,6 +189,7 @@ import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRes
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
 import { AppHeader } from "./editor/chrome/AppHeader";
+import { useAutosave } from "./editor/chrome/useAutosave";
 import { ActionPill } from "./editor/chrome/ActionPill";
 import { EditorTopBar } from "./editor/chrome/EditorTopBar";
 import { FavoritesStrip } from "./editor/chrome/FavoritesStrip";
@@ -474,7 +475,6 @@ function releasePhotoPreview(url: string | null): void {
     URL.revokeObjectURL(url);
   }
 }
-
 export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess, onShowApprovalCode }: EditorFlowProps) {
   const { t } = useTranslation();
   // The authoritative active-vault id for every vault-targeting surface below,
@@ -755,7 +755,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // as ONE editor change, so the buffer catches up WITHOUT the reload this screen
   // does not perform, and the next whole-markdown save therefore cannot delete the
   // merged-in peer text. `./lib/liveRemoteMerge.ts` states why the mapping is
-  // needed here and not on desktop: this screen does not autosave.
+  // Needed here, not on desktop: this screen autosaves on a debounce, so a
+  // replace that lands mid-write has a save in flight to reconcile with.
   //
   // `sessionMirrorRef` is the screen's record of what the session holds as far as
   // this buffer knows: the text it loaded, then the text each of the screen's OWN
@@ -1339,7 +1340,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     }
     return m;
   }, [notes, bodies]);
-  const liveNotes = useMemo(() => notes.filter((n) => isLiveNote(noteFlags.get(n.id)!)), [notes, noteFlags]);
+  // An EVENT belongs to the calendar, not the notes list (myne-md/myne#1037).
+  // Deliberately NOT in `isLiveNote`: the host's calendar read skips a record whose
+  // `live` flag is false. `resolverNotes` is untouched, so it still resolves.
+  const liveNotes = useMemo(
+    () =>
+      notes.filter((n) => {
+        const flags = noteFlags.get(n.id);
+        return flags !== undefined && flags.kind !== "event" && isLiveNote(flags);
+      }),
+    [notes, noteFlags],
+  );
   // The note-set every RESOLVER surface runs against (graph, backlinks, the
   // vault-indices sweep) - desktop's `resolverCache` rule, verbatim
   // (`src/notes/sidebarState.tsx`): trashed / soft-deleted / template /
@@ -1404,6 +1415,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     for (const n of liveNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
     return m;
   }, [liveNotes, bodies]);
+
+  // The DELETE path: `folderOf` hides events, so their folder would read as empty.
+  const folderOfAll = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const n of resolverNotes) m.set(n.noteUuid, readNoteFolder(bodies.get(n.noteUuid) ?? ""));
+    return m;
+  }, [resolverNotes, bodies]);
 
   // The interleave cache (MYND-596): note id → `updatedAt`, the recency key the
   // shared `orderContainerChildren` reads for unlisted notes. A superset (all
@@ -1655,33 +1673,57 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const persistItemOrder = (next: Record<string, string[]> | null) => {
     if (next && HAS_TAURI) void setItemOrder(next).catch(ignorePrefsWriteFailure);
   };
-  const noteReorder = (id: string) => {
-    if (!reorderableTree || favSet.has(id)) return undefined;
-    const containerPath = folderOf.get(id) ?? null;
-    const { index, count } = childOrderIndex({
-      tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: id,
-    });
-    if (index < 0) return undefined;
-    const nudge = (delta: -1 | 1) =>
-      persistItemOrder(reorderChildOrder({
-        tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: id, delta,
-      }));
-    return { id, canUp: index > 0, canDown: index < count - 1, onUp: () => nudge(-1), onDown: () => nudge(1) };
-  };
-  const folderReorder = (path: string) => {
+  // Row boxes, measured when a drag starts and keyed by `data-reorder-key`. Scoped
+  // to the tree's ref: a document-wide query also sees the trash and archive lists.
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const dragBoxes = useRef<Map<string, { top: number; bottom: number }>>(new Map());
+  const [dragRowKey, setDragRowKey] = useState<string | null>(null);
+
+  /** The press-and-hold reorder gesture that replaced the action sheet's arrows:
+   *  boxes measured on PRESS, target decided on RELEASE, so one drop is one write.
+   *  Inert when the tree is not the manual-order surface. */
+  const dragFor = (rowKey: string, containerPath: string | null) => {
     if (!reorderableTree) return undefined;
-    // The folder's container is its PARENT (null for a top-level folder).
-    const anc = ancestorPaths(path);
-    const containerPath = anc.length >= 2 ? anc[anc.length - 2]! : null;
-    const { index, count } = childOrderIndex({
-      tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: path,
-    });
-    if (index < 0) return undefined;
-    const nudge = (delta: -1 | 1) =>
-      persistItemOrder(reorderChildOrder({
-        tree: fullTree, itemOrder: prefs.item_order, cache: orderCache, containerPath, rowKey: path, delta,
-      }));
-    return { key: folderKey(path), canUp: index > 0, canDown: index < count - 1, onUp: () => nudge(-1), onDown: () => nudge(1) };
+    return {
+      onStart: () => {
+        const boxes = new Map<string, { top: number; bottom: number }>();
+        const root = treeScrollRef.current;
+        if (root !== null) {
+          for (const el of root.querySelectorAll("[data-reorder-key]")) {
+            const key = el.getAttribute("data-reorder-key");
+            if (key === null) continue;
+            const r = el.getBoundingClientRect();
+            boxes.set(key, { top: r.top, bottom: r.bottom });
+          }
+        }
+        dragBoxes.current = boxes;
+        setDragRowKey(rowKey);
+      },
+      // No per-move work: the lifted row is the feedback, and a setState per move
+      // would re-render the whole tree on every pointer event.
+      onEnd: (point: { x: number; y: number }, moved: boolean) => {
+        setDragRowKey(null);
+        // A hold that never moved is the action sheet's, which `useHold` fires.
+        if (!moved) return;
+        const hit = [...dragBoxes.current.entries()]
+          .filter(([key]) => key !== rowKey)
+          .find(([, box]) => point.y >= box.top && point.y <= box.bottom);
+        if (hit === undefined) return;
+        const [targetKey, box] = hit;
+        const place = point.y < (box.top + box.bottom) / 2 ? "above" : "below";
+        persistItemOrder(
+          reorderChildBeside({
+            tree: fullTree,
+            itemOrder: prefs.item_order,
+            cache: orderCache,
+            containerPath,
+            rowKey,
+            targetKey,
+            place,
+          }),
+        );
+      },
+    };
   };
 
   // Honor the default-view-mode pref when entering the editor for an EXISTING
@@ -2544,14 +2586,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     setView("list");
   }, []);
 
-  const newNote = useCallback(() => {
+  const newNote = useCallback(async () => {
+    // Flush first: the autosave is a debounce a tap can beat, and this control
+    // replaces the buffer outright, so the line typed a moment ago would be gone.
+    if (!(await persistOpenBuffer())) return;
     // Create in the folder you're currently viewing (root → empty body).
     setEditorText(buildInitialPlaintext(normalizeFolderPath(currentFolder)));
     setEditing({ id: null });
     setEditorError(null);
     setReadingMode(false);
     setView("editor");
-  }, [currentFolder]);
+  }, [currentFolder, persistOpenBuffer]);
 
   const newDrawing = useCallback(async () => {
     if (!(await persistOpenBuffer())) return;
@@ -2574,7 +2619,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // sheet in its ready state - the user taps Stop when done (safer than
   // auto-arming the mic on a cold launch).
   const startCapture = useCallback((mode: CaptureMode) => {
-    newNote();
+    void newNote();
     if (mode === "voice") setRecordOpen(true);
   }, [newNote]);
   useEffect(() => {
@@ -2587,10 +2632,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return () => window.removeEventListener(CAPTURE_EVENT, onCapture);
   }, [startCapture]);
   // Apple Watch pending-capture drain (§9.18): this editor mounts on every unlock
-  // path (password / PIN / biometric / reload-probe), so draining here turns any
-  // queued watch-dictated captures into notes right after unlock.
-  // `drainPendingCaptures` self-serialises (StrictMode-safe) and is a no-op when
-  // the queue is empty; refresh the list if it created any so they appear.
+  // path, so draining here turns queued watch dictations into notes right after
+  // unlock. `drainPendingCaptures` self-serialises and no-ops when empty.
   useEffect(() => {
     const runDrain = () => {
       // Share-import drain (§9.20, SYNC-4/6): decrypt + import any files shared
@@ -2771,7 +2814,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * Write the open buffer if disk does not already have it, WITHOUT leaving the
    * note. `saveNote` is the EXIT path (it calls `exitEditor`), so anything that
    * replaces the buffer while a list is reachable owes this first: this client
-   * has no autosave and no snapshot, so a replaced buffer exists nowhere
+   * keeps no snapshot history, so a replaced buffer exists nowhere
    * (mobile/AGENTS.md). Returns false when the write failed, and every caller
    * then stays put rather than navigating away from text nobody can recover.
    *
@@ -2806,6 +2849,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     }
   }
 
+  // The writer answers "did it land"; the cadence only needs to know it ran.
+  useAutosave(editorText, view === "editor" && editing !== null, () => {
+    void persistOpenBuffer();
+  });
+
+  /** A list row's open: persist the open buffer first, and a failed write keeps the
+   *  user where the text is rather than navigating away from it. */
   async function openFromList(id: string) {
     if (!(await persistOpenBuffer())) return;
     await openRelated(id);
@@ -3138,7 +3188,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    *  pre-computed list, which is how the two get to disagree. */
   function requestFolderTrash(path: string, name: string) {
     setFolderActions(null);
-    const noteCount = notesInSubtree(folderOf, path).length;
+    const noteCount = notesInSubtree(folderOfAll, path).length;
     if (noteCount === 0) {
       void trashFolderFromMenu(path);
       return;
@@ -3151,7 +3201,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    *  confirmation it was opened from. */
   async function trashFolderFromMenu(path: string) {
     setFolderTrash(null);
-    const ids = notesInSubtree(folderOf, path);
+    const ids = notesInSubtree(folderOfAll, path);
     try {
       for (const id of ids) await trashNote(id);
       if (HAS_TAURI) {
@@ -3478,7 +3528,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * one undoable change and takes the normal note-save route (MY01). `new`
    * creates a titled note through the same helper the saved-transcript path
    * uses, honours the user's new-note location, then opens it with `openFromList`
-   * rather than `openNote`: mobile has no autosave, and switching buffers
+   * rather than `openNote`: "autosave" is an idle debounce, and switching buffers
    * without flushing first silently discards whatever is in the editor.
    */
   async function commitPhotoNote(text: string, destination: PhotoNoteDestination) {
@@ -3632,7 +3682,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>
   );
   const paletteCommands: PaletteCommand[] = [
-    { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
+    { id: "new-note", label: t("common.newnote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
     { id: "new-drawing", label: t("notes.newTab.createDrawing"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" {...gi} /></svg>, run: () => newDrawing() },
     { id: "daily", label: t("commands.actions.openTodayNote.label"), icon: calendarGlyph, run: () => void openToday() },
     // myne#177: the weekly and monthly siblings, palette-only like daily and
@@ -3680,7 +3730,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             ),
           )
         : folderOf;
-    const titleOf = new Map(notes.map((n) => [n.id, n.title]));
+    // `null`, not `""`: the body's first line is a SNIPPET, never a name (desktop
+    // parity), and a resolver taking `""` for a title matches nothing while
+    // looking like it had a target.
+    const titleOf = new Map(notes.map((n) => [n.id, n.title || null]));
     // MYND-596: folders and notes interleave in ONE display-ordered list PER
     // container (shared `orderedChildren`) - a note can now sit above a folder,
     // the same list desktop renders from the same synced `item_order`. The tree
@@ -3804,6 +3857,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   color={prefs.item_colors[f.key]}
                   onToggle={() => toggleFolder(f.key)}
                   onHold={() => setFolderActions({ path: f.path, name: f.name })}
+                  reorderKey={f.path}
+                  drag={dragFor(f.path, current)}
+                  dragging={dragRowKey === f.path}
                 />
               </div>
               {!isCollapsed && (
@@ -3831,6 +3887,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               onHold={() => setRowActions(n)}
               favorited={favSet.has(n.id)}
               onToggleFavorite={() => toggleFavorite(n.id)}
+              reorderKey={n.id}
+              drag={dragFor(n.id, current)}
+              dragging={dragRowKey === n.id}
             />,
           );
         }
@@ -3891,7 +3950,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   {listView === "notes" && (
                     <button
                       onClick={() => openFolderPrompt({ mode: "new" })}
-                      aria-label={t("notes.list.newFolder")}
+                      aria-label={t("common.newfolder")}
                       data-testid="notes.new-folder"
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, border: "1px solid var(--line-2)", borderRadius: 10, background: "transparent", color: "var(--fg-2)", cursor: "pointer" }}
                     >
@@ -3903,13 +3962,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   )}
                   {listView === "notes" && (
                     <button
-                      onClick={newNote}
+                      onClick={() => void newNote()}
                       data-testid="notes.new-note"
-                      aria-label={t("notes.list.newNote")}
+                      aria-label={t("common.newnote")}
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
                     >
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" /></svg>
-                      {t("notes.list.newNote")}
+                      {t("common.newnote")}
                     </button>
                   )}
                 </div>
@@ -3963,7 +4022,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                       style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--fg-1)", fontSize: 14 }}
                     />
                     {searchQuery !== "" && (
-                      <button onClick={() => setSearchQuery("")} aria-label={t("editor.list.clearSearch")} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexShrink: 0 }}>
+                      <button onClick={() => setSearchQuery("")} aria-label={t("common.clearsearch")} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexShrink: 0 }}>
                         <svg width="15" height="15" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="var(--fg-3)" strokeWidth="1.8" strokeLinecap="round" /></svg>
                       </button>
                     )}
@@ -4009,10 +4068,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 </span>
                 <div style={{ display: "flex", gap: 14, flexShrink: 0 }}>
                   <button onClick={() => setViewEditor({ initial: activeView })} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                    {t("editor.list.edit")}
+                    {t("common.edit")}
                   </button>
                   <button onClick={() => setActiveViewId(null)} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                    {t("notes.tagBrowser.clear")}
+                    {t("common.clear")}
                   </button>
                 </div>
               </div>
@@ -4093,7 +4152,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 testId="editor.list-empty"
               />
             ) : treeMode ? (
-              <ScreenScroll style={{ marginTop: 4 }}>
+              <ScreenScroll style={{ marginTop: 4 }} ref={treeScrollRef}>
                 {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} onHold={setRowActions} />}
                 {renderTree(null, 0)}
               </ScreenScroll>
@@ -4142,10 +4201,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                               {t("notes.archive.folderDeleteConfirm", { count: subtreeCount })}
                             </span>
                             <button onClick={() => void deleteArchivedFolderToTrash(path)} data-testid="archive.folder-delete-confirm" data-folder-path={path} style={{ border: "none", background: "transparent", color: "var(--danger)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                              {t("notes.archive.folderDeleteConfirmCta")}
+                              {t("common.movetotrash")}
                             </button>
                             <button onClick={() => setConfirmArchiveFolder(null)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                              {t("notes.archive.cancel")}
+                              {t("common.cancel")}
                             </button>
                           </div>
                         ) : (
@@ -4287,7 +4346,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onClose={() => setTab("notes")}
             // Saving a transcript from the Files tab creates a note and opens
             // it, so the action lands somewhere the user can see. `openFromList`
-            // flushes the in-progress buffer first (mobile has no autosave), so
+            // flushes the in-progress buffer first (the autosave is a debounce, so
+            // the last keystrokes may still be pending), so
             // the switch cannot discard typed text.
             onSavedNote={(id) => {
               setTab("notes");
@@ -4558,7 +4618,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
         {rowActions && (
           <NoteRowActionsSheet
-            title={rowActions.title || t("notes.row.untitled")}
+            title={rowActions.title || t("common.untitled")}
             favorited={favSet.has(rowActions.id)}
             onClose={() => setRowActions(null)}
             onOpen={() => {
@@ -4590,7 +4650,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               setRowActions(null);
               void organizeRow(trashNote, id);
             }}
-            reorder={noteReorder(rowActions.id)}
           />
         )}
 
@@ -4606,7 +4665,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onDecorate={() => openFolderDecoration(folderActions.path)}
             onArchive={() => void archiveFolderFromMenu(folderActions.path)}
             onTrash={() => requestFolderTrash(folderActions.path, folderActions.name)}
-            reorder={folderReorder(folderActions.path)}
           />
         )}
 
@@ -4643,10 +4701,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               <>
                 <div style={SHEET_TITLE}>
                   {folderPrompt.mode === "rename"
-                    ? t("attachments.library.menuRename")
+                    ? t("common.rename")
                     : folderPrompt.mode === "subfolder"
                       ? t("notes.list.newSubfolder")
-                      : t("notes.list.newFolder")}
+                      : t("common.newfolder")}
                 </div>
                 <input
                   data-testid="notes.folder-prompt-input"
@@ -4656,7 +4714,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   placeholder={
                     folderPrompt.mode === "subfolder"
                       ? t("notes.list.newFolderInPlaceholder", { path: folderPrompt.parent.replace(/\/$/, "") })
-                      : t("notes.list.newFolderPlaceholder")
+                      : t("common.newfolder")
                   }
                   autoFocus
                   autoCapitalize="none"
@@ -4670,7 +4728,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     data-testid="notes.folder-prompt-submit"
                     onClick={() => void submitFolderPrompt()}
                   >
-                    {folderPrompt.mode === "rename" ? t("attachments.library.menuRename") : t("notes.list.newFolder")}
+                    {folderPrompt.mode === "rename" ? t("common.rename") : t("common.newfolder")}
                   </Button>
                 </div>
               </>
@@ -5072,7 +5130,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           onSavedNote={(id) => {
             // Saving a transcript from the in-editor sheet hands back the new
             // note. `openFromList` rather than `openNote`: the editor may hold
-            // unsaved typing, and mobile has no autosave, so switching buffers
+            // unsaved typing, and autosave is a debounce, so switching buffers
             // without flushing first silently discards it.
             setManageAttachments(false);
             void openFromList(id);
@@ -5418,7 +5476,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
             </div>
             <div data-testid="workspace.detail-pane" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              {editing ? renderEditorPane() : <EmptyDetail onNew={newNote} />}
+              {editing ? renderEditorPane() : <EmptyDetail onNew={() => void newNote()} />}
             </div>
           </>
         ) : (

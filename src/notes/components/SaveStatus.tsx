@@ -227,7 +227,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           <span style={DOT_BASE_STYLE} />
           {t("notes.saveStatus.saved")}
           <span style={SEP_STYLE}>·</span>
-          {rel || t("notes.saveStatus.justNow")}
+          {rel || t("common.justnow")}
         </span>
       );
     }

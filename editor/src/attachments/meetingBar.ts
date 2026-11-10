@@ -159,7 +159,7 @@ export function mountMeetingBar(opts: MeetingBarOptions): MeetingBarHandle {
   cancel.type = "button";
   cancel.className = "cm-voice-rec-cancel";
   cancel.setAttribute("data-testid", "meeting.cancel");
-  cancel.textContent = i18n.t("editor.meeting.cancel");
+  cancel.textContent = i18n.t("common.cancel");
   cancel.addEventListener("click", () => opts.onCancel());
   bar.appendChild(cancel);
 

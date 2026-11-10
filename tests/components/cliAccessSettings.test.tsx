@@ -103,7 +103,10 @@ describe("terminal-access copy bounds", () => {
   });
 
   it("says plainly, when on, that any program under the user's account gets in", () => {
-    const helper = i18n.t("settings.cliAccess.helperOn").toLowerCase();
+    // Row sentence plus disclosure: the "any program under your account" clause
+    // is the row's, the bounds are behind the `?`.
+    const helper =
+      `${i18n.t("settings.cliAccess.inlineOn")} ${i18n.t("settings.cliAccess.helperOn")}`.toLowerCase();
     // The §7 residual, in the user's words: "while the door is open … any
     // program running as the same OS user can drive the CLI".
     expect(helper).toContain("any program running under your account");

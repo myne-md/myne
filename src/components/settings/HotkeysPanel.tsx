@@ -337,7 +337,7 @@ export function HotkeysPanel() {
             {t("settings.hotkeys.resetAllYes")}
           </button>
           <button style={ICON_BTN_STYLE} {...interactiveSurface()} onClick={() => setConfirmResetAll(false)}>
-            {t("settings.hotkeys.cancel")}
+            {t("common.cancel")}
           </button>
         </span>
       ) : null}

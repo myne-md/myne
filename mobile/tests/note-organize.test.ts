@@ -15,7 +15,16 @@ const patch = (text: string, fn: (b: Uint8Array) => Uint8Array) => dec.decode(fn
 describe("note-organize flags", () => {
   it("a plain note (no frontmatter) has no flags and is live", () => {
     const f = readNoteFlags("# Hello\n\nbody");
-    expect(f).toEqual({ trashed: null, archived: null, deleted: null, template: false, conflict: false });
+    expect(f).toEqual({
+      trashed: null,
+      archived: null,
+      deleted: null,
+      template: false,
+      conflict: false,
+      // Carried so `EditorFlow` can keep an EVENT out of the notes list; it is
+      // not part of the working-set predicate (see `NoteFlags.kind`).
+      kind: null,
+    });
     expect(isLiveNote(f)).toBe(true);
   });
 

@@ -106,7 +106,13 @@ async function openSetup() {
 function expectNoBiometricAffordance(why: string) {
   expect(screen.queryByTestId("settings.quick-unlock-setup-biometric"), why).toBeNull();
 
-  const label = copy("settings.quickUnlock.useTouchId");
+  // The label now carries the method as a parameter, so the assertion reads the
+  // rendered sentence rather than a fixed key: a button that says "Use Touch ID"
+  // is what must be absent.
+  const label = copy("settings.quickUnlock.useBiometric").replace(
+    "{{method}}",
+    copy("settings.quickUnlock.methodTouchId"),
+  );
   expect(
     screen.queryByText(label, { exact: false }),
     `${why} — the control is gone but its label "${label}" is still on screen, ` +

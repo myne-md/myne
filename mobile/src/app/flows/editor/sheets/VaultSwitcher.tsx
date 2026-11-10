@@ -53,7 +53,7 @@ export function VaultSwitcher({
           onClick={close}
           style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0 }}
         >
-          {t("editor.sheet.done")}
+          {t("common.done")}
         </button>
       </div>
       <div style={{ border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>

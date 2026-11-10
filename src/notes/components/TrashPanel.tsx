@@ -228,12 +228,12 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                   })
                 }
               >
-                {t("notes.trash.empty")}
+                {t("common.emptytrash")}
               </Button>
             )}
             <IconButton
               icon="x"
-              label={t("notes.trash.close")}
+              label={t("common.close")}
               tooltip
               testId="trash.close"
               onClick={onClose}
@@ -255,10 +255,10 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
               <div key={r.noteUuid} style={ROW_STYLE}>
                 <span
                   style={ROW_TITLE_STYLE}
-                  title={r.title ?? t("notes.trash.untitled")}
+                  title={r.title ?? t("common.untitled")}
                 >
                   {r.title === null || r.title.trim() === ""
-                    ? t("notes.trash.untitled")
+                    ? t("common.untitled")
                     : r.title}
                 </span>
                 <span style={AGE_STYLE}>
@@ -320,7 +320,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
           body={t("notes.trash.emptyConfirmBody", {
             count: confirm.ids.length,
           })}
-          confirmLabel={t("notes.trash.emptyConfirmCta")}
+          confirmLabel={t("common.emptytrash")}
           openedByKey={confirm.viaKey}
           onCancel={() => setConfirm(null)}
           onConfirm={() => void confirmPurge()}

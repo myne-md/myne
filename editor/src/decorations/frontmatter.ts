@@ -434,7 +434,7 @@ class PropertiesWidget extends WidgetType {
     input.rows = 1;
     input.className = "cm-fm-properties-name";
     input.value = displayValue;
-    input.placeholder = i18n.t("editor.frontmatter.titlePlaceholder");
+    input.placeholder = i18n.t("common.untitled");
     input.spellcheck = false;
     input.autocomplete = "off";
     input.setAttribute("aria-label", i18n.t("editor.frontmatter.titleAriaLabel"));

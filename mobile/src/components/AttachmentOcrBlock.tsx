@@ -93,20 +93,14 @@ export function AttachmentOcrBlock({ enabled }: { enabled: boolean }) {
           </span>
         </div>
       </div>
+      {/* One helper line, the same one desktop prints (owner, 2026-11-08).
+          This block used to add two more: "this one is per device" and a
+          paragraph about the extracted text being offered as a draft. Both were
+          true and both were duplication, the first restates what the toggle's
+          own state already means on a phone-only surface, and the second describes
+          another screen's behaviour (the draft sheet) inside a settings row. */}
       <div style={HINT_STYLE} data-testid="settings.attachmentOcr.helper">
         {t("settings.attachmentOcr.helper")}
-      </div>
-      {/* DEVICE-LOCAL, unlike the compression switch above it in this panel. */}
-      <div style={HINT_STYLE} data-testid="settings.attachmentOcr.scope">
-        {t("settings.attachmentOcr.mobileDeviceLocal")}
-      </div>
-      {/* The second consumer of what this switch produces (myne-md/myne#926).
-          The shared `helper` above says "so search can find them", which was the
-          only purpose when it was written and is still true; a reader of this
-          panel is now also a user of the draft sheet, and the two claims have to
-          live on the client where the draft exists, because desktop has none. */}
-      <div style={HINT_STYLE} data-testid="settings.attachmentOcr.draft-use">
-        {t("settings.attachmentOcr.draftUse")}
       </div>
     </div>
   );

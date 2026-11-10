@@ -850,7 +850,7 @@ function NoteGroup({
         }}
       >
         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {title ?? t("agent.review.untitledNote")}
+          {title ?? t("common.untitlednote")}
         </span>
         <span
           data-testid="agentReview.noteChangeCount"
@@ -919,7 +919,7 @@ function EditRowView({
     ? t("agent.review.rowMove", {
         folder:
           row.edit.replacement === ""
-            ? t("agent.review.vaultRoot")
+            ? t("common.vaultroot")
             : row.edit.replacement,
       })
     : row.edit.kind === "append"
@@ -1046,14 +1046,14 @@ function EditRowView({
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
               <span>{t("agent.review.diffCurrent")}</span>
               <span data-testid="agentReview.moveFrom" style={{ color: "var(--fg-1)" }}>
-                {sourceFolder ?? t("agent.review.vaultRoot")}
+                {sourceFolder ?? t("common.vaultroot")}
               </span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
               <span>{t("agent.review.diffProposed")}</span>
               <span data-testid="agentReview.moveTo" style={{ color: "var(--fg-1)" }}>
                 {row.edit.replacement === ""
-                  ? t("agent.review.vaultRoot")
+                  ? t("common.vaultroot")
                   : row.edit.replacement}
               </span>
             </div>
@@ -1363,7 +1363,7 @@ function NewNotesGroup({
               {note.title}
             </span>
             <span style={{ flex: "none", fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
-              {note.folder ?? t("agent.review.vaultRoot")}
+              {note.folder ?? t("common.vaultroot")}
             </span>
             <span style={{ flex: 1 }} />
             {created.has(index) ? (

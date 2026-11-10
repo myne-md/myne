@@ -660,7 +660,7 @@ export function SyncPanel({ vaultId, onDialogOpenChange }: SyncPanelProps = {}) 
               <Input
                 readOnly
                 mono
-                aria-label={t("sync.panel.identity.codeLabel")}
+                aria-label={t("common.youridentitycode")}
                 value={identityCode}
                 data-testid="sync.panel.identity-code"
                 style={{ flex: 1, minWidth: 0, userSelect: "all" }}
@@ -714,7 +714,7 @@ export function SyncPanel({ vaultId, onDialogOpenChange }: SyncPanelProps = {}) 
                 data-testid="sync.panel.register-cta"
                 onClick={() => setRegisterOpen(true)}
               >
-                {t("identityHome.registerCta")}
+                {t("common.registerthisidentity")}
               </Button>
               <PersonRegisterDialog
                 open={registerOpen}

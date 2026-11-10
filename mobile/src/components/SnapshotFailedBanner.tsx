@@ -80,7 +80,7 @@ export function SnapshotFailedBanner() {
     <div role="status" aria-live="polite" style={ROOT} data-testid="snapshot-failed">
       <span style={MSG}>{t("notes.snapshotFailed.message")}</span>
       <button type="button" style={DISMISS} onClick={() => setVisible(false)}>
-        {t("notes.snapshotFailed.dismiss")}
+        {t("common.dismiss")}
       </button>
     </div>
   );

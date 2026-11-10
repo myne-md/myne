@@ -79,6 +79,17 @@ const anchors = new Map<string, ScrollAnchor>();
 const restoring = new Map<string, number>();
 
 /**
+ * When the reader last moved note `noteId` themselves, in ms since the epoch.
+ *
+ * The one question a restore cannot answer from the anchor alone: is the pane
+ * still where this anchor says, or has the reader moved since? A restore that
+ * fires late (a scrollbar appearing narrows the pane, a width observation, a
+ * body arriving) would otherwise drag them back to a position they have already
+ * scrolled past, which reads as the view jumping upward mid-scroll.
+ */
+const readerMoves = new Map<string, number>();
+
+/**
  * How long a restore suppresses re-remembering, in ms. Comfortably longer than
  * `PaneView`'s `SCROLL_SETTLE_MS` (120), because the write to suppress happens
  * on the trailing edge of that timer, one full settle AFTER the scroll lands.
@@ -111,6 +122,23 @@ function scrollRestoreRemaining(noteId: string, now = Date.now()): number {
   if (started === undefined) return 0;
   const left = RESTORE_SUPPRESSION_MS - (now - started);
   return left > 0 ? left : 0;
+}
+
+/**
+ * Whether the reader moved note `noteId` within the last `within` ms.
+ *
+ * A restore path asks this before it scrolls: an anchor recorded before the
+ * reader's own scroll describes a position they left on purpose, and applying it
+ * is the upward jump this guards (`rememberScroll` is called only from a scroll
+ * listener, so this tracks real movement and never the restore's own dispatch).
+ */
+export function readerMovedRecently(
+  noteId: string,
+  within = 250,
+  now = Date.now(),
+): boolean {
+  const at = readerMoves.get(noteId);
+  return at !== undefined && now - at <= within;
 }
 
 /** Whether a restore of `noteId` is still settling. */
@@ -162,6 +190,9 @@ export function rememberScroll(
   // SYNC-8: layout numbers only. Written before any early return so a
   // suppressed or unreadable pass still records where the pane actually was.
   scroller.dataset.scrollAnchorTop = String(Math.round(scroller.scrollTop));
+  // Before the suppression early-return: this call IS the reader moving, which is
+  // exactly what a restore needs to know, whether or not the anchor is written.
+  readerMoves.set(noteId, Date.now());
   if (isRestoringScroll(noteId)) {
     scroller.dataset.scrollAnchorWrite = "suppressed";
     // **A suppressed write is DEFERRED, not dropped.** The suppression window
@@ -247,6 +278,7 @@ export function forgetScroll(noteId: string): void {
   // and then closed, for the life of the session, with nothing able to read it
   // again. The note is gone; its mark cannot matter.
   restoring.delete(noteId);
+  readerMoves.delete(noteId);
 }
 
 /**
@@ -309,4 +341,5 @@ export function resetScrollMemory(): void {
   // session's note with the same id. It cost a test before it could cost a user,
   // which is the cheap version of the same bug.
   restoring.clear();
+  readerMoves.clear();
 }

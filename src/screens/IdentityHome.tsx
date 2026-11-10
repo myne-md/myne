@@ -490,18 +490,18 @@ export function IdentityHome({
           <span style={WORDMARK_STYLE}>Myne</span>
         </div>
 
-        <h1 style={CARD_TITLE_STYLE}>{t("identityHome.title")}</h1>
+        <h1 style={CARD_TITLE_STYLE}>{t("common.youridentity")}</h1>
 
         {/* The account number, where the identity is named: one value for
             support and for a self-host handoff, derived rather than generated so
             losing it costs nothing (myne-md/myne#911 review). */}
         {accountNumber ? (
           <div style={BLOCK_STYLE}>
-            <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.accountNumberHeading")}</h2>
+            <h2 style={SECTION_HEADING_STYLE}>{t("common.accountnumber")}</h2>
             <div style={FIELD_ROW_STYLE}>
               <Input
                 data-testid="identity-home.account-number"
-                aria-label={t("identityHome.accountNumberHeading")}
+                aria-label={t("common.accountnumber")}
                 autoComplete="off"
                 readOnly
                 value={accountNumber}
@@ -602,7 +602,7 @@ export function IdentityHome({
                   onClick={() => setRegisterOpen(true)}
                   data-testid="identity-home.register-cta"
                 >
-                  {t("identityHome.registerCta")}
+                  {t("common.registerthisidentity")}
                 </Button>
               )}
             </div>
@@ -614,7 +614,7 @@ export function IdentityHome({
             <p style={HINT_STYLE}>{t("identityHome.invitesLoading")}</p>
           ) : pending.length === 0 && claimed.length === 0 ? (
             <p data-testid="identity-home.empty-invites" style={HINT_STYLE}>
-              {t("identityHome.noInvites")}
+              {t("common.noinvitationsyet")}
             </p>
           ) : (
             <div data-testid="identity-home.invites" style={INVITES_STYLE}>
@@ -708,7 +708,7 @@ export function IdentityHome({
             onClick={() => setForgetOpen(true)}
             data-testid="identity-home.forget-cta"
           >
-            {t("identityHome.forgetCta")}
+            {t("common.forgetthisidentityonthisdevice")}
           </Button>
         </div>
 
@@ -804,16 +804,16 @@ function ForgetIdentityDialog({
   return (
     <ModalShell
       open
-      title={t("identityHome.forgetCta")}
+      title={t("common.forgetthisidentityonthisdevice")}
       labelId="identity-home-forget-title"
-      closeLabel={t("identityHome.forgetCancel")}
+      closeLabel={t("common.keepit")}
       canDismiss={() => !busy}
       onClose={onCancel}
       testId="identity-home.forget-confirm"
     >
       <div style={DIALOG_BODY_STYLE}>
         <p data-testid="identity-home.forget-warning" style={BODY_SMALL_STYLE}>
-          {t("identityHome.forgetWarning")}
+          {`${t("identityForget.body")} ${t("identityForget.savedPhraseTail")}`}
         </p>
         <label style={CHECKBOX_LABEL_STYLE}>
           <input
@@ -839,7 +839,7 @@ function ForgetIdentityDialog({
           onClick={onCancel}
           data-testid="identity-home.forget-cancel"
         >
-          {t("identityHome.forgetCancel")}
+          {t("common.keepit")}
         </Button>
         <Button
           variant="danger"

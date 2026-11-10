@@ -163,7 +163,7 @@ export function WelcomeFlow({ onHaveIdentity, onIdentity }: WelcomeFlowProps) {
                       {t("welcome.residueGatedDelete")}
                     </Button>
                     <Button variant="ghost" onClick={() => { setConfirming(false); setTypedDelete(""); }} disabled={busy}>
-                      {t("welcome.repairResidue.cancel")}
+                      {t("common.cancel")}
                     </Button>
                   </>
                 ) : (

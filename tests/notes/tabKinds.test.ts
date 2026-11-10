@@ -14,6 +14,7 @@ import {
   canonicalTabId,
   isSingletonTabKind,
   tabKindSpec,
+  tabOwnsWholeSurface,
 } from "../../src/notes/tabKinds";
 import {
   ATTACHMENTS_TAB_ID,
@@ -118,5 +119,24 @@ describe("singleton ids are canonical, whatever a stored key claimed", () => {
     // test's example until `agent` became a registered kind (myne-md/myne#771),
     // which is exactly the failure this case exists to catch one level up.
     expect(parseItemKey("widget:xyz")).toEqual({ kind: "note", id: "widget:xyz" });
+  });
+});
+
+describe("tabOwnsWholeSurface", () => {
+  it("answers yes for the agent and the calendar, and no for everything else", () => {
+    // The rule the Editor's sidebar collapse reads (myne-md/myne#1037). Asserted
+    // as a SET rather than one kind at a time, because the failure mode is a
+    // kind that is added later and silently inherits "no".
+    const whole = TAB_KINDS.filter((spec) => spec.ownsWholeSurface === true).map(
+      (spec) => spec.kind,
+    );
+    expect(whole.sort()).toEqual(["agent", "calendar"]);
+  });
+
+  it("is total over a null tab, because an empty pane is not a surface", () => {
+    expect(tabOwnsWholeSurface(null)).toBe(false);
+    expect(tabOwnsWholeSurface(undefined)).toBe(false);
+    expect(tabOwnsWholeSurface("note")).toBe(false);
+    expect(tabOwnsWholeSurface("tasks")).toBe(false);
   });
 });

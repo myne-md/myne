@@ -30,7 +30,7 @@ function mapProtocolError(error: ProtocolError): ErrorState {
       // defensive entry kept so the exhaustive switch covers the variant.
       return {
         title: i18n.t("vaultCreation.errors.invalidPassword.title"),
-        body: i18n.t("vaultCreation.errors.invalidPassword.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -53,7 +53,7 @@ function mapProtocolError(error: ProtocolError): ErrorState {
       // Defensive — should not fire during creation, only during unlock.
       return {
         title: i18n.t("vaultCreation.errors.aeadFailure.title"),
-        body: i18n.t("vaultCreation.errors.aeadFailure.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -61,7 +61,7 @@ function mapProtocolError(error: ProtocolError): ErrorState {
       // Defensive — backend just built the meta we'd be parsing.
       return {
         title: i18n.t("vaultCreation.errors.invalidVaultMeta.title"),
-        body: i18n.t("vaultCreation.errors.invalidVaultMeta.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -69,14 +69,14 @@ function mapProtocolError(error: ProtocolError): ErrorState {
       // Not reached during creation (account number is generated, not parsed).
       return {
         title: i18n.t("vaultCreation.errors.accountNumberInvalid.title"),
-        body: i18n.t("vaultCreation.errors.accountNumberInvalid.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "Csprng":
       return {
         title: i18n.t("vaultCreation.errors.csprng.title"),
-        body: i18n.t("vaultCreation.errors.csprng.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -116,14 +116,14 @@ function mapIoError(error: IoErrorKind): ErrorState {
     case "NotFound":
       return {
         title: i18n.t("vaultCreation.errors.notFound.title"),
-        body: i18n.t("vaultCreation.errors.notFound.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
     case "Other":
       return {
         title: i18n.t("vaultCreation.errors.ioOther.title"),
-        body: i18n.t("vaultCreation.errors.ioOther.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };
@@ -172,7 +172,7 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
     case "JoinFailure":
       return {
         title: i18n.t("vaultCreation.errors.joinFailure.title"),
-        body: i18n.t("vaultCreation.errors.joinFailure.body"),
+        body: i18n.t("common.tryagain"),
         primaryAction: "retry",
         displayMode: "inline",
       };

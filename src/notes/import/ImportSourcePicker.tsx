@@ -155,7 +155,7 @@ export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps
         }}
       >
         <Button variant="ghost" onClick={onCancel} data-testid="import.picker-cancel">
-          {t("notes.import.modal.cancel")}
+          {t("common.cancel")}
         </Button>
       </div>
     </>

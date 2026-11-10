@@ -248,8 +248,8 @@ export function GraphSettingsPanel({
         <button
           type="button"
           onClick={onClose}
-          aria-label={t("notes.graph.settings.closeTitle")}
-          title={t("notes.graph.settings.closeTitle")}
+          aria-label={t("common.close")}
+          title={t("common.close")}
           data-testid="editor.graph-settings-close"
           style={{
             display: "flex",

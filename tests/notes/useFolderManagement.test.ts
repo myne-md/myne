@@ -22,6 +22,14 @@ import {
   vi,
 } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import { getToasts, resetToasts } from "../../src/components/toast/toastStore";
+
+/** The message on the newest toast, or null. Folder refusals report through the
+ *  shared toast stack (#238), not an inline notice. */
+function lastNotice(): string | null {
+  const items = getToasts();
+  return items.length === 0 ? null : (items[items.length - 1]?.message ?? null);
+}
 
 // ---- IPC-boundary mocks ---------------------------------------------------
 
@@ -106,13 +114,24 @@ import type { UseSelectedNoteReturn } from "../../src/notes/sidebarState";
 // ---- fixtures -------------------------------------------------------------
 
 function rec(id: string, folder: string | null): TitleRecord {
+  // The full record, not the fields this file happens to read: a fixture missing
+  // half of TitleRecord type-checks nowhere and the folders plan reads more of it
+  // than the derivation used to (myne-md/myne#23's folder-delete union).
   return {
     noteUuid: id,
     title: id,
     folder,
     updatedAt: new Date(0),
     trashed: null,
+    deleted: null,
+    archived: null,
     template: false,
+    folderIndex: false,
+    conflict: false,
+    conflictOf: null,
+    hasSource: false,
+    kind: null,
+    done: null,
   };
 }
 
@@ -196,6 +215,7 @@ beforeEach(() => {
   prefs.favorites = [];
   prefs.item_colors = {};
   prefs.folder_icons = {};
+  resetToasts();
   vi.clearAllMocks();
 });
 afterEach(() => vi.clearAllMocks());
@@ -261,7 +281,7 @@ describe("create folder", () => {
     // being emptied, which is what the notice says. Reverting here would delete
     // a folder the user just made, over a limit rather than a failure.
     expect(result.current.deliberate).toContain("Ideas/");
-    expect(result.current.blockNotice).toMatch(/list is full/i);
+    expect(lastNotice()).toMatch(/list is full/i);
   });
 
   it("a persistent write failure reverts the folder and says so", async () => {
@@ -273,7 +293,7 @@ describe("create folder", () => {
     // The opposite arm: nothing was recorded, so showing the folder would be a
     // lie that survives until the next unlock.
     expect(result.current.deliberate).not.toContain("Ideas/");
-    expect(result.current.blockNotice).toMatch(/couldn't record it/i);
+    expect(lastNotice()).toMatch(/couldn't record it/i);
   });
 
   it("a transient failure the wrapper recovered from shows nothing", async () => {
@@ -291,7 +311,7 @@ describe("create folder", () => {
     act(() => result.current.commitNewFolder("Ideas"));
     await act(async () => {});
     expect(result.current.deliberate).toContain("Ideas/");
-    expect(result.current.blockNotice).toBeNull();
+    expect(lastNotice()).toBeNull();
   });
 
   it("empty input → cancel, no persist, no notice", () => {
@@ -299,7 +319,7 @@ describe("create folder", () => {
     act(() => result.current.startNewFolder(""));
     act(() => result.current.commitNewFolder(""));
     expect(result.current.newFolder).toBeNull();
-    expect(result.current.blockNotice).toBeNull();
+    expect(lastNotice()).toBeNull();
     expect(setDeliberateFolders).not.toHaveBeenCalled();
   });
 
@@ -308,7 +328,7 @@ describe("create folder", () => {
     act(() => result.current.startNewFolder(""));
     // A segment containing a backslash is grammar-illegal (markdown-dialect §3.6.2).
     act(() => result.current.commitNewFolder("bad\\name"));
-    expect(result.current.blockNotice).toMatch(/can't contain/);
+    expect(lastNotice()).toMatch(/can't contain/);
     expect(result.current.newFolder).not.toBeNull(); // still editing
     expect(setDeliberateFolders).not.toHaveBeenCalled();
   });
@@ -375,6 +395,30 @@ describe("rename folder", () => {
     expect(result.current.renamingFolderKey).toBeNull();
   });
 
+  it("a rename re-roots item_order, so the manual position survives it", async () => {
+    // The owner's report (2026-11-08): rearrange the tree, rename a folder, and the
+    // order changes. `item_order` is keyed by path twice over (container key and
+    // child entry), so both have to move with the folder.
+    renameFolder.mockResolvedValue({
+      moved: ["n1"],
+      failed: [],
+      deliberateRewritten: 1,
+      nextDeliberate: ["Workspace/"],
+      invalid: false,
+    });
+    prefs.item_order = { "": ["Drafts/", "Work/"], "work/": ["n1"] };
+    const { result, ctx } = mount([rec("n1", "Work/")], ["Work/", "Drafts/"]);
+    const node = findNode(result.current.treeRef.current.roots, "work/")!;
+    act(() => result.current.startRenameFolder(node));
+    await act(async () => {
+      await result.current.commitRenameFolder(node, "Workspace");
+    });
+    expect(setItemOrder).toHaveBeenCalledWith({
+      "": ["Drafts/", "Workspace/"],
+      "workspace/": ["n1"],
+    });
+  });
+
   it("commit rename with a legal name → calls renameFolder, refreshes moved, updates deliberate", async () => {
     renameFolder.mockResolvedValue({
       moved: ["n1"],
@@ -409,7 +453,7 @@ describe("rename folder", () => {
       await result.current.commitRenameFolder(node, "a/b");
     });
     expect(renameFolder).not.toHaveBeenCalled();
-    expect(result.current.blockNotice).toMatch(/can't contain/);
+    expect(lastNotice()).toMatch(/can't contain/);
     expect(result.current.renamingFolderKey).toBe("work/"); // still editing
   });
 
@@ -455,7 +499,7 @@ describe("rename folder", () => {
     expect(setItemColors).not.toHaveBeenCalled();
     // And it is not silent: an invalid rename reported as a value used to close
     // the input on the old name with nothing on screen.
-    expect(result.current.blockNotice).toMatch(/Couldn't rename the folder/);
+    expect(lastNotice()).toMatch(/Couldn't rename the folder/);
   });
 
   // The refused-batch arm, which is the one that reaches a user in ordinary use:
@@ -478,7 +522,7 @@ describe("rename folder", () => {
     await act(async () => {
       await result.current.commitRenameFolder(node, "Workspace");
     });
-    expect(result.current.blockNotice).toMatch(/Couldn't rename the folder/);
+    expect(lastNotice()).toMatch(/Couldn't rename the folder/);
     expect(setItemColors).not.toHaveBeenCalled();
     expect(ctx.refreshOne).not.toHaveBeenCalled();
   });
@@ -586,21 +630,16 @@ describe("block notice auto-dismiss", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("clears itself after the 4s timeout", () => {
+  it("reports the refusal on the shared toast stack, which owns the lifetime", () => {
+    // The sentence and its dismissal are the toast stack's now (#238): one stack,
+    // one lifetime, and the tree is not pushed down by a box of its own. The
+    // timeout itself belongs to the mounted `<Toaster>`, which has its own spec,
+    // so asserting it here would need a renderer this hook test does not mount.
     const { result } = mount([]);
     act(() => result.current.startNewFolder(""));
     act(() => result.current.commitNewFolder("bad\\name"));
-    expect(result.current.blockNotice).not.toBeNull();
-    act(() => vi.advanceTimersByTime(4000));
-    expect(result.current.blockNotice).toBeNull();
-  });
-
-  it("dismissBlock clears it immediately", () => {
-    const { result } = mount([]);
-    act(() => result.current.startNewFolder(""));
-    act(() => result.current.commitNewFolder("bad\\name"));
-    act(() => result.current.dismissBlock());
-    expect(result.current.blockNotice).toBeNull();
+    expect(lastNotice()).toMatch(/can't contain/);
+    expect(getToasts()[getToasts().length - 1]?.variant).toBe("error");
   });
 });
 
@@ -1011,7 +1050,7 @@ describe("move folder (myne#281)", () => {
       await result.current.moveFolderTo(node, "Work/");
     });
     expect(renameFolder).not.toHaveBeenCalled();
-    expect(result.current.blockNotice).toBeTruthy();
+    expect(lastNotice()).toBeTruthy();
   });
 
   it("refuses a move into its own descendant", async () => {
@@ -1022,7 +1061,7 @@ describe("move folder (myne#281)", () => {
       await result.current.moveFolderTo(node, "Work/Reports/");
     });
     expect(renameFolder).not.toHaveBeenCalled();
-    expect(result.current.blockNotice).toBeTruthy();
+    expect(lastNotice()).toBeTruthy();
   });
 
   it("refuses a name collision in the target rather than merging two subtrees", async () => {
@@ -1033,7 +1072,7 @@ describe("move folder (myne#281)", () => {
       await result.current.moveFolderTo(node, "Archive/");
     });
     expect(renameFolder).not.toHaveBeenCalled();
-    expect(result.current.blockNotice).toBeTruthy();
+    expect(lastNotice()).toBeTruthy();
   });
 
   it("is a silent no-op when the folder is already there", async () => {
@@ -1045,6 +1084,6 @@ describe("move folder (myne#281)", () => {
       await result.current.moveFolderTo(node, "Archive/");
     });
     expect(renameFolder).not.toHaveBeenCalled();
-    expect(result.current.blockNotice).toBeNull();
+    expect(lastNotice()).toBeNull();
   });
 });

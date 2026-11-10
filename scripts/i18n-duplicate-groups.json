@@ -48,15 +48,6 @@
     "reason": "Same attach-type gate on desktop and the mobile editor flow; one gate, two clients, intentionally identical."
   },
   {
-    "value": "Another vault operation is in progress. Wait for it to finish, then try again.",
-    "keys": [
-      "backup.errors.export.authOperationInProgress",
-      "backup.errors.restore.authOperationInProgress",
-      "export.vault.errors.authOperationInProgress"
-    ],
-    "reason": "Same backend-busy error on backup export, backup restore and vault export; one error, three call sites."
-  },
-  {
     "value": "That destination folder is not usable.",
     "keys": [
       "backup.errors.export.invalidDestination",
@@ -97,21 +88,20 @@
     "reason": "Same action label on the command palette and the bottom bar; the palette mirrors the UI, intentionally identical."
   },
   {
+    "value": "The vault is locked. Unlock it, then try again.",
+    "keys": [
+      "common.thevaultislockedunlockitthentryagain",
+      "plainFile.importLocked"
+    ],
+    "reason": "Two surfaces report the same locked-vault state: the plain-file import button and the editor's own guard. The sentence is one fact and stays identical, so a change to the wording lands in both."
+  },
+  {
     "value": "This note could not be read.",
     "keys": [
       "export.note.errors.cannotDecrypt",
       "export.note.flow.couldNotRead"
     ],
     "reason": "Same unreadable-note error on the two export-note stages; one error, two stages."
-  },
-  {
-    "value": "The vault is locked. Unlock it, then try again.",
-    "keys": [
-      "export.note.errors.vaultLocked",
-      "export.vault.errors.vaultLocked",
-      "plainFile.importLocked"
-    ],
-    "reason": "Same locked-vault error on note export, vault export and the plain-file editor's Import to vault (myne-md/myne#788): the app has one sentence for that state, and the import deliberately reuses it rather than growing a second copy."
   },
   {
     "value": "Cannot read the vault file.",
@@ -202,33 +192,6 @@
     "reason": "Same busy notice on recover and password reset; one state, two entry points."
   },
   {
-    "value": "Unexpected error. Please try again.",
-    "keys": [
-      "recover.errors.unexpected",
-      "unlock.errors.unexpected",
-      "vaultRecover.passwordReset.errors.unexpected"
-    ],
-    "reason": "Same generic failure on recover, unlock and password reset; generic fallback, intentionally shared."
-  },
-  {
-    "value": "Vault file not found. Please restart the app.",
-    "keys": [
-      "recover.errors.vaultNotFound",
-      "unlock.errors.vaultNotFound",
-      "vault.ioBanner.notFound"
-    ],
-    "reason": "Same missing-vault error on recover, unlock and the IO banner; one error, three call sites."
-  },
-  {
-    "value": "Vault file is unreadable. Restore from a backup.",
-    "keys": [
-      "recover.vaultUnreadable",
-      "settings.vault.vaultUnreadable",
-      "unlock.vaultUnreadable"
-    ],
-    "reason": "Same unreadable-vault error on recover, settings and unlock; one error, three call sites."
-  },
-  {
     "value": "Something went wrong. Please try again.",
     "keys": [
       "recover.genericError",
@@ -269,15 +232,6 @@
     "reason": "Same save failure in Appearance and Typography panels; generic error, intentionally shared."
   },
   {
-    "value": "Could not save this setting.",
-    "keys": [
-      "settings.attachmentCompression.errorSaveSetting",
-      "settings.attachmentOcr.errorSaveSetting",
-      "settings.folderNotes.errorSaveSetting"
-    ],
-    "reason": "Same save failure on the three attachment settings panels; generic error, intentionally shared."
-  },
-  {
     "value": "Couldn't save that setting.",
     "keys": [
       "settings.dateTime.errorSave",
@@ -300,24 +254,6 @@
       "vaultCreation.errors.vaultBusyAuth.body"
     ],
     "reason": "Same backend-busy error on quick-unlock and vault creation; one error, two call sites."
-  },
-  {
-    "value": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
-    "keys": [
-      "approvalWait.verifyChanged",
-      "join.verifyChanged",
-      "sync.devices.verifyChanged"
-    ],
-    "reason": "One sentence for one situation: the head moved between the read that drew the compare code and the read that follows it. The two live sites are the approving side's device list and the phone's approval wait, and both must say the same thing because the user is looking at two screens at once and a rewording on either turns a matched pair into an apparent mismatch. The browser's site joined them as `approvalWait.verifyChanged` when its bootstrap screen became the approval wait (`decisions/sync/0767`); `sync.join.verifyChanged` left with the account-number join form, and the English did not move either time, only the namespaces did."
-  },
-  {
-    "value": "Forget this identity on this device",
-    "keys": [
-      "identityFlow.home.forget",
-      "identityHome.forgetCta",
-      "sync.memberRoster.identityForgetCta"
-    ],
-    "reason": "Deliberate verbatim sharing: the identity home and the member-roster panel both need the SAME short label for the same destructive action, and one wording keeps the three surfaces(both, and mobile) from drifting. Rewording per surface would invent a difference the user does not have."
   },
   {
     "value": "I understand this identity will be removed from this device.",

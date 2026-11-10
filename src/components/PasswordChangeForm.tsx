@@ -145,7 +145,7 @@ export function PasswordChangeForm({
             letterSpacing: "var(--tracking-tight)",
           }}
         >
-          {t("settings.changePassword.title")}
+          {t("common.changepassword")}
         </h3>
         {onCancel && (
           <button
@@ -164,7 +164,7 @@ export function PasswordChangeForm({
               cursor: inFlight ? "default" : "pointer",
             }}
           >
-            {t("settings.changePassword.cancel")}
+            {t("common.cancel")}
           </button>
         )}
       </div>
@@ -233,7 +233,7 @@ export function PasswordChangeForm({
           onClick={handleSubmit}
           disabled={!submitReady || inFlight}
         >
-          {inFlight ? t("settings.changePassword.submitting") : t("settings.changePassword.submit")}
+          {inFlight ? t("settings.changePassword.submitting") : t("common.changepassword")}
         </Button>
       </div>
     </div>

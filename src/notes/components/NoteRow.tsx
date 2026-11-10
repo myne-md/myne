@@ -716,7 +716,7 @@ function TitleLine({
     return (
       <div style={titleUntitledStyle} title={t("notes.row.loadError")}>
         <span style={errorIndicatorStyle} aria-hidden="true" />
-        {t("notes.row.untitled")}
+        {t("common.untitled")}
         {markers}
       </div>
     );
@@ -734,7 +734,7 @@ function TitleLine({
     const placeholder =
       record.kind === DRAWING_KIND_VALUE
         ? t("notes.row.untitledDrawing")
-        : t("notes.row.untitled");
+        : t("common.untitled");
     return (
       <div style={titleUntitledStyle}>
         {placeholder}

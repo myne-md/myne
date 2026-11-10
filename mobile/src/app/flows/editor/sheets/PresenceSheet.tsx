@@ -82,7 +82,7 @@ export function PresenceSheet({
                 cursor: "pointer",
               }}
             >
-              {t("editor.sheet.done")}
+              {t("common.done")}
             </span>
           </div>
           <div style={{ overflowY: "auto", minHeight: 0 }}>

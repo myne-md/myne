@@ -361,7 +361,7 @@ export function UnlinkedMentionsSection({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {mention.title || t("notes.unlinkedMentions.untitled")}
+                    {mention.title || t("common.untitled")}
                   </button>
                   <button
                     type="button"

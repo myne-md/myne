@@ -426,7 +426,7 @@ function CreateAnother({
         variant="primary"
         icon="download"
         onClick={onRestoreBackup}
-        title={t("vaultPicker.restoreFromBackup")}
+        title={t("common.restorefrombackup")}
         data-testid="picker.restore-cta"
         style={ACTION_STYLE}
       >
@@ -709,7 +709,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
                 label={vaultDisplayName(vault, state.vaults, t)}
                 meta={lastUnlockText(vault.last_unlock, t)}
                 publishNote={
-                  vault.published ? "" : t("vaultPicker.deviceOnly")
+                  vault.published ? "" : t("common.deviceonly")
                 }
                 onSelect={onSelect}
               />

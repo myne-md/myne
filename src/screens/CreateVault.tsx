@@ -691,7 +691,7 @@ function provisionFailedError() {
 function genericError() {
   return {
     title: i18n.t("vaultCreation.orchestrator.genericError.title"),
-    body: i18n.t("vaultCreation.orchestrator.genericError.body"),
+    body: i18n.t("common.tryagain"),
     primaryAction: "retry",
     displayMode: "inline",
   } as const;

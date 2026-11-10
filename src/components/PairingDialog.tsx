@@ -234,7 +234,7 @@ export function PairingDialog() {
               data-testid="pairing.dismiss"
               onClick={() => setState({ phase: "idle" })}
             >
-              {t("clipper.pairing.close")}
+              {t("common.close")}
             </button>
           </div>
         </div>
@@ -256,7 +256,7 @@ export function PairingDialog() {
               data-testid="pairing.dismiss"
               onClick={() => setState({ phase: "idle" })}
             >
-              {t("clipper.pairing.close")}
+              {t("common.close")}
             </button>
           </div>
         </div>

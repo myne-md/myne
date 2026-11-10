@@ -1053,6 +1053,18 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n-duplicates.mjs --check
 
+    copy-budget:
+      # The 2026-11 copy campaign (myne-md/myne#23) told every repeated word once:
+      # `Cancel` under 47 call sites, `Untitled` under 19, 12 words and 49 phrases
+      # total. Nothing stopped them coming back, because check-i18n-duplicates
+      # deliberately starts at 25 characters. Two halves, both one-way ratchets:
+      # a non-`common.*` key may not carry a value `common.*` owns unless
+      # scripts/copy-budget.json records it with a reason, and a settings surface
+      # may not render more English copy than its recorded total. `--record`
+      # re-baselines, seeding new aliases with a placeholder the check rejects.
+      glob: "*.{ts,tsx,json}"
+      run: node scripts/check-copy-budget.mjs
+
     comment-density:
       # AGENTS.md rule 3 ("a comment earns its lines or it goes") had no guard and
       # was the one rule that decayed: 199,438 comment lines across the shared

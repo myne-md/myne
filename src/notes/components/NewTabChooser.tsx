@@ -423,7 +423,7 @@ export function NewTabChooser({
                 }}
               >
                 {row.kind === "note"
-                  ? (row.title ?? t("notes.newTab.untitled"))
+                  ? (row.title ?? t("common.untitled"))
                   : row.action.label}
               </span>
               <span style={ROW_META}>{meta(row)}</span>
@@ -434,7 +434,7 @@ export function NewTabChooser({
 
       <div style={CREATE_ROW}>
         <Button variant="ghost" icon="plus" onClick={onCreate} data-testid="notes.newTab.create-note">
-          {t("notes.newTab.createNote")}
+          {t("common.newnote")}
         </Button>
         <Button
           variant="ghost"

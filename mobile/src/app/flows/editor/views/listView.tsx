@@ -67,12 +67,12 @@ export function MobileListView({
   const { t } = useTranslation();
   const columns = useMemo(() => displayColumns(def), [def]);
   const { stream, total } = useMemo(
-    () => buildViewStream(result, t("notes.views.list.noValue")),
+    () => buildViewStream(result, t("common.novalue")),
     [result, t],
   );
 
   if (total === 0) {
-    return <MobileViewEmpty message={t("notes.views.list.empty")} />;
+    return <MobileViewEmpty message={t("common.nonotesmatchthisview")} />;
   }
 
   return (
@@ -100,7 +100,7 @@ export function MobileListView({
               style={ROW_STYLE}
             >
               <div style={TITLE_STYLE}>
-                {row.title ?? t("notes.views.cards.untitled")}
+                {row.title || t("common.untitled")}
               </div>
               {metaCols.length > 0 && (
                 <div style={META_STYLE}>

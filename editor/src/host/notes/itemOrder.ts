@@ -78,6 +78,54 @@ export function containerKeyOf(folderKey: string | null): string {
 }
 
 /**
+ * Re-root a folder rename through `item_order`: the renamed folder's container key,
+ * every descendant container's key, and every child ENTRY that names one of them.
+ *
+ * Without it a rename drops the folder's manual position, because the map is
+ * path-keyed twice over and the row falls back to name order (owner, 2026-11-08).
+ * Note UUIDs are untouched. Returns the same reference when nothing matched.
+ */
+export function rewriteItemOrderPrefix(
+  order: Readonly<ItemOrderMap>,
+  oldPath: string,
+  newPath: string,
+): { next: ItemOrderMap; changed: boolean } {
+  const oldNorm = normalizeFolderPath(oldPath);
+  const newNorm = normalizeFolderPath(newPath);
+  if (oldNorm === null || newNorm === null) return { next: order, changed: false };
+  const oldKey = foldSegment(oldNorm);
+  const newKey = foldSegment(newNorm);
+  // A case-only rename keeps the folded identity, so every key still matches.
+  if (oldKey === newKey) return { next: order, changed: false };
+
+  // A container KEY is folded (`projects/`); a child ENTRY is a display path
+  // (`Projects/`). Remap each in its own spelling, or the tree renders lowercased.
+  const rekey = (key: string): string =>
+    key !== "" && key.endsWith("/") && key.startsWith(oldKey)
+      ? newKey + key.slice(oldKey.length)
+      : key;
+  const strip = (p: string): string => p.replace(/\/+$/, "");
+  const reentry = (entry: string): string => {
+    if (!entry.endsWith("/")) return entry;
+    const norm = normalizeFolderPath(entry);
+    if (norm === null || !foldSegment(norm).startsWith(oldKey)) return entry;
+    // Trailing slash folded back on: `normalizeFolderPath` keeps it.
+    return `${strip(newNorm)}${strip(norm).slice(strip(oldNorm).length)}/`;
+  };
+
+  let changed = false;
+  const next: Record<string, readonly string[]> = {};
+  for (const [key, seq] of Object.entries(order)) {
+    const mapped = seq.map(reentry);
+    const entryMoved = mapped.some((entry, i) => entry !== seq[i]);
+    const nextKey = rekey(key);
+    if (entryMoved || nextKey !== key) changed = true;
+    next[nextKey] = entryMoved ? mapped : seq;
+  }
+  return changed ? { next, changed } : { next: order, changed: false };
+}
+
+/**
  * Build a single container's `key → index` rank map from its `item_order`
  * sequence (folder entries folded via {@link itemOrderKey}, note UUIDs verbatim).
  */
