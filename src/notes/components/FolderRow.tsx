@@ -20,7 +20,7 @@ import { labelColorVar } from "../decorations";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
 import { NEUTRAL_PRESS_BG, usePressSurface } from "../../components/primitives/pressSurface";
-import { dragZone, insertionLineStyle } from "./reorderDnd";
+import { FOLDER_DRAG_MIME, dragZone, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
 // Left inset of a top-level folder icon. Kept small so the folder glyph sits
@@ -280,8 +280,10 @@ export type FolderRowProps = {
   onFolderReorderLeave?: (key: string) => void;
   /** A dragged folder was dropped relative to this row (reorder). */
   onFolderReorderDrop?: (node: FolderNode, place: "above" | "below") => void;
-  /** myne#281 — a folder dropped INTO this one (the middle-half zone). */
-  onDropFolderInto?: (node: FolderNode) => void;
+  /** myne#281: a folder dropped INTO this one (the middle-half zone). The second
+   *  argument is the source path read back from the `dataTransfer`, which survives
+   *  a `dragend` that cleared the drag's ref. */
+  onDropFolderInto?: (node: FolderNode, draggedPath: string | null) => void;
   /** Any drag originating from this row ended (cleanup transient UI). */
   onDragEnd?: () => void;
   /** Commit an inline rename to `newName` (last-segment name). */
@@ -452,10 +454,13 @@ export function FolderRow({
           onDropFiles?.(node.path, Array.from(e.dataTransfer.files));
           return;
         }
-        if (dragKind === "folder") {
+        // The payload, not the drag state: a long drag over a virtualized list can
+        // have fired `dragend` already, and the data survives that.
+        const draggedPath = e.dataTransfer.getData(FOLDER_DRAG_MIME) || null;
+        if (dragKind === "folder" || draggedPath !== null) {
           const zone = dragZone(e);
           onDragTarget?.(null);
-          if (zone === "into" && onDropFolderInto) onDropFolderInto(node);
+          if (zone === "into" && onDropFolderInto) onDropFolderInto(node, draggedPath);
           else onFolderReorderDrop?.(node, zone === "into" ? "below" : zone);
           return;
         }

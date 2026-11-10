@@ -261,7 +261,7 @@ export function CardsView({
     () =>
       result.groups.map((group) => ({
         key: group.key,
-        label: group.key === "" ? t("notes.views.cards.noValue") : group.key,
+        label: group.key === "" ? t("common.novalue") : group.key,
         rows: dedupeRowsByNote(group.rows),
       })),
     [result.groups, t],
@@ -278,7 +278,7 @@ export function CardsView({
   if (totalRows === 0) {
     return (
       <div data-testid="view.empty" style={EMPTY_STYLE}>
-        {t("notes.views.cards.empty")}
+        {t("common.nonotesmatchthisview")}
       </div>
     );
   }

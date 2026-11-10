@@ -39,8 +39,9 @@ export async function expandFolder(page: Page, name: string): Promise<void> {
 
 /**
  * Fire a long-press on the first element matching `selector`: a bubbling
- * `pointerdown`, then wait past the 480ms hold threshold with no pointer
- * move/up so the row's hold timer resolves and opens its action sheet.
+ * `pointerdown`, a wait past the 480ms hold threshold with no pointer move, then
+ * the `pointerup` a real finger supplies. The release is what opens the action
+ * sheet now that the rows are drag sources.
  */
 export async function longPress(page: Page, selector: string): Promise<void> {
   await page.evaluate((sel) => {
@@ -52,6 +53,18 @@ export async function longPress(page: Page, selector: string): Promise<void> {
     );
   }, selector);
   await page.waitForTimeout(600);
+  // The release, because a hold is not over until the finger lifts: since the
+  // rows became drag sources (`useHold`'s drag phase) the sheet opens on
+  // pointerup rather than at the timer, so a helper that never lifts asserts a
+  // gesture no device can perform.
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel) as HTMLElement | null;
+    if (!el) throw new Error(`longPress: no element for ${sel}`);
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: r.x + 8, clientY: r.y + 8 }),
+    );
+  }, selector);
 }
 
 /**

@@ -36,7 +36,7 @@ export function canExportViewManifest(): boolean {
  *  the OS dialog owns everything else, the same rule the note exports follow. */
 export function manifestFilename(name: string): string {
   const trimmed = name.trim();
-  const base = trimmed === "" ? i18n.t("notes.views.untitledView") : trimmed;
+  const base = trimmed === "" ? i18n.t("common.untitledview") : trimmed;
   return `${base.replace(/[/\\]/g, "_")}.myneview`;
 }
 

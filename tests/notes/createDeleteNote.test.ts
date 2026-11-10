@@ -28,13 +28,21 @@ describe("createNote, action helper", () => {
   // where the title is frontmatter-only. It now carries one, exactly as a
   // foldered create already did.
   it("invokes note_create with a frontmatter block carrying an empty title", async () => {
-    invokeMock.mockResolvedValueOnce("00000000-0000-7000-8000-000000000001");
+    invokeMock.mockResolvedValue("00000000-0000-7000-8000-000000000001");
     const id = await createNote();
-    expect(invokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenCalledWith("plugin:notes|note_create", {
       plaintext: '---\ntitle: ""\n---\n\n',
     });
     expect(id).toBe("00000000-0000-7000-8000-000000000001");
+    // The create ALSO registers the note in the index (myne-md/myne#1037), at
+    // the chokepoint every create path crosses. Asserted here because this is
+    // the cheapest witness of that pair: one `note_create`, then one apply for
+    // it. A calendar event is created this way and is never opened, so without
+    // the second call it had no property row and the grid could not see it.
+    expect(invokeMock).toHaveBeenCalledWith(
+      "plugin:vault-indices|vault_indices_apply",
+      expect.objectContaining({ noteId: "00000000-0000-7000-8000-000000000001" }),
+    );
   });
 
   it("returns the backend-minted NoteId verbatim", async () => {

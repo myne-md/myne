@@ -401,7 +401,7 @@ export function RecoverFlow({ initialSubStep, initialVaultId, onComplete, onCanc
       return { message: ioBanner(ioKind), wipe: false };
     }
     if (kind === "InvalidVaultMeta") {
-      return { message: t("recover.vaultUnreadable"), wipe: false };
+      return { message: t("common.vaultfileisunreadablerestorefromabackup"), wipe: false };
     }
     return { message: t("recover.genericError"), wipe: false };
   }
@@ -485,7 +485,7 @@ export function RecoverFlow({ initialSubStep, initialVaultId, onComplete, onCanc
           <Title>{t("recover.accountTitle")}</Title>
           <Lead>{t("recover.accountLead")}</Lead>
           <div style={{ marginTop: 22 }}>
-            <FieldLabel>{t("sync.enroll.accountNumberLabel")}</FieldLabel>
+            <FieldLabel>{t("common.accountnumber")}</FieldLabel>
             <AccountField
               value={state.accountInput}
               error={state.accountError}
@@ -550,7 +550,7 @@ export function RecoverFlow({ initialSubStep, initialVaultId, onComplete, onCanc
           >
             {t("common.prompt.cancel")}
           </button>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{t("sync.enroll.recoveryPhraseLabel")}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{t("common.recoveryphrase")}</div>
           <button
             onClick={() => void onPasteClipboard()}
             style={{

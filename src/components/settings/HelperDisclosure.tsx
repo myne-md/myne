@@ -66,7 +66,6 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { IconButton } from "../primitives/IconButton";
-import { Button } from "../primitives/Button";
 
 /** Gap between the trigger and the popover. */
 const GAP = 6;
@@ -190,13 +189,7 @@ interface HelperDisclosureProps {
    * rides directly after a setting's title, and the icon means "more about THIS";
    * in the destructive dialog there is no such title, so the icon-only shape
    * rendered a lone glyph under the warning with nothing saying what it explains.
-   * A labelled trigger belongs on the heading's own line, at its trailing edge,
-   * where a `?` annotates the title instead of reading as the next step.
-   * That is not a contrast or hit-target problem, so no audit would have caught
-   * it: it is a control whose subject is only in its accessible name, which is a
-   * failure for everybody reading the screen rather than hearing it.
    */
-  visibleLabel?: boolean;
 }
 
 interface Anchor {
@@ -210,7 +203,6 @@ export function HelperDisclosure({
   descriptionId,
   testId,
   triggerLabel,
-  visibleLabel = false,
 }: HelperDisclosureProps) {
   const { t } = useTranslation();
   const label = triggerLabel ?? t("settings.helperDisclosureLabel");
@@ -357,29 +349,16 @@ export function HelperDisclosure({
         dismiss();
       }}
     >
-      {visibleLabel ? (
-        <Button
-          variant="ghost"
-          icon="circle-help"
-          aria-expanded={open}
-          data-testid={testId === undefined ? undefined : `${testId}-explain`}
-          ref={triggerRef}
-          onClick={press}
-        >
-          {label}
-        </Button>
-      ) : (
-        <IconButton
-          icon="circle-help"
-          label={label}
-          expanded={open}
-          nativeTitle={false}
-          iconSize={14}
-          testId={testId === undefined ? undefined : `${testId}-explain`}
-          onClick={press}
-          ref={triggerRef}
-        />
-      )}
+      <IconButton
+        icon="circle-help"
+        label={label}
+        expanded={open}
+        nativeTitle={false}
+        iconSize={14}
+        testId={testId === undefined ? undefined : `${testId}-explain`}
+        onClick={press}
+        ref={triggerRef}
+      />
       <div
         id={descriptionId}
         ref={bubbleRef}

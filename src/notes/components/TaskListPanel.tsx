@@ -679,7 +679,7 @@ function TaskFilterBuilder({
     folder: t("tasks.axis.folder"),
     note: t("tasks.axis.note"),
     tag: t("tasks.axis.tag"),
-    priority: t("tasks.axis.priority"),
+    priority: t("common.priority"),
     sort: t("tasks.axis.sort"),
   };
 
@@ -763,16 +763,16 @@ function TaskFilterBuilder({
         return [
           { value: "undone", label: t("tasks.status.undone") },
           { value: "all", label: t("tasks.status.all") },
-          { value: "done", label: t("tasks.status.done") },
+          { value: "done", label: t("common.done") },
         ];
       case "due":
         return [
           { value: "any", label: t("tasks.due.any") },
           { value: "overdue", label: t("tasks.due.overdue") },
-          { value: "today", label: t("tasks.due.today") },
+          { value: "today", label: t("common.today") },
           { value: "upcoming", label: t("tasks.due.upcoming") },
           { value: "later", label: t("tasks.due.later") },
-          { value: "none", label: t("tasks.due.none") },
+          { value: "none", label: t("common.nodate") },
         ];
       case "folder":
         return [
@@ -781,7 +781,7 @@ function TaskFilterBuilder({
         ];
       case "note":
         return [
-          { value: "", label: t("tasks.view.allNotes") },
+          { value: "", label: t("common.allnotes") },
           ...noteOptions.map(([id, title]) => ({ value: id, label: title })),
         ];
       case "tag":
@@ -796,9 +796,9 @@ function TaskFilterBuilder({
         ];
       case "sort":
         return [
-          { value: "due", label: t("tasks.sort.due") },
+          { value: "due", label: t("common.duedate") },
           { value: "dueDesc", label: t("tasks.sort.dueDesc") },
-          { value: "priority", label: t("tasks.sort.priority") },
+          { value: "priority", label: t("common.priority") },
           { value: "note", label: t("tasks.sort.note") },
         ];
     }
@@ -1042,7 +1042,7 @@ export function TaskListPanel({
       if (view.folders.length > 0 && !view.folders.some((f) => folderInScope(f, task.noteFolder))) {
         continue;
       }
-      if (!seen.has(task.noteId)) seen.set(task.noteId, task.noteTitle ?? t("tasks.view.untitled"));
+      if (!seen.has(task.noteId)) seen.set(task.noteId, task.noteTitle ?? t("common.untitled"));
     }
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [tasks, t, view.folders]);
@@ -1079,14 +1079,14 @@ export function TaskListPanel({
       });
     }
     if (view.noteId !== null) {
-      const title = noteOptions.find(([id]) => id === view.noteId)?.[1] ?? t("tasks.view.untitled");
+      const title = noteOptions.find(([id]) => id === view.noteId)?.[1] ?? t("common.untitled");
       out.push({ key: "note", label: `${t("tasks.axis.note")}: ${title}`, clear: () => setView({ noteId: null }) });
     }
     for (const tag of view.tags) {
       out.push({ key: `tag:${tag}`, label: `${t("tasks.axis.tag")}: ${tag}`, clear: () => setView({ tags: view.tags.filter((x) => x !== tag) }) });
     }
     if (view.priority !== "any") {
-      out.push({ key: "priority", label: `${t("tasks.axis.priority")}: ${t(`tasks.priority.${view.priority}`)}`, clear: () => setView({ priority: "any" }) });
+      out.push({ key: "priority", label: `${t("common.priority")}: ${t(`tasks.priority.${view.priority}`)}`, clear: () => setView({ priority: "any" }) });
     }
     if (view.sort !== "due") {
       out.push({ key: "sort", label: `${t("tasks.axis.sort")}: ${t(`tasks.sort.${view.sort}`)}`, clear: () => setView({ sort: "due" }) });

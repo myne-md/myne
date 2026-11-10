@@ -119,7 +119,7 @@ export function RecordingSheet({
           <h2 style={{ margin: "18px 0 0", fontSize: 20, fontWeight: 600, color: "var(--fg-display)", letterSpacing: "-0.02em" }}>{heading}</h2>
           <p style={{ margin: "10px auto 20px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 300 }}>{body}</p>
           <Button variant="ghost" onClick={closeCancel} style={{ color: "var(--fg-3)", fontWeight: 600 }}>
-            {t("notes.import.offer.notNow")}
+            {t("common.notnow")}
           </Button>
         </div>
       </Sheet>

@@ -100,7 +100,7 @@ export function UsedInNotesPopover({
             const title = cache.get(id as NoteId)?.title ?? null;
             const label =
               title === null || title.trim() === ""
-                ? t("attachments.usedInNotesPopover.untitled")
+                ? t("common.untitled")
                 : title;
             return (
               <button

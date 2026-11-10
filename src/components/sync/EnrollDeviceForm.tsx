@@ -153,7 +153,7 @@ export function EnrollDeviceForm() {
     label:
       value === "password"
         ? t("sync.enroll.mode.password")
-        : t("sync.enroll.mode.recovery"),
+        : t("common.recoveryphrase"),
   }));
 
   const [accountNumber, setAccountNumber] = useState("");
@@ -210,7 +210,7 @@ export function EnrollDeviceForm() {
     <div style={ROOT} data-testid="sync.enroll">
       <div style={FIELD}>
         <label style={LABEL} htmlFor={`${baseId}-account`}>
-          {t("sync.enroll.accountNumberLabel")}
+          {t("common.accountnumber")}
         </label>
         <Input
           id={`${baseId}-account`}

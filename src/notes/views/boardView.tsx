@@ -565,7 +565,7 @@ export function BoardView({
       rendered.map((lane) => ({
         value: lane.value,
         label:
-          lane.value === "" ? t("notes.views.cards.noValue") : lane.value,
+          lane.value === "" ? t("common.novalue") : lane.value,
       })),
     [rendered, t],
   );
@@ -686,10 +686,10 @@ export function BoardView({
       for (const lane of rendered) {
         const row = lane.rows.find((r) => r.noteId === noteId);
         if (row !== undefined) {
-          return row.title ?? t("notes.views.cards.untitled");
+          return row.title ?? t("common.untitled");
         }
       }
-      return t("notes.views.cards.untitled");
+      return t("common.untitled");
     },
     [rendered, t],
   );
@@ -705,7 +705,7 @@ export function BoardView({
           reason: refusalSentence(drag.refusal.reason, t),
           lane:
             drag.refusal.fromLane === ""
-              ? t("notes.views.cards.noValue")
+              ? t("common.novalue")
               : drag.refusal.fromLane,
         })}
       </p>
@@ -786,7 +786,7 @@ export function BoardView({
   if (rendered.length === 0) {
     return (
       <div data-testid={VIEW_TESTID.empty} style={EMPTY_STYLE}>
-        {t("notes.views.cards.empty")}
+        {t("common.nonotesmatchthisview")}
       </div>
     );
   }
@@ -844,7 +844,7 @@ export function BoardView({
       <div data-testid={VIEW_TESTID.boardLanes} style={LANES_STYLE}>
         {rendered.map((lane: BoardLane) => {
           const label =
-            lane.value === "" ? t("notes.views.cards.noValue") : lane.value;
+            lane.value === "" ? t("common.novalue") : lane.value;
           const isDropTarget = drag.hoverLane === lane.value;
           const isRenaming = renameTarget === lane.value;
           return (
@@ -888,7 +888,7 @@ export function BoardView({
                     data-testid={VIEW_TESTID.boardRenameCancel}
                     onClick={() => setRenameTarget(null)}
                   >
-                    {t("notes.views.board.cancelLaneRename")}
+                    {t("common.cancel")}
                   </Button>
                 </div>
               ) : (
@@ -952,7 +952,7 @@ export function BoardView({
                               testId={VIEW_TESTID.boardSelectCard}
                               noteId={row.noteId}
                               label={t("notes.views.board.selectCard", {
-                                title: row.title ?? t("notes.views.cards.untitled"),
+                                title: row.title ?? t("common.untitled"),
                               })}
                               checked={selected.has(row.noteId)}
                               onToggle={() => toggleCard(row.noteId)}
@@ -1004,7 +1004,7 @@ export function BoardView({
         <p style={CONFIRM_BODY_STYLE}>{t("notes.list.trashConfirmWarning")}</p>
         <div style={CONFIRM_ACTIONS_STYLE}>
           <Button variant="ghost" onClick={() => setTrashTarget(null)}>
-            {t("notes.views.board.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button
             variant="danger"
@@ -1015,7 +1015,7 @@ export function BoardView({
               if (id !== null) runLifecycle(id, "trash");
             }}
           >
-            {t("notes.list.trashConfirmConfirm")}
+            {t("common.movetotrash")}
           </Button>
         </div>
       </ModalShell>

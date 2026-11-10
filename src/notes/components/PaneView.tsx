@@ -27,6 +27,7 @@ import {
   evictClosedTabs,
   isRestoringScroll,
   recallScroll,
+  readerMovedRecently,
   rememberScroll,
 } from "../scrollMemory";
 import { applyScrollAnchor } from "../scrollAnchorApply";
@@ -1109,6 +1110,12 @@ export function PaneView({
         sc.dataset.scrollRestore = "skip-top";
         return;
       }
+      // The armed offset above only knows what the ANCHOR said. A reader who has
+      // scrolled since is somewhere else on purpose, and this restore is late.
+      if (readerMovedRecently(noteId, 400) && sc !== null && sc.scrollTop > 4) {
+        sc.dataset.scrollRestore = "skip-reader-moved";
+        return;
+      }
       applyScrollAnchor(v, anchor, noteId);
     };
 
@@ -1209,6 +1216,14 @@ export function PaneView({
         const noteId = activeIdRef.current;
         if (view === null || noteId === null) {
           scroller.dataset.scrollRo = "skip-null";
+          return;
+        }
+        // A scrollbar APPEARING shrinks `clientWidth` exactly like a narrower
+        // pane does, and the reader who caused it was scrolling a note that just
+        // grew past a screen. Restoring then drags them back up to where the
+        // anchor was before that scroll.
+        if (readerMovedRecently(noteId)) {
+          scroller.dataset.scrollRo = "skip-reader-moved";
           return;
         }
         const anchor = recallScroll(noteId);
@@ -2261,12 +2276,15 @@ export function PaneView({
       };
     }
     if (isCalendar && leaf.activeTab !== null) {
-      // The calendar fills its pane and takes gutters like the task list: it is a
-      // dense schedule, not prose, so the reading measure would leave a month grid
-      // narrower than the window it sits in.
+      // The calendar fills its pane and takes NO gutters: a month grid is the
+      // widest surface in the product, and `tabKinds` gives it the whole surface
+      // on entry (both sidebars close) so the reading measure would only take
+      // width back off it, 48px of a layout that is already all grid. The task
+      // list keeps its gutters because it is a list of lines; this is the second
+      // full-bleed body beside the graph.
       return {
         fill: true,
-        gutters: true,
+        gutters: false,
         el: (
           <CalendarPane
             paneId={leaf.id}
@@ -2642,7 +2660,7 @@ export function PaneView({
           const view = prefs.saved_views.find((v) => v.id === it.id);
           if (view === undefined) return null;
           return view.name.trim() === ""
-            ? t("notes.pane.untitledView")
+            ? t("common.untitledview")
             : view.name;
         }}
         colorOf={(key) => {
@@ -2844,7 +2862,7 @@ function PaneLoading() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {t("notes.pane.loading")}
+      {t("common.loading")}
     </div>
   );
 }
@@ -3075,7 +3093,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         <div style={QUIET_WRAP_STYLE} data-testid="editor.view-pending">
           <p style={QUIET_TITLE_STYLE}>
             {t("notes.views.manager.pendingTitle", {
-              name: def.name.trim() === "" ? t("notes.views.untitledView") : def.name,
+              name: def.name.trim() === "" ? t("common.untitledview") : def.name,
             })}
           </p>
           <p style={QUIET_BODY_STYLE}>{t("notes.views.manager.pendingBody")}</p>

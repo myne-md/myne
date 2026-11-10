@@ -35,7 +35,7 @@ export async function suggestedDeviceName(): Promise<string> {
   try {
     return deviceNameForPlatform(await devicePlatform());
   } catch {
-    return i18n.t("sync.devices.platform.unknown");
+    return i18n.t("common.thisdevice");
   }
 }
 
@@ -49,7 +49,7 @@ export async function suggestedDeviceName(): Promise<string> {
  *  id-derived label. */
 export async function nameableDeviceSuggestion(): Promise<string | null> {
   const name = await suggestedDeviceName();
-  return name === i18n.t("sync.devices.platform.unknown") ? null : name;
+  return name === i18n.t("common.thisdevice") ? null : name;
 }
 
 /** This device's adopted vault head, or `null` when it has never pulled.
@@ -83,7 +83,7 @@ export function useDeviceNameField(): {
   // Seeded synchronously with the neutral label, NOT "": `resolved` must never be
   // blank, or a submit landing before the platform IPC resolves would send an
   // empty name and the device would arrive with the id-derived fallback.
-  const [suggestion, setSuggestion] = useState(() => i18n.t("sync.devices.platform.unknown"));
+  const [suggestion, setSuggestion] = useState(() => i18n.t("common.thisdevice"));
 
   useEffect(() => {
     let cancelled = false;

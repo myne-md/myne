@@ -344,7 +344,7 @@ export function PhotoNoteSheet({
       {canCommit && (
         <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
           <Segmented
-            options={[t("photoNote.thisNote"), t("photoNote.newNote")]}
+            options={[t("common.thisnote"), t("common.newnote")]}
             active={destination}
             onChange={setDestination}
             ariaLabel={t("photoNote.destinationLabel")}
@@ -374,14 +374,14 @@ export function PhotoNoteSheet({
             </Button>
           )}
           <Button variant="ghost" onClick={onCancel} data-testid="photo-note.cancel">
-            {t("photoNote.cancel")}
+            {t("common.cancel")}
           </Button>
         </div>
       )}
 
       {(phase === "locked" || importing) && (
         <Button variant="secondary" onClick={onCancel} data-testid="photo-note.cancel">
-          {t("photoNote.cancel")}
+          {t("common.cancel")}
         </Button>
       )}
     </Sheet>

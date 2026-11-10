@@ -67,8 +67,8 @@ export function NoteActionsSheet({
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
           {row(copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard"), onCopy)}
-          {row(t("tasks.title"), onTasks, { testId: "editor.note-menu-tasks" })}
-          {row(t("editor.noteMenu.versionHistory"), onHistory)}
+          {row(t("common.tasks"), onTasks, { testId: "editor.note-menu-tasks" })}
+          {row(t("common.versionhistory"), onHistory)}
           {row(t("export.pdf.title"), onExport)}
           {drawing && (
             <>
@@ -99,7 +99,7 @@ export function NoteActionsSheet({
           {row(t("editor.noteMenu.moveToFolder"), onMove, { groupTop: true })}
           {row(t("notes.archive.title"), onArchive)}
           {sep}
-          {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}
+          {row(t("common.movetotrash"), onTrash, { danger: true, groupTop: true })}
         </>
       )}
     </Sheet>

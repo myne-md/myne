@@ -341,7 +341,7 @@ export function AiReviewFlow({
         style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
       >
         <div style={HEADER}>
-          <h2 style={H_TITLE}>{titleOf(openNote) ?? t("agent.review.untitledNote")}</h2>
+          <h2 style={H_TITLE}>{titleOf(openNote) ?? t("common.untitlednote")}</h2>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
           {body === null ? (
@@ -360,7 +360,7 @@ export function AiReviewFlow({
         </div>
         <div style={ACTIONS}>
           <Button variant="secondary" data-testid="ai.review-back" onClick={() => setOpenNote(null)}>
-            {t("agent.review.close")}
+            {t("common.close")}
           </Button>
         </div>
       </div>
@@ -406,7 +406,7 @@ export function AiReviewFlow({
             style={ROW}
             onClick={() => setOpenNote(noteId)}
           >
-            <span style={ROW_TITLE}>{titleOf(noteId) ?? t("agent.review.untitledNote")}</span>
+            <span style={ROW_TITLE}>{titleOf(noteId) ?? t("common.untitlednote")}</span>
             <span style={ROW_META}>
               {t("agent.review.noteHeading", { count: edits.length })}
               {" · "}
@@ -427,7 +427,7 @@ export function AiReviewFlow({
           const field = editHidesNoteAs(e) ?? "trashed";
           return (
             <div key={i} data-testid="ai.review-removal" style={{ ...ROW, cursor: "default" }}>
-              <span style={ROW_TITLE}>{titleOf(e.noteId) ?? t("agent.review.untitledNote")}</span>
+              <span style={ROW_TITLE}>{titleOf(e.noteId) ?? t("common.untitlednote")}</span>
               <span data-testid="ai.review-removal-flag" style={FLAG}>
                 {removalFlagLabel(field, t)}
               </span>
@@ -468,7 +468,7 @@ export function AiReviewFlow({
           {t("agent.review.approveAll", { count: bulkApprovable.length })}
         </Button>
         <Button variant="secondary" data-testid="ai.review-close" onClick={onClose}>
-          {t("agent.review.close")}
+          {t("common.close")}
         </Button>
       </div>
     </div>

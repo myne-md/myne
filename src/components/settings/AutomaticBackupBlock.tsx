@@ -236,7 +236,7 @@ export function AutomaticBackupBlock({
             onClick={() => void chooseFolder()}
             data-testid="settings.auto-backup-folder"
           >
-            {t("settings.autoBackup.chooseFolder")}
+            {t("common.choosefolder")}
           </Button>
         }
       >

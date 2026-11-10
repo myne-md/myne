@@ -658,13 +658,13 @@ export function VaultPanel({
           at instead, rather than offering a button that silently does nothing
           (myne-md/myne#858). */}
       {memberVault ? (
-        <SettingsSection title={t("settings.vault.changePasswordHeading")}>
+        <SettingsSection title={t("common.changepassword")}>
           <p data-testid="settings.member-vault-notice" style={HELPER_TEXT_STYLE}>
             {t("settings.vault.memberVaultNotice")}
           </p>
         </SettingsSection>
       ) : (
-        <SettingsSection title={t("settings.vault.changePasswordHeading")}>
+        <SettingsSection title={t("common.changepassword")}>
           <p style={HELPER_TEXT_STYLE}>{t("settings.vault.changePasswordHelper")}</p>
           <div>
             <Button
@@ -672,7 +672,7 @@ export function VaultPanel({
               data-testid="settings.change-password-cta"
               onClick={() => setView("change-password")}
             >
-              {t("settings.vault.changePasswordButton")}
+              {t("common.changepassword")}
             </Button>
           </div>
         </SettingsSection>

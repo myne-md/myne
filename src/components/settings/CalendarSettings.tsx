@@ -133,7 +133,7 @@ export function CalendarSettings() {
                   variant="ghost"
                   onClick={() => void write(`${CALENDAR_COLOUR_PREFIX}${name}`, null)}
                 >
-                  {t("settings.calendar.remove")}
+                  {t("common.remove")}
                 </Button>
               </div>
             ))}

@@ -158,7 +158,7 @@ function MemoryRow(props: {
       <li style={ROW} data-testid="settings.memory.row-editing">
         <textarea
           data-testid="settings.memory.edit-input"
-          aria-label={t("settings.memory.editLabel")}
+          aria-label={t("common.edit")}
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
@@ -182,7 +182,7 @@ function MemoryRow(props: {
             disabled={busy}
             onClick={() => setEditing(false)}
           >
-            {t("settings.memory.cancel")}
+            {t("common.cancel")}
           </Button>
         </div>
       </li>
@@ -225,7 +225,7 @@ function MemoryRow(props: {
             disabled={busy}
             onClick={() => setDeleteArmed(false)}
           >
-            {t("settings.memory.cancelLabel")}
+            {t("common.cancel")}
           </Button>
         </div>
       ) : (
@@ -240,7 +240,7 @@ function MemoryRow(props: {
               setEditing(true);
             }}
           >
-            {t("settings.memory.editLabel")}
+            {t("common.edit")}
           </Button>
           <Button
             variant="secondary"
@@ -346,7 +346,7 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
         <div style={HELPER}>
           <p data-testid="settings.memory.load-failed">{t("settings.memory.loadFailed")}</p>
           <Button variant="secondary" data-testid="settings.memory.retry" onClick={() => void reload()}>
-            {t("settings.memory.retryLabel")}
+            {t("common.tryagain")}
           </Button>
         </div>
       ) : rows === null ? null : rows.length === 0 ? (
@@ -397,7 +397,7 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
             data-testid="settings.memory.clear-cancel"
             onClick={() => setConfirmingClear(false)}
           >
-            {t("settings.memory.cancelLabel")}
+            {t("common.cancel")}
           </Button>
         </div>
       ) : (

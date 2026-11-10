@@ -228,7 +228,7 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
           icon="arrow-left"
           data-testid="create.briefing-back"
         >
-          {t("vaultCreation.briefing.back")}
+          {t("common.back")}
         </Button>
         <div style={{ flex: 1 }} />
         <Button

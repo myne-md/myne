@@ -328,26 +328,39 @@ describe("the pane as a calendar", () => {
 });
 
 describe("starting an event from the grid", () => {
-  it("opens the composer for the day whose empty space was clicked", async () => {
+  it("captures on the day and hour whose empty space was clicked", async () => {
     const { host, cleanup } = await renderPane(
       <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
-    const cell = host.querySelector('[data-date="2026-11-06"]') as HTMLElement;
+    // The week view is an hour axis, so the target is one cell of it: the 6th at
+    // 11:00. The claim is the same one this test has always made - the note lands
+    // where the user pointed rather than on today - and it now holds for the hour
+    // as well as the day.
+    const slot = host.querySelector('[data-date="2026-11-06"] [data-hour="11"]') as HTMLElement;
     act(() => {
-      cell.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      slot.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await act(async () => {});
-    // The composer is seeded from the day, so the note lands where the user pointed
-    // rather than on today, which is the bug a "new event" button without a date has.
-    expect(host.querySelector('[data-testid="calendar.form"]')).not.toBeNull();
-    // Seeded with THAT day's date, not today's: the note must land where the user
-    // pointed, which is the bug a dateless "new event" button has.
-    const dateInputs = Array.from(host.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
-    expect(dateInputs.some((input) => input.value === "2026-11-06")).toBe(true);
+    const field = host.querySelector(".myne-calendar__slotform input") as HTMLInputElement;
+    expect(field).not.toBeNull();
+
+    await act(async () => {
+      // React tracks the value through its own setter, so the field is driven the
+      // way a person drives it rather than by assigning `.value`.
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(field, "Coffee");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+
+    await vi.waitFor(() => expect(created).toHaveLength(1));
+    expect(created[0]).toContain("start: 2026-11-06 11:00");
     cleanup();
   });
 
-  it("does not open it when the click landed on a row instead", async () => {
+  it("opens the event's own form on a chip, never the markdown note", async () => {
     const { host, cleanup } = await renderPane(
       <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
@@ -357,9 +370,19 @@ describe("starting an event from the grid", () => {
       chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await act(async () => {});
-    // Clicking a chip opens the NOTE. A form opening on top of it would be the pane
-    // fighting itself, and the user would see a new note instead of the one they hit.
-    expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
+    // The chip opens the SAME designed form a cell click opens, prefilled, and
+    // never the note: an event's markdown is not part of the notes UI (owner,
+    // 2026-11-08). Prefilled is the half a create-form would also satisfy, so the
+    // assertion is on the values the row carries.
+    const form = host.querySelector('[data-testid="calendar.form"]');
+    expect(form).not.toBeNull();
+    expect(form?.textContent).toMatch(/Edit event/);
+    expect(
+      host.querySelector('[data-testid="calendar.form.startDate"]')?.getAttribute("data-value"),
+    ).toBe("2026-11-05");
+    expect(
+      host.querySelector('[data-testid="calendar.form.startTime"]')?.getAttribute("data-value"),
+    ).toBe("09:00");
     cleanup();
   });
 });

@@ -157,7 +157,7 @@ function ViewRow({
   onCancelRename: () => void;
 }) {
   const { t } = useTranslation();
-  const label = viewLabel(view, t("notes.views.untitledView"));
+  const label = viewLabel(view, t("common.untitledview"));
 
   if (renaming) {
     return (
@@ -347,7 +347,7 @@ export function ViewsSection({
     const q = query.trim().toLowerCase();
     if (q === "") return views;
     return views.filter((v) =>
-      viewLabel(v, t("notes.views.untitledView")).toLowerCase().includes(q),
+      viewLabel(v, t("common.untitledview")).toLowerCase().includes(q),
     );
   }, [views, query, t]);
 
@@ -390,7 +390,7 @@ export function ViewsSection({
         },
         {
           id: "rename",
-          label: t("notes.views.menu.rename"),
+          label: t("common.rename"),
           group: "edit",
           onSelect: () => setRenamingId(menu.id),
         },

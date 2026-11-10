@@ -148,7 +148,7 @@ export function SidebarPane({
       <div style={{ marginTop: 12, flex: 1, minHeight: 0, overflowY: "auto" }}>
         <NavItem
           testid="sidebar.nav-notes"
-          label={t("editor.nav.allNotes")}
+          label={t("common.allnotes")}
           active={tab === "notes" && listView === "notes"}
           onClick={onAllNotes}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" {...gi} /><path d="M9 8h6M9 12h6M9 16h3" {...gi} /></svg>}
@@ -167,7 +167,7 @@ export function SidebarPane({
             note-scoped list is a tab here rather than the phone's sheet. */}
         <NavItem
           testid="sidebar.nav-tasks"
-          label={t("tasks.title")}
+          label={t("common.tasks")}
           active={tab === "tasks"}
           onClick={onTasks}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.6" {...gi} /><path d="M5.4 7l1.3 1.3L9 5.8" {...gi} /><path d="M13 6.5h7M13 12h7M13 17.5h7M5 12h5M5 17.5h5" {...gi} /></svg>}

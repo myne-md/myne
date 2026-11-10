@@ -56,7 +56,7 @@ export function ioWriteErrorMessage(
 export function noteExportErrorMessage(e: NoteExportError): string {
   switch (e?.kind) {
     case "VaultNotUnlocked":
-      return i18n.t("export.note.errors.vaultLocked");
+      return i18n.t("common.thevaultislockedunlockitthentryagain");
     case "InvalidNoteId":
       // Bug-canary on the Rust side — the UI should never produce a
       // malformed id. Surfaced as a generic failure, nothing was written.

@@ -36,7 +36,7 @@ export function formatRelativeTime(date: Date, now: Date = new Date()): string {
   // and it reads "just now" on BOTH clients. This file used to fall through to
   // the absolute date, so the same note said "just now" on a computer and an ISO
   // date on a phone (R1.5). The buckets below are the desktop file's, unchanged.
-  if (diff < MIN) return i18n.t("notes.relativeTime.justNow");
+  if (diff < MIN) return i18n.t("common.justnow");
   if (diff < HOUR) return i18n.t("notes.relativeTime.minutesAgo", { m: Math.floor(diff / MIN) });
   if (diff < DAY) return i18n.t("notes.relativeTime.hoursAgo", { h: Math.floor(diff / HOUR) });
   if (diff < WEEK) {

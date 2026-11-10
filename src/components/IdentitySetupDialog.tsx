@@ -116,9 +116,9 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
       title={
         ceremonyStarted
           ? step === "confirm"
-            ? t("identitySetup.confirmTitle")
+            ? t("common.confirmyourphrase")
             : t("identitySetup.phraseTitle")
-          : t("identitySetup.title")
+          : t("common.createanidentity")
       }
       onClose={close}
       labelId="identity-setup-title"

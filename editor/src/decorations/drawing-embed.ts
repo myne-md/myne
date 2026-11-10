@@ -252,7 +252,7 @@ class DrawingEmbedWidget extends WidgetType {
     const edit = document.createElement("button");
     edit.type = "button";
     edit.className = "cm-drawing-embed-action";
-    edit.textContent = i18n.t("editor.drawingEmbed.editAction");
+    edit.textContent = i18n.t("common.edit");
     edit.setAttribute("data-testid", "editor.drawing-embed.edit-button");
     const noteId = this.noteId;
     edit.addEventListener("click", (e) => {
@@ -302,14 +302,14 @@ class DrawingEmbedWidget extends WidgetType {
         open(noteId);
       });
     } else if (this.active) {
-      action.textContent = i18n.t("editor.drawingEmbed.done");
+      action.textContent = i18n.t("common.done");
       action.setAttribute("data-testid", "editor.drawing-embed.collapse");
       action.addEventListener("click", (e) => {
         e.preventDefault();
         view.dispatch({ effects: setActiveDrawingEmbed.of(null) });
       });
     } else {
-      action.textContent = i18n.t("editor.drawingEmbed.editAction");
+      action.textContent = i18n.t("common.edit");
       action.setAttribute("data-testid", "editor.drawing-embed.edit-button");
       action.addEventListener("click", (e) => {
         e.preventDefault();

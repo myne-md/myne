@@ -140,8 +140,10 @@ test.describe("the unfolded band", () => {
     await page.locator(".cm-content").click();
     await page.keyboard.type("this must reach disk before it is replaced");
 
-    // "+ New note" inside the drawer replaces the open buffer. This client has
-    // no autosave and no snapshot, so a replace with no write is unrecoverable.
+    // "+ New note" inside the drawer replaces the open buffer. This client keeps
+    // no snapshot history, and the autosave is an idle debounce that this click
+    // can beat, so a replace with no write is still unrecoverable in practice,
+    // the flush the control owes is what this scenario is about.
     await page.getByTestId("editor.back").click();
     await expect(page.getByTestId("notes.list-drawer")).toBeVisible();
     await page.getByTestId("notes.new-note").click();
@@ -149,11 +151,20 @@ test.describe("the unfolded band", () => {
 
     await page.getByTestId("editor.back").click();
     await expect(page.getByTestId("notes.list-drawer")).toBeVisible();
-    // A row here is a note that reached the store; without the write the list
-    // would show none of it. The count is not pinned because the dev-only seed
-    // spread (`maybeSeedTestData`, which fires on a vault of one note or fewer)
-    // contributes rows of its own once writes persist.
-    await expect.poll(async () => page.getByTestId("notes.row").count()).toBeGreaterThan(0);
+    // The claim is the WRITE, and BOTH ledgers carry one: a note that has never
+    // been saved is flushed through `note_create`, an existing one through
+    // `note_update`/the live session patch. Reading only the update ledger is how
+    // this spec failed while the fix was already in place.
+    await expect
+      .poll(async () =>
+        (
+          await page.evaluate(() => {
+            const w = window as unknown as { __noteCreates?: string[]; __noteUpdates?: string[] };
+            return [...(w.__noteCreates ?? []), ...(w.__noteUpdates ?? [])];
+          })
+        ).join("\n"),
+      )
+      .toContain("this must reach disk before it is replaced");
   });
 
   test("survives a fold with the drawer open instead of losing the list", async ({ page }) => {

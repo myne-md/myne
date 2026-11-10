@@ -318,7 +318,7 @@ export function DeviceJoinQr({
       ) : (
         <>
           <label style={LABEL} htmlFor="device-join-qr-account">
-            {t("sync.deviceJoinQr.accountLabel")}
+            {t("common.accountnumber")}
           </label>
           <div style={INPUT_ROW}>
             <input

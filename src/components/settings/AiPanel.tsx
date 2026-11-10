@@ -455,7 +455,7 @@ function SideloadRow(props: {
         <ModelPathButton
           path={props.path}
           label={props.roleLabel}
-          revealLabel={t("settings.ai.modelShowInFolder")}
+          revealLabel={t("common.showinfolder")}
           testId={`${props.testIdChoose}-location`}
           panelTestId={`${props.testIdChoose}-location-panel`}
         />

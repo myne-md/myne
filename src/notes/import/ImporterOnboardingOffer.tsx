@@ -141,10 +141,10 @@ export function ImporterOnboardingOffer({
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
           <Button variant="ghost" onClick={onDismiss} data-testid="importer.offer-dismiss">
-            {t("notes.import.offer.notNow")}
+            {t("common.notnow")}
           </Button>
           <Button variant="primary" icon="folder" onClick={onChoose} data-testid="importer.offer-choose">
-            {t("notes.import.offer.chooseFolder")}
+            {t("common.choosefolder")}
           </Button>
         </div>
 

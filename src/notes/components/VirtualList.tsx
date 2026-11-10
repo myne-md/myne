@@ -64,6 +64,10 @@ export type VirtualListProps<T> = {
   /** Render this many extra rows above + below the visible window so
    *  fast scrolls don't flash empty space. Default 5. */
   buffer?: number;
+  /** Render every row, ignoring the window. For a drag in progress: removing the
+   *  dragged row unmounts the browser's drag source and cancels the gesture, and
+   *  an off-screen row cannot be a drop target. Bounded by the gesture. */
+  renderAll?: boolean;
   /** Opaque token: when it changes, the measured-height cache is dropped so
    *  every row re-measures from the (current) estimate. Pass a value that
    *  encodes any GLOBAL change to row geometry that ResizeObserver can't catch
@@ -106,6 +110,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     keyOf = (item: T, _index: number) => String(item),
     estimatedRowHeight = DEFAULT_ESTIMATED_HEIGHT,
     buffer = DEFAULT_BUFFER,
+    renderAll = false,
     heightResetToken,
     overflowX = "hidden",
     overlayScrollbar = false,
@@ -221,8 +226,10 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     return Math.min(items.length, lo + buffer);
   }, [cumulativeOffsets, scrollTop, viewportHeight, items.length, startIndex, buffer]);
 
-  const topSpacer = cumulativeOffsets[startIndex] ?? 0;
-  const bottomSpacer = totalHeight - (cumulativeOffsets[endIndex] ?? 0);
+  const winStart = renderAll ? 0 : startIndex;
+  const winEnd = renderAll ? items.length : endIndex;
+  const topSpacer = renderAll ? 0 : (cumulativeOffsets[startIndex] ?? 0);
+  const bottomSpacer = renderAll ? 0 : totalHeight - (cumulativeOffsets[endIndex] ?? 0);
 
   // Single ResizeObserver for the entire list's lifetime. Per-row
   // observe / unobserve happens in the ref callback below — this
@@ -253,7 +260,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
   }, [triggerRender]);
 
   const visibleSlice: Array<{ item: T; index: number; key: string }> = [];
-  for (let i = startIndex; i < endIndex; i++) {
+  for (let i = winStart; i < winEnd; i++) {
     const item = items[i];
     if (item === undefined) continue;
     visibleSlice.push({ item, index: i, key: keyOf(item, i) });

@@ -19,18 +19,10 @@
 import { patchUpdatedField } from "../dialect/surgery";
 import { noteUpdate } from "./updateNote";
 
-/**
- * Idle-debounce N — autosave fires after N ms of no keystrokes since
- * the last input. Pinned at 1000ms by `decisions.md` 2026-05-15.
- */
-export const AUTOSAVE_IDLE_MS = 1000;
-
-/**
- * Max-debounce M — autosave fires at most every M ms even during
- * sustained typing (γ2 safety net). Pinned at 10000ms by
- * `decisions.md` 2026-05-15.
- */
-export const AUTOSAVE_MAX_MS = 10000;
+// The cadence pair lives in `@myne/client-core/autosave`: the phone autosaves on
+// the same numbers, and a second pair of literals is how the two clients drift
+// apart with nothing failing. Re-exported so this module's callers are unchanged.
+export { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS } from "@myne/client-core/autosave";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
