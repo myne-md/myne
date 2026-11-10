@@ -229,6 +229,10 @@ pub async fn door_call(app: DoorContext<'_>, call: WireCall<'_>) -> McpCallOutco
             archived_folders: &prefs.archived_folders,
             quiet_folders: &quiet,
             writer: Some(&writer),
+            // The process's one ledger: the lifetime a budget means is the app's,
+            // so it survives a lock and an unlock and ends when the process does.
+            budget: super::budget::process_ledger(),
+            now_ms: host.monotonic_millis(),
         },
         &source,
     )
@@ -264,6 +268,40 @@ pub async fn door_call(app: DoorContext<'_>, call: WireCall<'_>) -> McpCallOutco
             } else {
                 McpToolError::OutOfScopeFolder { folder }
             })
+        }
+        // **A call that named a folder the user left out becomes a READ request.**
+        // The mirror of the write card, and the reason it exists: a plain refusal is
+        // answered by a client retrying, and a client retrying is indistinguishable
+        // from one probing. Accepting removes that one folder from the exclusion set
+        // (mcp external access rework, myne-md/myne#1052).
+        McpCallOutcome::Refused(McpToolError::OutOfScopeFolder { folder }) => {
+            // The reason does NOT change when a row is stored: there is no
+            // `read_queued_for_review`, because the client's next action is the same
+            // either way (tell the person), and a second reason would be a second
+            // wire label for one situation. A failed store costs the card and
+            // nothing else, so the refusal stands either way.
+            // A failed store costs the card and nothing else, but it must not look
+            // like a successful enqueue: the refusal stands either way, so the error
+            // is logged at the point it happens rather than reason encoded on the
+            // wire (D9, myne-md/myne#1052).
+            if crate::plugins::prefs::commands::enqueue_mcp_read_request_from_host(
+                host,
+                state,
+                hooks,
+                call.connection.trim().to_string(),
+                folder.clone(),
+                call.tool.to_string(),
+                io,
+            )
+            .await
+            .is_err()
+            {
+                tracing::warn!(
+                    target: "myne::mcp",
+                    "read request not queued; the refusal stands"
+                );
+            }
+            McpCallOutcome::Refused(McpToolError::OutOfScopeFolder { folder })
         }
         other => other,
     };

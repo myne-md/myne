@@ -6548,6 +6548,7 @@ fn normalize_connection_name(name: &str) -> Option<String> {
 /// that the same approval leaves out of the read scope is refused
 /// (`PrefsWriteError::InvalidValue`) rather than dropped, so the screen and the
 /// stored bytes never disagree about the grant.
+#[allow(clippy::too_many_arguments)]
 pub async fn set_mcp_connection_grant_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -6555,6 +6556,7 @@ pub async fn set_mcp_connection_grant_from_host(
     name: String,
     excluded_folders: Vec<String>,
     write_folders: Vec<String>,
+    disabled_verbs: Vec<String>,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<bool, PrefsWriteError> {
     let dir =
@@ -6566,6 +6568,7 @@ pub async fn set_mcp_connection_grant_from_host(
         name,
         excluded_folders,
         write_folders,
+        disabled_verbs,
         io,
         host,
     )
@@ -6608,6 +6611,9 @@ pub async fn dismiss_mcp_write_request<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     connection: String,
     folder: String,
+    // `write` or `read`: one folder can be waiting for both kinds at once, and a
+    // dismiss that guessed would clear a decision the person had not answered.
+    kind: protocol::McpRequestKind,
 ) -> Result<bool, PrefsWriteError> {
     dismiss_mcp_write_request_from_host(
         &TauriHost::new(app),
@@ -6615,6 +6621,7 @@ pub async fn dismiss_mcp_write_request<R: Runtime>(
         hooks.inner(),
         connection,
         folder,
+        kind,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -6652,6 +6659,7 @@ pub async fn set_mcp_connection_grant<R: Runtime>(
     name: String,
     excluded_folders: Vec<String>,
     write_folders: Vec<String>,
+    disabled_verbs: Vec<String>,
 ) -> Result<bool, PrefsWriteError> {
     set_mcp_connection_grant_from_host(
         &TauriHost::new(app),
@@ -6660,6 +6668,7 @@ pub async fn set_mcp_connection_grant<R: Runtime>(
         name,
         excluded_folders,
         write_folders,
+        disabled_verbs,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -6674,6 +6683,7 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
     name: String,
     excluded_folders: Vec<String>,
     write_folders: Vec<String>,
+    disabled_verbs: Vec<String>,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<bool, PrefsWriteError> {
@@ -6727,6 +6737,17 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
     }
     let folder_count = excluded_set.len();
     let write_folder_count = write_set.len();
+    // The verb set, canonicalized the same way: a verb is a wire name this build
+    // owns, so the canonical form is trimmed, sorted and deduped. An empty set is
+    // stored as empty and omitted from the bytes, which the resolver reads as
+    // "every verb is on" (mcp external access rework, myne-md/myne#1052).
+    let disabled_set: std::collections::BTreeSet<String> = disabled_verbs
+        .iter()
+        .map(|verb| verb.trim().to_string())
+        .filter(|verb| !verb.is_empty())
+        .collect();
+    let disabled_verb_count = disabled_set.len();
+    let disabled_verbs: Vec<String> = disabled_set.into_iter().collect();
     let excluded_folders: Vec<String> = excluded_set.into_iter().collect();
     let write_folders: Vec<String> = write_set.into_iter().collect();
     let mut accepted = false;
@@ -6764,6 +6785,12 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
                     // empty and omitted from the bytes, which the resolver reads as
                     // "may write nowhere".
                     write_folders,
+                    // The verbs the person switched off, canonical and sorted above.
+                    // Empty is stored as empty and omitted from the bytes: the
+                    // resolver reads that as every verb available, which is the
+                    // reading every grant written before this member existed has to
+                    // keep.
+                    disabled_verbs,
                 },
             );
             if mcp_grant_fits(&candidate) {
@@ -6794,7 +6821,8 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
         field = "mcp_connections",
         accepted,
         excluded_folders = folder_count,
-        write_folders = write_folder_count
+        write_folders = write_folder_count,
+        disabled_verbs = disabled_verb_count
     );
     Ok(accepted)
 }
@@ -6827,6 +6855,7 @@ pub(crate) async fn enqueue_mcp_write_request_with_dir(
     folder: String,
     verb: String,
     summary: String,
+    kind: protocol::McpRequestKind,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<bool, PrefsWriteError> {
@@ -6844,6 +6873,7 @@ pub(crate) async fn enqueue_mcp_write_request_with_dir(
             let queued = crate::plugins::mcp::queue::enqueue(
                 &mut candidate.mcp_write_requests,
                 protocol::McpWriteRequest {
+                    kind,
                     connection: connection.clone(),
                     folder,
                     requested_at,
@@ -6905,6 +6935,7 @@ pub(crate) async fn accept_mcp_write_request_with_dir(
                 &mut candidate.mcp_write_requests,
                 &connection,
                 &folder,
+                protocol::McpRequestKind::Write,
             ) else {
                 // Nothing queued for that pair: a stale click. Keeping the row is
                 // not an option because there is none, so this is a no-op.
@@ -6961,14 +6992,127 @@ pub(crate) async fn accept_mcp_write_request_with_dir(
     Ok(accepted)
 }
 
+/// Slot::Unlocked-gated ACCEPT of one queued READ request: the folder stops being
+/// left out of that connection's read scope, and nothing else changes
+/// (mcp external access rework, myne-md/myne#1052).
+///
+/// The mirror of [`accept_mcp_write_request`], and deliberately a separate command
+/// rather than a mode of that one: the two move the grant in opposite directions,
+/// so a caller that passed the wrong kind would widen where it meant to narrow.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn accept_mcp_read_request<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    connection: String,
+    folder: String,
+) -> Result<bool, PrefsWriteError> {
+    accept_mcp_read_request_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        connection,
+        folder,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+pub async fn accept_mcp_read_request_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    accept_mcp_read_request_with_dir(&dir, state, hooks, connection, folder, io, host).await
+}
+
+pub(crate) async fn accept_mcp_read_request_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(connection) = normalize_connection_name(&connection) else {
+        return Err(PrefsWriteError::InvalidValue);
+    };
+    let mut accepted = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            let mut candidate = prefs.clone();
+            let Some(request) = crate::plugins::mcp::queue::take(
+                &mut candidate.mcp_write_requests,
+                &connection,
+                &folder,
+                protocol::McpRequestKind::Read,
+            ) else {
+                // Nothing queued for that pair: a stale click, and keeping a row
+                // that does not exist is not an option.
+                return;
+            };
+            let quiet = crate::plugins::mcp::scope::quiet_folders(&candidate);
+            let target = crate::plugins::mcp::queue::accept_read_target(
+                candidate.mcp_connections.get(&connection),
+                &request.folder,
+                &quiet,
+            );
+            let next_exclusions = match target {
+                Ok(next) => next,
+                Err(_) => {
+                    // Dropped rather than kept: the row cannot be acted on, and a
+                    // card that keeps offering it would ask the same unanswerable
+                    // question after every reload.
+                    if mcp_grant_fits(&candidate) {
+                        *prefs = candidate;
+                    }
+                    return;
+                }
+            };
+            if let Some(grant) = candidate.mcp_connections.get_mut(&connection) {
+                grant.excluded_folders = next_exclusions;
+                accepted = true;
+            }
+            if mcp_grant_fits(&candidate) {
+                *prefs = candidate;
+            } else {
+                accepted = false;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    // COUNT only: neither a connection name nor a folder path reaches the log.
+    tracing::info!(
+        event = "prefs_written",
+        field = "mcp_connections",
+        accepted,
+        read_scope_extended = accepted
+    );
+    Ok(accepted)
+}
+
 /// Slot::Unlocked-gated DISMISS of one queued write request: drop the row and
 /// change nothing else. The client is not told; its next attempt queues again.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn dismiss_mcp_write_request_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     connection: String,
     folder: String,
+    kind: protocol::McpRequestKind,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<bool, PrefsWriteError> {
@@ -6986,6 +7130,7 @@ pub(crate) async fn dismiss_mcp_write_request_with_dir(
                 &mut candidate.mcp_write_requests,
                 &connection,
                 &folder,
+                kind,
             )
             .is_some();
             if removed {
@@ -7097,7 +7242,48 @@ pub async fn enqueue_mcp_write_request_from_host(
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     enqueue_mcp_write_request_with_dir(
-        &dir, state, hooks, connection, folder, verb, summary, io, host,
+        &dir,
+        state,
+        hooks,
+        connection,
+        folder,
+        verb,
+        summary,
+        protocol::McpRequestKind::Write,
+        io,
+        host,
+    )
+    .await
+}
+
+/// Queue a READ request: the client named a folder this connection may not read
+/// (mcp external access rework, myne-md/myne#1052).
+///
+/// A separate entry point rather than a flag on the write one, because the summary
+/// argument has no meaning here: a read request carries no client-authored text,
+/// and a read card that displayed one would be showing a string nobody wrote for it.
+pub async fn enqueue_mcp_read_request_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    verb: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    enqueue_mcp_write_request_with_dir(
+        &dir,
+        state,
+        hooks,
+        connection,
+        folder,
+        verb,
+        String::new(),
+        protocol::McpRequestKind::Read,
+        io,
+        host,
     )
     .await
 }
@@ -7134,11 +7320,12 @@ pub async fn dismiss_mcp_write_request_from_host(
     hooks: &crate::hooks::Hooks,
     connection: String,
     folder: String,
+    kind: protocol::McpRequestKind,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<bool, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    dismiss_mcp_write_request_with_dir(&dir, state, hooks, connection, folder, io, host).await
+    dismiss_mcp_write_request_with_dir(&dir, state, hooks, connection, folder, kind, io, host).await
 }
 
 /// Slot::Unlocked-gated revocation of one external MCP connection. Revoking a

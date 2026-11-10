@@ -54,6 +54,7 @@ export type SettingsTopicId =
   | "answering"
   | "models"
   | "limits"
+  | "externalAccess"
   | "advanced"
   // The Appearance panel.
   | "display"
@@ -116,6 +117,9 @@ export const AI_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
   { id: "answering", labelKey: "settings.ai.groupGeneral" },
   { id: "models", labelKey: "settings.ai.groupModels" },
   { id: "limits", labelKey: "settings.ai.groupLimits" },
+  // Its own topic, out of Limits: what an external AI tool may do is a different
+  // question from what Myne's own AI may read (myne-md/myne#1052).
+  { id: "externalAccess", labelKey: "settings.ai.sections.externalAccess" },
   { id: "advanced", labelKey: "settings.ai.groupAdvanced" },
 ];
 

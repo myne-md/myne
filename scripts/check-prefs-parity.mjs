@@ -294,6 +294,10 @@ export const FIELD_OVERRIDES = {
   // row); the parity row names the grant, because that is the field whose value
   // the user is deciding about, and the row removal is the bookkeeping beside it.
   accept_mcp_write_request: "mcp_connections",
+  // The READ kind of the same queue (myne-md/myne#1052): accepting removes one
+  // folder from the exclusion list of `mcp_connections`, which is the grant the
+  // person is deciding about. Same shape as the write accept above.
+  accept_mcp_read_request: "mcp_connections",
   dismiss_mcp_write_request: "mcp_write_requests",
   upsert_saved_view: "saved_views",
   delete_saved_view: "saved_views",

@@ -199,10 +199,12 @@ describe("SettingsTabs: the strip's contract", () => {
       "General",
       "Models",
       "Limits",
+      "External access",
       "Advanced",
     ]);
     expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual([
       "true",
+      "false",
       "false",
       "false",
       "false",
@@ -226,12 +228,12 @@ describe("SettingsTabs: the strip's contract", () => {
       [...screen.getByTestId("settings.ai-tabs").querySelectorAll('[role="tab"]')].map((tab) =>
         tab.getAttribute("tabindex"),
       );
-    expect(stops()).toEqual(["0", "-1", "-1", "-1"]);
+    expect(stops()).toEqual(["0", "-1", "-1", "-1", "-1"]);
     expect(selected()).toEqual(["settings.ai-tab-answering"]);
 
     fireEvent.keyDown(screen.getByTestId("settings.ai-tab-answering"), { key: "ArrowRight" });
     expect(selected()).toEqual(["settings.ai-tab-models"]);
-    expect(stops()).toEqual(["-1", "0", "-1", "-1"]);
+    expect(stops()).toEqual(["-1", "0", "-1", "-1", "-1"]);
     // And the focus moved with it: a selected-but-unfocused tab leaves the
     // strip's one Tab stop behind the user.
     expect(document.activeElement?.getAttribute("data-testid")).toBe("settings.ai-tab-models");

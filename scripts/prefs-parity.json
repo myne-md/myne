@@ -25,6 +25,7 @@
     "scripts/check-prefs-parity.mjs."
   ],
   "states": {
+    "accept_mcp_read_request": "called|never-bound",
     "accept_mcp_write_request": "called|never-bound",
     "dismiss_mcp_write_request": "called|never-bound",
     "revoke_mcp_connection": "called|never-bound",
@@ -59,6 +60,7 @@
     "set_view_approval": "called|never-bound"
   },
   "oneSided": {
+    "accept_mcp_read_request": "Desktop calls it; mobile has nothing to call it from, for the same structural reason `accept_mcp_write_request` below records: the row is produced by an external client calling the `myne-mcp` sidecar over a local socket, and a phone has neither. Both queue kinds ship in one card, so the two rows stand or fall together.",
     "accept_mcp_write_request": "Desktop calls it; mobile has nothing to call it from, for the same structural reason `revoke_mcp_connection` above records. The caller is the external-access section's queue card (`src/components/settings/McpSection.tsx`, via `src/lib/prefs.ts`), which renders only under the `externalMcp` capability, and mobile's descriptor answers that one false: `myne-mcp` is a desktop sidecar installed on a PATH, and a phone has neither a shell nor a PATH. The queued requests it would decide about are produced by an external client calling that sidecar, so on a phone there is never a row to accept or dismiss. Not a gap this branch introduces or can close.",
     "dismiss_mcp_write_request": "Desktop calls it; mobile has nothing to call it from, for the same structural reason `revoke_mcp_connection` above records. The caller is the external-access section's queue card (`src/components/settings/McpSection.tsx`, via `src/lib/prefs.ts`), which renders only under the `externalMcp` capability, and mobile's descriptor answers that one false: `myne-mcp` is a desktop sidecar installed on a PATH, and a phone has neither a shell nor a PATH. The queued requests it would decide about are produced by an external client calling that sidecar, so on a phone there is never a row to accept or dismiss. Not a gap this branch introduces or can close.",
     "revoke_mcp_connection": "Desktop calls it; mobile has nothing to call it from. The caller is the external-access section's per-connection Revoke (`src/components/settings/McpSection.tsx`, via `src/lib/prefs.ts`), which renders only under the `externalMcp` capability: mobile's descriptor answers that one false, because `myne-mcp` is a desktop sidecar installed on a PATH and a phone has neither a shell nor a PATH. The gap is therefore structural rather than temporary, and the verdict stays one-sided on purpose. Note the state columns: desktop went `never-bound` -> `called` when the section shipped, and the row's remaining absence is mobile's.",
