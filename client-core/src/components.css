@@ -1986,6 +1986,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The second clock reads as a quieter line than the event's own time: it is the
+   same instant said twice, and the note's clock is the one that is stored. */
+.myne-calendar__home {
+  flex: 0 0 auto;
+  max-width: 100%;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .myne-calendar__title {
   min-width: 0;
   color: var(--fg-1);
