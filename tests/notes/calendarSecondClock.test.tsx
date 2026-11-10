@@ -58,10 +58,21 @@ vi.mock("../../src/notes/taskIndex", async (importActual) => {
 import { CalendarPane } from "../../src/notes/components/CalendarPane";
 import { WorkspaceProvider } from "../../src/notes/workspaceContext";
 import { calendarItem, emptyWorkspace } from "../../src/notes/workspaceState";
-import { deviceZone, writeHomeZone } from "../../src/lib/homeZone";
+import { deviceZone, homeClockFor, writeHomeZone } from "../../src/lib/homeZone";
 
-/** A zone four hours ahead of the machine's, so 09:00 reads 13:00 and never matches. */
-const HOME = "Asia/Tokyo";
+// The easternmost zone there is (UTC+14, no DST): every device on earth is west of
+// it, so a late-evening start here ALWAYS reads as the next day at home. A zone
+// picked for being "a few hours ahead" of the machine would make the day-offset case
+// pass or fail depending on where the test runs, which is the fragility CI caught.
+const HOME = "Pacific/Kiritimati";
+
+/** What the row must say for a stored start, derived rather than hardcoded. */
+function expectedReading(start: string): string {
+  const reading = homeClockFor(start.replace(" ", "T"), HOME, deviceZone());
+  expect(reading, `${start} has no reading in ${HOME} from ${deviceZone()}`).not.toBeNull();
+  const day = reading!.dayOffset === 0 ? "" : reading!.dayOffset > 0 ? "+1" : "-1";
+  return `${reading!.time}${day}`;
+}
 
 async function renderPane(view: "day" | "week"): Promise<{ host: HTMLElement; cleanup: () => void }> {
   const host = document.createElement("div");
@@ -114,16 +125,18 @@ describe("the second clock on a calendar row", () => {
   it("reads the event's wall clock in the home zone", async () => {
     writeHomeZone(HOME);
     const { host, cleanup } = await renderPane("day");
-    // Berlin 09:00 is Tokyo 17:00, and the day is the same one.
-    expect(homeClock(host)?.textContent).toContain("17:00");
+    const reading = homeClock(host)?.textContent ?? "";
+    expect(reading).toBe(expectedReading(standup.start));
+    // And it is a SECOND reading, not the event's own clock echoed back.
+    expect(reading).not.toContain("09:00");
     cleanup();
   });
 
   it("names the day too when the reading crosses midnight", async () => {
-    // Tokyo is ahead of Berlin, so a late event there reads as the NEXT day at home.
     writeHomeZone(HOME);
     rangeRows = [{ ...standup, start: "2026-11-05 23:30", end: "2026-11-06 00:15" }];
     const { host, cleanup } = await renderPane("day");
+    expect(homeClock(host)?.textContent).toBe(expectedReading("2026-11-05 23:30"));
     expect(homeClock(host)?.textContent).toContain("+1");
     cleanup();
   });
