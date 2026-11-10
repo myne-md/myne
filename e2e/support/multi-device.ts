@@ -20,7 +20,6 @@ import {
   closeSettings,
   createNote,
   dismissImporterOffer,
-  dismissImporterOfferIfPresent,
   ipcOk,
   openSettings,
   pageSeatInvoke,

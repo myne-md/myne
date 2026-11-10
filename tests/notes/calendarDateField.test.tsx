@@ -12,7 +12,7 @@
 // what the trigger prints, because the trigger follows the user's date format and
 // the note does not.
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import {

@@ -147,6 +147,10 @@ async function wire<T>(
 
 /** Handle to a located element, scoped to its session. */
 export class Element {
+  /** What the last stale-hit-map repair did, quoted in a click timeout: the
+   *  message has to say whether the repair ran and what it answered. */
+  private lastRefresh = "<never>";
+
   constructor(
     private readonly session: Session,
     readonly elementId: string,
@@ -306,7 +310,7 @@ export class Element {
     //    refreshes the hit map is committed by the next paint, not inside the
     //    task that asked for it (measured: a single-task toggle leaves the map
     //    stale, the same toggle split across two evaluates cures it).
-    const toggleScript = (mode: string) =>
+    const toggleScript = (_mode: string) =>
       "var el = arguments[0], mode = arguments[1];" +
       "var n = el;" +
       "while (n && n !== document.body) {" +

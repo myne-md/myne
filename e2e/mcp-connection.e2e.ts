@@ -66,7 +66,6 @@ import {
   enableDeveloperMode,
   nameNewNote,
   openSettings,
-  pageSeatInvoke,
   selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
