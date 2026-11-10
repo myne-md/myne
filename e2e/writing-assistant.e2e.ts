@@ -94,6 +94,9 @@ async function bufferText(session: Session): Promise<string> {
   return buffer;
 }
 
+/** The title this note is born with; the slash command must MOVE it. */
+const SEED_TITLE = "wa1notealfa7k2m9qx4w8e5rj0aa";
+
 aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
   it("accepts+undoes ghost-text, sets a title via slash, and rewrites a selection", async () => {
@@ -109,7 +112,7 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         // Enable AI BEFORE opening the note so the ghost/slash extensions compose.
         await enableAi(s);
 
-        await createNote(s, "wa1notealfa7k2m9qx4w8e5rj0aa");
+        await createNote(s, SEED_TITLE);
 
         // ── (a) ghost-text: pause → widget → Tab accept → Ctrl+Z reverse ──
         await typeIntoEditor(s, "The mitochondria is the powerhouse of the");
@@ -164,25 +167,34 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         );
 
         // ── (b) slash → sets the frontmatter `title:` ──
-        // Type the slash query at the caret and confirm the top fuzzy match with
-        // Enter (the slash keymap's `confirm()` applies it — no menu DOM query,
-        // mirroring `slash-datetime.e2e.ts`). English label: "Suggest title (AI)".
+        // TWO things about this step were wrong, and each was enough on its own
+        // (measured 2026-11-09: thirteen literal `/suggest title` lines in the
+        // buffer and no menu ever opened). A slash query never spans whitespace -
+        // a space ENDS it and the menu closes (`editor/src/slash/plugin.ts`) - so
+        // `/suggest title` was typed as markdown; and `/` is suppressed mid-word,
+        // so the trigger also has to sit at a line start. `/title` fuzzy-matches
+        // the label "Suggest title (AI)" at a word boundary, and an ENTER first
+        // puts the caret on a fresh line.
         const content = await s.waitForElement(CM_CONTENT);
         await content.click();
-        // Enter goes to the ELEMENT and the whole query is RE-FIRED until the
-        // title lands. Two reasons, both already paid for elsewhere in this
-        // branch: `pressKey` routes through `POST /actions`, which needs focus
-        // that `Element.sendKeys` never established, and a single burst can
-        // outrun the slash menu's filter so the Enter confirms nothing. Same
-        // shape as `/drawing` in `drawing-inline-embed.e2e.ts` and the audio ⋮
-        // menu: when a trigger can miss, re-fire it rather than wait longer.
-        await content.sendKeys(`/suggest title${String.fromCharCode(0xe007)}`);
+        const ENTER_KEY = String.fromCharCode(0xe007);
+        // The claim is what a user reads: the note's own title field, not the
+        // `title:` source. The frontmatter renders as a Properties widget, so
+        // `editorText` never contains the key at all and the old assertion could
+        // not have passed on a command that worked.
+        const titleChanged = async (): Promise<boolean> => {
+          for (const field of await s.byTestIdAll("editor.frontmatter-title")) {
+            const value = await field.property<string>("value");
+            if (value !== null && value !== undefined && value !== SEED_TITLE) return true;
+          }
+          return false;
+        };
         await s.waitUntil(
           async () => {
-            if ((await editorText(s)).includes("title:")) return true;
-            await content.sendKeys(`/suggest title${String.fromCharCode(0xe007)}`);
+            if (await titleChanged()) return true;
+            await content.sendKeys(`${ENTER_KEY}/title${ENTER_KEY}`);
             await new Promise((r) => setTimeout(r, 2_000));
-            return (await editorText(s)).includes("title:") ? true : null;
+            return (await titleChanged()) ? true : null;
           },
           { label: "slash set a frontmatter title", timeoutMs: 30_000 },
         );
