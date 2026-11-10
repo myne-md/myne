@@ -712,7 +712,7 @@ runner(
         "62-seed-candidates",
         "Step two: the model's three entries, each editable and counted before anything is saved.",
         async () => {
-          await (await s.byTestId("common.continue")).click();
+          await (await s.byTestId("settings.memory.seed.continue")).click();
           await s.byTestId("settings.memory.seed.candidate-list", { timeoutMs: 60_000 });
           await sleep(600);
         },
