@@ -92,6 +92,16 @@ describe("TabBar", () => {
     expect(bar.children.length).toBe(5);
   });
 
+  it("stays above a full-screen destination, so a tab is always a way back", () => {
+    // The calendar draws itself over the list, the header and the editor at
+    // `--z-dropdown`. Without a level of its own the bar is what gets covered, and
+    // the only way out of the calendar is its own ✕ (owner, 2026-11-10).
+    renderBar({ ai: false });
+    const bar = screen.getByTestId("workspace.tab-bar");
+    expect(bar.style.position).toBe("relative");
+    expect(bar.style.zIndex).toBe("calc(var(--z-dropdown) + 1)");
+  });
+
   it("opens the calendar from its column", () => {
     const onCalendar = vi.fn();
     renderBar({ ai: false, onCalendar });
