@@ -119,12 +119,23 @@ describe("the hour axis", () => {
     cleanup();
   });
 
-  it("puts a timed row in its own hour and an all-day one above the axis", async () => {
+  it("draws a timed row as a block that SPANS its minutes", async () => {
     const { host, cleanup } = await renderPane(dayPane());
-    const fourteen = slot(host, 14)!;
-    expect(fourteen.textContent).toContain("Design review");
-    // 02:00 must NOT hold it: an hour row that draws everything makes the axis a
-    // decoration, and the assertion that catches that is this pair.
+    // 14:00-15:00 covers minutes 840 to 900 of the day, and that is what the grid
+    // positions: 840/1440 of the column's height, one hour tall. The defect this
+    // replaces drew the row INSIDE the 14:00 slot, so the hour after two looked
+    // free while the note said the event was in it.
+    const block = host.querySelector('[data-testid="calendar.block"]') as HTMLElement | null;
+    expect(block).not.toBeNull();
+    expect(block!.getAttribute("data-start-minute")).toBe("840");
+    expect(block!.getAttribute("data-end-minute")).toBe("900");
+    expect(block!.style.top).toBe(`${(840 / 1440) * 100}%`);
+    expect(block!.style.height).toBe(`${(60 / 1440) * 100}%`);
+    expect(block!.textContent).toContain("Design review");
+
+    // The slot is now a rule and a click target, not a container: a row inside it
+    // could never be taller than an hour.
+    expect(slot(host, 14)!.textContent).not.toContain("Design review");
     expect(slot(host, 2)!.textContent).not.toContain("Design review");
     expect(slot(host, 0)!.textContent).not.toContain("Away in Lisbon");
     expect(host.querySelector(".myne-calendar__allday")!.textContent).toContain("Away in Lisbon");
