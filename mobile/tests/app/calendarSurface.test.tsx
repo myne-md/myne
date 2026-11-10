@@ -24,6 +24,7 @@ vi.mock("../../src/lib/calendar", () => ({
 
 import { CalendarSurface } from "../../src/app/flows/CalendarSurface";
 import { EventComposerSheet } from "../../src/app/flows/EventComposerSheet";
+import { formatLocalDate } from "../../src/lib/localDateTime";
 
 // Partial mock: `createEventNote` reaches `noteCreate`, and other modules in this
 // graph (conflict copies, the list) import their own members from the same file, so
@@ -225,5 +226,145 @@ describe("retiming one appearance", () => {
     // The series' own start and end are untouched: only the one appearance moved.
     expect(body).toContain("start: 2026-11-03 09:15");
     expect(body).toContain("end: 2026-11-03 09:45");
+  });
+});
+
+// ── The three views and the two gestures ─────────────────────────────────────
+//
+// A phone that only shows a month and lists a day is a calendar you cannot move an
+// event on. These assert the axis: the same hour grid the desktop draws, a press on
+// empty space that opens the form ON that minute, a drag of a block's body that
+// reschedules it in ONE write, and a drag of its end that changes that instant.
+//
+// jsdom computes no layout, so a column's box is stubbed to one pixel per minute:
+// with `height: 1440` a pointer at y=540 IS 09:00, and the assertion is about the
+// mapping rather than about a rect.
+/** The day the axis opens on: `todayCivil()` in the surface, so the tests agree. */
+const TODAY = formatLocalDate(new Date());
+
+function stubColumn(host: HTMLElement, date: string): HTMLElement {
+  const column = host.querySelector<HTMLElement>(`[data-testid="calendar.cell.${date}"]`);
+  if (column === null) throw new Error(`no column for ${date}`);
+  column.getBoundingClientRect = () =>
+    ({ top: 0, left: 0, bottom: 1440, right: 200, width: 200, height: 1440, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+  return column;
+}
+
+function pointer(target: EventTarget, type: string, minutes: number): void {
+  fireEvent.pointerDown;
+  target.dispatchEvent(
+    new PointerEvent(type, { bubbles: true, cancelable: true, clientX: 100, clientY: minutes, button: 0, pointerId: 1 }),
+  );
+}
+
+describe("choosing a view", () => {
+  it("draws the hour axis for the day view, with a block over its own minutes", async () => {
+    answer.rows = [{ ...row(TODAY, "Standup"), start: `${TODAY} 09:00`, end: `${TODAY} 10:30` }];
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    const block = await screen.findByTestId("calendar.block");
+    // 09:00 is minute 540 and the block spans ninety of them, so it covers the
+    // hour after nine instead of sitting inside the hour it starts in.
+    expect(block.getAttribute("data-start-minute")).toBe("540");
+    expect(block.getAttribute("data-end-minute")).toBe("630");
+    expect(container.querySelector('[data-hour="9"]')).toBeTruthy();
+  });
+
+  it("shows all-day rows in the band above the axis, not at midnight", async () => {
+    answer.rows = [{ ...row(TODAY, "Trip"), start: TODAY, end: null, allDay: true }];
+    render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-week"));
+    expect(await screen.findByTestId("calendar.allday")).toBeTruthy();
+    expect(screen.queryByTestId("calendar.block")).toBeNull();
+  });
+});
+
+describe("creating from the axis", () => {
+  it("opens the form on the hour that was tapped", async () => {
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    stubColumn(container, TODAY);
+    // A press that does not move is a TAP: it opens the form at 14:00 rather than
+    // asking for a drag on a phone keyboard-less surface.
+    pointer(container.querySelector('[data-hour="14"]')!, "pointerdown", 840);
+    pointer(window, "pointerup", 840);
+    const startField = await screen.findByTestId("calendar.composer.start-field");
+    expect((startField as HTMLInputElement).value).toBe("14:00");
+  });
+
+  it("opens the form over the RANGE a drag drew", async () => {
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    stubColumn(container, TODAY);
+    pointer(container.querySelector('[data-hour="9"]')!, "pointerdown", 540);
+    pointer(window, "pointermove", 660);
+    pointer(window, "pointerup", 660);
+    const startField = await screen.findByTestId("calendar.composer.start-field");
+    const endField = screen.getByTestId("calendar.composer.end-field");
+    expect((startField as HTMLInputElement).value).toBe("09:00");
+    expect((endField as HTMLInputElement).value).toBe("11:00");
+  });
+});
+
+describe("moving an event on the axis", () => {
+  it("reschedules the whole span in one write, keeping its duration", async () => {
+    answer.rows = [{ ...row(TODAY, "Standup"), start: `${TODAY} 09:00`, end: `${TODAY} 09:30` }];
+    const notes = await import("../../src/lib/notes");
+    vi.mocked(notes.noteRead).mockResolvedValue(
+      `---\ntitle: Standup\nkind: event\nstart: ${TODAY} 09:00\nend: ${TODAY} 09:30\n---\n\n`,
+    );
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    stubColumn(container, TODAY);
+    const block = await screen.findByTestId("calendar.block");
+    // Pressed at the block's own start and dragged to 10:00: both edges move an
+    // hour, so the event is 10:00-10:30 rather than a thirty-minute stretch.
+    pointer(block, "pointerdown", 540);
+    pointer(window, "pointermove", 600);
+    pointer(window, "pointerup", 600);
+    await waitFor(() => expect(vi.mocked(notes.noteUpdate)).toHaveBeenCalledTimes(1));
+    const [, body] = vi.mocked(notes.noteUpdate).mock.calls.at(-1) ?? [];
+    expect(body).toContain(`start: ${TODAY} 10:00`);
+    expect(body).toContain(`end: ${TODAY} 10:30`);
+  });
+
+  it("moves one instant when an end grip is dragged", async () => {
+    answer.rows = [{ ...row(TODAY, "Standup"), start: `${TODAY} 09:00`, end: `${TODAY} 09:30` }];
+    const notes = await import("../../src/lib/notes");
+    vi.mocked(notes.noteRead).mockResolvedValue(
+      `---\ntitle: Standup\nkind: event\nstart: ${TODAY} 09:00\nend: ${TODAY} 09:30\n---\n\n`,
+    );
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    stubColumn(container, TODAY);
+    const grip = (await screen.findByTestId("calendar.block")).querySelector('[data-edge="end"]')!;
+    pointer(grip, "pointerdown", 570);
+    pointer(window, "pointermove", 690);
+    pointer(window, "pointerup", 690);
+    await waitFor(() => expect(vi.mocked(notes.noteUpdate)).toHaveBeenCalledTimes(1));
+    const [, body] = vi.mocked(notes.noteUpdate).mock.calls.at(-1) ?? [];
+    expect(body).toContain(`end: ${TODAY} 11:30`);
+    expect(body).toContain(`start: ${TODAY} 09:00`);
+  });
+
+  it("opens the editor on a TAP, prefilled, and saves through the shared writer", async () => {
+    answer.rows = [{ ...row(TODAY, "Standup"), start: `${TODAY} 09:00`, end: `${TODAY} 09:30` }];
+    const notes = await import("../../src/lib/notes");
+    vi.mocked(notes.noteRead).mockResolvedValue(
+      `---\ntitle: Standup\nkind: event\nstart: ${TODAY} 09:00\nend: ${TODAY} 09:30\n---\n\n`,
+    );
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    stubColumn(container, TODAY);
+    pointer(await screen.findByTestId("calendar.block"), "pointerdown", 540);
+    pointer(window, "pointerup", 540);
+    const titleField = (await screen.findByTestId("calendar.composer.title-field")) as HTMLInputElement;
+    expect(titleField.value).toBe("Standup");
+    fireEvent.change(titleField, { target: { value: "Standup with tea" } });
+    fireEvent.click(screen.getByTestId("calendar.composer.create"));
+    await waitFor(() => expect(vi.mocked(notes.noteUpdate)).toHaveBeenCalledTimes(1));
+    const [noteId, body] = vi.mocked(notes.noteUpdate).mock.calls.at(-1) ?? [];
+    expect(noteId).toBe("note-Standup");
+    expect(body).toContain("title: Standup with tea");
   });
 });

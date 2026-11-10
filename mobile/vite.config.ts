@@ -39,6 +39,15 @@ export default defineConfig(async () => ({
       // the desktop pane and the agent tool's answers, so a cell and a row cannot
       // disagree about which day a span falls on.
       { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      // The hour axis: where a block sits on a day, and what a pointer position
+      // means. Shared so a phone and a laptop cannot disagree about 10:30.
+      { find: "@myne/calendar-layout", replacement: sib("../src/notes/calendar/layout.ts") },
+      // The whole-vocabulary edit writer: saving an EVENT must patch the same six
+      // frontmatter fields on a phone as on a laptop.
+      { find: "@myne/calendar-update", replacement: sib("../src/notes/calendar/updateEvent.ts") },
+      // The two hour-axis gestures: where a drag landed. One implementation, because
+      // two copies is how a phone and a laptop start disagreeing about 10:30.
+      { find: "@myne/calendar-gesture", replacement: sib("../src/notes/calendar/gesture.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
       // The one reader of `skip:`, and the one writer of it (decisions/storage/0795).
       // Aliased rather than reimplemented: the field's bytes are a function of its

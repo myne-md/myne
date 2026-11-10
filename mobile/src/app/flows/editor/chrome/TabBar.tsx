@@ -45,6 +45,7 @@ export function TabBar({
   onTasks,
   onGraph,
   onAttachments,
+  onCalendar,
   onChat,
 }: {
   active: WorkspaceTab;
@@ -55,6 +56,7 @@ export function TabBar({
   onTasks: () => void;
   onGraph: () => void;
   onAttachments: () => void;
+  onCalendar: () => void;
   onChat: () => void;
 }) {
   const { t } = useTranslation();
@@ -140,6 +142,18 @@ export function TabBar({
           <path d="M21 15l-5-5L5 21" stroke={col(active === "files")} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span style={label(active === "files")}>{t("settings.shell.panels.files")}</span>
+      </button>
+      {/* The calendar was reachable only from the expanded-width sidebar, so on a
+          phone the surface existed with no door to it (owner, 2026-11-10). It sits
+          after Files and before the optional Chat: appending keeps every column
+          users already learned where it was, and reordering top-level navigation is
+          the one change a user cannot be told about. */}
+      <button data-testid="workspace.tab-calendar" onClick={onCalendar} aria-label={t("calendar.title")} style={tab}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke={col(active === "calendar")} strokeWidth="1.8" />
+          <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke={col(active === "calendar")} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+        <span style={label(active === "calendar")}>{t("calendar.title")}</span>
       </button>
       {/* Last, deliberately: it is the newest destination and the only optional
           one, so appending keeps every existing column where users learned it.

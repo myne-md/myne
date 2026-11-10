@@ -52,8 +52,6 @@ import {
   EventWriteRefused,
   applyEventMove,
   planDrag,
-  planEdgeResize,
-  planMoveTo,
   planResize,
   type EventSpan,
   type EventWriteRefusal,
@@ -78,11 +76,11 @@ import {
 import { WEEKDAY_HEADERS, dayCells, monthGrid, shiftAnchor, weekRow, windowForView } from "../calendar/grid";
 import {
   DAY_MINUTES,
-  SNAP_MINUTES,
+  MIN_BLOCK_MINUTES,
   clockOf,
   layoutDay,
   minuteOfDay,
-  snapMinute,
+  rowHour,
   type PlacedSpan,
 } from "../calendar/layout";
 import {
@@ -92,6 +90,7 @@ import {
   planEventForm,
   type EventFormValues,
 } from "./CalendarEventForm";
+import { beginCreateGesture, beginMoveGesture, beginResizeGesture } from "../calendar/gesture";
 import { calendarColour } from "../calendar/colour";
 import {
   isProjected,
@@ -119,44 +118,11 @@ const CAPTURE_HOUR = "09:00";
 /** How many chips a month cell shows before it counts the rest. */
 const CELL_CHIPS = 3;
 
-/** The shortest a timed block may DRAW itself, so a point event is still hittable. */
-const MIN_BLOCK_MINUTES = 18;
-
 /** The hours a day column draws: a fixed axis, so two days' 14:00 sit level. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 /** Where a day column starts when the day holds nothing: a working morning. */
 const FIRST_VISIBLE_HOUR = 8;
-
-/** The hour of a row's start, or `null` when it carries no clock at all. */
-function rowHour(row: CalendarRow): number | null {
-  if (row.start.length <= 10) return null;
-  const hour = Number(row.start.slice(11, 13));
-  return Number.isFinite(hour) ? hour : null;
-}
-
-/** The day column under a pointer's x, so a drag can change the DAY as well as the
- *  hour. `null` outside the grid, which the gesture reads as "stay on this day". */
-function columnUnder(clientX: number, from: HTMLElement | null): { column: HTMLElement; date: string } | null {
-  const grid = from?.closest<HTMLElement>(".myne-calendar__hours") ?? null;
-  if (grid === null) return null;
-  for (const column of grid.querySelectorAll<HTMLElement>(".myne-calendar__column")) {
-    const rect = column.getBoundingClientRect();
-    if (rect.width > 0 && clientX >= rect.left && clientX <= rect.right) {
-      return { column, date: column.getAttribute("data-date") ?? "" };
-    }
-  }
-  return null;
-}
-
-/** Minutes past midnight for a pointer over `column`, snapped; `null` when the
- *  column has no measured height. */
-function minuteAt(clientY: number, column: HTMLElement | null): number | null {
-  if (column === null) return null;
-  const rect = column.getBoundingClientRect();
-  if (!Number.isFinite(rect.height) || rect.height <= 0) return null;
-  return snapMinute(((clientY - rect.top) / rect.height) * DAY_MINUTES);
-}
 
 function hourValue(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
@@ -453,44 +419,26 @@ export function CalendarPane({
    *  A press that does not move stays the inline field, so neither is a mode. */
   const beginCreate = (event: React.PointerEvent<HTMLDivElement>, date: string) => {
     if (event.button !== 0 || event.target !== event.currentTarget) return;
-    const column = event.currentTarget.closest<HTMLElement>(".myne-calendar__column");
-    // The element's own window: this component holds the calendar RANGE as
-    // `window`, which is what `window.addEventListener` here resolved to.
-    const host = event.currentTarget.ownerDocument.defaultView;
-    if (host === null) return;
-    const anchor = minuteAt(event.clientY, column);
-    if (anchor === null) return;
-    draggedRef.current = false;
-    let from = anchor;
-    let to = anchor + SNAP_MINUTES;
-
-    const move = (next: PointerEvent) => {
-      const minute = minuteAt(next.clientY, column);
-      if (minute === null) return;
-      draggedRef.current = true;
-      from = Math.min(anchor, minute);
-      to = Math.max(Math.max(anchor, minute), from + SNAP_MINUTES);
-      setCreating({ date, from, to });
-    };
-
-    const up = () => {
-      host.removeEventListener("pointermove", move);
-      host.removeEventListener("pointerup", up);
-      setCreating(null);
-      if (!draggedRef.current) return;
-      // `23:59`, because a clock has 1440 minutes and 1440 is not one.
-      const startMin = Math.min(from, DAY_MINUTES - SNAP_MINUTES);
-      const endMin = Math.min(Math.max(to, startMin + SNAP_MINUTES), DAY_MINUTES - 1);
-      setComposing({
-        ...emptyEventForm(date),
-        startTime: clockOf(startMin),
-        endDate: date,
-        endTime: clockOf(endMin),
-      });
-    };
-
-    host.addEventListener("pointermove", move);
-    host.addEventListener("pointerup", up);
+    // The geometry is the shared gesture's; the pane supplies the two meanings a
+    // press has here: a drag opens the form in the range it drew, and a plain press
+    // stays the inline field it always was, so neither is a mode.
+    beginCreateGesture(event, {
+      date,
+      onRange: (from, to) => setCreating({ date, from, to }),
+      onDrawn: (from, to) => {
+        setCreating(null);
+        setComposing({
+          ...emptyEventForm(date),
+          startTime: clockOf(from),
+          endDate: date,
+          endTime: clockOf(to),
+        });
+      },
+      onTap: (minute) => {
+        setCreating(null);
+        openCapture(date, Math.floor(minute / 60));
+      },
+    });
   };
 
   /** Drag an event's body: the whole span moves by the pointer, so the day and the
@@ -509,39 +457,22 @@ export function CalendarPane({
       refuseOccurrence(row);
       return;
     }
-    const origin = event.currentTarget.closest<HTMLElement>(".myne-calendar__column");
-    const host = event.currentTarget.ownerDocument.defaultView;
-    if (host === null || origin === null) return;
-    const grabAt = minuteAt(event.clientY, origin);
-    if (grabAt === null) return;
-    const grabOffset = grabAt - drawnStartMin;
-
     const rendered: EventSpan = { start: row.start, end: row.end, allDay: row.allDay };
-    let preview: EventSpan | null = null;
-
-    const move = (next: PointerEvent) => {
-      const under = columnUnder(next.clientX, origin) ?? { column: origin, date };
-      const minute = minuteAt(next.clientY, under.column);
-      if (minute === null) return;
-      const targetStart = snapMinute(minute - grabOffset);
-      const dayDelta = daysBetween(parseCivilDate(date)!, parseCivilDate(under.date) ?? parseCivilDate(date)!);
-      const planned = planMoveTo(rendered, dayDelta * DAY_MINUTES + (targetStart - drawnStartMin));
-      if (planned === null) return;
-      draggedRef.current = true;
-      preview = planned;
-      setOptimistic((current) => ({ ...current, [row.noteId]: planned }));
-    };
-
-    const up = () => {
-      host.removeEventListener("pointermove", move);
-      host.removeEventListener("pointerup", up);
-      const next = preview;
-      if (next === null) return;
-      void commitSpan(row, rendered, next, next.start !== rendered.start || next.end !== rendered.end);
-    };
-
-    host.addEventListener("pointermove", move);
-    host.addEventListener("pointerup", up);
+    // The geometry is the shared gesture's (`calendar/gesture.ts`); what is here is
+    // what only a pane knows: the optimistic overlay, the one writer, and that the
+    // click which follows a drag must not also open the form.
+    beginMoveGesture(event, {
+      rendered,
+      drawnStartMin,
+      date,
+      onPreview: (next) => {
+        draggedRef.current = true;
+        setOptimistic((current) => ({ ...current, [row.noteId]: next }));
+      },
+      onCommit: (next) => {
+        void commitSpan(row, rendered, next, next.start !== rendered.start || next.end !== rendered.end);
+      },
+    });
   };
 
   /** Drag an edge to move that instant. ONE write on release, never per move. */
@@ -559,36 +490,16 @@ export function CalendarPane({
       refuseOccurrence(row);
       return;
     }
-    const column = event.currentTarget.closest<HTMLElement>(".myne-calendar__column");
-    const host = event.currentTarget.ownerDocument.defaultView;
-    if (host === null) return;
     const rendered: EventSpan = { start: row.start, end: row.end, allDay: row.allDay };
-    let preview: EventSpan | null = null;
-
-    const move = (next: PointerEvent) => {
-      const minute = minuteAt(next.clientY, column);
-      if (minute === null) return;
-      const planned = planEdgeResize(rendered, edge, `${date} ${clockOf(minute)}`);
-      if (planned === null) return;
-      preview = planned;
-      setOptimistic((current) => ({ ...current, [row.noteId]: planned }));
-    };
-
-    const up = () => {
-      host.removeEventListener("pointermove", move);
-      host.removeEventListener("pointerup", up);
-      const next = preview;
-      if (next === null) return;
-      void commitSpan(
-        row,
-        rendered,
-        next,
-        next.start !== rendered.start || next.end !== rendered.end,
-      );
-    };
-
-    host.addEventListener("pointermove", move);
-    host.addEventListener("pointerup", up);
+    beginResizeGesture(event, {
+      rendered,
+      date,
+      edge,
+      onPreview: (next) => setOptimistic((current) => ({ ...current, [row.noteId]: next })),
+      onCommit: (next) => {
+        void commitSpan(row, rendered, next, next.start !== rendered.start || next.end !== rendered.end);
+      },
+    });
   };
 
   const commitCapture = useCallback(

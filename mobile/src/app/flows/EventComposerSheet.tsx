@@ -1,22 +1,32 @@
-// The phone's event composer (myne-md/myne#1037).
+// The phone's event sheet: the same six fields, whether the event is new or not
+// (myne-md/myne#1037).
 //
-// Three fields, because three is what a phone can ask for without becoming a
-// form: a title, a day (the cell you tapped) and either a time or all-day. Repeat,
-// a reminder lead and the calendar's colour are the desktop form's job for now,
-// and this file says so rather than leaving a user to wonder why the event they
-// created has none of them.
+// # Two modes, one sheet
 //
-// **It writes through the one writer.** `createEventNote` builds the same bytes
-// the desktop `createEvent` builds and calls the phone's own `note_create`, so an
-// event created here is byte-identical to one created on a laptop
-// (`mobile/src/lib/eventWrite.ts`).
+// `edit` absent means CREATE, through `createEventNote`, which builds the same bytes
+// the desktop `createEvent` builds and calls the phone's own `note_create`. `edit`
+// present means SAVE, through the shared `applyEventEdit` (`@myne/calendar-update`):
+// the writer the desktop form uses, patching the same six frontmatter fields behind
+// the same value anchor and base hash, so a concurrent pull turns into a named
+// refusal instead of an overwrite.
+//
+// # What the segmented controls may not express
+//
+// Repeat and reminder are four short choices each rather than the desktop's rule
+// builder. A file may legally carry a rule this sheet cannot draw (`repeat: 1w`), and
+// saving must not delete it: `applyEventEdit` treats `undefined` as "leave the line
+// alone", so an unrepresentable value arrives absent rather than null.
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Segmented, Sheet, Switch, TextField } from "../../components";
 import { createEventNote, parseClock } from "../../lib/eventWrite";
-import type { EventInstant } from "../../dialect/event";
+import { formatEventInstant, parseEventInstant, type EventInstant } from "../../dialect/event";
 import { parseCivilDate } from "@myne/dialect-civil-date";
+import type { CalendarRow } from "@myne/vault-indices";
+import { applyEventEdit } from "@myne/calendar-update";
+import { EventWriteRefused } from "@myne/calendar-drag-write";
+import { noteRead, noteUpdate } from "../../lib/notes";
 
 /**
  * `YYYY-MM-DD` plus an optional `HH:MM`, as the dialect's instant.
@@ -50,22 +60,35 @@ const REMIND_VALUES: readonly string[] = ["", "10m", "1h", "1d"];
 
 export function EventComposerSheet({
   date,
+  startTime,
+  endTime,
+  edit,
   onClose,
   onCreated,
 }: {
   /** The day the composer was opened on, `YYYY-MM-DD`. */
   date: string;
+  /** The clock a create-drag or a tap on the hour axis landed on, `HH:MM`. */
+  startTime?: string;
+  endTime?: string;
+  /** The row being changed. Absent, the sheet creates. */
+  edit?: CalendarRow;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
-  const [title, setTitle] = useState("");
-  const [allDay, setAllDay] = useState(false);
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("");
-  const [repeat, setRepeat] = useState("");
-  const [remind, setRemind] = useState("");
-  const [calendar, setCalendar] = useState("");
+  const existing = edit === undefined ? null : parseEventInstant(edit.start);
+  const [title, setTitle] = useState(edit?.title ?? "");
+  const [allDay, setAllDay] = useState(edit?.allDay ?? false);
+  const [start, setStart] = useState(startTime ?? existing?.time ?? "09:00");
+  const [end, setEnd] = useState(
+    endTime ?? (edit?.end == null ? "" : (parseEventInstant(edit.end)?.time ?? "")),
+  );
+  // `-1` means "the file carries a rule this sheet cannot draw": held as absent so
+  // the save leaves the line alone instead of replacing it with a simpler phrase.
+  const [repeat, setRepeat] = useState(REPEAT_VALUES.indexOf(edit?.repeat ?? ""));
+  const [remind, setRemind] = useState(REMIND_VALUES.indexOf(edit?.remind ?? ""));
+  const [calendar, setCalendar] = useState(edit?.calendar ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,19 +103,47 @@ export function EventComposerSheet({
     setBusy(true);
     setError(null);
     try {
-      await createEventNote({
-        title: title.trim(),
-        start: startInstant,
-        end: endInstant,
-        // Empty means "the file carries no such field", which is the absence the
-        // readers treat as "one-off" and "no reminder" rather than a value.
-        repeat: repeat === "" ? null : repeat,
-        remind: remind === "" ? null : remind,
-        calendar: calendar.trim() === "" ? null : calendar.trim(),
-      });
+      if (edit !== undefined) {
+        await applyEventEdit({
+          noteId: edit.noteId,
+          rendered: { start: edit.start, end: edit.end, allDay: edit.allDay },
+          next: {
+            title: title.trim(),
+            start: formatEventInstant(startInstant),
+            end: endInstant === null ? null : formatEventInstant(endInstant),
+            calendar: calendar.trim() === "" ? null : calendar.trim(),
+            // `-1` is unrepresentable, and `undefined` is how the writer is told to
+            // leave that line exactly as the file has it.
+            repeat: repeat < 0 ? undefined : (REPEAT_VALUES[repeat] ?? ""),
+            remind: remind < 0 ? undefined : (REMIND_VALUES[remind] ?? ""),
+          },
+          io: {
+            readNote: noteRead,
+            writeNote: (id: string, body: string, base: string) => noteUpdate(id, body, base),
+          },
+        });
+      } else {
+        await createEventNote({
+          title: title.trim(),
+          start: startInstant,
+          end: endInstant,
+          // Empty means "the file carries no such field", which is the absence the
+          // readers treat as "one-off" and "no reminder" rather than a value.
+          repeat: repeat < 0 ? null : (REPEAT_VALUES[repeat] ?? ""),
+          remind: remind < 0 ? null : (REMIND_VALUES[remind] ?? ""),
+          calendar: calendar.trim() === "" ? null : calendar.trim(),
+        });
+      }
       onCreated();
-    } catch {
-      setError(t("calendar.composer.createFailed"));
+    } catch (err) {
+      // A value-anchored refusal is not a bug in the sheet: the note moved under it.
+      setError(
+        // One failure line for both modes: the user's next move is the same either
+        // way, and a second identical sentence is a string nobody can keep in step.
+        err instanceof EventWriteRefused
+          ? t("calendar.composer.refused")
+          : t("calendar.composer.createFailed"),
+      );
       setBusy(false);
     }
   }
@@ -100,7 +151,9 @@ export function EventComposerSheet({
   return (
     <Sheet onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }} data-testid="calendar.composer">
-        <h2 style={{ margin: "var(--space-0)", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>{t("calendar.composer.title")}</h2>
+        <h2 style={{ margin: "var(--space-0)", fontSize: "var(--text-lg)", fontWeight: "var(--weight-semibold, 600)" }}>
+          {edit === undefined ? t("calendar.composer.title") : t("common.edit")}
+        </h2>
 
         <TextField
           label={t("calendar.composer.titleLabel")}
@@ -163,8 +216,8 @@ export function EventComposerSheet({
               t("calendar.composer.repeatWeekly"),
               t("calendar.composer.repeatMonthly"),
             ]}
-            active={REPEAT_VALUES.indexOf(repeat)}
-            onChange={(index) => setRepeat(REPEAT_VALUES[index] ?? "")}
+            active={repeat}
+            onChange={setRepeat}
             testIdPrefix="calendar.composer.repeat"
             optionValues={["never", "daily", "weekly", "monthly"]}
           />
@@ -180,8 +233,8 @@ export function EventComposerSheet({
               "1h",
               "1d",
             ]}
-            active={REMIND_VALUES.indexOf(remind)}
-            onChange={(index) => setRemind(REMIND_VALUES[index] ?? "")}
+            active={remind}
+            onChange={setRemind}
             testIdPrefix="calendar.composer.remind"
             optionValues={["none", "10m", "1h", "1d"]}
           />
@@ -196,7 +249,7 @@ export function EventComposerSheet({
         />
 
         <Button disabled={!canCreate} onClick={() => void create()} data-testid="calendar.composer.create">
-          {t("calendar.composer.create")}
+          {edit === undefined ? t("calendar.composer.create") : t("calendar.form.save")}
         </Button>
         <Button variant="ghost" onClick={onClose} data-testid="calendar.composer.cancel">
           {t("common.cancel")}
