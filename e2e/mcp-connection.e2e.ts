@@ -58,6 +58,7 @@ import { expect, it } from "vitest";
 
 import { seedVault } from "./support/fixtures";
 import {
+  clickByTestId,
   closeSettings,
   contextMenuPick,
   createFolder,
@@ -472,7 +473,15 @@ describeE2E("mcp3 revoke and lock are refusals rather than protocol errors (myne
 
         // Revoke through the row, then close Settings: the grant is re-read on
         // every call, so the NEXT call is already refused with nothing to wait for.
-        await (await s.byTestId("settings.mcp-revoke")).click();
+        //
+        // `clickByTestId`, not `Element.click()`, because the row sits BELOW the
+        // fold of Settings' scrolling body: measured 2026-11-09, the button's
+        // centre was at y=749 in a 691 px window, `elementsFromPoint` answered
+        // `[]` there, and `Element.click` spent its whole budget on a control that
+        // never moves. `clickBySelector` scrolls per poll and, when its own
+        // hit-test names the viewport, dispatches the click - the arm
+        // `sync-join-recovery` already relies on.
+        await clickByTestId(s, "settings.mcp-revoke");
         await closeSettings(s);
 
         const revoked = runMcp(app, [
