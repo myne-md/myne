@@ -7,6 +7,7 @@
 
 import { DEFAULT_DAY_ANCHOR, resolveDayAnchor } from "@myne/dialect/event";
 import { invoke } from "../platform/core";
+import { CALENDAR_COLOUR_SETTING_PREFIX } from "../notes/calendar/colour";
 import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
 
 /**
@@ -1618,7 +1619,7 @@ export const CALENDAR_DEFAULT_DAY_ANCHOR = DEFAULT_DAY_ANCHOR;
 export const CALENDAR_ANCHOR_SETTING = "day_reminder_anchor";
 
 /** The prefix a per-calendar colour entry carries in `calendar_settings`. */
-export const CALENDAR_COLOUR_PREFIX = "colours.";
+export const CALENDAR_COLOUR_PREFIX = CALENDAR_COLOUR_SETTING_PREFIX;
 
 /**
  * Set ONE calendar setting (myne-md/myne#1037):
@@ -1647,21 +1648,6 @@ export function resolveCalendarDayAnchor(settings: Readonly<Record<string, strin
   // scheduler, where a value that is not `HH:MM` produced `Invalid Date` and silently
   // dropped every all-day reminder on that client.
   return resolveDayAnchor(settings[CALENDAR_ANCHOR_SETTING]);
-}
-
-/**
- * The token name a calendar draws in, or `undefined` when none is set.
- *
- * Returns the raw name even when this build's token sheet has never heard of it:
- * resolving membership is the renderer's job, so a theme that adds a token and is
- * read by an older build shows the default colour instead of refusing the entry.
- */
-export function resolveCalendarColour(
-  settings: Readonly<Record<string, string>>,
-  calendarName: string,
-): string | undefined {
-  const raw = settings[`${CALENDAR_COLOUR_PREFIX}${calendarName}`];
-  return raw === undefined || raw === "" ? undefined : raw;
 }
 
 /**

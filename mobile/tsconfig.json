@@ -30,6 +30,8 @@
       "@myne/calendar-layout": ["../src/notes/calendar/layout.ts"],
       "@myne/calendar-update": ["../src/notes/calendar/updateEvent.ts"],
       "@myne/calendar-gesture": ["../src/notes/calendar/gesture.ts"],
+      "@myne/calendar-colour": ["../src/notes/calendar/colour.ts"],
+      "@myne/calendar-visibility": ["../src/notes/calendar/visibility.ts"],
       "@myne/calendar-format": ["../src/notes/calendar/format.ts"],
       "@myne/calendar-skip": ["../src/notes/calendar/skipWrite.ts"],
       "@myne/calendar-drag-write": ["../src/notes/calendar/dragWrite.ts"],

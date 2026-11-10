@@ -59,6 +59,14 @@ vi.mock("../../src/notes/updateNote", () => ({
   },
 }));
 
+// The vault's calendar settings: which calendars are switched off and what colour
+// each one draws in. Mocked at the hook so a case can say "Work is hidden" without a
+// prefs round trip through the platform seam.
+const calendarSettings = vi.hoisted(() => ({ current: {} as Record<string, string> }));
+vi.mock("../../src/hooks/usePrefs", () => ({
+  usePrefs: () => ({ prefs: { calendar_settings: calendarSettings.current } }),
+}));
+
 const taskFixture = vi.hoisted(() => ({ rows: [] as unknown[] }));
 vi.mock("../../src/notes/taskIndex", async (importActual) => {
   const actual = await importActual<typeof import("../../src/notes/taskIndex")>();
@@ -133,6 +141,7 @@ function pointer(target: EventTarget, type: string, minutes: number, clientX = 0
 
 beforeEach(() => {
   taskFixture.rows = [];
+  calendarSettings.current = {};
   written.length = 0;
   rangeRows = [];
 });
@@ -313,6 +322,35 @@ describe("dragging an event's body", () => {
     pointer(window, "pointerup", 600);
 
     expect(written).toHaveLength(0);
+    cleanup();
+  });
+});
+
+
+// ── The calendar a row belongs to ────────────────────────────────────────────
+//
+// Owner, 2026-11-10: an event's background should be its calendar's colour, and a
+// calendar should be switchable off. Both are wiring, and wiring is what a unit test
+// of the pure module cannot see.
+describe("calendar colour and visibility", () => {
+  it("paints the chip from its calendar's token, so the wash is the spine's colour", async () => {
+    calendarSettings.current = { "colours.Work": "group-olive" };
+    rangeRows = [standup];
+    const { host, cleanup } = await renderPane();
+    const chip = host.querySelector<HTMLElement>('[data-testid="calendar.row"]')!;
+    // ONE variable: the stylesheet reads it for the spine and for the wash, so a
+    // second value for the background is a difference that can only ever drift.
+    expect(chip.style.getPropertyValue("--calendar-colour")).toBe("var(--group-olive, var(--fg-2))");
+    cleanup();
+  });
+
+  it("draws no row at all for a calendar that is switched off", async () => {
+    calendarSettings.current = { "hidden.Work": "1" };
+    rangeRows = [standup];
+    const { host, cleanup } = await renderPane();
+    expect(host.querySelector('[data-testid="calendar.row"]')).toBeNull();
+    // And the axis itself still renders: hiding a calendar must not empty the view.
+    expect(host.querySelector('[data-hour="9"]')).not.toBeNull();
     cleanup();
   });
 });

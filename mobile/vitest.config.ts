@@ -39,6 +39,8 @@ export default defineConfig({
       { find: "@myne/calendar-layout", replacement: sib("../src/notes/calendar/layout.ts") },
       { find: "@myne/calendar-update", replacement: sib("../src/notes/calendar/updateEvent.ts") },
       { find: "@myne/calendar-gesture", replacement: sib("../src/notes/calendar/gesture.ts") },
+      { find: "@myne/calendar-colour", replacement: sib("../src/notes/calendar/colour.ts") },
+      { find: "@myne/calendar-visibility", replacement: sib("../src/notes/calendar/visibility.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
       // Same alias as the build config; vitest resolves through this file, so an
       // alias added only to vite.config.ts passes the build and fails every suite.
