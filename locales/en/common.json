@@ -5921,7 +5921,9 @@
       "repeatMonthly": "Monthly",
       "remindNone": "No reminder",
       "calendarLabel": "Calendar (a name)",
-      "refused": "This event changed elsewhere, so nothing was saved. Reopen it."
+      "refused": "This event changed elsewhere, so nothing was saved. Reopen it.",
+      "date": "Date",
+      "badDate": "Use YYYY-MM-DD."
     },
     "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
     "taskRow": "A task due {date}",

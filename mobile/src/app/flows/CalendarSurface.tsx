@@ -15,11 +15,14 @@
 //
 // # Gestures are pointer gestures, never HTML5 drag
 //
-// `draggable` does not fire on touch, so every move here is `pointerdown` ->
-// `pointermove` -> `pointerup` on the element or its window, exactly as the desktop
-// pane does it: press and drag empty space to draw a range, drag a block's body to
-// reschedule it, drag its ends to change one instant. A press that does not move is a
-// tap and opens the form, so neither gesture is a mode the user has to know about.
+// The HTML5 drag attribute does not fire on touch, so every move here is
+// `pointerdown` -> `pointermove` -> `pointerup` on the element or its window, exactly
+// as the desktop pane does it: press and drag empty space to draw a range, drag a
+// block's body to reschedule it, drag its ends to change one instant. A press that
+// does not move is a tap and opens the form, so neither gesture is a mode the user
+// has to know about — and every one of those changes is also reachable by TYPING in
+// the event sheet (its date, start and end fields), which is the alternative WCAG
+// 2.5.7 asks for: the drag is an accelerator, never the only path.
 //
 // # Why the read is not bounded
 //

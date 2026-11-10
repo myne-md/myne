@@ -347,6 +347,29 @@ describe("moving an event on the axis", () => {
     expect(body).toContain(`start: ${TODAY} 09:00`);
   });
 
+  it("lets the DAY be typed, so a move is never drag-only", async () => {
+    answer.rows = [{ ...row(TODAY, "Standup"), start: `${TODAY} 09:00`, end: `${TODAY} 09:30` }];
+    const notes = await import("../../src/lib/notes");
+    vi.mocked(notes.noteRead).mockResolvedValue(
+      `---\ntitle: Standup\nkind: event\nstart: ${TODAY} 09:00\nend: ${TODAY} 09:30\n---\n\n`,
+    );
+    const { container } = render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.view-day"));
+    stubColumn(container, TODAY);
+    pointer(await screen.findByTestId("calendar.block"), "pointerdown", 540);
+    pointer(window, "pointerup", 540);
+    const dateField = (await screen.findByTestId("calendar.composer.date-field")) as HTMLInputElement;
+    // The sheet is the keyboard alternative to dragging a block to another day
+    // (WCAG 2.5.7), so the field has to be there and to land in the write.
+    expect(dateField.value).toBe(TODAY);
+    fireEvent.change(dateField, { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByTestId("calendar.composer.create"));
+    await waitFor(() => expect(vi.mocked(notes.noteUpdate)).toHaveBeenCalledTimes(1));
+    const [, body] = vi.mocked(notes.noteUpdate).mock.calls.at(-1) ?? [];
+    expect(body).toContain("start: 2026-12-01 09:00");
+    expect(body).toContain("end: 2026-12-01 09:30");
+  });
+
   it("opens the editor on a TAP, prefilled, and saves through the shared writer", async () => {
     answer.rows = [{ ...row(TODAY, "Standup"), start: `${TODAY} 09:00`, end: `${TODAY} 09:30` }];
     const notes = await import("../../src/lib/notes");
