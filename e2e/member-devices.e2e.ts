@@ -95,7 +95,7 @@
 // SYNC-13: the passwords and the phrase are in-source scenario constants, and no
 // `expect` below prints one or a phrase-word length.
 
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {

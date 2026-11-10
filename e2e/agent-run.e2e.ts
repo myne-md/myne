@@ -264,9 +264,14 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
           timeoutMs: 15_000,
         });
 
-        await waitForSaved(s);
-        // The note changed. The specific text depends on the stub engine, so the
-        // assertion is that the body is no longer what was typed.
+        // The assertion IS the wait: an agent apply writes through the vault, so
+        // the editor's post-EDIT badge state never appears and `waitForSaved`
+        // timed out on a write that had landed (measured 2026-11-09, four
+        // scenarios in this file).
+        await s.waitUntil(async () => ((await editorText(s)) !== original ? true : null), {
+          label: "the approved edits reached the note",
+          timeoutMs: 15_000,
+        });
         expect(await editorText(s)).not.toBe(original);
       },
     );
@@ -395,7 +400,7 @@ aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
 
         // Reject all is the exit now (myne-md/myne#894).
         await clickByTestId(s, "agentReview.rejectAll");
-        await waitForSaved(s);
+        await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 20_000 });
         expect(await editorText(s)).not.toContain("trashed:");
       },
     );
@@ -442,8 +447,13 @@ aiDescribe("ag4 undo after the review screen is closed", () => {
         await s.waitForGone(testIdSelector("agentReview.screen"), {
           timeoutMs: 20_000,
         });
-        await waitForSaved(s);
-        const afterApply = await editorText(s);
+        const afterApply = await s.waitUntil(
+          async () => {
+            const text = await editorText(s);
+            return text === original ? null : text;
+          },
+          { label: "the applied run reached the note", timeoutMs: 15_000 },
+        );
         expect(afterApply).not.toBe(original);
 
         // The offer is on the assistant turn as a revert icon, reachable with
@@ -741,11 +751,15 @@ aiDescribe("ag7 an append writes into a note with no body", () => {
 
         await (await s.byTestId("agentReview.approveAll")).click();
         await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 20_000 });
-        await waitForSaved(s);
-
         // The note carries the appended text. This is the assertion the whole
         // verb exists for, and the one no unit test can make: it proves the
-        // proposal survived the review screen, the apply and the write.
+        // proposal survived the review screen, the apply and the write. It is
+        // also the wait, for the reason ag1 records: a vault write never puts
+        // the editor's badge into its post-edit state.
+        await s.waitUntil(
+          async () => ((await editorText(s)).includes("appended by the stub") ? true : null),
+          { label: "the append reached the note", timeoutMs: 15_000 },
+        );
         expect(await editorText(s)).toContain("appended by the stub");
       },
     );

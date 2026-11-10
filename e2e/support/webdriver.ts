@@ -147,6 +147,9 @@ async function wire<T>(
 
 /** Handle to a located element, scoped to its session. */
 export class Element {
+  /** What the last hit-test repair saw, for the diagnostic message only. */
+  private lastRefresh = "";
+
   constructor(
     private readonly session: Session,
     readonly elementId: string,
@@ -306,7 +309,10 @@ export class Element {
     //    refreshes the hit map is committed by the next paint, not inside the
     //    task that asked for it (measured: a single-task toggle leaves the map
     //    stale, the same toggle split across two evaluates cures it).
-    const toggleScript = (mode: string) =>
+    // One script, and the mode travels as an ARGUMENT: it used to be a
+    // parameter of this builder that the script never read, so `arguments[1]`
+    // was undefined and even the release pass took the restore branch.
+    const toggleScript =
       "var el = arguments[0], mode = arguments[1];" +
       "var n = el;" +
       "while (n && n !== document.body) {" +
@@ -327,16 +333,16 @@ export class Element {
       "}" +
       "return 'none';";
     try {
-      const args = [{ [ELEMENT_KEY]: this.elementId }];
-      toggle = await this.session.execute<string>(toggleScript("remember"), args);
+      const args = (mode: "remember" | "restore") => [{ [ELEMENT_KEY]: this.elementId }, mode];
+      toggle = await this.session.execute<string>(toggleScript, args("remember"));
       if (toggle === "released") {
-        await this.session.execute<string>(toggleScript("restore"), args);
+        await this.session.execute<string>(toggleScript, args("restore"));
       }
       hit = await this.session.execute<string>(
         "var el = arguments[0]; if (!el) return 'gone';" +
           "var r = el.getBoundingClientRect();" +
           "return document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).indexOf(el) === -1 ? 'no' : 'yes';",
-        args,
+        [{ [ELEMENT_KEY]: this.elementId }],
       );
     } catch {
       // Best-effort by design; the timeout below is still the failure.
