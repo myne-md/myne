@@ -328,7 +328,7 @@ async function toggleToolbarItem(s: Session, itemId: string): Promise<void> {
 
 describeE2E("st2 the Editor panel's topics drive its preview (myne-md/myne#885)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("follows the active topic, and reflects the date, toolbar, spell and task settings", async () => {
+  it("follows the active topic, and reflects the date, toolbar and task settings", async () => {
     let password = "";
     await scenario(
       "st2-editor-topic-preview",
@@ -402,14 +402,19 @@ describeE2E("st2 the Editor panel's topics drive its preview (myne-md/myne#885)"
           { label: "the button came back when it was shown again", timeoutMs: 15_000 },
         );
 
-        // ── Writing: the spell demo ────────────────────────────────────────
-        // Spell check is ON by default (`null` ≡ unset), which is the resolution
-        // the editor itself applies, so the demo belongs here out of the box.
+        // ── Writing: a column with no band ────────────────────────────────
+        // The spell demo that used to sit here is DELETED by design (owner,
+        // 2026-11-09, `7ee6bb976`): a wavy underline on a specimen answers no
+        // question a user decides by looking at it. What is left to assert is the
+        // absence - Writing draws no toolbar band.
         await selectSettingsTopic(s, "editor", "writing");
-        await s.byTestId("settings.editor-preview-spell", { timeoutMs: 10_000 });
         expect(
           (await s.byTestIdAll("settings.editor-preview-toolbar")).length,
           "the toolbar band belongs to Editing, not to Writing",
+        ).toBe(0);
+        expect(
+          (await s.byTestIdAll("settings.editor-preview-datetime")).length,
+          "the date band belongs to Date & time, not to Writing",
         ).toBe(0);
 
         // ── Tasks: the chip, from the workspace container ───────────────────
@@ -516,10 +521,11 @@ async function disclosureState(
       " display: getComputedStyle(e).display," +
       " paragraphs: e.children.length," +
       " copyLength: copy.length," +
-      // The RESIDUE paragraph's opening, which is one of the three that moved.
-      // The sentence kept on the row is the destructive one, so asserting on
-      // that would be true either way.
-      " inlineHasMovedCopy: inline.indexOf('It cannot reach a copy taken earlier') !== -1" +
+      // Whether the ROW still carries any of the moved copy. Generic rather than
+      // a quoted English sentence: the row this runs on is not the one the check
+      // was written for any more, and a hardcoded phrase is a second thing that
+      // has to move with it.
+      " inlineHasMovedCopy: inline.indexOf(copy.slice(0, 30)) !== -1" +
       "};",
     [
       testIdSelector(`${rowTestId}-explain`),
@@ -562,10 +568,18 @@ describeE2E("st3 the long-copy affordance beside a setting's title (myne-md/myne
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        // The row lives in Privacy's `access` topic, which is that panel's
-        // default, so the strip needs no click here.
-        await openSettings(s, "privacy");
-        const ROW = "settings.hide-vault-names";
+        // **NOT the Privacy `hide-vault-names` row any more.** The owner withdrew
+        // that row's `?` on 2026-11-08 (`decisions/clients/0799`): the sentence
+        // kept on the row is the destructive one and the popover itself was the
+        // noise, so the affordance this scenario is about no longer exists there.
+        // The disclosure machinery is unchanged and eleven `settings.*` rows still
+        // carry it. This one is Files' folder-notes row: one moved paragraph, in a
+        // panel that needs no Developer mode and no bound account. (Two earlier
+        // retargets are recorded here because each cost a run: the AI provider row
+        // is behind Developer mode, so `settings.tab-ai` never appeared, and
+        // Account's vaults row only renders for a bound account.)
+        await openSettings(s, "files");
+        const ROW = "settings.folder-notes";
         await s.byTestId(ROW, { timeoutMs: 15_000 });
 
         // ── Collapsed: the copy is present, associated, and not shown ────────
@@ -576,8 +590,8 @@ describeE2E("st3 the long-copy affordance beside a setting's title (myne-md/myne
         // to render 776 characters; the point of the move is that the row is no
         // longer an essay, so asserting the copy is GONE from the row is the
         // assertion, not that it exists somewhere.
-        expect(collapsed!.paragraphs).toBe(3);
-        expect(collapsed!.copyLength).toBeGreaterThan(300);
+        expect(collapsed!.paragraphs).toBe(1);
+        expect(collapsed!.copyLength).toBeGreaterThan(40);
         expect(collapsed!.inlineHasMovedCopy).toBe(false);
 
         // ── Keyboard focus opens it ──────────────────────────────────────────
@@ -646,7 +660,7 @@ describeE2E("st3 the long-copy affordance beside a setting's title (myne-md/myne
 
         // The row's own control still works: the affordance was added BESIDE it
         // and changed nothing about the switch.
-        await s.byTestId("settings.hide-vault-names-toggle");
+        await s.byTestId("settings.folder-notes-toggle");
 
         await closeSettings(s);
       },
