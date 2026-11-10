@@ -63,7 +63,7 @@
 // Self-skips without the tauri-driver harness AND the `myne-server` binary, the
 // gate every two-device scenario here carries.
 
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { closeSettings, openSyncDevices } from "./support/flows";

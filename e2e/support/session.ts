@@ -424,7 +424,7 @@ function ownedProcessIds(): number[] {
       // `rmSync`) has nothing left to serve, so it is the leak, and only it.
       const dir = environ
         .split("\0")
-        .find((entry) => entry.startsWith(needle))
+        .find((entry: string) => entry.startsWith(needle))
         ?.slice("XDG_DATA_HOME=".length);
       if (dir !== undefined && !existsSync(dir)) ids.push(pid);
     } catch {
