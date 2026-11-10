@@ -388,7 +388,7 @@ export function PersonRegisterForm({
               disabled={!serverReady}
               data-testid={tid("continue")}
             >
-              {t("identityHome.registerContinue")}
+              {t("common.continue")}
             </Button>
           </>
         ) : (

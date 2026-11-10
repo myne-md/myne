@@ -117,7 +117,7 @@ describe("the move row", () => {
     mount(() => "Work");
     openRow();
     expect(screen.getByTestId("agentReview.moveTo").textContent).toBe(
-      "agent.review.vaultRoot",
+      "common.vaultroot",
     );
   });
 
@@ -129,7 +129,7 @@ describe("the move row", () => {
     mount(() => null);
     openRow();
     expect(screen.getByTestId("agentReview.moveFrom").textContent).toBe(
-      "agent.review.vaultRoot",
+      "common.vaultroot",
     );
     expect(screen.getByTestId("agentReview.moveTo").textContent).toBe("Projects");
   });

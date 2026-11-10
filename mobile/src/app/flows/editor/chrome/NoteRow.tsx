@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { NoteEntry } from "../types";
 import { ColorDot } from "../decorations/ColorDot";
-import { useHold } from "./useHold";
+import { useHold, type HoldDrag } from "./useHold";
 import { tappable } from "../../../a11y/tappable";
 
 /** A chronological note row (mirror notes/05 ChronoRow geometry). */
@@ -21,6 +21,9 @@ export function NoteRow({
   divider = true,
   selected = false,
   color,
+  reorderKey,
+  drag,
+  dragging = false,
 }: {
   entry: NoteEntry;
   last: boolean;
@@ -44,15 +47,24 @@ export function NoteRow({
   /** Highlight as the note open in the detail pane (regular size classes; the
    *  compact list never coexists with an open editor). */
   selected?: boolean;
+  /** The row's identity for the tree's drag, rendered as `data-reorder-key` so
+   *  the gesture can measure boxes by querySelector (see `EditorFlow.dragFor`). */
+  reorderKey?: string;
+  /** The drag phase of the same press, when the tree is the manual-order surface. */
+  drag?: HoldDrag;
+  /** True while this row is the one lifted off the list. */
+  dragging?: boolean;
 }) {
   const { t } = useTranslation();
   const sub = subtitle !== undefined ? subtitle : entry.snippet;
   // Long-press (touch) / right-click reveals the row action sheet (shared hook).
-  const { handlers, consumeHeldClick } = useHold(onHold);
+  const { handlers, consumeHeldClick } = useHold(onHold, drag);
   return (
     <div
       data-testid="notes.row"
       data-note-id={entry.id}
+      data-reorder-key={reorderKey}
+      data-dragging={dragging ? "true" : undefined}
       data-selected={selected || undefined}
       // NOT a control, and that is the second answer rather than the first
       // (myne#728, review of task 16). Making the whole row a `role="button"`
@@ -78,6 +90,12 @@ export function NoteRow({
         WebkitUserSelect: "none",
         userSelect: "none",
         WebkitTouchCallout: "none",
+        // The lifted row stays in place and dims: a floating copy would have to
+        // be positioned from a measured offset and would then have to be kept in
+        // step with the scroll container, which is a second layout for a gesture
+        // whose feedback is "this row is now following my finger".
+        opacity: dragging ? 0.55 : undefined,
+        background: dragging ? "var(--bg-2)" : undefined,
       }}
     >
       {/* The selected highlight is a rounded block INSET to the content x (after

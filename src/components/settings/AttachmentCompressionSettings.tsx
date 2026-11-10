@@ -37,7 +37,7 @@ export function AttachmentCompressionSettings() {
     select: (p) => p.attachment_compression_enabled,
     write: setAttachmentCompressionEnabled,
     initial: true,
-    errorMessage: t("settings.attachmentCompression.errorSaveSetting"),
+    errorMessage: t("common.couldnotsavethissetting"),
   });
 
   const scope = has("imageCompression")

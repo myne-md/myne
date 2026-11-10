@@ -343,7 +343,7 @@ export function PeriodicNotesBlock({
             }
             style={TEMPLATE_ROW_STYLE}
           >
-            {row.title || t("settings.dailyNotes.untitledTemplate")}
+            {row.title || t("common.untitledtemplate")}
           </button>
         ))}
       </div>

@@ -461,6 +461,37 @@ const CALENDAR_FIXTURE: Fixture = {
           repeatUnrecognized: false,
         },
         {
+          // The owner's own report, kept as a specimen: nine till ten has to LOOK
+          // like one hour of the axis, and it did not while a row was drawn inside
+          // the hour it started in.
+          noteId: "n6",
+          title: "Fransaya gidis",
+          folder: "Travel/",
+          calendar: "Personal",
+          start: "2026-11-05 09:00",
+          end: "2026-11-05 10:00",
+          allDay: false,
+          occurrenceOf: null,
+          occurrenceDate: null,
+          conflicts: false,
+          repeat: null,
+          repeatUnrecognized: false,
+        },
+        {
+          noteId: "n5",
+          title: "Design review",
+          folder: "Projects/",
+          calendar: "Work",
+          start: "2026-11-05 14:00",
+          end: "2026-11-05 15:00",
+          allDay: false,
+          occurrenceOf: null,
+          occurrenceDate: null,
+          conflicts: false,
+          repeat: null,
+          repeatUnrecognized: false,
+        },
+        {
           noteId: "n4",
           title: "Away in Lisbon",
           folder: "Calendar/",
@@ -1429,7 +1460,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarEventForm",
     state: "empty",
     description:
-      "The event form as a cell click opens it: a title, a start date, and All day chosen, which is why no time control is drawn. Everything the file can carry is authorable here, and the recurrence control offers the closed vocabulary rather than a text field, so a rule Myne cannot read is not a rule a user can type.",
+      "The event form as a cell click opens it: one name per row on the left and its controls on the right, so the sheet reads down one column of controls instead of five stacked captions at five origins. All day is chosen, which is why no time control is drawn, and the end is an OFFER rather than an empty value - a field reading `No date` gave no way to tell it from the start date above it. The recurrence picker offers the closed vocabulary rather than a text field, so a rule Myne cannot read is not a rule a user can type.",
     tags: ["notes", "calendar", "form", "event", "capture"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
@@ -1448,8 +1479,8 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarEventForm",
     state: "prefilled",
     description:
-      "The same form reopened on an existing event: a timed start with an end 90 minutes later, an every-two-weeks rule chosen from the builder, and a reminder lead whose control states the horizon it must stay inside. The values are what the note carries, so what a user sees here is a rendering of the record rather than a second copy of it.",
-    tags: ["notes", "calendar", "form", "event", "recurrence", "reminder"],
+      "The same form reopened on an existing event: a timed start with an end an hour later, each date opening the app's own month grid and each time a pair of the app's own dropdowns (the wall clock is stored as 24 hours and printed in the reader's own format), an every-two-weeks rule chosen from the kind picker beside its builder, and a reminder whose options state the horizon as they go rather than a field name carrying a sentence. The values are what the note carries, so what a user sees here is a rendering of the record rather than a second copy of it.",
+    tags: ["notes", "calendar", "form", "event", "recurrence", "reminder", "date-picker", "time-field"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
       <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
@@ -1479,13 +1510,13 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "month",
     description:
-      "The month view of November 2026: whole weeks starting Monday, a three-day trip drawing in all three of its cells, an overlap tinted, and a recurring occurrence carrying its repeat glyph. Each calendar name draws in its own token colour, so a theme change repaints the grid with the rest of the app.",
-    tags: ["notes", "calendar", "pane", "month", "grid", "events", "recurrence"],
+      "The month view of November 2026 at a desktop pane's size: whole weeks starting Monday, every week row dividing the pane's height rather than stacking on its content, days divided by hairlines rather than gaps, a three-day trip drawing in all three of its cells, an overlap tinted, and a recurring occurrence carrying its repeat glyph. Each calendar name draws its own spine of token colour, so a theme change repaints the grid with the rest of the app, and the day a pointer is over is the only one offering `+`.",
+    tags: ["notes", "calendar", "pane", "month", "grid", "events", "recurrence", "full-height"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
       <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
         <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
-          <Box width={720} height={520}>
+          <Box width={1024} height={700}>
             <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={NOVEMBER_5} />
           </Box>
         </WorkspaceProvider>
@@ -1498,13 +1529,13 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "week",
     description:
-      "The week view around 5 November 2026: seven columns, each listing its own times, so a week is readable at a glance rather than by scanning a grid for dots.",
-    tags: ["notes", "calendar", "pane", "week", "events"],
+      "The week view around 5 November 2026: seven columns on ONE hour axis, so 10:00 is the same line across the week and an empty hour is a place a pointer can put something. A timed event is a BLOCK over the minutes it spans rather than a row pinned inside the hour it starts in, so nine till ten covers the hour after nine; two rows sharing minutes split the column's width instead of one covering the other. Pressing empty space and dragging draws a range that opens the form in it; dragging an event's body moves the whole span, day and time together, and dragging its top or bottom edge moves that instant alone. The three-day trip draws in the all-day band above the axis rather than at a made-up midnight, overlapping rows are tinted, and each row carries its calendar's colour on its spine.",
+    tags: ["notes", "calendar", "pane", "week", "hour-axis", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
       <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
         <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
-          <Box width={720} height={380}>
+          <Box width={1024} height={700}>
             <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={NOVEMBER_5} />
           </Box>
         </WorkspaceProvider>
@@ -1517,13 +1548,13 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "day",
     description:
-      "The day view: one column, the day's events in the order the index returns them. An event with no time of its own shows as all day rather than at a made-up hour.",
-    tags: ["notes", "calendar", "pane", "day", "events"],
+      "The day view: one column with the hours named down its axis, opened where the day starts rather than at midnight, so a 14:00 event starts level with the label that says so, covers its own hour of the axis, and an empty hour is a target. Each hour offers capture at itself; a drag down the column draws a range and opens the form in it, and an all-day event sits in the band above the axis rather than at a made-up hour.",
+    tags: ["notes", "calendar", "pane", "day", "hour-axis", "capture", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
       <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
         <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
-          <Box width={420} height={320}>
+          <Box width={1024} height={700}>
             <CalendarPane paneId="pane-1" item={calendarItem("day")} initialAnchor={NOVEMBER_5} />
           </Box>
         </WorkspaceProvider>

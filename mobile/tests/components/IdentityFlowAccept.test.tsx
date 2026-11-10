@@ -126,7 +126,7 @@ const ACCEPT_COPY_KEYS = [
   "identityHome.acceptPhraseLabel",
   "identityHome.passwordHeading",
   "identityHome.acceptPasswordNote",
-  "password.createForm.passwordLabel",
+  "common.masterpassword",
   "password.createForm.confirmLabel",
   "identityHome.acceptSubmit",
 ];
@@ -492,7 +492,7 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
       "identityHome.acceptPasswordNote",
     );
     expect(screen.getByTestId("identity-flow.accept.password-label").textContent).toBe(
-      "password.createForm.passwordLabel",
+      "common.masterpassword",
     );
     expect(screen.getByTestId("identity-flow.accept.confirm-label").textContent).toBe(
       "password.createForm.confirmLabel",
@@ -624,7 +624,7 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
       screen.getByTestId("identity-flow.name-input").getAttribute("aria-label"),
     ).toBe("sync.nameGate.label");
     expect(screen.getByTestId("identity-flow.name.save").textContent).toBe(
-      "sync.nameGate.save",
+      "common.continue",
     );
   });
 });

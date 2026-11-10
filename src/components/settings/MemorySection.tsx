@@ -165,7 +165,7 @@ function MemoryRow(props: {
       <li style={ROW_STYLE} data-testid="settings.memory.row-editing">
         <textarea
           data-testid="settings.memory.edit-input"
-          aria-label={t("settings.memory.editLabel")}
+          aria-label={t("common.edit")}
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
@@ -190,7 +190,7 @@ function MemoryRow(props: {
             onClick={() => setEditing(false)}
             style={LINK_BUTTON_STYLE}
           >
-            {t("settings.memory.cancel")}
+            {t("common.cancel")}
           </button>
         </div>
       </li>
@@ -225,7 +225,7 @@ function MemoryRow(props: {
           onClick={startEdit}
           style={LINK_BUTTON_STYLE}
         >
-          {t("settings.memory.editLabel")}
+          {t("common.edit")}
         </button>
         <button
           type="button"
@@ -390,7 +390,7 @@ export function MemorySection(props: {
         <div style={HELPER_STYLE}>
           <p data-testid="settings.memory.load-failed">{t("settings.memory.loadFailed")}</p>
           <button type="button" data-testid="settings.memory.retry" style={LINK_BUTTON_STYLE} onClick={() => void reload()}>
-            {t("settings.memory.retryLabel")}
+            {t("common.tryagain")}
           </button>
         </div>
       ) : rows === null ? null : rows.length === 0 ? (
@@ -488,7 +488,7 @@ export function MemorySection(props: {
                     data-testid="settings.memory.seed.remove-cancel"
                     onClick={() => setConfirmingSeedClear(false)}
                   >
-                    {t("settings.memory.cancelLabel")}
+                    {t("common.cancel")}
                   </Button>
                 </div>
               ) : (
@@ -524,7 +524,7 @@ export function MemorySection(props: {
               onClick={() => setConfirmingClear(false)}
               style={LINK_BUTTON_STYLE}
             >
-              {t("settings.memory.cancelLabel")}
+              {t("common.cancel")}
             </button>
           </>
         ) : (

@@ -187,7 +187,7 @@ export function PasswordCreateForm({
   const fields = (
     <>
         <PasswordInput
-          label={t("password.createForm.passwordLabel")}
+          label={t("common.masterpassword")}
           value={password}
           onChange={setPassword}
           show={showPassword}

@@ -188,7 +188,7 @@ export function AiProviderConsent({
           data-testid="ai-consent.cancel"
           onClick={onCancel}
         >
-          {t("settings.ai.consent.cancel")}
+          {t("common.cancel")}
         </Button>
         {/* Explicit and specific to the named provider — never a bare "OK". */}
         <Button variant="primary" data-testid="ai-consent.accept" onClick={onAccept}>

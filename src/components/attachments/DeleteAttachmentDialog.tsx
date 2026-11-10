@@ -98,7 +98,7 @@ export function DeleteAttachmentDialog({
       onClose={deleting ? () => {} : onClose}
       labelId="delete-attachment-title"
       width={460}
-      closeLabel={t("attachments.deleteDialog.cancel")}
+      closeLabel={t("common.cancel")}
       bodyBleed
     >
       <div style={BODY_STYLE}>
@@ -114,7 +114,7 @@ export function DeleteAttachmentDialog({
                 const title = cache.get(id as NoteId)?.title ?? null;
                 const label =
                   title === null || title.trim() === ""
-                    ? t("attachments.deleteDialog.untitled")
+                    ? t("common.untitled")
                     : title;
                 return <li key={id}>{label}</li>;
               })}
@@ -134,7 +134,7 @@ export function DeleteAttachmentDialog({
           disabled={deleting}
           data-testid="delete-attachment.cancel"
         >
-          {t("attachments.deleteDialog.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="danger"

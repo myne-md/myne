@@ -39,7 +39,26 @@ export default defineConfig(async () => ({
       // the desktop pane and the agent tool's answers, so a cell and a row cannot
       // disagree about which day a span falls on.
       { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      // The hour axis: where a block sits on a day, and what a pointer position
+      // means. Shared so a phone and a laptop cannot disagree about 10:30.
+      { find: "@myne/calendar-layout", replacement: sib("../src/notes/calendar/layout.ts") },
+      // The whole-vocabulary edit writer: saving an EVENT must patch the same six
+      // frontmatter fields on a phone as on a laptop.
+      { find: "@myne/calendar-update", replacement: sib("../src/notes/calendar/updateEvent.ts") },
+      // The two hour-axis gestures: where a drag landed. One implementation, because
+      // two copies is how a phone and a laptop start disagreeing about 10:30.
+      { find: "@myne/calendar-gesture", replacement: sib("../src/notes/calendar/gesture.ts") },
+      // Which colour a calendar draws in, and which calendars a view shows: the same
+      // answers the desktop pane uses, so an event cannot be one colour on each.
+      { find: "@myne/calendar-colour", replacement: sib("../src/notes/calendar/colour.ts") },
+      { find: "@myne/calendar-visibility", replacement: sib("../src/notes/calendar/visibility.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
+      // The version-history surface: the diff RENDERER and the author-label rule are
+      // one implementation each on the desktop, and the phone reads them rather than
+      // growing twins — a diff drawn two ways is two answers to "what changed", and
+      // `identityLabel.ts` exists BECAUSE two surfaces had already drifted on how an
+      // unattributed device is named (myne-md/myne#1042).
+      { find: "@myne/diff-view", replacement: sib("../src/notes/components/DiffView.tsx") },
       // The one reader of `skip:`, and the one writer of it (decisions/storage/0795).
       // Aliased rather than reimplemented: the field's bytes are a function of its
       // set, so two writers would be two orderings and every sync would see a
@@ -370,7 +389,17 @@ export default defineConfig(async () => ({
   server: {
     port: 1422,
     strictPort: true,
-    host: host || false,
+    // `"::"` rather than `false`, and that is what makes the iOS development client
+    // able to load at all. `false` binds whichever stack `localhost` happens to
+    // resolve to first (measured both ways on this Mac: `127.0.0.1` on one run,
+    // `[::1]` on the next), and the app reaches the server through Tauri's custom
+    // protocol handler in Rust, which does NOT fall back to the other stack: a
+    // mismatched run fails every module with `Failed to request
+    // http://localhost:1422/src/...: error sending request` while the server is
+    // plainly up. `"::"` listens on both (macOS leaves IPV6_V6ONLY off), so the
+    // devUrl name resolves either way. It is a DEV-only bind and it covers the LAN,
+    // which is also what a physical iPhone needs.
+    host: host || "::",
     hmr: host
       ? {
           protocol: "ws",

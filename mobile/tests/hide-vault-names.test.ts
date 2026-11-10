@@ -211,56 +211,38 @@ async function click(el: HTMLElement): Promise<void> {
 }
 
 describe("the Privacy row states its bounds, one press away", () => {
-  it("keeps the destructive sentence on the row and puts all three in the sheet", async () => {
+  it("keeps the destructive sentence on the row and draws no sheet at all", async () => {
     // The row sentence is the one a reader cannot miss, and it is the reason the
-    // switch can be understood without opening anything. The three explanatory
-    // sentences are NOT deleted: they are the bounds, and both of them have to
-    // survive the move: "erases" read alone means more than it does.
+    // switch can be understood without opening anything (myne-md/myne#411: a bound
+    // on a destructive switch may not hide behind an interaction).
+    //
+    // The three explanatory paragraphs that used to open in a sheet are GONE on
+    // both clients (owner, 2026-11-08: the popover was the noise). The four
+    // limits stay recorded in `agent-tooling/docs/threat-model.md` §7
+    // (`decisions/clients/0799`).
     invoke.mockResolvedValue({ hidden: false, available: true });
     const container = await renderBlockAsync();
 
-    // On the row, unconditionally: the destructive sentence.
     expect(rowEl(container).textContent).toContain("settings.privacy.hideVaultNamesInline");
-
-    // Not painted anywhere before the press: no standing grey paragraphs.
-    expect(container.querySelector('[data-testid="settings.hide-vault-names-erases"]')).toBeNull();
-    expect(container.querySelector('[data-testid="settings.hide-vault-names-residue"]')).toBeNull();
-
-    const trigger = container.querySelector(
-      '[data-testid="settings.hide-vault-names-trigger"]',
-    ) as HTMLElement;
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(trigger.getAttribute("aria-label")).toBe("settings.helperDisclosureLabel");
-
-    // On the TITLE line, not under the card. A bare `?` annotates the thing it
-    // sits beside, and parked below the card it read as belonging to whatever
-    // followed it (found in the myne-md/myne#960 capture, not by a test).
-    expect(rowEl(container).contains(trigger)).toBe(true);
-    const titleLine = trigger.parentElement as HTMLElement;
-    expect(titleLine.textContent).toContain("settings.privacy.hideVaultNamesLabel");
-    expect(titleLine.textContent).not.toContain("settings.privacy.hideVaultNamesInline");
-
-    await click(trigger);
-
-    const sheet = container.querySelector(
-      '[data-testid="settings.hide-vault-names-sheet"]',
-    ) as HTMLElement;
-    expect(sheet.textContent).toContain("settings.privacy.hideVaultNamesHelper");
-    expect(sheet.textContent).toContain("settings.privacy.hideVaultNamesErases");
-    expect(sheet.textContent).toContain("settings.privacy.hideVaultNamesResidue");
+    expect(
+      container.querySelector('[data-testid="settings.hide-vault-names-trigger"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-testid="settings.hide-vault-names-sheet"]'),
+    ).toBeNull();
   });
 
-  it("carries exactly the desktop row's nine locale keys, and invents none", () => {
+  it("carries exactly the desktop row's locale keys, and invents none", () => {
     // Byte-identical copy across the two clients is the point: they must not
     // come to disagree about what is private. A mobile-only shortened key would
-    // be exactly how that starts, and the two bounds are the ones that would be
-    // shortened first.
+    // be exactly how that starts.
     //
-    // The count moved 8 -> 9 with myne-md/myne#885, which split the row's copy:
-    // the destructive sentence became `hideVaultNamesInline` on the row and the
-    // rest moved behind the desktop's question mark. The desktop's panel now
-    // names nine of these keys and mobile names the same nine, which is what the
-    // equality below checks. (The feature's search-index key lives in
+    // The count fell 9 -> 6 on 2026-11-08, when the popover behind the `?` was
+    // removed on BOTH clients (owner: the qualifying paragraphs were the noise).
+    // What the pair still shares is the label, the one sentence that is the ACT,
+    // and the three error/unavailable notices, and the equality below is what
+    // stops either client from growing a second, quieter version of the copy back
+    // on its own. (The feature's search-index key lives in
     // `settingsSearchIndex.ts`, not in the panel, so the regex never sees it.)
     const mobile = read("../src/components/HideVaultNamesBlock.tsx");
     const desktop = read("../../src/components/settings/PrivacyPanel.tsx");
@@ -270,7 +252,7 @@ describe("the Privacy row states its bounds, one press away", () => {
           [...s.matchAll(/t\("(settings\.privacy\.hideVaultNames[A-Za-z]*)"\)/g)].map((m) => m[1]),
         ),
       ].sort();
-    expect(keys(mobile)).toHaveLength(9);
+    expect(keys(mobile)).toHaveLength(6);
     expect(keys(mobile)).toEqual(keys(desktop));
   });
 

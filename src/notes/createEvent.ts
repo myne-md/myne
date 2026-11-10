@@ -21,16 +21,6 @@ import { noteCreate } from "./createNote";
 
 const decoder = new TextDecoder();
 
-/**
- * The folder a new event lands in when the user has not said otherwise.
- *
- * A default LOCATION only: `kind` is an event's identity, never its folder, so an
- * event dragged to `Work/` or filed by an importer stays an event. Creating in it
- * registers the folder as deliberate through `noteCreate`, the daily-notes
- * discipline, so an empty `Calendar/` still shows in the sidebar.
- */
-export const DEFAULT_CALENDAR_FOLDER = "Calendar/";
-
 /** What a caller supplies when creating an event. */
 export type NewEventInput = {
   readonly title: string;
@@ -86,12 +76,17 @@ export function buildEventNoteBytes(input: NewEventInput): Uint8Array {
 /**
  * Create an event note and return its `NoteId`.
  *
- * `folder` defaults to {@link DEFAULT_CALENDAR_FOLDER}; pass `null` for the vault
- * root, which is what an importer or a drag already did.
+ * `folder` defaults to the VAULT ROOT, and that is the fix rather than an
+ * omission (owner, 2026-11-08). A default of `Calendar/` created a folder
+ * nobody asked for on the first event and then kept it alive through the
+ * deliberate-folder registry even after every event in it was deleted, and
+ * because `.ics` import already passed `null`, the two halves of one feature
+ * filed the same note in two different places. `kind` is an event's identity,
+ * so nothing needs a folder of its own: a caller that wants one names it.
  */
 export async function createEvent(input: NewEventInput): Promise<string> {
   const folder = normalizeFolderPath(
-    input.folder === undefined ? DEFAULT_CALENDAR_FOLDER : input.folder,
+    input.folder === undefined ? null : input.folder,
   );
   let bytes = buildEventNoteBytes(input);
   // `folder:` through the same seam, never by string concatenation: the create

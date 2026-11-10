@@ -7,25 +7,32 @@
 // the zoom, paging and the write gestures.
 //
 // **The grid math is not here.** `calendar/grid.ts` owns what day an event falls on
-// and how a month lays out; this file draws what those functions say. That split is
-// why the four views agree: a cell and an agenda line cannot disagree about a
-// multi-day span, because both read `rowsByDate`.
+// and how a month lays out; this file draws what those functions say, which is why
+// a cell and an agenda line cannot disagree about a multi-day span.
 //
-// **A cell click captures, a row click opens.** Capture is one gesture (a `+` on the
-// day, an inline title, Enter), and the note is the event, so the fastest path
-// writes the same bytes the full form would. Opening a row opens the note in a tab,
-// because an event IS a note and its keys, links and body are the note's.
+// **A cell click captures, a row click opens its form.** Capture is one gesture (a
+// `+`, an inline title, Enter) that writes the same bytes the full form would; the
+// month grid gives it a day, the hour axis gives it an hour.
 //
 // **Locked shows a shell with no data.** The query is slot-gated host-side, so a
 // locked vault gets a refusal rather than content; the pane says so instead of
 // rendering an empty grid that reads as "nothing scheduled".
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Input } from "../../components/primitives/Input";
+import { SearchableSelect } from "../../components/primitives/SearchableSelect";
 import { Segmented } from "../../components/primitives/Segmented";
 import {
   vaultIndicesCalendarRange,
@@ -35,9 +42,13 @@ import {
 import { useIndexNonce } from "../indexNonce";
 import { useLocalToday } from "../useLocalToday";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
+import { formatWallClockTime } from "../../lib/datetimeFormat";
 import { usePrefs } from "../../hooks/usePrefs";
 import { createEvent } from "../createEvent";
 import { importIcsIntoVault } from "../calendar/icsImport";
+import { TimeField } from "../calendar/fields";
+import { applyEventEdit, editFromPlan } from "../calendar/updateEvent";
+import { reindexNote } from "../vaultIndices";
 import {
   canImportIcs,
   exportIcsFile,
@@ -72,7 +83,31 @@ import {
   type WorkspaceItem,
 } from "../workspaceState";
 import { WEEKDAY_HEADERS, dayCells, monthGrid, shiftAnchor, weekRow, windowForView } from "../calendar/grid";
-import { CalendarEventForm, emptyEventForm } from "./CalendarEventForm";
+import {
+  DAY_MINUTES,
+  MIN_BLOCK_MINUTES,
+  clockOf,
+  layoutDay,
+  minuteOfDay,
+  rowHour,
+  type PlacedSpan,
+} from "../calendar/layout";
+import {
+  CalendarEventForm,
+  emptyEventForm,
+  formFromRow,
+  planEventForm,
+  type EventFormValues,
+} from "./CalendarEventForm";
+import { beginCreateGesture, beginMoveGesture, beginResizeGesture } from "../calendar/gesture";
+import {
+  hiddenSettingFor,
+  isCalendarVisible,
+  knownCalendars,
+  visibleRows,
+} from "../calendar/visibility";
+import { CALENDAR_COLOUR_SETTING_PREFIX } from "../calendar/colour";
+import { setCalendarSetting } from "../../lib/prefs";
 import { calendarColour } from "../calendar/colour";
 import {
   isProjected,
@@ -82,11 +117,10 @@ import {
   type OccurrenceRefusal,
 } from "../calendar/occurrence";
 import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
-import { Fragment } from "react";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { skipOccurrence } from "../calendar/skipWrite";
 import { overrideOccurrence } from "../calendar/overrideWrite";
-import { homeClockFor } from "../../lib/homeZone";
+import { homeClockFor, readHomeZone, subscribeHomeZone } from "../../lib/homeZone";
 
 /** A row the pane draws: an event's occurrence, or a due-bearing task. */
 type DisplayRow = CalendarRow & { readonly task?: VaultTask };
@@ -95,12 +129,21 @@ type DisplayRow = CalendarRow & { readonly task?: VaultTask };
  *  opens a calendar to answer. */
 const AGENDA_DAYS = 30;
 
-/** The default time a captured event gets: 09:00, the hour the all-day reminder
- *  anchor defaults to, so capture and reminder agree about mornings. */
+/** A captured event's default hour: the all-day reminder anchor's own. */
 const CAPTURE_HOUR = "09:00";
 
 /** How many chips a month cell shows before it counts the rest. */
 const CELL_CHIPS = 3;
+
+/** The hours a day column draws: a fixed axis, so two days' 14:00 sit level. */
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+/** Where a day column starts when the day holds nothing: a working morning. */
+const FIRST_VISIBLE_HOUR = 8;
+
+function hourValue(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
 
 export function CalendarPane({
   paneId,
@@ -118,6 +161,7 @@ export function CalendarPane({
   const ws = useWorkspace();
   const nonce = useIndexNonce();
   const { timeZone: zone } = useDateTimeDisplay();
+  const display = useDateTimeDisplay();
   const today = useLocalToday(zone);
   const { prefs } = usePrefs();
   const settings = prefs.calendar_settings ?? {};
@@ -128,6 +172,8 @@ export function CalendarPane({
   const [range, setRange] = useState<CalendarRange | null>(null);
   const [error, setError] = useState<"locked" | "failed" | null>(null);
   const [capturing, setCapturing] = useState<string | null>(null);
+  /** The hour a click landed on; `null` means a day was clicked, not an hour. */
+  const [captureHour, setCaptureHour] = useState<string | null>(null);
   // The gesture in flight: which row, and whether the user is moving or resizing it.
   const [drag, setDrag] = useState<{
     row: CalendarRow;
@@ -141,15 +187,45 @@ export function CalendarPane({
   // Optimistic spans keyed by note id, so the row lands where it was dropped and
   // is put back by the reload when the write is refused.
   const [optimistic, setOptimistic] = useState<Record<string, EventSpan>>({});
+  const io = useMemo(
+    () => ({
+      readNote: noteRead,
+      writeNote: (id: string, body: string, base: string) => noteUpdate(id, body, base),
+      flushDirtyPanes: ws.flushAll,
+    }),
+    [ws],
+  );
+  /** A projected occurrence has no note: name the series instead. */
+  const refuseOccurrence = useCallback(
+    (row: CalendarRow) =>
+      setOccurrence({
+        refusal: {
+          reason: "belongs-to-series" as const,
+          seriesNoteId: seriesNoteId(row),
+          occurrenceDate: occurrenceDate(row),
+          title: row.title,
+        },
+        row,
+      }),
+    [],
+  );
   const [failure, setFailure] = useState<EventWriteRefusal | null>(null);
   /**
-   * The full form's date, or `null` when it is closed.
+   * The full form's seed values, or `null` when it is closed.
    *
    * Deliberately separate from `capturing`: a click on a cell is the fast path (a
    * title and nothing else), and the form is the deliberate one. Both write through
    * `createEvent`, so the two paths produce the same record.
    */
-  const [composing, setComposing] = useState<string | null>(null);
+  const [composing, setComposing] = useState<EventFormValues | null>(null);
+  /** The range a create-drag is drawing, or `null`. */
+  const [creating, setCreating] = useState<{ date: string; from: number; to: number } | null>(null);
+  /** Set while a create-drag ran, so its release does not also open the inline
+   *  capture field. */
+  const draggedRef = useRef(false);
+  /** The event whose form is open for EDITING, or `null`. A chip opens this rather
+   *  than the markdown note, which the owner wants visible only on export. */
+  const [editing, setEditing] = useState<DisplayRow | null>(null);
   /** The time the user typed for a retimed occurrence, held per row. */
   const [retime, setRetime] = useState<string>("");
   const [reload, setReload] = useState(0);
@@ -225,7 +301,10 @@ export function CalendarPane({
     })
     .filter((row) => row.start !== "");
 
-  const rows: DisplayRow[] = [
+  // Harvest once, over the rows as the host returned them: a calendar switched off
+  // must not reach the month grid, the axis or the agenda, and it must not count as a
+  // conflict either.
+  const allRows: DisplayRow[] = [
     ...(range?.rows ?? []).map((row) => {
       const span = optimistic[row.noteId];
       if (span === undefined) return row as DisplayRow;
@@ -233,6 +312,8 @@ export function CalendarPane({
     }),
     ...taskRows,
   ];
+  const rows: DisplayRow[] = visibleRows(settings, allRows);
+  const calendars = knownCalendars(settings, allRows, CALENDAR_COLOUR_SETTING_PREFIX);
   const unreadable = range?.unreadable ?? [];
 
   /**
@@ -259,11 +340,7 @@ export function CalendarPane({
         await skipOccurrence({
           noteId: seriesNoteId(row),
           occurrenceDate: occurrenceDate(row),
-          io: {
-            readNote: noteRead,
-            writeNote: (id, body, base) => noteUpdate(id, body, base),
-            flushDirtyPanes: ws.flushAll,
-          },
+          io,
         });
         setOccurrence(null);
       } catch (err) {
@@ -289,11 +366,7 @@ export function CalendarPane({
           noteId: seriesNoteId(row),
           occurrenceDate: occurrenceDate(row),
           time: retime,
-          io: {
-            readNote: noteRead,
-            writeNote: (id, body, base) => noteUpdate(id, body, base),
-            flushDirtyPanes: ws.flushAll,
-          },
+          io,
         });
         setOccurrence(null);
         setRetime("");
@@ -303,6 +376,38 @@ export function CalendarPane({
       setReload((n) => n + 1);
     },
     [retime, ws],
+  );
+
+  /** ONE writer for every gesture that changes `start`/`end`, so a refused move
+   *  cannot be shown as landed by the gesture that did not check. */
+  const commitSpan = useCallback(
+    async (row: CalendarRow, rendered: EventSpan, next: EventSpan, changed: boolean) => {
+      const clear = () =>
+        setOptimistic((current) => {
+          const rest = { ...current };
+          delete rest[row.noteId];
+          return rest;
+        });
+      if (!changed) {
+        clear();
+        return;
+      }
+      setFailure(null);
+      setOptimistic((current) => ({ ...current, [row.noteId]: next }));
+      try {
+        await applyEventMove({ noteId: row.noteId, rendered, next, io });
+        // Re-index before reloading, or the fresh read returns the OLD `start`.
+        await reindexNote(row.noteId);
+        clear();
+        setReload((n) => n + 1);
+      } catch (err) {
+        clear();
+        setFailure(err instanceof EventWriteRefused ? err.reason : null);
+        setReload((n) => n + 1);
+        if (!(err instanceof EventWriteRefused)) throw err;
+      }
+    },
+    [io],
   );
 
   const dropOn = useCallback(
@@ -316,15 +421,7 @@ export function CalendarPane({
       // exceptions). Refuse it with the two honest alternatives rather than a
       // toast, and refuse BEFORE any planner runs.
       if (isProjected(gesture.row)) {
-        setOccurrence({
-          refusal: {
-            reason: "belongs-to-series",
-            seriesNoteId: seriesNoteId(gesture.row),
-            occurrenceDate: occurrenceDate(gesture.row),
-            title: gesture.row.title,
-          },
-          row: gesture.row,
-        });
+        refuseOccurrence(gesture.row);
         return;
       }
       const from = parseCivilDate(gesture.rendered.start.slice(0, 10));
@@ -335,43 +432,107 @@ export function CalendarPane({
 
       const next = gesture.mode === "move" ? planDrag(gesture.rendered, delta) : planResize(gesture.rendered, delta);
       if (next === null) return; // an end before the start is not a shape to write
-
-      setFailure(null);
-      setOptimistic((current) => ({ ...current, [gesture.row.noteId]: next }));
-      try {
-        await applyEventMove({
-          noteId: gesture.row.noteId,
-          rendered: gesture.rendered,
-          next,
-          io: {
-            readNote: noteRead,
-            writeNote: (id, body, base) => noteUpdate(id, body, base),
-            flushDirtyPanes: ws.flushAll,
-          },
-        });
-        setReload((n) => n + 1);
-      } catch (err) {
-        setOptimistic((current) => {
-          const rest = { ...current };
-          delete rest[gesture.row.noteId];
-          return rest;
-        });
-        setFailure(err instanceof EventWriteRefused ? err.reason : null);
-        setReload((n) => n + 1);
-        if (!(err instanceof EventWriteRefused)) throw err;
-      }
+      await commitSpan(gesture.row, gesture.rendered, next, true);
     },
-    [drag, ws],
+    [drag, commitSpan],
   );
+
+  /** Press and drag on empty hour space: draw the range, then open the form in it.
+   *  A press that does not move stays the inline field, so neither is a mode. */
+  const beginCreate = (event: React.PointerEvent<HTMLDivElement>, date: string) => {
+    if (event.button !== 0 || event.target !== event.currentTarget) return;
+    // The geometry is the shared gesture's; the pane supplies the two meanings a
+    // press has here: a drag opens the form in the range it drew, and a plain press
+    // stays the inline field it always was, so neither is a mode.
+    beginCreateGesture(event, {
+      date,
+      onRange: (from, to) => setCreating({ date, from, to }),
+      onDrawn: (from, to) => {
+        setCreating(null);
+        setComposing({
+          ...emptyEventForm(date),
+          startTime: clockOf(from),
+          endDate: date,
+          endTime: clockOf(to),
+        });
+      },
+      onTap: (minute) => {
+        setCreating(null);
+        openCapture(date, Math.floor(minute / 60));
+      },
+    });
+  };
+
+  /** Drag an event's body: the whole span moves by the pointer, so the day and the
+   *  time both follow it. The point inside the block that was grabbed stays under
+   *  the pointer, so grabbing near its bottom does not slide the start. */
+  const beginMove = (
+    event: React.PointerEvent<HTMLElement>,
+    row: DisplayRow,
+    date: string,
+    drawnStartMin: number,
+  ) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    if (row.task !== undefined) return;
+    if (isProjected(row)) {
+      refuseOccurrence(row);
+      return;
+    }
+    const rendered: EventSpan = { start: row.start, end: row.end, allDay: row.allDay };
+    // The geometry is the shared gesture's (`calendar/gesture.ts`); what is here is
+    // what only a pane knows: the optimistic overlay, the one writer, and that the
+    // click which follows a drag must not also open the form.
+    beginMoveGesture(event, {
+      rendered,
+      drawnStartMin,
+      date,
+      onPreview: (next) => {
+        draggedRef.current = true;
+        setOptimistic((current) => ({ ...current, [row.noteId]: next }));
+      },
+      onCommit: (next) => {
+        void commitSpan(row, rendered, next, next.start !== rendered.start || next.end !== rendered.end);
+      },
+    });
+  };
+
+  /** Drag an edge to move that instant. ONE write on release, never per move. */
+  const beginResize = (
+    event: React.PointerEvent<HTMLElement>,
+    row: DisplayRow,
+    date: string,
+    edge: "start" | "end",
+  ) => {
+    if (event.button !== 0) return;
+    event.preventDefault(); // the pointer's default here is a text selection
+    event.stopPropagation();
+    if (row.task !== undefined) return;
+    if (isProjected(row)) {
+      refuseOccurrence(row);
+      return;
+    }
+    const rendered: EventSpan = { start: row.start, end: row.end, allDay: row.allDay };
+    beginResizeGesture(event, {
+      rendered,
+      date,
+      edge,
+      onPreview: (next) => setOptimistic((current) => ({ ...current, [row.noteId]: next })),
+      onCommit: (next) => {
+        void commitSpan(row, rendered, next, next.start !== rendered.start || next.end !== rendered.end);
+      },
+    });
+  };
 
   const commitCapture = useCallback(
     async (date: string) => {
       const title = draft.trim();
       if (title === "") {
         setCapturing(null);
+        setCaptureHour(null);
         return;
       }
-      const start = parseEventInstant(`${date} ${CAPTURE_HOUR}`);
+      const start = parseEventInstant(`${date} ${captureHour ?? CAPTURE_HOUR}`);
       if (start === null) {
         setError("failed");
         return;
@@ -380,12 +541,20 @@ export function CalendarPane({
         await createEvent({ title, start });
         setDraft("");
         setCapturing(null);
+        setCaptureHour(null);
       } catch {
         setError("failed");
       }
     },
-    [draft],
+    [draft, captureHour],
   );
+
+  /** One gesture, two grains: a day from the grid, an hour from the axis. */
+  const openCapture = (date: string, hour: number | null = null) => {
+    setCapturing(date);
+    setCaptureHour(hour === null ? null : hourValue(hour));
+    setDraft("");
+  };
 
   const heading = useMemo(() => {
     switch (view) {
@@ -423,6 +592,7 @@ export function CalendarPane({
         }
         if (event.key === "Escape") {
           setCapturing(null);
+          setCaptureHour(null);
           setDraft("");
         }
       }}
@@ -430,7 +600,15 @@ export function CalendarPane({
     />
   );
 
-  const chip = (row: DisplayRow, showTime: boolean) => (
+  // The preference lives in `localStorage` and Settings writes it from another screen,
+  // so the calendar SUBSCRIBES: reading it once during render left an open calendar on
+  // one clock until something unrelated forced a re-render, which is what made the
+  // second clock look like a feature that does nothing.
+  const homeZone = useSyncExternalStore(subscribeHomeZone, readHomeZone);
+  const homeFor = (row: DisplayRow) =>
+    row.allDay ? null : homeClockFor(row.start.replace(" ", "T"), homeZone);
+
+  const chip = (row: DisplayRow, showTime: boolean, showGrip = showTime, dragToMove = true) => (
     <Button
       key={`${row.noteId}-${row.start}`}
       variant="ghost"
@@ -448,9 +626,9 @@ export function CalendarPane({
       // A task is not draggable: its date is a `due:` field on a line (or on the
       // note's frontmatter), not an event `start`, and the move writer would patch a
       // field no reader of that line agrees about.
-      draggable={row.task === undefined}
+      draggable={dragToMove && row.task === undefined}
       onDragStart={(event) => {
-        if (row.task !== undefined) {
+        if (!dragToMove || row.task !== undefined) {
           event.preventDefault();
           return;
         }
@@ -461,7 +639,19 @@ export function CalendarPane({
           rendered: { start: row.start, end: row.end, allDay: row.allDay },
         });
       }}
-      onClick={() => ws.openNewTabInFocused(row.noteId)}
+      // An event opens its form; a task opens the note it is a line inside.
+      onClick={() => {
+        if (row.task !== undefined) {
+          ws.openNewTabInFocused(row.noteId);
+          return;
+        }
+        if (isProjected(row)) {
+          // An appearance has no note of its own: the panel names the series.
+          refuseOccurrence(row);
+          return;
+        }
+        setEditing(row);
+      }}
       onContextMenu={
         isProjected(row)
           ? (event) => {
@@ -470,93 +660,64 @@ export function CalendarPane({
               // answers (edit the series, add a one-off, cancel this one) instead
               // of a menu with a fourth thing that would have no legal write.
               event.preventDefault();
-              setOccurrence({
-                refusal: {
-                  reason: "belongs-to-series",
-                  seriesNoteId: seriesNoteId(row),
-                  occurrenceDate: occurrenceDate(row),
-                  title: row.title,
-                },
-                row,
-              });
+              refuseOccurrence(row);
             }
           : undefined
       }
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-1)",
-        width: "100%",
-        minWidth: 0,
-        padding: "var(--space-1)",
-        border: "1px solid var(--line-1)",
-        borderRadius: "var(--radius-1)",
-        background: row.conflicts ? "var(--warning-soft)" : "var(--bg-1)",
-        cursor: "pointer",
-        textAlign: "left",
-      }}
+      className="myne-calendar__chip"
+      // The row's colour is the user's own token choice, so it comes per row, and it
+      // arrives as ONE variable: the spine and the wash are the same value or they
+      // drift the first time one of them is edited.
+      style={{ "--calendar-colour": calendarColour(settings, row.calendar) } as CSSProperties}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width: "var(--space-2)",
-          height: "var(--space-2)",
-          flex: "0 0 auto",
-          borderRadius: "var(--radius-pill)",
-          background: calendarColour(settings, row.calendar),
-        }}
-      />
       {showTime && (
-        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)", flex: "0 0 auto" }}>
-          {row.allDay ? t("calendar.allDay") : row.start.slice(11)}
-          {(() => {
-            // The second clock (decisions/storage/0797): the note's time is a wall
-            // clock and stays one, so this is an addition to the READING rather
-            // than anything stored. `homeClockFor` answers null when the preference
-            // is unset or is the device's own zone, which is the common case and
-            // must cost the row nothing.
-            const home = homeClockFor(row.start.replace(" ", "T"));
-            if (home === null) return null;
-            const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
-            return (
-              <span data-testid="calendar.row.home-clock" style={{ marginLeft: "var(--space-1)" }}>
-                {`· ${home.time}${day}`}
-              </span>
-            );
-          })()}
+        <span className="myne-calendar__time">
+          {row.allDay ? t("calendar.allDay") : formatWallClockTime(row.start.slice(11), display)}
         </span>
       )}
-      <span
-        style={{
-          fontSize: "var(--text-xs)",
-          color: "var(--fg-1)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {row.title ?? t("calendar.untitled")}
-      </span>
+      {/* The second clock (decisions/storage/0797): the note's time is a wall clock
+          and stays one, so this is an addition to the READING and nothing stored.
+          Its OWN line rather than a suffix on the clock: a block in a week column is
+          narrow enough to cut "09:00 · 17:00" mid-string, and a reading nobody can
+          finish is a reading that is not there. `homeClockFor` answers null when the
+          preference is unset or is the device's own zone, so the common case costs
+          the row nothing. */}
+      {showTime &&
+        (() => {
+          const home = homeFor(row);
+          if (home === null) return null;
+          const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
+          return (
+            <span className="myne-calendar__home" data-testid="calendar.row.home-clock">
+              {`${home.time}${day}`}
+            </span>
+          );
+        })()}
+      <span className="myne-calendar__title">{row.title ?? t("calendar.untitled")}</span>
       {row.task !== undefined && <Icon name="check" size={10} />}
       {row.occurrenceOf !== null && <Icon name="rotate-ccw" size={10} />}
-      <span
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label={t("calendar.resize", { title: row.title ?? t("calendar.untitled") })}
-        draggable
-        onDragStart={(event) => {
-          event.stopPropagation();
-          setDrag({
-            row,
-            mode: "resize",
-            rendered: { start: row.start, end: row.end, allDay: row.allDay },
-          });
-        }}
-        onClick={(event) => event.stopPropagation()}
-        style={{ flex: "0 0 auto", width: "var(--space-2)", cursor: "ns-resize", color: "var(--fg-3)" }}
-      >
-        <Icon name="more-horizontal" size={10} />
-      </span>
+      {/* The grip only where a time axis exists to lengthen an event along: a month
+          cell has none, and `⋯` on every row of a 42-cell grid is noise. */}
+      {showGrip && (
+        <span
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t("calendar.resize", { title: row.title ?? t("calendar.untitled") })}
+          draggable
+          onDragStart={(event) => {
+            event.stopPropagation();
+            setDrag({
+              row,
+              mode: "resize",
+              rendered: { start: row.start, end: row.end, allDay: row.allDay },
+            });
+          }}
+          onClick={(event) => event.stopPropagation()}
+          style={{ flex: "0 0 auto", width: "var(--space-2)", cursor: "ns-resize", color: "var(--fg-3)" }}
+        >
+          <Icon name="more-horizontal" size={10} />
+        </span>
+      )}
     </Button>
   );
 
@@ -566,29 +727,6 @@ export function CalendarPane({
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
   }
-
-  /** Whether the marker belongs above this row: the first row that starts later. */
-  const nowMarker = (rowTime: string) => rowTime > now.slice(11);
-
-  /**
-   * The "now" line.
-   *
-   * A calendar without one makes the reader do the arithmetic the app already knows:
-   * every day looks the same, including today. It carries `aria-hidden` because it is
-   * a position, not information a screen reader can use, and the day header already
-   * says which day this is.
-   */
-  const nowLine = () => (
-    <div
-      aria-hidden="true"
-      data-testid="calendar.now"
-      style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", padding: "var(--space-0) 0" }}
-    >
-      <span style={{ width: "var(--space-1)", height: "var(--space-1)", borderRadius: "var(--radius-pill)", background: "var(--accent)" }} />
-      <span style={{ flex: "1 1 auto", borderTop: "1px solid var(--accent)" }} />
-      <span style={{ fontSize: "var(--text-xs)", color: "var(--accent)" }}>{now.slice(11, 16)}</span>
-    </div>
-  );
 
   const dayHeader = (date: string) => {
     const parsed = parseCivilDate(date);
@@ -612,149 +750,254 @@ export function CalendarPane({
           icon="plus"
           label={t("calendar.capture.on", { date })}
           iconSize={12}
-          onClick={() => {
-            setCapturing(date);
-            setDraft("");
-          }}
+          onClick={() => openCapture(date)}
         />
       </div>
     );
   };
 
-  const renderMonth = () => (
-    <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: "var(--space-1)", minHeight: 0 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "var(--space-1)" }}>
-        {WEEKDAY_HEADERS.map((day) => (
-          <span key={day} style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)", textAlign: "center" }}>
-            {t(`calendar.weekday.${day}`)}
-          </span>
-        ))}
+  const monthCell = (cell: ReturnType<typeof monthGrid>[number][number]) => (
+    <div
+      key={cell.date}
+      data-testid="calendar.cell"
+      data-date={cell.date}
+      data-outside={cell.inMonth ? undefined : "true"}
+      data-today={cell.date === today ? "true" : undefined}
+      className="myne-calendar__cell"
+      onDragOver={(event) => {
+        if (drag !== null) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        void dropOn(cell.date);
+      }}
+      // Empty space in a day captures. A month cell has one line of room, so what
+      // it opens is the inline title, where a week column opens the full form.
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        openCapture(cell.date);
+      }}
+    >
+      <div className="myne-calendar__cellhead">
+        <span className="myne-calendar__daynum">{cell.date.slice(8)}</span>
+        <span style={{ flex: "1 1 auto" }} />
+        <span className="myne-calendar__add">
+          <IconButton
+            icon="plus"
+            label={t("calendar.capture.on", { date: cell.date })}
+            iconSize={11}
+            onClick={() => openCapture(cell.date)}
+          />
+        </span>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateRows: `repeat(${monthGrid(anchor, rows).length}, minmax(0, 1fr))`,
-          gap: "var(--space-1)",
-          minHeight: 0,
-        }}
-      >
-        {monthGrid(anchor, rows).map((week) => (
-          <div key={week[0]!.date} style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "var(--space-1)", minHeight: 0 }}>
-            {week.map((cell) => (
-              <div
-                key={cell.date}
-                data-testid="calendar.cell"
-                data-date={cell.date}
-                onDragOver={(event) => {
-                  if (drag !== null) event.preventDefault();
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  void dropOn(cell.date);
-                }}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "var(--space-0)",
-                  minHeight: 0,
-                  padding: "var(--space-1)",
-                  borderRadius: "var(--radius-1)",
-                  border: "1px solid var(--line-1)",
-                  background: cell.inMonth ? "var(--bg-1)" : "var(--bg-2)",
-                  opacity: cell.inMonth ? 1 : 0.6,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{cell.date.slice(8)}</span>
-                  <span style={{ flex: "1 1 auto" }} />
-                  <IconButton
-                    icon="plus"
-                    label={t("calendar.capture.on", { date: cell.date })}
-                    iconSize={11}
-                    onClick={() => {
-                      setCapturing(cell.date);
-                      setDraft("");
-                    }}
-                  />
-                </div>
-                {capturing === cell.date && captureField(cell.date)}
-                {cell.rows.slice(0, CELL_CHIPS).map((row) => chip(row, false))}
-                {cell.rows.length > CELL_CHIPS && (
-                  <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
-                    {t("calendar.more", { count: cell.rows.length - CELL_CHIPS })}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
+      {capturing === cell.date && captureField(cell.date)}
+      <div className="myne-calendar__events">
+        {cell.rows.slice(0, CELL_CHIPS).map((row) => chip(row, true, false))}
       </div>
+      {cell.rows.length > CELL_CHIPS && (
+        <span className="myne-calendar__more">
+          {t("calendar.more", { count: cell.rows.length - CELL_CHIPS })}
+        </span>
+      )}
     </div>
   );
 
-  const renderColumns = (cells: ReturnType<typeof weekRow>) => (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))`,
-        gap: "var(--space-1)",
-        minHeight: 0,
-        overflowY: "auto",
-      }}
-    >
-      {cells.map((cell) => (
-        <div
-          key={cell.date}
-          data-testid="calendar.cell"
-          data-date={cell.date}
-          onDragOver={(event) => {
-            if (drag !== null) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            void dropOn(cell.date);
-          }}
-          // The cell is NOT a button. It holds buttons - one per event chip, plus the
-          // header's `+` - and a `role="button"` around them is the `nested-interactive`
-          // violation axe reports: a screen reader announces a button whose contents are
-          // buttons, and the focus order inside it stops making sense. The keyboard
-          // authoring path is the day header's `+`, which is a real labelled button; this
-          // click stays for the mouse, where an empty day is where a person reaches for a
-          // pen.
-          onClick={(event) => {
-            // Empty space in a day is where a person reaches for a pen, so a click
-            // on the cell itself opens the composer for that day. `currentTarget`
-            // rather than `target`: a click on a chip, the header's `+` or the
-            // capture field must keep meaning what it already meant, and a handler
-            // that fired on every bubbled click would open a form under the user's
-            // finger every time they opened an event.
-            if (event.target !== event.currentTarget) return;
-            setComposing(cell.date);
-          }}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-0)",
-            minHeight: 0,
-            padding: "var(--space-1)",
-            borderRadius: "var(--radius-1)",
-            border: "1px solid var(--line-1)",
-            background: "var(--bg-1)",
-          }}
-        >
-          {dayHeader(cell.date)}
-          {capturing === cell.date && captureField(cell.date)}
-          {cell.rows.map((row) => (
-            <Fragment key={`${row.noteId}-${row.start}`}>
-              {cell.date === today && nowMarker(row.start.slice(11)) ? nowLine() : null}
-              {chip(row, true)}
-            </Fragment>
+  const renderMonth = () => {
+    const weeks = monthGrid(anchor, rows);
+    return (
+      <div className="myne-calendar__month" data-testid="calendar.month">
+        <div className="myne-calendar__weekdays">
+          {WEEKDAY_HEADERS.map((day) => (
+            <span key={day} className="myne-calendar__weekday">
+              {t(`calendar.weekday.${day}`)}
+            </span>
           ))}
-          {cell.date === today && cell.rows.every((row) => row.start.slice(11) <= now.slice(11)) && nowLine()}
         </div>
-      ))}
-    </div>
-  );
+        <div
+          className="myne-calendar__weeks"
+          style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}
+        >
+          {weeks.map((week) => (
+            <div key={week[0]!.date} className="myne-calendar__week">
+              {week.map(monthCell)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const hoursRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Land the axis where the day usually starts: the first thing on it, else the
+   * current hour, else a working morning. Never midnight, and the slot's own
+   * `offsetTop` is the target so the row height stays in the stylesheet.
+   */
+  useEffect(() => {
+    const el = hoursRef.current;
+    if (el === null) return;
+    const first = rows
+      .map(rowHour)
+      .filter((hour): hour is number => hour !== null)
+      .sort((a, b) => a - b)[0];
+    const showsToday = today >= window.start && today <= window.end;
+    const hour = first ?? (showsToday ? Number(now.slice(11, 13)) : FIRST_VISIBLE_HOUR);
+    const slot = el.querySelector<HTMLElement>(`[data-hour="${hour}"]`);
+    if (slot !== null) el.scrollTop = slot.offsetTop;
+    // Only when the surface changes: re-running on every render would fight the
+    // reader's own scrolling while the pane ticks its clock.
+  }, [view, anchor, window.start]);
+
+  /**
+   * A day column with an hour axis, for both views that want one.
+   *
+   * A list of rows could not answer "at what hour", and gave a person nowhere to
+   * put a 14:00 meeting except the form. Each hour is a target of its own.
+   */
+  /** A timed row as a BLOCK over its own minutes; `layoutDay` owns the geometry and
+   *  the overlap split. The grips are a pointer shortcut the form also offers. */
+  const timedBlock = (date: string, block: PlacedSpan<DisplayRow>) => {
+    const share = 100 / block.columns;
+    const minutes = Math.max(block.endMin - block.startMin, MIN_BLOCK_MINUTES);
+    const title = block.row.title ?? t("calendar.untitled");
+    return (
+      <div
+        key={block.key}
+        className="myne-calendar__block"
+        data-testid="calendar.block"
+        // The body is the MOVE target; the grips inside it are the edges. A press
+        // that does not move still opens the form, which is what the chip's own
+        // click does - the drag suppresses it.
+        onPointerDown={(event) => beginMove(event, block.row, date, block.startMin)}
+        // The span as NUMBERS, so a scenario (and a test in jsdom, which computes
+        // no layout) can assert what the block covers instead of reading pixels.
+        data-start-minute={block.startMin}
+        data-end-minute={block.endMin}
+        style={{
+          top: `${(block.startMin / DAY_MINUTES) * 100}%`,
+          height: `${(minutes / DAY_MINUTES) * 100}%`,
+          insetInlineStart: `${block.column * share}%`,
+          width: `calc(${share}% - 2px)`,
+        }}
+      >
+        <span
+          aria-hidden="true"
+          className="myne-calendar__grip"
+          data-edge="start"
+          title={t("calendar.resize", { title })}
+          onPointerDown={(event) => beginResize(event, block.row, date, "start")}
+        />
+        {chip(block.row, true, false, false)}
+        <span
+          aria-hidden="true"
+          className="myne-calendar__grip"
+          data-edge="end"
+          title={t("calendar.resize", { title })}
+          onPointerDown={(event) => beginResize(event, block.row, date, "end")}
+        />
+      </div>
+    );
+  };
+
+  const renderTimeGrid = (cells: ReturnType<typeof weekRow>) => {
+    const gridStyle = { gridTemplateColumns: `var(--space-7) repeat(${cells.length}, minmax(0, 1fr))` };
+    const band = cells.some((cell) => cell.rows.some((row) => rowHour(row) === null));
+    const nowMinute = minuteOfDay(now.slice(0, 16).replace("T", " "));
+    return (
+      <div className="myne-calendar__timegrid">
+        <div className="myne-calendar__days" style={gridStyle}>
+          <span aria-hidden="true" />
+          {cells.map((cell) => (
+            <div key={cell.date} className="myne-calendar__dayhead">
+              {dayHeader(cell.date)}
+            </div>
+          ))}
+        </div>
+        {band && (
+          <div className="myne-calendar__allday" style={gridStyle}>
+            <span className="myne-calendar__hourlabel">{t("calendar.allDay")}</span>
+            {cells.map((cell) => (
+              <div key={cell.date} className="myne-calendar__alldaycell">
+                {cell.rows.filter((row) => rowHour(row) === null).map((row) => chip(row, false))}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="myne-calendar__hours" style={gridStyle} ref={hoursRef} data-testid="calendar.hours">
+          <div className="myne-calendar__labels" aria-hidden="true">
+            {HOURS.map((hour) => (
+              <span key={hour} className="myne-calendar__hourlabel">
+                {formatWallClockTime(hourValue(hour), display)}
+              </span>
+            ))}
+          </div>
+          {cells.map((cell) => (
+            <div
+              key={cell.date}
+              data-testid="calendar.cell"
+              data-date={cell.date}
+              className="myne-calendar__column"
+              // A block moves by the POINTER here: the hour axis can express 10:30.
+            >
+              {HOURS.map((hour) => {
+                const open = capturing === cell.date && captureHour === hourValue(hour);
+                return (
+                  <div
+                    key={hour}
+                    data-hour={hour}
+                    className="myne-calendar__slot"
+                    onPointerDown={(event) => beginCreate(event, cell.date)}
+                    // A TARGET, not a control: `currentTarget` keeps the field's own.
+                    onClick={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (draggedRef.current) {
+                        draggedRef.current = false;
+                        return;
+                      }
+                      openCapture(cell.date, hour);
+                    }}
+                  >
+                    {open && <div className="myne-calendar__slotform">{captureField(cell.date)}</div>}
+                  </div>
+                );
+              })}
+              {/* Its own layer, because a slot is an hour tall and an event is not. */}
+              <div className="myne-calendar__layer">
+                {cell.date === today && nowMinute !== null && (
+                  <div
+                    aria-hidden="true"
+                    data-testid="calendar.now"
+                    className="myne-calendar__now"
+                    style={{ top: `${(nowMinute / DAY_MINUTES) * 100}%` }}
+                  >
+                    <span className="myne-calendar__nowdot" />
+                    <span className="myne-calendar__nowrule" />
+                    <span className="myne-calendar__nowtime">
+                      {formatWallClockTime(now.slice(11, 16), display)}
+                    </span>
+                  </div>
+                )}
+                {layoutDay(cell.rows, cell.date).map((block) => timedBlock(cell.date, block))}
+                {creating !== null && creating.date === cell.date && (
+                  <div
+                    className="myne-calendar__ghost"
+                    data-testid="calendar.createSpan"
+                    data-start-minute={creating.from}
+                    data-end-minute={creating.to}
+                    style={{
+                      top: `${(creating.from / DAY_MINUTES) * 100}%`,
+                      height: `${((creating.to - creating.from) / DAY_MINUTES) * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderAgenda = () => {
     // The agenda shows each row once, on the day it STARTS: a three-day trip is one
@@ -815,9 +1058,9 @@ export function CalendarPane({
       case "month":
         return renderMonth();
       case "week":
-        return renderColumns(weekRow(anchor, rows));
+        return renderTimeGrid(weekRow(anchor, rows));
       case "day":
-        return renderColumns(dayCells(anchor, rows));
+        return renderTimeGrid(dayCells(anchor, rows));
       case "agenda":
         return renderAgenda();
       default: {
@@ -828,11 +1071,9 @@ export function CalendarPane({
   };
 
   /**
-   * Where "now" is, re-read on a tick so the marker moves while the pane is open.
-   *
-   * One interval for the whole pane rather than a timer per row: the marker is a
-   * single line, and a calendar that recomputed a hundred cells a minute would be
-   * the reason a laptop's fan turns on while nobody is looking at it.
+   * Where "now" is. ONE interval for the whole pane, not a timer per row: the
+   * marker is a single line, and recomputing a hundred cells a minute is a fan
+   * nobody can hear the reason for.
    */
   const [now, setNow] = useState<string>(() => currentMinute());
   useEffect(() => {
@@ -881,7 +1122,7 @@ export function CalendarPane({
         return;
       case "n":
       case "N":
-        setCapturing(today);
+        openCapture(today);
         event.preventDefault();
         return;
       default:
@@ -891,7 +1132,9 @@ export function CalendarPane({
 
   return (
     <div
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, gap: "var(--space-2)", padding: "var(--space-3) 0" }}
+      // No gutters are granted (`PaneView`'s calendar branch): this surface's
+      // inset is its own and symmetric, in `components.css` beside the grid's.
+      className="myne-calendar"
       data-testid="calendar.pane"
       data-pane={paneId}
       tabIndex={0}
@@ -899,7 +1142,7 @@ export function CalendarPane({
       role="application"
       aria-label={t("calendar.view.label")}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+      <div className="myne-calendar__bar">
         <Segmented
           ariaLabel={t("calendar.view.label")}
           value={view}
@@ -927,16 +1170,40 @@ export function CalendarPane({
         />
         <IconButton
           icon="calendar-days"
-          label={t("calendar.today")}
+          label={t("common.today")}
           iconSize={14}
           onClick={() => setAnchor(parseCivilDate(today) ?? todayCivilDate())}
         />
         <span style={{ flex: "1 1 auto" }} />
+        {/* Which calendars this view draws (owner, 2026-11-10). A multi-select rather
+            than a bespoke menu: it is the primitive that already answers "many things,
+            each on or off", with search for a vault with a dozen calendars. Unticking
+            writes `hidden.<name>` into the same prefs map the colours use, so the
+            choice survives a restart and a second device merges its own. */}
+        {calendars.length > 0 && (
+          <SearchableSelect
+            multiple
+            aria-label={t("calendar.calendarsToggle")}
+            testId="calendar.calendars"
+            options={calendars.map((name) => ({ value: name, label: name }))}
+            selected={calendars.filter((name) => isCalendarVisible(settings, name))}
+            onChange={(next: string[]) => {
+              const shown = new Set(next);
+              for (const name of calendars) {
+                if (shown.has(name) !== isCalendarVisible(settings, name)) {
+                  const entry = hiddenSettingFor(name, !shown.has(name));
+                  void setCalendarSetting(entry.key, entry.value);
+                }
+              }
+              setReload((n) => n + 1);
+            }}
+          />
+        )}
         <IconButton
           icon="calendar-plus"
           label={t("calendar.form.title")}
           iconSize={14}
-          onClick={() => setComposing(formatCivilDate(anchor))}
+          onClick={() => setComposing(emptyEventForm(formatCivilDate(anchor)))}
         />
         {/* `.ics` exchange. In the pane header rather than the palette because it
             is a control for the view you are already in, and it is the only path
@@ -1042,12 +1309,11 @@ export function CalendarPane({
           >
             {t("calendar.occurrence.addOneOff")}
           </Button>
-          <Input
-            type="time"
-            aria-label={t("calendar.occurrence.retime")}
-            value={retime}
-            onChange={(event) => setRetime(event.target.value)}
-            data-testid="calendar.occurrence.retime-field"
+          <TimeField
+            label={t("calendar.occurrence.retime")}
+            value={retime === "" ? null : retime}
+            onChange={(next) => setRetime(next ?? "")}
+            testId="calendar.occurrence.retime-field"
           />
           <Button
             variant="ghost"
@@ -1066,10 +1332,43 @@ export function CalendarPane({
 
       {composing !== null && (
         <CalendarEventForm
-          initial={emptyEventForm(composing)}
+          initial={composing}
+          calendars={calendars}
           onClose={() => {
             setComposing(null);
             setReload((n) => n + 1);
+          }}
+        />
+      )}
+
+      {editing !== null && (
+        <CalendarEventForm
+          mode="edit"
+          initial={formFromRow(editing)}
+          calendars={calendars}
+          onClose={() => setEditing(null)}
+          onSubmit={async (values) => {
+            const plan = planEventForm(values);
+            if (!plan.ok) return;
+            setFailure(null);
+            try {
+              await applyEventEdit({
+                noteId: editing.noteId,
+                rendered: { start: editing.start, end: editing.end, allDay: editing.allDay },
+                next: editFromPlan(plan.input),
+                io,
+              });
+              // `note_update` does not touch the index this pane reads.
+              await reindexNote(editing.noteId);
+            } catch (err) {
+              setFailure(err instanceof EventWriteRefused ? err.reason : null);
+              // A real I/O failure is not a refusal: rethrown so it reaches the
+              // pane's error surface instead of closing on the old values.
+              if (!(err instanceof EventWriteRefused)) throw err;
+            } finally {
+              setEditing(null);
+              setReload((n) => n + 1);
+            }
           }}
         />
       )}
@@ -1079,7 +1378,7 @@ export function CalendarPane({
           {t("calendar.locked")}
         </p>
       ) : (
-        <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div className="myne-calendar__body">
           {body()}
           {unreadable.length > 0 && (
             <div data-testid="calendar.unreadable" style={{ paddingTop: "var(--space-2)" }}>

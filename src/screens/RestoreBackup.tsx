@@ -139,7 +139,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
   }
 
   const backLabel =
-    entry === "settings" ? t("restore.backLabel") : t("restore.cancelLabel");
+    entry === "settings" ? t("common.back") : t("common.back");
 
   return (
     <CenteredCard>
@@ -155,7 +155,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
             color: "var(--fg-display)",
           }}
         >
-          {t("restore.title")}
+          {t("common.restorefrombackup")}
         </div>
 
         {state.step === "pick" && (
@@ -219,7 +219,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 onClick={() => void backupCancel()}
                 data-testid="restore.cancel"
               >
-                {t("restore.working.cancel")}
+                {t("common.cancel")}
               </Button>
             </div>
           </>
@@ -278,7 +278,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 {t("restore.damaged.salvage")}
               </Button>
               <Button variant="secondary" onClick={onExit}>
-                {t("restore.damaged.close")}
+                {t("common.close")}
               </Button>
             </div>
           </>

@@ -491,20 +491,27 @@ export function NoteRow(props: NoteRowProps) {
   // MYND-627: a coloured note washes its ROW rather than carrying a dot.
   // The dot spent a fixed slice of width on every coloured row -- costly in a
   // narrow sidebar, worse on mobile -- and read as a bullet rather than as the
-  // note being marked. A highlight-style wash costs no width at all. Kept low
-  // enough in alpha to sit under the selected/hover fills without muddying
-  // them, and the title text stays in the ink ramp, so PRODUCT.md's rule that
-  // colour never tints prose still holds.
-  const colorWash =
-    colorSlot && !highlighted
-      ? {
-          background: `color-mix(in srgb, ${labelColorVar(colorSlot)} 14%, transparent)`,
-        }
-      : {};
+  // note being marked. A highlight-style wash costs no width at all, and the
+  // title text stays in the ink ramp, so PRODUCT.md's rule that colour never
+  // tints prose still holds.
+  //
+  // **The wash is a LAYER, not a background** (owner, 2026-11-10). It used to be
+  // the row's `background`, which meant every state that has its own fill --
+  // hover, selected, pressed -- replaced it outright, and the row only looked
+  // coloured when the pointer was somewhere else. A gradient layer paints OVER
+  // whichever solid fill wins below, so the colour is still there when the row is
+  // hovered, selected or pressed. The alpha is also up from 14%: at that strength
+  // the row read as off-white rather than as a coloured note, which is why the
+  // owner asked for the tint after seeing only the viewer icon change.
+  const colorWash = colorSlot
+    ? (() => {
+        const wash = `color-mix(in srgb, ${labelColorVar(colorSlot)} 22%, transparent)`;
+        return { backgroundImage: `linear-gradient(${wash}, ${wash})` };
+      })()
+    : {};
   const composedRowStyle: CSSProperties = {
     ...rowBaseStyle,
     ...(showTimestamps ? {} : rowCompactStyle),
-    ...colorWash,
     // Press outranks the selected and hover fills: it is the more specific fact,
     // and the row is by definition still hovered while it is being pressed.
     ...(pressed
@@ -514,6 +521,7 @@ export function NoteRow(props: NoteRowProps) {
         : hovering
           ? rowHoverStyle
           : {}),
+    ...colorWash,
   };
 
   return (
@@ -716,7 +724,7 @@ function TitleLine({
     return (
       <div style={titleUntitledStyle} title={t("notes.row.loadError")}>
         <span style={errorIndicatorStyle} aria-hidden="true" />
-        {t("notes.row.untitled")}
+        {t("common.untitled")}
         {markers}
       </div>
     );
@@ -734,7 +742,7 @@ function TitleLine({
     const placeholder =
       record.kind === DRAWING_KIND_VALUE
         ? t("notes.row.untitledDrawing")
-        : t("notes.row.untitled");
+        : t("common.untitled");
     return (
       <div style={titleUntitledStyle}>
         {placeholder}

@@ -328,7 +328,7 @@ export function FilterBuilder({
       onClose={onCancel}
       width={580}
       height={560}
-      closeLabel={t("notes.filterBuilder.cancel")}
+      closeLabel={t("common.cancel")}
       bodyBleed
     >
       <div data-testid="view-filter.modal" style={BODY_STYLE}>
@@ -526,7 +526,7 @@ export function FilterBuilder({
           </span>
         )}
         <Button variant="ghost" data-testid="view-filter.cancel" onClick={onCancel}>
-          {t("notes.filterBuilder.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="primary"

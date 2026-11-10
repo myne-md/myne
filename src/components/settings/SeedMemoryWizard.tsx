@@ -439,7 +439,7 @@ export function SeedMemoryWizard(props: {
       title={title}
       width={720}
       testId="settings.memory.seed.wizard"
-      closeLabel={t("settings.memory.seed.close")}
+      closeLabel={t("common.close")}
       canDismiss={() => !generating && !applying}
     >
       {step === "scope" ? (
@@ -542,7 +542,7 @@ export function SeedMemoryWizard(props: {
           ) : null}
           <div style={ACTIONS}>
             <Button variant="ghost" onClick={close} data-testid="settings.memory.seed.cancel">
-              {t("settings.memory.seed.cancel")}
+              {t("common.cancel")}
             </Button>
             <Button
               data-testid="settings.memory.seed.continue"
@@ -554,7 +554,7 @@ export function SeedMemoryWizard(props: {
               }
               onClick={() => void generate()}
             >
-              {t("settings.memory.seed.continue")}
+              {t("common.continue")}
             </Button>
           </div>
         </div>
@@ -704,7 +704,7 @@ export function SeedMemoryWizard(props: {
                     setStep("scope");
                   }}
                 >
-                  {t("settings.memory.seed.back")}
+                  {t("common.back")}
                 </Button>
                 <Button
                   data-testid="settings.memory.seed.apply"
@@ -769,7 +769,7 @@ export function SeedMemoryRow(props: {
       data-seeded={seeded ? "true" : "false"}
     >
       <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
-        {t("settings.memory.seed.rowTitle")}
+        {t("settings.memory.seed.title")}
       </p>
       <p style={HELPER}>
         {seeded
@@ -804,7 +804,7 @@ export function SeedMemoryRow(props: {
               data-testid="settings.memory.seed.rebuild-cancel"
               onClick={() => setConfirming(false)}
             >
-              {t("settings.memory.seed.cancel")}
+              {t("common.cancel")}
             </Button>
           </>
         ) : (
@@ -818,7 +818,7 @@ export function SeedMemoryRow(props: {
           >
             {seeded
               ? t("settings.memory.seed.rebuild")
-              : t("settings.memory.seed.start")}
+              : t("settings.memory.seed.title")}
           </Button>
         )}
       </div>

@@ -26,6 +26,7 @@ import {
   EventWriteRefused,
   applyEventMove,
   planDrag,
+  planEdgeResize,
   planResize,
   type EventSpan,
   type EventWriteIo,
@@ -96,6 +97,38 @@ describe("planDrag", () => {
   it("is a no-op for a zero delta", () => {
     const original = span({ start: "2026-11-05 09:00", end: "2026-11-05 10:00" });
     expect(planDrag(original, 0)).toEqual(original);
+  });
+});
+
+describe("planEdgeResize", () => {
+  it("moves the dragged edge to the instant the gesture landed on", () => {
+    const rendered = span({ start: "2026-11-05 09:00", end: "2026-11-05 10:00" });
+    // The hour axis snaps to a quarter hour before it gets here, so 09:15 stays
+    // 09:15: rounding it to the hour would make a drag land somewhere else.
+    expect(planEdgeResize(rendered, "end", "2026-11-05 11:15")?.end).toBe("2026-11-05 11:15");
+    expect(planEdgeResize(rendered, "start", "2026-11-05 08:45")?.start).toBe("2026-11-05 08:45");
+  });
+
+  it("moves ONE edge and leaves the other where the note had it", () => {
+    const rendered = span({ start: "2026-11-05 09:00", end: "2026-11-05 10:00" });
+    const end = planEdgeResize(rendered, "end", "2026-11-05 12:00")!;
+    expect(end.start).toBe("2026-11-05 09:00");
+    const start = planEdgeResize(rendered, "start", "2026-11-05 08:00")!;
+    expect(start.end).toBe("2026-11-05 10:00");
+  });
+
+  it("grows a point event into a span when its end is dragged away", () => {
+    const next = planEdgeResize(span({ start: "2026-11-05 09:00" }), "end", "2026-11-05 09:45")!;
+    expect(next).toEqual({ start: "2026-11-05 09:00", end: "2026-11-05 09:45", allDay: false });
+  });
+
+  it("refuses an edge that would empty or invert the span", () => {
+    const rendered = span({ start: "2026-11-05 09:00", end: "2026-11-05 10:00" });
+    // Dragging the end onto (or past) the start is not a shorter event: it is the
+    // `end-before-start` shape the reader refuses.
+    expect(planEdgeResize(rendered, "end", "2026-11-05 09:00")).toBeNull();
+    expect(planEdgeResize(rendered, "end", "2026-11-05 08:00")).toBeNull();
+    expect(planEdgeResize(rendered, "start", "2026-11-05 10:00")).toBeNull();
   });
 });
 

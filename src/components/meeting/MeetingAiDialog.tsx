@@ -248,7 +248,7 @@ function MeetingAiDialogInner({
                 </Button>
               )}
               <Button variant="secondary" onClick={close}>
-                {t("editor.meeting.ai.close")}
+                {t("common.close")}
               </Button>
             </div>
           </>
@@ -349,7 +349,7 @@ function MeetingAiDialogInner({
                 data-testid="meeting.ai.close"
                 onClick={close}
               >
-                {t("editor.meeting.ai.close")}
+                {t("common.close")}
               </Button>
             </div>
           </>
@@ -366,7 +366,7 @@ function MeetingAiDialogInner({
                 data-testid="meeting.ai.close"
                 onClick={close}
               >
-                {t("editor.meeting.ai.close")}
+                {t("common.close")}
               </Button>
             </div>
           </>

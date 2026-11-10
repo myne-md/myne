@@ -237,7 +237,7 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
             <circle cx="28" cy="28" r="24" stroke="var(--line-1)" strokeWidth="2" />
             <path d="M28 4a24 24 0 0 1 24 24" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
-          <Title>{t("sync.join.waitingTitle")}</Title>
+          <Title>{t("common.waitingforapproval")}</Title>
           <div
             style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 320 }}
           >
@@ -311,7 +311,7 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
             }}
             data-testid="sync.join.sas-changed"
           >
-            {t("join.verifyChanged")}
+            {t("common.thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue")}
           </div>
         )}
         {abortFailed && (

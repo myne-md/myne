@@ -32,7 +32,7 @@ export interface TextPromptCopy {
 
 const RENAME_COPY: TextPromptCopy = {
   titleKey: "editor.attachment.rename.title",
-  confirmKey: "editor.attachment.rename.confirm",
+  confirmKey: "common.rename",
   testidPrefix: "attachment-rename",
 };
 
@@ -132,7 +132,7 @@ export function promptForText(
 
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = i18n.t("editor.attachment.rename.cancel");
+    cancel.textContent = i18n.t("common.cancel");
     cancel.setAttribute("data-testid", `${copy.testidPrefix}.cancel`);
     Object.assign(cancel.style, {
       fontFamily: "var(--font-sans)",

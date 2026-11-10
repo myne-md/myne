@@ -525,15 +525,15 @@ export function ChatComposer({
    */
   const scopeLabel =
     attached === VAULT_SCOPE_SENTINEL
-      ? t("agent.composer.scopeAllVault")
+      ? t("common.allnotes")
       : attached !== null
         ? attached
         : openNoteId !== null && openNoteId !== ""
           ? // The name when the caller has it; the pointer only as a fallback.
             (openNoteTitle !== null && openNoteTitle !== ""
               ? openNoteTitle
-              : t("agent.composer.scopeOpenNote"))
-          : t("agent.composer.scopeAllVault");
+              : t("common.thisnote"))
+          : t("common.allnotes");
 
   // The count comes from the HOST, resolved by the same code the commit runs.
   // Counting here would leave out the `ai_excluded_folders` clamp, so the number
@@ -647,9 +647,9 @@ export function ChatComposer({
     () => [
       // The whole vault first: it is what a new conversation opens on, so it is
       // the entry the trigger reads back most of the time (myne-md/myne#848).
-      { value: VAULT_SCOPE_SENTINEL, label: t("agent.composer.scopeAllVault") },
+      { value: VAULT_SCOPE_SENTINEL, label: t("common.allnotes") },
       ...(openNoteId !== null && openNoteId !== ""
-        ? [{ value: "", label: t("agent.composer.scopeOpenNote") }]
+        ? [{ value: "", label: t("common.thisnote") }]
         : []),
       // The folders are a SECTION, not four more nouns in one list
       // (myne-md/myne#913): the kinds above are fixed and about the vault, and

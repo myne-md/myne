@@ -15,7 +15,17 @@
 // no private palette to drift from the design system.
 
 import { GROUP_COLOR_PALETTE, colorGroupVar } from "../graphColorGroups";
-import { resolveCalendarColour } from "../../lib/prefs";
+
+/**
+ * The prefs key prefix a calendar's colour lives under.
+ *
+ * Declared HERE rather than imported from `lib/prefs`, because this module is
+ * aliased into the mobile and web bundles and `lib/prefs` reaches the desktop
+ * platform seam: a colour is a lookup in a map the caller already holds, so it
+ * needs nothing from prefs beyond the key's spelling. `lib/prefs` re-exports this
+ * as `CALENDAR_COLOUR_PREFIX`, so there is one value and not two.
+ */
+export const CALENDAR_COLOUR_SETTING_PREFIX = "colours.";
 
 /** The token name a calendar draws in, resolving a derived default when unset. */
 function calendarColourToken(
@@ -26,7 +36,7 @@ function calendarColourToken(
     // The default calendar (an event with no `calendar:` field).
     return GROUP_COLOR_PALETTE[0]!.key;
   }
-  const stored = resolveCalendarColour(settings, calendarName);
+  const stored = settings[`${CALENDAR_COLOUR_SETTING_PREFIX}${calendarName}`];
   if (stored !== undefined && isPaletteToken(stored)) return stored;
   return derivedToken(calendarName);
 }

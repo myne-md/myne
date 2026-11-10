@@ -124,7 +124,7 @@ export function SeedMemoryCard() {
             setEligible(false);
           }}
         >
-          {t("editor.chrome.rightPanel.aiChat.seedCard.dismiss")}
+          {t("common.notnow")}
         </Button>
       </div>
     </div>

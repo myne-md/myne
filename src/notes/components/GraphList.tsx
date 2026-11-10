@@ -54,7 +54,7 @@ export function GraphList({
   const rows = useMemo<ListRow[]>(() => {
     const title = (id: string): string => {
       const node = model.nodes.find((n) => n.id === id);
-      return node?.title ?? t("notes.graph.untitledNote");
+      return node?.title ?? t("common.untitlednote");
     };
     const known = new Set(model.nodes.map((n) => n.id));
     const links = new Map<string, { to: string[]; from: string[] }>();
@@ -72,7 +72,7 @@ export function GraphList({
         const l = links.get(n.id) ?? { to: [], from: [] };
         return {
           id: n.id,
-          title: n.title ?? t("notes.graph.untitledNote"),
+          title: n.title ?? t("common.untitlednote"),
           kind: n.kind === "tag" ? ("tag" as const) : ("note" as const),
           tagKey: tagKeyFromNodeId(n.id),
           degree: l.to.length + l.from.length,

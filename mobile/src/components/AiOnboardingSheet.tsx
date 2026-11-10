@@ -146,7 +146,7 @@ export function AiOnboardingSheet({
             {t("aiOnboarding.skip")}
           </Button>
           <Button variant="primary" onClick={dismiss} data-testid="aiOnboarding.done">
-            {t("aiOnboarding.done")}
+            {t("common.done")}
           </Button>
         </div>
       </div>

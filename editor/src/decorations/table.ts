@@ -45,6 +45,7 @@ import type { SyntaxNode } from "@lezer/common";
 import { revealActive, selectionTouchesLines } from "./cursor-aware";
 import { makeCursorAwareStateField } from "./plugin-factory";
 import { renderInlineCell } from "./table-inline";
+import { attachCellLinkSuggest, type CellLinkSuggest } from "./tableCellLink";
 import i18n from "@myne/editor/i18n";
 import {
   addColumn,
@@ -368,6 +369,12 @@ class TableWidget extends WidgetType {
     input.autocomplete = "off";
     input.setAttribute("aria-label", i18n.t("editor.table.cellAriaLabel"));
     input.setAttribute("data-testid", "table.cell-input");
+    // `[[` completion for this cell (owner, 2026-11-10). The `[[` PICKER is a
+    // CodeMirror plugin keyed on the document, and a cell is a plain `<input>`, so
+    // without this the one place a table is edited was the one place a link could
+    // only be written by knowing its exact title. The popup reads the same note-set
+    // facet and emits through the same emitter the picker uses.
+    const linkSuggest: CellLinkSuggest = attachCellLinkSuggest(input, view);
     // Replace the rendered text with the input (replaceChildren — NOT append — so a
     // plain-text node can't show through and collide with the input text), and pin
     // the host's min-width to the frozen rendered width so the cell keeps its size.
@@ -382,16 +389,24 @@ class TableWidget extends WidgetType {
     // the DOM would fire blur and double-commit.
     let handled = false;
     input.addEventListener("keydown", (keyEvent) => {
+      // The suggestion popup owns the arrows, Enter/Tab and Escape while it is
+      // open, so a link is chosen before the cell commits or moves on.
+      if (linkSuggest.handleKey(keyEvent)) {
+        keyEvent.preventDefault();
+        return;
+      }
       if (keyEvent.key === "Enter") {
         keyEvent.preventDefault();
         input.blur(); // commit via blur
       } else if (keyEvent.key === "Escape") {
         keyEvent.preventDefault();
         handled = true;
+        linkSuggest.destroy();
         revertCell(host, source); // revert, drop the input
       } else if (keyEvent.key === "Tab") {
         keyEvent.preventDefault();
         handled = true;
+        linkSuggest.destroy();
         // Tab is the only key that grows the table past its last cell.
         this.navigate(view, el, row, col, source, input.value, keyEvent.shiftKey ? "prev" : "next", true);
       } else {
@@ -404,6 +419,9 @@ class TableWidget extends WidgetType {
       }
     });
     input.addEventListener("blur", () => {
+      // The popup is anchored to an input that is about to leave the DOM (or be
+      // replaced by the rebuilt widget), so it goes with it.
+      linkSuggest.destroy();
       // A real change dispatches → the StateField rebuilds the whole widget,
       // replacing this DOM, so restoring `el` would be wasted (guarded by the
       // returned flag). An unchanged / no-op value restores the rendered cell.

@@ -212,7 +212,7 @@ export function NoteExportModal({
             onClick={onCancel}
             data-testid="export.cancel"
           >
-            {t("export.note.modal.cancel")}
+            {t("common.cancel")}
           </Button>
           {/* Icon-only (MYND-643): the label would compete with Export for the
               eye while doing less, and the tooltip carries the meaning. */}

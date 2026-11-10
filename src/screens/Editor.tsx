@@ -48,7 +48,7 @@ import {
   shouldMirrorSelection,
   shouldOpenIntoFocusedPane,
 } from "../notes/selectionBridges";
-import { openCommandForKind } from "../notes/tabKinds";
+import { openCommandForKind, tabOwnsWholeSurface } from "../notes/tabKinds";
 import { CommandPalette } from "../components/CommandPalette";
 import { LeftRibbon, RAIL_WIDTH } from "../notes/components/LeftRibbon";
 import { ribbonCommands } from "../notes/ribbonCommands";
@@ -252,7 +252,7 @@ import { useBackupScheduler } from "../hooks/useBackupScheduler";
 import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
-import { agentTabCollapse, useEditorLayout } from "./editorLayout";
+import { wholeSurfaceTabCollapse, useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
 import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
@@ -1268,19 +1268,21 @@ function EditorChrome({
     layout.leftCollapsed || forced.forceLeftCollapsed || focusActive || detached;
   const rightCollapsed =
     layout.rightCollapsed || forced.forceRightCollapsed || focusActive || detached;
-  // **The agent tab carries its own rail** (myne-md/myne#913, on the report that
-  // the conversation list and the note tree sat side by side saying "pick
-  // something" twice). Entering the agent tab in a SINGLE-pane workspace closes
-  // the left sidebar once.
+  // **A whole-surface tab carries its own chrome** (myne-md/myne#913 for the
+  // agent, myne-md/myne#1037 for the calendar). Entering one in a SINGLE-pane
+  // workspace closes both sidebars once.
   //
-  // Once, and not as a forced collapse: the user can reopen it and it stays
-  // open, because the effect only fires on the ENTRY (the previous value is the
-  // one it compares against) and never on `leftCollapsed` coming back to false.
-  // A split workspace is left alone: there the note tree is what the other pane
-  // is for, and closing it would hide the selection you are working from.
-  // A restored session that opens ON the agent tab does not collapse anything:
-  // the ref starts at the current value, so there is no entry to react to.
-  const agentTabFocused = ws.focusedLeaf.activeTab?.kind === "agent";
+  // Once, and not as a forced collapse: the user can reopen either side and it
+  // stays open, because the effect only fires on the ENTRY (the previous value is
+  // the one it compares against) and never on `leftCollapsed` coming back to
+  // false. A split workspace is left alone: there the note tree is what the other
+  // pane is for, and closing it would hide the selection you are working from.
+  // A restored session that opens ON such a tab collapses too: it is an entry,
+  // and the transition-only version of this effect missed exactly that case.
+  //
+  // Which kinds qualify is `tabKinds.ts`'s answer, not this file's: the registry
+  // exists so a new kind declares its own behaviour instead of inheriting it.
+  const wholeSurfaceTabFocused = tabOwnsWholeSurface(ws.focusedLeaf.activeTab?.kind);
   // **Once per ENTRY, not once per transition** (myne-md/myne#913, second
   // report). The transition-only version missed the case that matters most: a
   // session restored ON the agent tab never transitions into it, so the sidebar
@@ -1296,12 +1298,12 @@ function EditorChrome({
   useEffect(() => {
     // Leaving the tab (or splitting the pane) starts a new entry, so coming back
     // collapses again. A split is not an entry: the note tree is in use there.
-    if (!agentTabFocused || ws.leaves.length !== 1) {
+    if (!wholeSurfaceTabFocused || ws.leaves.length !== 1) {
       collapsedForEntry.current = false;
       return;
     }
-    const collapse = agentTabCollapse({
-      agentTabFocused,
+    const collapse = wholeSurfaceTabCollapse({
+      wholeSurfaceTabFocused,
       paneCount: ws.leaves.length,
       hydrated: layout.hydrated,
       leftCollapsed: layout.leftCollapsed,
@@ -1317,7 +1319,7 @@ function EditorChrome({
     if (collapse.left) layout.toggleLeftCollapsed();
     if (collapse.right) layout.toggleRightCollapsed();
   }, [
-    agentTabFocused,
+    wholeSurfaceTabFocused,
     ws.leaves.length,
     layout.hydrated,
     layout.leftCollapsed,
@@ -2329,9 +2331,9 @@ function EditorChrome({
     if (active === undefined) return;
     void (async () => {
       const name = await promptForText({
-        title: t("editor.chrome.workspacePrompt.renameTitle"),
+        title: t("common.renameworkspace"),
         initialValue: active.name,
-        confirmLabel: t("editor.chrome.workspacePrompt.renameConfirm"),
+        confirmLabel: t("common.rename"),
         testIdPrefix: "workspace-prompt",
       });
       if (name !== null) renameWorkspace(active.id, name);
@@ -2345,9 +2347,9 @@ function EditorChrome({
       if (slot === undefined) return;
       void (async () => {
         const name = await promptForText({
-          title: t("editor.chrome.workspacePrompt.renameTitle"),
+          title: t("common.renameworkspace"),
           initialValue: slot.name,
-          confirmLabel: t("editor.chrome.workspacePrompt.renameConfirm"),
+          confirmLabel: t("common.rename"),
           testIdPrefix: "workspace-prompt",
         });
         if (name !== null) renameWorkspace(id, name);
@@ -3882,7 +3884,7 @@ function CommandPaletteHost({
         }
         for (const f of aiPrefs.deliberate_folders) folders.add(f);
         const items: QuickPickItem[] = [
-          { id: "", label: t("commands.picker.vaultRoot") },
+          { id: "", label: t("common.vaultroot") },
           ...[...folders].sort().map((f) => ({ id: f, label: f })),
         ];
         setPicker({
@@ -4374,7 +4376,7 @@ function CommandPaletteHost({
       kind: "action",
       action: "rename",
       icon: "pencil",
-      label: t("editor.noteActions.rename"),
+      label: t("common.rename"),
       onSelect: commandCtx.onRenameNote,
     },
     {
@@ -4426,7 +4428,7 @@ function CommandPaletteHost({
       kind: "action",
       action: "version-history",
       icon: "rotate-ccw",
-      label: t("editor.noteActions.versionHistory"),
+      label: t("common.versionhistory"),
       onSelect: commandCtx.onOpenSnapshots,
     },
     { kind: "divider" },
@@ -4539,7 +4541,7 @@ function CommandPaletteHost({
         <DeleteConfirmModal
           title={t("notes.trash.emptyConfirmTitle")}
           body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm.count })}
-          confirmLabel={t("notes.trash.emptyConfirmCta")}
+          confirmLabel={t("common.emptytrash")}
           // The palette's own answer, threaded through `CommandContext`. It was
           // an unconditional `true` for one E2E run, on the reasoning that the
           // palette is a keyboard-first surface, and `et1` failed three times
@@ -6222,7 +6224,7 @@ function WorkspaceSwitcherControl({
                     })}
                     data-testid="editor.workspace-switcher.rename"
                     data-workspace-id={s.id}
-                    title={t("editor.chrome.workspaceSwitcher.renameTitle")}
+                    title={t("common.renameworkspace")}
                     onClick={() => {
                       setOpen(false);
                       onRename(s.id);

@@ -195,7 +195,7 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
               data-testid="ai.history-retry"
               onClick={() => void refresh()}
             >
-              {t("editor.chrome.rightPanel.aiChat.historyRetry")}
+              {t("common.tryagain")}
             </Button>
           }
           testId="ai.history-error"
@@ -242,7 +242,7 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
                       data-testid="ai.conversation-delete-cancel"
                       onClick={() => setDeletingId(null)}
                     >
-                      {t("editor.chrome.rightPanel.aiChat.historyCancel")}
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       type="button"
@@ -258,7 +258,7 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
                 <div style={ROW_STYLE}>
                   <Input
                     data-testid="ai.conversation-rename-input"
-                    aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                    aria-label={t("common.rename")}
                     value={draft}
                     onChange={(e) => setDraft(e.currentTarget.value)}
                     onKeyDown={(e) => {
@@ -272,7 +272,7 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
                     data-testid="ai.conversation-rename-confirm"
                     onClick={() => void commitRename(row.id)}
                   >
-                    {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                    {t("common.rename")}
                   </Button>
                 </div>
               ) : (
@@ -297,14 +297,14 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
                     type="button"
                     variant="ghost"
                     data-testid="ai.conversation-rename"
-                    aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                    aria-label={t("common.rename")}
                     onClick={() => {
                       setDeletingId(null);
                       setDraft(row.title);
                       setRenamingId(row.id);
                     }}
                   >
-                    {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                    {t("common.rename")}
                   </Button>
                   <Button
                     type="button"

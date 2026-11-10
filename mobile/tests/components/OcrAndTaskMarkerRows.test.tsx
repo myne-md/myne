@@ -87,13 +87,19 @@ describe("the mobile attachment OCR switch", () => {
     );
   });
 
-  it("states that the choice is per device", () => {
+  it("prints the desktop's one helper line and nothing else", () => {
     render(<AttachmentOcrBlock enabled />);
-    // The neighbours in this panel are a mix (compression is shared), so the
-    // block says which this is rather than leaving it to the next sync.
-    expect(screen.getByTestId("settings.attachmentOcr.scope").textContent).toContain(
-      "settings.attachmentOcr.mobileDeviceLocal",
+    // The per-device line and the draft paragraph were removed on 2026-11-08
+    // (owner: "delete that, make it identical to desktop"), so the row is the
+    // label and the shared `helper`, the same two strings
+    // `AttachmentOcrSettings.tsx` renders. Asserted as an ABSENCE pair as well as
+    // a presence, because a filter that removed the helper too would pass a
+    // presence-only check on the wrong string.
+    expect(screen.getByTestId("settings.attachmentOcr.helper").textContent).toContain(
+      "settings.attachmentOcr.helper",
     );
+    expect(screen.queryByTestId("settings.attachmentOcr.scope")).toBeNull();
+    expect(screen.queryByTestId("settings.attachmentOcr.draft-use")).toBeNull();
   });
 });
 

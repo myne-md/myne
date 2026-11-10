@@ -1811,12 +1811,6 @@
       "title": "Filtru",
       "status": "Stare"
     },
-    "sortSheet": {
-      "title": "Sortează",
-      "manual": "Ordine manuală",
-      "titleAsc": "Titlu · A → Z",
-      "titleDesc": "Titlu · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Notă goală",
       "wordCount_one": "{{count}} cuvânt · {{minutes}} min de citit",
@@ -2730,8 +2724,7 @@
       "confirmBody": "Nota ta curentă va fi salvată mai întâi ca instantaneu, ca să poți anula această acțiune.",
       "confirmTitle": "Restaurezi acest instantaneu?",
       "decrypting": "Se decriptează…",
-      "emptyState": "Niciun instantaneu încă. Instantaneele sunt salvate automat pe măsură ce editezi și sunt păstrate aproximativ 7 zile. Sunt criptate și dispar când nota este ștearsă definitiv.",
-      "encryptedSize": "Criptat · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Acest instantaneu nu a putut fi decriptat.",
       "errorGeneric": "Ceva nu a funcționat. Încearcă din nou.",
       "errorIo": "A apărut o eroare de disc. Discul poate fi plin sau imposibil de scris.",
@@ -5726,17 +5719,6 @@
     "addCondition": "+ Adaugă condiție",
     "createView": "Creează vizualizare"
   },
-  "snapshots": {
-    "today": "Astăzi {{time}}",
-    "readError": "Istoricul versiunilor nu a putut fi citit.",
-    "decryptError": "Acea versiune nu a putut fi decriptată.",
-    "restoreError": "Acea versiune nu a putut fi restaurată.",
-    "title": "Istoricul versiunilor",
-    "emptyState": "Nicio versiune anterioară încă. Instantaneele sunt capturate automat pe măsură ce editezi.",
-    "hide": "Ascunde",
-    "empty": "(gol)",
-    "restoreThisVersion": "Restaurează această versiune"
-  },
   "restoreBackup": {
     "title": "Încă indisponibil pe mobil",
     "body": "Restaurarea dintr-un fișier de copie de rezervă nu este încă disponibilă pe mobil. Creează un seif sau recuperează cu fraza ta."
@@ -5840,7 +5822,6 @@
     "unlockingSubtitle": "Se deschide seiful tău.",
     "readyTitle": "Seiful tău este gata",
     "readyBody": "Tot ceea ce scrii de aici este criptat pe acest dispozitiv înainte de a fi stocat sau sincronizat.",
-    "personalLabel": "Personal",
     "openVault": "Deschide seiful",
     "backUpNow": "Fă o copie de rezervă acum"
   },

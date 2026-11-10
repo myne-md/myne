@@ -121,7 +121,7 @@ export function StoragePanel({
 
         <ControlBlock
           anchorId="storage.export"
-          label={t("settings.storage.exportLabel")}
+          label={t("common.export")}
           helper={t("settings.storage.exportHelper")}
           control={
             <div style={EXPORT_ROW_STYLE}>

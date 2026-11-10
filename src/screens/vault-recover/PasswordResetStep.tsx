@@ -82,7 +82,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // phrase-entry.
       return {
         kind: "io-failure",
-        banner: i18n.t("vaultRecover.passwordReset.errors.unexpected"),
+        banner: i18n.t("common.unexpectederrorpleasetryagain"),
       };
     case "VaultAlreadyUnlocked":
       // Defensive — A8f shouldn't see Unlocked slot, but the
@@ -95,7 +95,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // peek and take. Generic banner.
       return {
         kind: "banner-retry",
-        banner: i18n.t("vaultRecover.passwordReset.errors.unexpected"),
+        banner: i18n.t("common.unexpectederrorpleasetryagain"),
       };
     case "InvalidCredentialOrVault":
       // Defensive — A8f doesn't return this variant in practice
@@ -104,7 +104,7 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // banner if surfaces.
       return {
         kind: "banner-retry",
-        banner: i18n.t("vaultRecover.passwordReset.errors.unexpected"),
+        banner: i18n.t("common.unexpectederrorpleasetryagain"),
       };
     case "RecoveryAbortedByLock":
       // vault_lock raced complete_recovery's Argon2id window — the

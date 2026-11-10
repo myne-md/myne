@@ -59,7 +59,15 @@ function renderRow(over: Partial<FolderRowProps> = {}) {
 
 // jsdom synthetic drag events carry no `dataTransfer`; the handlers set
 // `dropEffect`, so we supply a minimal stub.
-const dataTransfer = () => ({ dropEffect: "", setData() {}, getData: () => "" });
+const dataTransfer = (payload: Record<string, string> = {}) => ({
+  dropEffect: "",
+  files: [] as unknown[],
+  setData() {},
+  getData: (type: string) => payload[type] ?? "",
+  get types() {
+    return Object.keys(payload);
+  },
+});
 
 // Fire a dragOver / drop with the mocked hit-test resolving to `zone`.
 function dragOverZone(el: HTMLElement, zone: "above" | "into" | "below") {
@@ -291,6 +299,28 @@ describe("FolderRow — drag affordances", () => {
     expect(onFolderReorderDrop).toHaveBeenCalledWith(n, "below");
   });
 
+  it("folder drop still lands when the drag state is gone but the payload is not", () => {
+    // The reported failure: a long drag over a virtualized tree can fire `dragend`
+    // and clear the drag's ref before the drop arrives, and the handler used to
+    // return early. The dataTransfer carries the source path.
+    const onDropFolderInto = vi.fn();
+    const n = node({ path: "Projects/" });
+    renderRow({ node: n, dragKind: null, onDropFolderInto });
+    nextZone = "into";
+    fireEvent.drop(screen.getByTestId("notes.folder-row"), {
+      dataTransfer: dataTransfer({ "application/x-myne-folder": "Archive/" }),
+    });
+    expect(onDropFolderInto).toHaveBeenCalledWith(n, "Archive/");
+  });
+
+  it("a drop with neither drag state nor a folder payload is not a folder move", () => {
+    const onDropFolderInto = vi.fn();
+    const n = node();
+    renderRow({ node: n, dragKind: null, onDropFolderInto });
+    dropZone(screen.getByTestId("notes.folder-row"), "into");
+    expect(onDropFolderInto).not.toHaveBeenCalled();
+  });
+
   it("note drop in the middle → onDropNote with the folder path", () => {
     const onDropNote = vi.fn();
     const onFolderReorderDrop = vi.fn();
@@ -398,7 +428,8 @@ describe("FolderRow — folder re-nest by drag (myne#281)", () => {
     const n = node({ path: "Projects/" });
     renderRow({ node: n, dragKind: "folder", onDropFolderInto, onFolderReorderDrop });
     dropZone(screen.getByTestId("notes.folder-row"), "into");
-    expect(onDropFolderInto).toHaveBeenCalledWith(n);
+    // `null` second argument: the payload was empty, so the ref was the source.
+    expect(onDropFolderInto).toHaveBeenCalledWith(n, null);
     expect(onFolderReorderDrop).not.toHaveBeenCalled();
   });
 

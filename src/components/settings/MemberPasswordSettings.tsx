@@ -197,7 +197,7 @@ export function MemberPasswordSettings() {
             onClick={() => setReminderDismissed(true)}
             style={LINK_STYLE}
           >
-            {t("settings.memberPassword.reminderDismiss")}
+            {t("common.notnow")}
           </Button>
         </p>
       ) : null}
@@ -298,7 +298,7 @@ export function MemberPasswordSettings() {
             onClick={() => void run(() => clearMemberUnlock())}
             data-testid="settings.member-password-remove"
           >
-            {t("settings.memberPassword.remove")}
+            {t("common.remove")}
           </Button>
         </div>
       )}

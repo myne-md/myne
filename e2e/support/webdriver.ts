@@ -147,8 +147,9 @@ async function wire<T>(
 
 /** Handle to a located element, scoped to its session. */
 export class Element {
-  /** What the last hit-test repair saw, for the diagnostic message only. */
-  private lastRefresh = "";
+  /** What the last stale-hit-map repair did, quoted in a click timeout: the
+   *  message has to say whether the repair ran and what it answered. */
+  private lastRefresh = "<never>";
 
   constructor(
     private readonly session: Session,
@@ -310,8 +311,9 @@ export class Element {
     //    task that asked for it (measured: a single-task toggle leaves the map
     //    stale, the same toggle split across two evaluates cures it).
     // One script, and the mode travels as an ARGUMENT: it used to be a
-    // parameter of this builder that the script never read, so `arguments[1]`
-    // was undefined and even the release pass took the restore branch.
+    // parameter of this builder that the script never read (develop silenced the
+    // unused-parameter error with an underscore, which left `arguments[1]`
+    // undefined), so even the release pass took the restore branch.
     const toggleScript =
       "var el = arguments[0], mode = arguments[1];" +
       "var n = el;" +

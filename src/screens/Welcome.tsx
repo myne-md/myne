@@ -155,7 +155,7 @@ export function Welcome({ onStart, onRestoreBackup, onInvited }: WelcomeProps) {
             />
             {onRestoreBackup !== undefined && (
               <ChoiceRow
-                title={t("welcome.restoreTitle")}
+                title={t("common.restorefrombackup")}
                 body={t("welcome.restoreBody")}
                 action={
                   <Button

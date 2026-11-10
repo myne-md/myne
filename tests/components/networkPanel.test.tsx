@@ -112,10 +112,13 @@ describe("Network panel — copy bounds", () => {
   });
 
   it("states the negative cases in the same breath as the positive one", () => {
-    const helper = i18n.t("settings.network.torHelper");
-    expect(helper).toContain("Hides your IP address and location");
-    expect(helper).toContain("does not make you anonymous to Myne");
-    expect(helper).toContain("does not hide what you sync or when");
+    // The claim is the row's sentence and the caveats are behind the `?` beside
+    // it, so the guarantee is read over the two together: a reader who opens the
+    // row sees the positive claim and, one interaction away, what it does not do.
+    const surface = `${i18n.t("settings.network.torInline")} ${i18n.t("settings.network.torHelper")}`;
+    expect(surface).toContain("Hides your IP address and location");
+    expect(surface).toContain("does not make you anonymous to Myne");
+    expect(surface).toContain("does not hide what you sync or when");
   });
 
   it("discloses all four residuals", async () => {

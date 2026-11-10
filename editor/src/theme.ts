@@ -998,6 +998,51 @@ export const myneThemeSpec = {
     display: "block",
     minWidth: "0",
   },
+  // `[[` completion inside a cell (`decorations/tableCellLink.ts`). The popup is
+  // `position: fixed` against the input's rect, because the editable table lives in
+  // a `contain: inline-size` scroll box and an anchored panel would be clipped at
+  // the cell's own edge. Same card language as the picker's tooltip — surface,
+  // hairline, radius — so a link being chosen looks the same in a cell and in a
+  // paragraph.
+  ".cm-table-link-suggest": {
+    position: "fixed",
+    zIndex: "1400",
+    maxWidth: "320px",
+    maxHeight: "224px",
+    overflowY: "auto",
+    padding: "4px",
+    background: "var(--paper)",
+    border: "1px solid var(--line-2)",
+    borderRadius: "var(--radius-2)",
+    boxShadow: "var(--shadow-3)",
+    fontFamily: "var(--font-sans)",
+  },
+  ".cm-table-link-suggest-row": {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1px",
+    padding: "6px 8px",
+    borderRadius: "var(--radius-1)",
+    cursor: "pointer",
+    minWidth: "0",
+  },
+  ".cm-table-link-suggest-row[data-active='true']": {
+    background: "var(--accent-soft)",
+  },
+  ".cm-table-link-suggest-label": {
+    fontSize: "var(--text-sm)",
+    color: "var(--fg-1)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  ".cm-table-link-suggest-detail": {
+    fontSize: "var(--text-xs)",
+    color: "var(--fg-3)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
   // An empty cell reserves a full line so it matches the height of filled cells
   // (otherwise an empty row collapses thinner — MYND-162 feedback).
   ".cm-table-cell-text:empty::before": {

@@ -140,7 +140,7 @@ export function MemberNameGate({ onDone }: { onDone: () => void }) {
             disabled={!ready}
             onClick={() => void save()}
           >
-            {t("sync.nameGate.save")}
+            {t("common.continue")}
           </Button>
         </>
       )}

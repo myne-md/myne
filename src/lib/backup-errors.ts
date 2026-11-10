@@ -183,7 +183,7 @@ export function exportErrorMessage(e: BackupExportError): string {
     case "VerifyFailed":
       return i18n.t("backup.errors.export.verifyFailed");
     case "AuthOperationInProgress":
-      return i18n.t("backup.errors.export.authOperationInProgress");
+      return i18n.t("common.anothervaultoperationisinprogresswaitforittofinishthentryagain");
     case "Cancelled":
       return i18n.t("backup.errors.export.cancelled");
     case "Io":
@@ -214,7 +214,7 @@ export function restoreErrorMessage(e: BackupRestoreError): string {
     case "VaultAlreadyExists":
       return i18n.t("backup.errors.restore.vaultAlreadyExists");
     case "AuthOperationInProgress":
-      return i18n.t("backup.errors.restore.authOperationInProgress");
+      return i18n.t("common.anothervaultoperationisinprogresswaitforittofinishthentryagain");
     case "Cancelled":
       return i18n.t("backup.errors.restore.cancelled");
     case "Io":

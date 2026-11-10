@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { computeResponsiveCollapse } from "../../src/screens/layoutClamp";
-import { agentTabCollapse } from "../../src/screens/editorLayout";
+import { wholeSurfaceTabCollapse } from "../../src/screens/editorLayout";
 
 // Default sidebar widths. need-both = 260+280+16+360 = 916;
 // need-left = 260+8+360 = 628.
@@ -79,9 +79,9 @@ describe("computeResponsiveCollapse (MYND-192)", () => {
   });
 });
 
-describe("agentTabCollapse", () => {
+describe("wholeSurfaceTabCollapse", () => {
   const base = {
-    agentTabFocused: true,
+    wholeSurfaceTabFocused: true,
     paneCount: 1,
     hydrated: true,
     leftCollapsed: false,
@@ -92,33 +92,33 @@ describe("agentTabCollapse", () => {
   it("closes BOTH sidebars on a single-pane agent tab", () => {
     // The report was about the right one (the AI chat), which duplicated the
     // agent pane's own transcript; the left duplicates its conversation rail.
-    expect(agentTabCollapse(base)).toEqual({ left: true, right: true });
+    expect(wholeSurfaceTabCollapse(base)).toEqual({ left: true, right: true });
   });
 
   it("does nothing while the persisted layout is still loading", () => {
-    expect(agentTabCollapse({ ...base, hydrated: false })).toEqual({
+    expect(wholeSurfaceTabCollapse({ ...base, hydrated: false })).toEqual({
       left: false,
       right: false,
     });
   });
 
   it("leaves a split workspace alone", () => {
-    expect(agentTabCollapse({ ...base, paneCount: 2 })).toEqual({
+    expect(wholeSurfaceTabCollapse({ ...base, paneCount: 2 })).toEqual({
       left: false,
       right: false,
     });
   });
 
   it("does not fight sides the user reopened, and asks only for the open ones", () => {
-    expect(agentTabCollapse({ ...base, handledForEntry: true })).toEqual({
+    expect(wholeSurfaceTabCollapse({ ...base, handledForEntry: true })).toEqual({
       left: false,
       right: false,
     });
-    expect(agentTabCollapse({ ...base, leftCollapsed: true })).toEqual({
+    expect(wholeSurfaceTabCollapse({ ...base, leftCollapsed: true })).toEqual({
       left: false,
       right: true,
     });
-    expect(agentTabCollapse({ ...base, agentTabFocused: false })).toEqual({
+    expect(wholeSurfaceTabCollapse({ ...base, wholeSurfaceTabFocused: false })).toEqual({
       left: false,
       right: false,
     });

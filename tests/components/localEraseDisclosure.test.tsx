@@ -59,11 +59,14 @@ function disclosureText(): string {
  * fails every reader who is looking rather than listening. Found from the
  * before/after capture on myne-md/myne#960, not by a test.
  */
-function expectTriggerShowsItsLabel(): void {
+/** The trigger is an ICON whose accessible name is the label (owner, 2026-11-08:
+ *  the labelled button was a whole sentence of chrome beside the one sentence
+ *  that matters). "Icon-only" here means no text node, not "unlabelled". */
+function expectTriggerIsIconOnly(): void {
   const trigger = screen.getByRole("button", {
     name: i18n.t("settings.deleteVault.detailsLabel"),
   });
-  expect(trigger.textContent).toContain(i18n.t("settings.deleteVault.detailsLabel"));
+  expect(trigger.textContent?.trim() ?? "").toBe("");
 }
 
 /** Render the idle-mode form with `localOnlyVault` answered by `only`. */
@@ -178,9 +181,9 @@ describe("the delete-vault promise", () => {
    * test that already renders the form, because `visibleLabel` is a property of
    * the shape this dialog chose, not of the primitive.
    */
-  it("labels its disclosure trigger on screen, not only for a screen reader", () => {
+  it("renders the disclosure trigger as an icon that still carries its name", () => {
     renderForm(true);
-    expectTriggerShowsItsLabel();
+    expectTriggerIsIconOnly();
   });
 
   /**
@@ -201,14 +204,16 @@ describe("the delete-vault promise", () => {
     expect(heading.parentElement?.contains(trigger)).toBe(true);
   });
 
-  it("keeps the desktop copy where it is true", () => {
+  it("keeps the desktop copy where it is true, without an eyebrow over it", () => {
     renderForm(true);
     const body = document.body.textContent ?? "";
     expect(body).toContain(i18n.t("settings.deleteVault.copyPrimary"));
     expect(body).not.toContain(LOCAL_ERASE_DISCLOSURE);
-    expect(screen.getByTestId("delete-vault.eyebrow").textContent).toBe(
-      i18n.t("settings.deleteVault.eyebrow"),
-    );
+    // The owner vault's eyebrow is GONE (owner, 2026-11-08): "IRREVERSIBLE" over a
+    // sentence that already says "cannot be undone" is one fact twice. The two
+    // capability-shaped eyebrows stay, because those name WHICH store the command
+    // touches, asserted on the web branch right below.
+    expect(screen.queryByTestId("delete-vault.eyebrow")).toBeNull();
   });
 
   /**

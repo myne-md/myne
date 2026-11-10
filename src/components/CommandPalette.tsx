@@ -612,7 +612,7 @@ export function CommandPalette({
               (h): Row => ({
                 kind: "note",
                 id: h.note_id,
-                title: h.title === "" ? t("commandPalette.untitledNote") : h.title,
+                title: h.title === "" ? t("common.untitled") : h.title,
                 matchedIn: h.matched_in,
                 // Archived notes STAY in search (archive ≠ soft-trash) — flagged
                 // for the badge, not filtered out (MYND-331).
@@ -970,7 +970,7 @@ export function CommandPalette({
           // stays mounted and empty so the combobox's `aria-controls` and
           // `aria-activedescendant` wiring keeps pointing at something real.
           <div style={EMPTY_STYLE} role="status">
-            {t("commandPalette.noMatches")}
+            {t("common.nomatches")}
           </div>
         )}
         {pinError !== null && (

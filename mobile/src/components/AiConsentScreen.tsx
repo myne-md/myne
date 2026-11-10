@@ -123,7 +123,7 @@ export function AiConsentScreen({
         // any non-empty box and `.click()` scrolls to its target first.
         position: "fixed",
         inset: 0,
-        zIndex: 50,
+        zIndex: "var(--z-modal)",
         display: "flex",
         flexDirection: "column",
         minHeight: 0,
@@ -230,7 +230,7 @@ export function AiConsentScreen({
           {t("settings.ai.consent.accept", { provider: name })}
         </Button>
         <Button variant="secondary" data-testid="ai-consent.cancel" onClick={onCancel}>
-          {t("settings.ai.consent.cancel")}
+          {t("common.cancel")}
         </Button>
       </div>
     </div>

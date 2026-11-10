@@ -27,7 +27,7 @@ export function FolderNotesSettings() {
     select: (p) => p.folder_notes_enabled,
     write: setFolderNotesEnabled,
     initial: false,
-    errorMessage: t("settings.folderNotes.errorSaveSetting"),
+    errorMessage: t("common.couldnotsavethissetting"),
   });
 
   return (

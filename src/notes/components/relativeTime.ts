@@ -28,7 +28,7 @@ export function formatRelativeTime(when: Date | null, now: Date = new Date()): s
   // skew rather than anything the user did. It reads "just now" on both clients:
   // mobile used to fall through to the absolute date here, so the same note said
   // "just now" on a computer and "2026-10-19" on a phone (R1.5).
-  if (delta < MINUTE) return i18n.t("notes.relativeTime.justNow");
+  if (delta < MINUTE) return i18n.t("common.justnow");
   if (delta < HOUR) {
     const m = Math.floor(delta / MINUTE);
     return i18n.t("notes.relativeTime.minutesAgo", { m });

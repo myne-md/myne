@@ -173,7 +173,7 @@ export function TemplatesManager({
   // to "no panes to close" rather than throw.
   const ws = useWorkspaceOptional();
   /** Default name for a brand-new template (renamed later via the editor). */
-  const newTemplateName = t("templates.manager.newTemplateName");
+  const newTemplateName = t("common.untitledtemplate");
   // `null` = loading; `[]` = loaded-but-empty (first-run empty state).
   const [templates, setTemplates] = useState<TitleRecord[] | null>(null);
   // The inline "name your template" step (myne-md/myne#820): creating a
@@ -340,7 +340,7 @@ export function TemplatesManager({
       )}
 
       {templates === null ? (
-        <div style={LOADING_STYLE}>{t("templates.manager.loading")}</div>
+        <div style={LOADING_STYLE}>{t("common.loading")}</div>
       ) : templates.length === 0 ? (
         <div style={EMPTY_STYLE}>
           <Icon name="file-text" size={28} style={{ color: "var(--fg-3)" }} />

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The bottom tab bar's fifth column (myne-md/myne#457).
+// The bottom tab bar's column budget (myne-md/myne#457, and owner 2026-11-10).
 //
 // **What is under test is the COLUMN BUDGET, not the icon.** The bar is
 // top-level navigation on a phone, so a fifth column is a fifth of the width
@@ -16,6 +16,7 @@
 // is a REQUIRED prop, and the test below that names both call sites is the
 // reason it is required rather than defaulted.
 
+import i18n from "@myne/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
@@ -33,6 +34,7 @@ function renderBar(overrides: Partial<Parameters<typeof TabBar>[0]> = {}) {
       onTasks={vi.fn()}
       onGraph={vi.fn()}
       onAttachments={vi.fn()}
+      onCalendar={vi.fn()}
       onChat={onChat}
       {...overrides}
     />,
@@ -48,17 +50,22 @@ function columns(): string[] {
 }
 
 describe("TabBar", () => {
-  it("is exactly the four columns it was when AI is off", () => {
+  it("is exactly these five columns when AI is off", () => {
     renderBar({ ai: false });
 
     // An exact list rather than a count. A count passes if a column was
     // swapped, and the point of this assertion is that turning AI off returns
     // the bar users learned, not a bar with the right number of things in it.
+    //
+    // Calendar is here because it had no door on a phone at all: the surface
+    // rendered at `tab === "calendar"` on every size class, and the only entry was
+    // `SidebarPane`, which draws at `expanded` width alone (owner, 2026-11-10).
     expect(columns()).toEqual([
       "workspace.tab-notes",
       "workspace.tab-tasks",
       "workspace.tab-graph",
       "workspace.tab-files",
+      "workspace.tab-calendar",
     ]);
     expect(screen.queryByTestId("workspace.tab-chat")).toBeNull();
   });
@@ -71,17 +78,37 @@ describe("TabBar", () => {
       "workspace.tab-tasks",
       "workspace.tab-graph",
       "workspace.tab-files",
+      "workspace.tab-calendar",
       "workspace.tab-chat",
     ]);
   });
 
-  it("leaves no reserved gap where the fifth column would be", () => {
+  it("leaves no reserved gap where the optional column would be", () => {
     // The alternative shape, and the one worth ruling out: rendering the button
     // always and hiding it with `visibility` or an empty flex child. That reads
-    // identically in a testid query and leaves a dead fifth of the bar.
+    // identically in a testid query and leaves a dead column in the bar.
     renderBar({ ai: false });
     const bar = screen.getByTestId("workspace.tab-bar");
-    expect(bar.children.length).toBe(4);
+    expect(bar.children.length).toBe(5);
+  });
+
+  it("stays above a full-screen destination, so a tab is always a way back", () => {
+    // The calendar draws itself over the list, the header and the editor at
+    // `--z-dropdown`. Without a level of its own the bar is what gets covered, and
+    // the only way out of the calendar is its own ✕ (owner, 2026-11-10).
+    renderBar({ ai: false });
+    const bar = screen.getByTestId("workspace.tab-bar");
+    expect(bar.style.position).toBe("relative");
+    expect(bar.style.zIndex).toBe("calc(var(--z-dropdown) + 1)");
+  });
+
+  it("opens the calendar from its column", () => {
+    const onCalendar = vi.fn();
+    renderBar({ ai: false, onCalendar });
+    const entry = screen.getByTestId("workspace.tab-calendar");
+    expect(entry.getAttribute("aria-label")).toBe(i18n.t("calendar.title"));
+    entry.click();
+    expect(onCalendar).toHaveBeenCalledTimes(1);
   });
 
   it("calls back when the column is pressed", () => {
@@ -119,8 +146,17 @@ describe("TabBar", () => {
     const flow = await import("node:fs").then((fs) =>
       fs.readFileSync("src/app/flows/EditorFlow.tsx", "utf8"),
     );
-    const renders = flow.match(/<TabBar\b/g) ?? [];
+    // Each render's OWN props, not a count over the whole file: `SidebarPane` is
+    // handed the same `onCalendar={() => setTab("calendar")}` text, so a
+    // file-wide match would pass while a TabBar call site was missing it.
+    const renders = flow.match(/<TabBar\b[\s\S]*?\/>/g) ?? [];
     expect(renders.length).toBeGreaterThanOrEqual(2);
-    expect(flow.match(/ai=\{prefs\.ai_enabled\}/g)?.length).toBe(renders.length);
+    for (const render of renders) {
+      expect(render).toContain("ai={prefs.ai_enabled}");
+      // A call site that forgot the calendar draws a bar whose new column does
+      // nothing; `onCalendar` is required, so that is a compile error, and this is
+      // what stops somebody making it optional to quiet a new call site.
+      expect(render).toContain('onCalendar={() => setTab("calendar")}');
+    }
   });
 });

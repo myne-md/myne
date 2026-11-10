@@ -326,7 +326,7 @@ function messageForUnlockError(e: unknown, t: TFunction): string {
     case "IoError":
       return ioBanner(err.detail.io_error_kind);
     case "InvalidVaultMeta":
-      return t("unlock.vaultUnreadable");
+      return t("common.vaultfileisunreadablerestorefromabackup");
     default:
       return t("unlock.unlockFailedGeneric");
   }
@@ -676,7 +676,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
     return (
       <FailClosed
         heading={t("unlock.corruptedHeading")}
-        message={t("unlock.vaultUnreadable")}
+        message={t("common.vaultfileisunreadablerestorefromabackup")}
         fromPicker={fromPicker}
         onBackToPicker={onBackToPicker ? handleBackToPicker : undefined}
         onRestore={props.onRestoreBackup}

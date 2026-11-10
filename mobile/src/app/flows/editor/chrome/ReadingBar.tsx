@@ -24,7 +24,7 @@ export function ReadingBar({ onEdit }: { onEdit: () => void }) {
         style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 18px", borderRadius: 9, border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 600 }}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-1L18.5 8.5a2 2 0 0 0-3-3L5 16l-1 4zM14 6l3 3" stroke="var(--accent)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        {t("editor.readingBar.edit")}
+        {t("common.edit")}
       </button>
     </div>
   );

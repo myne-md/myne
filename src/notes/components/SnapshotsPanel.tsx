@@ -9,8 +9,9 @@
 // than the selected one, which answers "what did this snapshot itself change?".
 //
 // Copy discipline (SYNC-4): the term is "snapshot", never "backup"/"export";
-// encryption is shown typographically ("Encrypted · 12s ago"), not with a
-// green-badge cliché; nothing overclaims beyond the threat-model §7 guarantee.
+// the row states the age and the size and says nothing about encryption, which
+// is what a snapshot IS here rather than a property worth printing on every row
+// (owner, 2026-11-10); nothing overclaims beyond the threat-model §7 guarantee.
 // Restore routes through the backend `snapshot_restore`, which captures the
 // current note as an undo point first (SYNC-5) — the confirm copy says so.
 
@@ -454,11 +455,11 @@ export function SnapshotsPanel({
           </h2>
           <span
             style={SUBTITLE_STYLE}
-            title={noteTitle ?? t("notes.snapshots.untitled")}
+            title={noteTitle ?? t("common.untitled")}
           >
             {noteTitle && noteTitle.trim() !== ""
               ? noteTitle
-              : t("notes.snapshots.untitled")}
+              : t("common.untitled")}
           </span>
         </div>
 
@@ -471,7 +472,7 @@ export function SnapshotsPanel({
             <div style={LIST_STYLE} aria-label={t("notes.snapshots.listLabel")}>
               {loading && snaps.length === 0 ? (
                 <div style={{ ...ROW_META_STYLE, padding: "var(--space-3) var(--space-5)" }}>
-                  {t("notes.snapshots.loading")}
+                  {t("common.loading")}
                 </div>
               ) : (
                 snaps.map((s, idx) => {
@@ -504,13 +505,14 @@ export function SnapshotsPanel({
                     >
                       <span style={ROW_AGE_STYLE}>
                         {formatRelativeTime(new Date(s.captured_at_ms)) ||
-                          t("notes.snapshots.justNow")}
+                          t("common.justnow")}
                       </span>
-                      <span style={ROW_META_STYLE}>
-                        {t("notes.snapshots.encryptedSize", {
-                          size: formatBytes(s.size_bytes),
-                        })}
-                      </span>
+                      {/* The size alone. It used to read "Encrypted · 4.2 KB",
+                          and the word said nothing a reader did not know: every
+                          snapshot in this vault is sealed, that is what a snapshot
+                          IS here, so the label was a guarantee restated on every
+                          row (owner, 2026-11-10). */}
+                      <span style={ROW_META_STYLE}>{formatBytes(s.size_bytes)}</span>
                       <span
                         style={ROW_META_STYLE}
                         data-testid="snapshots.author"
@@ -616,7 +618,7 @@ export function SnapshotsPanel({
             style={{ ...BTN_STYLE, marginInlineStart: "auto" }}
             onClick={onClose}
           >
-            {t("notes.snapshots.close")}
+            {t("common.close")}
           </button>
         </div>
       </div>
@@ -729,7 +731,7 @@ function RestoreConfirm({
             data-testid="snapshots.restore-cancel"
             onClick={onCancel}
           >
-            {t("notes.snapshots.cancel")}
+            {t("common.cancel")}
           </button>
           <button
             type="button"
