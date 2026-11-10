@@ -406,7 +406,7 @@ export function MemberRosterPanel({
           apart from the member list and the invitations below. */}
       {personReady ? (
       <SettingsSection
-        title={t("sync.memberRoster.identityHeading")}
+        title={t("common.youridentity")}
         testId="member-roster.identity-section"
       >
         <div data-testid="member-roster.person-ready" style={SECTION_STYLE}>
@@ -474,7 +474,7 @@ export function MemberRosterPanel({
               }}
             >
               <p data-testid="member-roster.forget-warning" style={{ ...STATUS_STYLE, margin: 0 }}>
-                {t("sync.memberRoster.identityForgetWarning")}
+                {`${t("identityForget.body")} ${t("identityForget.rosterTail")}`}
               </p>
               <label
                 style={{
@@ -511,7 +511,7 @@ export function MemberRosterPanel({
                   }}
                   data-testid="member-roster.forget-cancel"
                 >
-                  {t("sync.memberRoster.identityForgetCancel")}
+                  {t("common.keepit")}
                 </Button>
                 <div style={{ flex: 1 }} />
                 <Button
@@ -536,7 +536,7 @@ export function MemberRosterPanel({
               }}
               data-testid="member-roster.forget-cta"
             >
-              {t("sync.memberRoster.identityForgetCta")}
+              {t("common.forgetthisidentityonthisdevice")}
             </Button>
           )}
         </div>
@@ -562,7 +562,7 @@ export function MemberRosterPanel({
             onClick={reload}
             style={{ alignSelf: "flex-start" }}
           >
-            {t("invites.retry")}
+            {t("common.tryagain")}
           </Button>
         </div>
       ) : members.length === 0 ? (
@@ -666,7 +666,7 @@ export function MemberRosterPanel({
                     onClick={() => openNameEditor(m)}
                   >
                     {m.name_state === "verified"
-                      ? t("sync.memberRoster.nameEdit")
+                      ? t("common.rename")
                       : t("sync.memberRoster.nameInviteCta")}
                   </Button>
                 ) : null}
@@ -706,7 +706,7 @@ export function MemberRosterPanel({
                     data-testid="member-roster.remove-button"
                     onClick={() => setRemoveTarget(m)}
                   >
-                    {t("sync.memberRoster.remove")}
+                    {t("common.remove")}
                   </Button>
                 ) : null}
               </li>
@@ -1072,7 +1072,7 @@ function MemberNameDialog({
             disabled={busy}
             onClick={onClear}
           >
-            {t("sync.memberRoster.nameClear")}
+            {t("common.clear")}
           </Button>
           <Button
             type="button"
@@ -1081,7 +1081,7 @@ function MemberNameDialog({
             disabled={busy}
             onClick={onCancel}
           >
-            {t("sync.memberRoster.nameCancel")}
+            {t("common.cancel")}
           </Button>
         </div>
       </form>
@@ -1109,7 +1109,7 @@ function RemoveConfirmDialog({
       open
       testId="member-roster.remove-confirm"
       labelId={labelId}
-      title={t("sync.memberRoster.remove")}
+      title={t("common.remove")}
       onClose={onCancel}
     >
       <p>{t("sync.memberRoster.removeConfirm", { name })}</p>
@@ -1128,7 +1128,7 @@ function RemoveConfirmDialog({
           disabled={busy}
           onClick={() => void onConfirm()}
         >
-          {t("sync.memberRoster.remove")}
+          {t("common.remove")}
         </Button>
       </div>
     </ModalShell>
@@ -1161,7 +1161,7 @@ function InviteMemberModal({
       <p>{t("sync.memberRoster.inviteHint")}</p>
       <textarea
         data-testid="member-roster.invite-code"
-        aria-label={t("sync.memberRoster.inviteCodeLabel")}
+        aria-label={t("common.youridentitycode")}
         value={code}
         onChange={(e) => {
           setCode(e.target.value);

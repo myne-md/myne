@@ -1,6 +1,6 @@
 import { FolderGlyph } from "../../../../components";
 import { ColorDot } from "../decorations/ColorDot";
-import { useHold } from "./useHold";
+import { useHold, type HoldDrag } from "./useHold";
 import { tappable } from "../../../a11y/tappable";
 
 /** A folder header row in the inline notes tree (MYND-480): tap toggles the
@@ -17,6 +17,9 @@ export function FolderTreeRow({
   color,
   onToggle,
   onHold,
+  reorderKey,
+  drag,
+  dragging = false,
 }: {
   name: string;
   count: number;
@@ -28,12 +31,20 @@ export function FolderTreeRow({
   color?: string;
   onToggle: () => void;
   onHold: () => void;
+  /** The row's identity for the tree's drag (`data-reorder-key`). */
+  reorderKey?: string;
+  /** The drag phase of the same press, when the tree is the manual-order surface. */
+  drag?: HoldDrag;
+  /** True while this row is the one lifted off the list. */
+  dragging?: boolean;
 }) {
-  const { handlers, consumeHeldClick } = useHold(onHold);
+  const { handlers, consumeHeldClick } = useHold(onHold, drag);
   return (
     <div
       data-testid="notes.folder-row"
       data-folder-path={name}
+      data-reorder-key={reorderKey}
+      data-dragging={dragging ? "true" : undefined}
       // Expose the fold state so a flow spec can assert a RESTORED expand set
       // after a remount (MYND-561) — the chevron's rotation is a CSS transform,
       // which Playwright can't read as state.

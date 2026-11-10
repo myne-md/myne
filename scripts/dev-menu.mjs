@@ -545,6 +545,10 @@ function startIos() {
   // The simulator shares the host network stack, so a loopback endpoint works as
   // typed. A physical iPhone does not, and would need an https endpoint.
   mobileEndpointHint();
+  // `mobile/scripts/tauri.sh` names the device, because this spawn gives the child
+  // no stdin: `tauri ios dev` with no device PROMPTS, reads EOF, and reprints "Not
+  // to be pushy, but you need to pick a device." forever. That wrapper is the one
+  // place every entry point goes through, `MYNE_IOS_DEVICE` included.
   log("==> starting the iOS client in the simulator");
   const child = spawnTarget("ios", PNPM, ["mobile:ios"]);
   session.last = child;

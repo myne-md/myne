@@ -304,7 +304,7 @@ function ConfirmInstall({
           disabled={applying}
           data-testid="theme-install.cancel"
         >
-          {t("themeInstall.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="primary"
@@ -360,7 +360,7 @@ export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps
       title={signal.ok ? t("themeInstall.title") : t("themeInstall.errorTitle")}
       onClose={close}
       labelId="theme-install-title"
-      closeLabel={t("themeInstall.close")}
+      closeLabel={t("common.close")}
       // Unlike every other modal, this one is opened by an OS event rather than
       // by the user, so it can land over an already-open surface. At the shared
       // level it would paint UNDER the command palette while the focus trap
@@ -379,7 +379,7 @@ export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps
           <p style={HELPER_STYLE}>{t("themeInstall.error.nothingWritten")}</p>
           <div style={ACTIONS_STYLE}>
             <Button variant="secondary" onClick={close} data-testid="theme-install.dismiss">
-              {t("themeInstall.close")}
+              {t("common.close")}
             </Button>
           </div>
         </div>

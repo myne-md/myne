@@ -58,28 +58,32 @@ export interface EditorLayoutController extends EditorLayoutState {
 }
 
 /**
- * Which sidebars to close for the agent tab (myne-md/myne#913).
+ * Which sidebars to close for a tab that owns the whole surface.
+ *
+ * Two kinds answer yes: the agent tab (myne-md/myne#913) and the calendar
+ * (myne-md/myne#1037, on the owner's "day, week and month must cover the page").
+ * Both carry everything they need inside the pane, so a note tree beside them is
+ * a column spent on nothing.
  *
  * Pure so the cases can be asserted without mounting the Editor, the largest
- * component in the tree. **Both sides, not just the left**: the report was about
- * the RIGHT one, which is the AI chat's home, and an agent pane beside an AI chat
- * is the same surface twice with different transcripts. The left goes with it
- * because the agent has its own conversation rail, so two rails were asking the
- * user to pick something twice.
+ * component in the tree. **Both sides, not just the left**: the original report
+ * was about the RIGHT one, which is the AI chat's home, and an agent pane beside
+ * an AI chat is the same surface twice with different transcripts. The calendar
+ * reads neither side either.
  *
  * The cases are the whole rule:
  *
- *  - the agent tab is showing and the workspace is a SINGLE pane: close whatever
- *    is open. A SPLIT workspace is left alone: there the note tree and the
- *    backlinks pane are the other pane's context, and closing them hides the
+ *  - a whole-surface tab is showing and the workspace is a SINGLE pane: close
+ *    whatever is open. A SPLIT workspace is left alone: there the note tree and
+ *    the backlinks pane are the other pane's context, and closing them hides the
  *    selection being worked from.
  *  - the layout has not hydrated: do nothing. The persisted read REPLACES the
  *    state, so a collapse written before it lands is undone silently.
  *  - `handledForEntry` already true: do nothing, which is what lets the user
  *    reopen either side without being fought for the rest of the visit.
  */
-export function agentTabCollapse(input: {
-  agentTabFocused: boolean;
+export function wholeSurfaceTabCollapse(input: {
+  wholeSurfaceTabFocused: boolean;
   paneCount: number;
   hydrated: boolean;
   leftCollapsed: boolean;
@@ -87,7 +91,7 @@ export function agentTabCollapse(input: {
   handledForEntry: boolean;
 }): { left: boolean; right: boolean } {
   const none = { left: false, right: false };
-  if (!input.agentTabFocused || input.paneCount !== 1) return none;
+  if (!input.wholeSurfaceTabFocused || input.paneCount !== 1) return none;
   if (!input.hydrated) return none;
   if (input.handledForEntry) return none;
   return { left: !input.leftCollapsed, right: !input.rightCollapsed };

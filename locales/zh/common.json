@@ -1743,12 +1743,6 @@
       "title": "筛选",
       "status": "状态"
     },
-    "sortSheet": {
-      "title": "排序",
-      "manual": "手动排序",
-      "titleAsc": "标题 · A → Z",
-      "titleDesc": "标题 · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "空笔记",
       "wordCount_one": "{{count}} 个单词 · 阅读 {{minutes}} 分钟",
@@ -2623,8 +2617,7 @@
       "confirmBody": "你当前的笔记会先保存为一个快照，这样你可以撤销此操作。",
       "confirmTitle": "恢复此快照？",
       "decrypting": "正在解密…",
-      "emptyState": "暂无快照。快照会在你编辑时自动保存，并保留约 7 天。它们是加密的，并会在笔记被永久删除时一同消失。",
-      "encryptedSize": "已加密 · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "无法解密此快照。",
       "errorGeneric": "出了点问题。请重试。",
       "errorIo": "发生磁盘错误。磁盘可能已满或无法写入。",
@@ -5564,17 +5557,6 @@
     "addCondition": "+ 添加条件",
     "createView": "创建视图"
   },
-  "snapshots": {
-    "today": "今天 {{time}}",
-    "readError": "无法读取版本历史。",
-    "decryptError": "无法解密该版本。",
-    "restoreError": "无法恢复该版本。",
-    "title": "版本历史",
-    "emptyState": "尚无更早的版本。快照会在你编辑时自动捕获。",
-    "hide": "隐藏",
-    "empty": "（空）",
-    "restoreThisVersion": "恢复此版本"
-  },
   "restoreBackup": {
     "title": "移动端尚不可用",
     "body": "从备份文件恢复在移动端尚不可用。请创建保险库或使用你的恢复短语恢复。"
@@ -5672,7 +5654,6 @@
     "unlockingSubtitle": "正在打开你的保险库。",
     "readyTitle": "你的保险库已就绪",
     "readyBody": "从现在起你写的所有内容，在存储或同步之前都会在此设备上加密。",
-    "personalLabel": "个人",
     "openVault": "打开保险库",
     "backUpNow": "立即备份"
   },

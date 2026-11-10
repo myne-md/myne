@@ -20,6 +20,7 @@ import {
   forgetScroll,
   isRestoringScroll,
   readScrollAnchor,
+  readerMovedRecently,
   recallScroll,
   rememberScroll,
   resetScrollMemory,
@@ -267,5 +268,60 @@ describe("a restore does not write its own drift back", () => {
     beginScrollRestore("n1");
     resetScrollMemory();
     expect(isRestoringScroll("n1")).toBe(false);
+  });
+});
+
+describe("readerMovedRecently", () => {
+  // Why this exists at all: a restore that fires late must not drag a reader back
+  // to a position they scrolled past. The scrollbar appearing on a note that just
+  // grew past one screen narrows the pane, and the width observer used to answer
+  // that by putting the remembered line back at the top of the viewport.
+  it("is true right after a remembered scroll and false after the window", () => {
+    const view = new EditorView({ state: EditorState.create({ doc: "hello" }) });
+    const scroller = document.createElement("div");
+    scroller.appendChild(view.dom);
+    const t0 = 7_000_000;
+    const realNow = Date.now;
+    Date.now = () => t0;
+    try {
+      expect(readerMovedRecently("n1", 250, t0)).toBe(false);
+      rememberScroll("n1", view, scroller);
+      expect(readerMovedRecently("n1", 250, t0)).toBe(true);
+      expect(readerMovedRecently("n1", 250, t0 + 251)).toBe(false);
+    } finally {
+      Date.now = realNow;
+      view.destroy();
+    }
+  });
+
+  it("records the move even while a restore is suppressing the anchor write", () => {
+    // The suppressed pass is still the reader moving. Dropping it here is how the
+    // guard would read "nobody moved" at the exact moment somebody did.
+    const view = new EditorView({ state: EditorState.create({ doc: "hello" }) });
+    const scroller = document.createElement("div");
+    scroller.appendChild(view.dom);
+    try {
+      beginScrollRestore("n1");
+      rememberScroll("n1", view, scroller);
+      expect(readerMovedRecently("n1")).toBe(true);
+    } finally {
+      view.destroy();
+    }
+  });
+
+  it("forgets the move with the note and with the session", () => {
+    const view = new EditorView({ state: EditorState.create({ doc: "hello" }) });
+    const scroller = document.createElement("div");
+    scroller.appendChild(view.dom);
+    try {
+      rememberScroll("n1", view, scroller);
+      forgetScroll("n1");
+      expect(readerMovedRecently("n1")).toBe(false);
+      rememberScroll("n1", view, scroller);
+      resetScrollMemory();
+      expect(readerMovedRecently("n1")).toBe(false);
+    } finally {
+      view.destroy();
+    }
   });
 });

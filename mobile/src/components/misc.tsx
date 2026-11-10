@@ -212,7 +212,13 @@ export function Sheet({
   const body = typeof children === "function" ? children(close) : children;
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+    // `--z-modal`, not a bare 40. The bottom TabBar sits at
+    // `calc(var(--z-dropdown) + 1)` so no full-screen DESTINATION can cover it
+    // (`TabBar.tsx` carries that reasoning), which also put every sheet in this
+    // client BELOW the bar: a sheet's own Cancel or Create row was then painted
+    // over by the navigation, and the click landed on the bar instead. A sheet is a
+    // modal, and the ladder has a level for that.
+    <div style={{ position: "absolute", inset: 0, zIndex: "var(--z-modal)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div
         // The scrim is a touch convenience, not a control (myne#728): the
         // sheet's own Done/Cancel and the back gesture are the reachable
@@ -305,7 +311,9 @@ export function SidePanel({
   }, [onClose, setShown]);
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 45 }}>
+    // Same level as `Sheet` above, and above the TabBar for the same reason: a
+    // drawer with its own header row must not have that row covered by navigation.
+    <div style={{ position: "absolute", inset: 0, zIndex: "var(--z-modal)" }}>
       <div
         // A second scrim, same reasoning as the one above (myne#728).
         role="presentation"

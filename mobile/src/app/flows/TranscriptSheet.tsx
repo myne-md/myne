@@ -321,7 +321,7 @@ export function TranscriptSheet({
               data-testid="files.transcript-copy"
               style={{ flex: 1 }}
             >
-              {t("attachments.library.transcriptCopy")}
+              {t("common.copy")}
             </Button>
             <Button
               variant="secondary"

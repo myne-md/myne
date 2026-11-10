@@ -443,7 +443,7 @@ describe("ChatComposer", () => {
     expect(user!.kind).toBe("agent");
     expect(user!.role).toBe("user");
     expect(user!.text).toBe("tidy the headings");
-    expect(user!.scopeLabel).toBe("agent.composer.scopeOpenNote");
+    expect(user!.scopeLabel).toBe("common.thisnote");
     expect(agent!.kind).toBe("agent");
     expect(agent!.role).toBe("assistant");
     // Not a stream, so the ask composer's Stop control must not appear.
@@ -810,7 +810,7 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
   it("names the choice rather than a value it does not have", () => {
     noteless();
     expect(screen.getByTestId("ai.composer-scope-value").textContent).not.toContain(
-      "agent.composer.scopeOpenNote",
+      "common.thisnote",
     );
   });
 
@@ -820,7 +820,7 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
     // trigger says so rather than reading "nothing selected".
     noteless();
     expect(screen.getByTestId("ai.composer-scope-value").textContent).toContain(
-      "agent.composer.scopeAllVault",
+      "common.allnotes",
     );
     // An icon-only control states the KIND in its glyph and the value in its
     // name, which is the trade this change made (myne-md/myne#848).
@@ -1173,7 +1173,7 @@ describe("ChatComposer, the blocked zero state", () => {
     // `This note` when a note is open and nothing is attached: the value the run
     // will use, as text, which is what the user asked for.
     expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
-      "agent.composer.scopeOpenNote",
+      "common.thisnote",
     );
   });
 
@@ -1507,7 +1507,7 @@ describe("ChatComposer: the scope names the note", () => {
     // dead code: it is the arm a test or an isolated surface takes.
     mount({ openNoteId: "n1", openNoteTitle: null });
     expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
-      "agent.composer.scopeOpenNote",
+      "common.thisnote",
     );
   });
 });

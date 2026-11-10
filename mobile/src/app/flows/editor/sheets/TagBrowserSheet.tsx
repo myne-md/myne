@@ -104,7 +104,7 @@ export function TagBrowserSheet({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 8 }}>
             <span style={{ width: 60 }} />
             <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("notes.tagBrowser.title")}</span>
-            <button onClick={close} style={{ width: 60, textAlign: "end", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
+            <button onClick={close} style={{ width: 60, textAlign: "end", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("common.done")}</button>
           </div>
 
           {/* Search + All/Any toggle */}
@@ -155,7 +155,7 @@ export function TagBrowserSheet({
                   {matchIds.length > 0 && (
                     <button onClick={() => setSavingName("")} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("notes.tagBrowser.saveAsView")}</button>
                   )}
-                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("notes.tagBrowser.clear")}</button>
+                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("common.clear")}</button>
                 </div>
               </div>
 
@@ -188,7 +188,7 @@ export function TagBrowserSheet({
                     onClick={() => { close(); onOpenNote(id); }}
                     style={{ display: "block", width: "100%", textAlign: "start", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "12px 4px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                   >
-                    {titleById.get(id) || t("editor.untitledNote")}
+                    {titleById.get(id) || t("common.untitlednote")}
                   </button>
                 ))}
                 <div style={{ height: "calc(8px + env(safe-area-inset-bottom, 0px))" }} />

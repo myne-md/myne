@@ -34,7 +34,7 @@ export function AttachmentOcrSettings() {
     select: (p) => p.attachment_ocr_enabled,
     write: setAttachmentOcrEnabled,
     initial: true,
-    errorMessage: t("settings.attachmentOcr.errorSaveSetting"),
+    errorMessage: t("common.couldnotsavethissetting"),
   });
   // Attachments still queued. `0` hides the line — the indicator exists to
   // explain a busy fan, so it must disappear the moment there is nothing to

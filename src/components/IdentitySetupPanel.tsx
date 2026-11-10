@@ -346,7 +346,7 @@ export function IdentitySetupPanel({
                 onClick={() => setStep("phrase")}
                 data-testid={testId("confirm-back")}
               >
-                {t("identitySetup.back")}
+                {t("common.back")}
               </Button>
             ) : null}
             <div style={{ flex: 1 }} />
@@ -357,7 +357,7 @@ export function IdentitySetupPanel({
                 onClick={() => setStep("confirm")}
                 data-testid={testId("phrase-continue")}
               >
-                {t("identitySetup.phraseContinue")}
+                {t("common.continue")}
               </Button>
             ) : (
               <Button
@@ -366,7 +366,7 @@ export function IdentitySetupPanel({
                 disabled={doneDisabled}
                 data-testid={testId("close-cta")}
               >
-                {t("identitySetup.doneCta")}
+                {t("common.done")}
               </Button>
             )}
           </div>
@@ -389,7 +389,7 @@ export function IdentitySetupPanel({
                 <Input
                   readOnly
                   mono
-                  aria-label={t("sync.panel.identity.codeLabel")}
+                  aria-label={t("common.youridentitycode")}
                   value={heldCode}
                   data-testid={testId("held-code")}
                   style={{ userSelect: "all" }}
@@ -475,7 +475,7 @@ export function IdentitySetupPanel({
                     }}
                     data-testid={testId("recover-back")}
                   >
-                    {t("identitySetup.back")}
+                    {t("common.back")}
                   </Button>
                 )}
                 <div style={{ flex: 1 }} />
@@ -514,7 +514,7 @@ export function IdentitySetupPanel({
                     onClick={() => setConfirmForget(false)}
                     data-testid={testId("forget-cancel")}
                   >
-                    {t("identitySetup.forgetCancel")}
+                    {t("common.keepit")}
                   </Button>
                   <div style={{ flex: 1 }} />
                   <Button
@@ -555,7 +555,7 @@ export function IdentitySetupPanel({
               style={{ alignSelf: "flex-start" }}
               data-testid={testId("cancel")}
             >
-              {t("identitySetup.back")}
+              {t("common.back")}
             </Button>
           ) : null}
         </div>

@@ -240,7 +240,7 @@ export function buildTaskDateTimeControl(initial: string): TaskDateTimeControl {
   const clear = button(
     "cm-task-field-clear",
     "editor.task-field-clear",
-    i18n.t("editor.taskField.clear"),
+    i18n.t("common.clear"),
   );
   dateSection.appendChild(clear);
   root.appendChild(dateSection);
@@ -257,7 +257,7 @@ export function buildTaskDateTimeControl(initial: string): TaskDateTimeControl {
     const m = d.getUTCMonth();
     month.textContent = monthLabel(display.locale, y, m);
     valueLabel.textContent =
-      selected === null ? i18n.t("editor.taskField.noDate") : formatCivilDate(selected, display);
+      selected === null ? i18n.t("common.nodate") : formatCivilDate(selected, display);
 
     const firstOfMonth = new Date(Date.UTC(y, m, 1));
     const leading = (firstOfMonth.getUTCDay() - start + 7) % 7;

@@ -26,7 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CalendarRow } from "@myne/vault-indices";
 import { resolveDayAnchor } from "@myne/dialect/event";
 import { formatLocalDate } from "./localDateTime";
-import { REMINDER_MAX_PENDING, runBoundedReminderPass } from "./reminderPass";
+import { REMINDER_MAX_PENDING, hasPendingReminders, runBoundedReminderPass } from "./reminderPass";
 import { createReminderNotifier, createReminderPermissionApi, remindersReachTheOs } from "./reminders";
 import { vaultIndicesCalendarRange } from "./calendar";
 import { usePrefs } from "./use-prefs";
@@ -43,6 +43,12 @@ const TICK_MINUTES = 15;
  * noise the user dismisses without reading. The comment said "once per app run" while
  * the code did once per mount, and the test that was supposed to catch it asserted a
  * range wide enough to admit both (`toBeLessThanOrEqual(2)`).
+ *
+ * The ask is NOT part of opening the app: it fires when a pass finds a reminder it
+ * is about to register, never on the mount pass. It used to fire at the top of the
+ * first pass — the unlock — so the platform dialog met the user the second the
+ * vault opened, about reminders the device did not have yet (`reminders_enabled`
+ * defaults on, so that pass always ran). HIG: avoid requesting permission at launch.
  */
 let askedForPermission = false;
 
@@ -103,26 +109,7 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
     let cancelled = false;
     const notifier = createReminderNotifier();
 
-    const run = async () => {
-      // The permission is asked at the FIRST pass rather than at the settings toggle,
-      // because that is the moment it has a reason a user can see: the app is about to
-      // put something in the notification list. A refusal leaves the pass running and
-      // simply achieves nothing, which is the same outcome as scheduling into a denied
-      // permission, minus the lie.
-      if (!askedForPermission) {
-        askedForPermission = true;
-        try {
-          const api = createReminderPermissionApi();
-          const status = await api.status();
-          // `not-determined` is iOS/Android's "never asked"; a granted or denied state
-          // is a decision the user already made, and re-asking is how a prompt becomes
-          // noise. `unavailable` means the platform has no notification model at all.
-          if (status === "not-determined") await api.request();
-        } catch {
-          // A platform with no permission model needs no prompt.
-        }
-      }
-
+    const run = async (reason: "mount" | "resume" | "write" | "tick") => {
       const now = new Date();
       const { start, end } = windowFor(now, horizonDays);
       let rows: readonly CalendarRow[] = [];
@@ -145,14 +132,50 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
       }
       if (cancelled) return;
 
+      const eventSources = eventSourcesFrom(rows);
+      const dayAnchor = resolveDayAnchor(prefs.calendar_settings?.day_reminder_anchor);
+
+      // The permission, asked only where it can explain itself (see
+      // `askedForPermission`): on a pass that has a reminder to register, and never
+      // on the mount pass, which is the unlock. A device with no reminder is never
+      // asked at all. A refusal leaves the pass running and simply achieves nothing,
+      // which is the same outcome as scheduling into a denied permission, minus the
+      // lie.
+      if (!askedForPermission && reason !== "mount") {
+        let worthAsking = false;
+        try {
+          worthAsking = hasPendingReminders(
+            { tasks: tasksRef.current, events: eventSources, dayAnchor },
+            () => new Date(),
+            horizonDays,
+          );
+        } catch {
+          // A source that cannot be read has nothing to ask about.
+        }
+        if (worthAsking) {
+          askedForPermission = true;
+          try {
+            const api = createReminderPermissionApi();
+            const status = await api.status();
+            // `not-determined` is iOS/Android's "never asked"; a granted or denied
+            // state is a decision the user already made, and re-asking is how a prompt
+            // becomes noise. `unavailable` means the platform has no notification model
+            // at all.
+            if (status === "not-determined") await api.request();
+          } catch {
+            // A platform with no permission model needs no prompt.
+          }
+        }
+      }
+
       const outcome = await runBoundedReminderPass({
         tasks: tasksRef.current,
-        events: eventSourcesFrom(rows),
+        events: eventSources,
         // Through the shared resolver, not the raw value: `calendar_settings` is a
         // SHARED pref, so a device can receive a value its own setter never validated,
         // and `targetEventReminders` interpolates whatever it is given. A bad value
         // used to produce `Invalid Date` and silently drop every all-day reminder.
-        dayAnchor: resolveDayAnchor(prefs.calendar_settings?.day_reminder_anchor),
+        dayAnchor,
         notifier,
         clock: () => new Date(),
         horizonDays,
@@ -161,20 +184,20 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
       if (!cancelled) setResult(outcome);
     };
 
-    void run();
+    void run("mount");
 
     // Resume is the trigger that matters on a phone: the app can sit in the background
     // for a week, and the platform may have pruned registrations in the meantime.
     const onVisible = () => {
-      if (document.visibilityState === "visible") void run();
+      if (document.visibilityState === "visible") void run("resume");
     };
     document.addEventListener("visibilitychange", onVisible);
     // A ticked task or an edited event is the change that must move a reminder, and
     // every write funnels through this one event on both clients.
-    const onTaskWrite = () => void run();
+    const onTaskWrite = () => void run("write");
     window.addEventListener(TASK_WRITE_EVENT, onTaskWrite);
     const tick = setInterval(() => {
-      if (document.visibilityState === "visible") void run();
+      if (document.visibilityState === "visible") void run("tick");
     }, TICK_MINUTES * 60_000);
 
     return () => {

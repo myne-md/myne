@@ -24,7 +24,7 @@ import { formatRelativeTime } from "../../lib/relative-time";
 const SCRIM: CSSProperties = {
   position: "fixed",
   inset: 0,
-  zIndex: 40,
+  zIndex: "var(--z-modal)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "flex-end",
@@ -338,7 +338,7 @@ export function AiHistorySheet({
                     aria-pressed={mode === m}
                     onClick={() => setMode(m)}
                   >
-                    {m === "vault" ? t("agent.hub.modeVault") : t("agent.hub.modeNote")}
+                    {m === "vault" ? t("agent.hub.modeVault") : t("common.thisnote")}
                   </Button>
                 ))}
               </div>
@@ -379,7 +379,7 @@ export function AiHistorySheet({
               variant="filtered"
               size="sm"
               glyph={<Icon name="message-square" size={20} />}
-              title={t("agent.hub.noMatchTitle")}
+              title={t("common.nomatches")}
               // The query is echoed by the SENTENCE rather than by the
               // component's own `query` prop, because `noMatchBody` already
               // interpolates it: passing both would print it twice.
@@ -441,7 +441,7 @@ export function AiHistorySheet({
                     <>
                       <input
                         data-testid="ai.conversation-rename-input"
-                        aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        aria-label={t("common.rename")}
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         onKeyDown={(e) => {
@@ -454,14 +454,14 @@ export function AiHistorySheet({
                       <button
                         type="button"
                         data-testid="ai.conversation-rename-confirm"
-                        aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        aria-label={t("common.rename")}
                         onClick={(e) => {
                           e.stopPropagation();
                           void commitRename(row.id);
                         }}
                         style={SMALL_BUTTON}
                       >
-                        {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        {t("common.rename")}
                       </button>
                     </>
                   ) : deletingId === row.id ? (
@@ -493,7 +493,7 @@ export function AiHistorySheet({
                         }}
                         style={SMALL_BUTTON}
                       >
-                        {t("editor.chrome.rightPanel.aiChat.historyCancel")}
+                        {t("common.cancel")}
                       </button>
                     </>
                   ) : (
@@ -611,7 +611,7 @@ export function AiHistorySheet({
                         }}
                         style={{ ...SMALL_BUTTON, textAlign: "left" }}
                       >
-                        {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        {t("common.rename")}
                       </button>
                       <button
                         type="button"

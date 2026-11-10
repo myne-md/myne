@@ -132,7 +132,7 @@ export function CoverPickerSheet({
       </div>
 
       {entries === null ? (
-        <div style={STATE_STYLE}>{t("attachments.coverPicker.loading")}</div>
+        <div style={STATE_STYLE}>{t("common.loading")}</div>
       ) : entries.length === 0 ? (
         <div style={STATE_STYLE} data-testid="cover-picker.empty">
           {t("editor.cover.emptyLibraryMobile")}

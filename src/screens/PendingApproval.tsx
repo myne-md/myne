@@ -137,7 +137,7 @@ export function PendingApproval({ onSettled }: PendingApprovalProps) {
             prompt to look again rather than a silent re-convergence. */}
         {sasChanged && (
           <p style={HINT_STYLE} data-testid="pending-approval.sas-changed">
-            {t("approvalWait.verifyChanged")}
+            {t("common.thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue")}
           </p>
         )}
         {/* The abort's own failure surfaces HERE, in the step where the user
@@ -170,7 +170,7 @@ export function PendingApproval({ onSettled }: PendingApprovalProps) {
   return (
     <CenteredCard>
       <h1 style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xl)" }}>
-        {t("approvalWait.pendingTitle")}
+        {t("common.waitingforapproval")}
       </h1>
       {/* Load-bearing copy: rendered verbatim, never translated (SYNC-13 /
           `src/lib/load-bearing-copy.ts`). It states what approval does and does

@@ -24,18 +24,15 @@ async function openAppearance(page: Page): Promise<void> {
 }
 
 test.describe("mobile custom-themes list", () => {
-  test("no themes installed → the block still renders, with its helper line", async ({ page }) => {
+  test("no themes installed → the block is ABSENT, not an empty card", async ({ page }) => {
     await installMockIpc(page, { customThemes: [] });
     await page.goto("/");
     await openAppearance(page);
 
-    const block = page.getByTestId("settings.custom-themes");
-    await expect(block).toBeVisible();
-    await expect(
-      block.getByText("Custom themes are installed on your computer. Yours arrive here on their own after a sync.", {
-        exact: true,
-      }),
-    ).toBeVisible();
+    // 0.17.0 owner pass: a read-only block with nothing in it is a row whose only
+    // content is "none yet", and the Appearance panel above it already reads as
+    // populated. The scope sentence travels with the list it describes.
+    await expect(page.getByTestId("settings.custom-themes")).toHaveCount(0);
     await expect(page.getByTestId("settings.custom-theme-row")).toHaveCount(0);
   });
 

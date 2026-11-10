@@ -67,7 +67,7 @@ describe("manifestFilename", () => {
   });
 
   it("falls back to the untitled wording for an unnamed view", () => {
-    expect(manifestFilename("   ")).toBe("notes.views.untitledView.myneview");
+    expect(manifestFilename("   ")).toBe("common.untitledview.myneview");
   });
 });
 

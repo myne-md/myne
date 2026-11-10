@@ -583,7 +583,7 @@ function NotesActionsBar({
       <IconButton
         icon="folder-plus"
         iconSize={15}
-        label={t("notes.list.newFolder")}
+        label={t("common.newfolder")}
         testId="notes.new-folder"
         tooltip
         onClick={onNewFolder}
@@ -591,7 +591,7 @@ function NotesActionsBar({
       <IconButton
         icon="file-plus"
         iconSize={15}
-        label={t("notes.list.newNote")}
+        label={t("common.newnote")}
         testId="notes.create"
         tooltip
         onClick={onCreate}
@@ -728,18 +728,6 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
   borderRadius: "var(--radius-1)",
   padding: "3px 6px",
   outline: "none",
-};
-
-const BLOCK_NOTICE_STYLE: CSSProperties = {
-  margin: "6px 10px",
-  padding: "8px 10px",
-  background: "var(--warning-soft, var(--paper))",
-  borderInlineStart: "2px solid var(--line-3)",
-  borderRadius: "var(--radius-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  color: "var(--fg-2)",
-  flexShrink: 0,
 };
 
 const CASE_MERGE_STYLE: CSSProperties = {
@@ -2410,7 +2398,7 @@ function PopulatedList({
     () => [
       {
         id: "__vault_root__",
-        label: t("notes.list.vaultRoot"),
+        label: t("common.vaultroot"),
         icon: "folder",
         depth: 0,
         onSelect: () => void runBulkMove(null, moveTarget?.ids),
@@ -2438,7 +2426,7 @@ function PopulatedList({
     return [
       {
         id: "__vault_root__",
-        label: t("notes.list.vaultRoot"),
+        label: t("common.vaultroot"),
         icon: "folder",
         depth: 0,
         onSelect: () => void fm.moveFolderTo(node, null),
@@ -2523,7 +2511,7 @@ function PopulatedList({
         id: "rename",
         group: "edit",
         icon: "pencil",
-        label: t("notes.list.rename"),
+        label: t("common.rename"),
         onSelect: () => ctx.startRename(menu.id),
       },
       {
@@ -2662,7 +2650,7 @@ function PopulatedList({
         id: "rename",
         group: "organize",
         icon: "pencil",
-        label: t("notes.list.rename"),
+        label: t("common.rename"),
         onSelect: () => fm.startRenameFolder(node),
       },
       {
@@ -2804,14 +2792,14 @@ function PopulatedList({
         id: "new-folder",
         group: "create",
         icon: "folder-plus",
-        label: t("notes.list.newFolder"),
+        label: t("common.newfolder"),
         onSelect: () => fm.startNewFolder(""),
       },
       {
         id: "new-note",
         group: "create",
         icon: "file-plus",
-        label: t("notes.list.newNoteMenu"),
+        label: t("common.newnote"),
         onSelect: onCreate,
       },
       {
@@ -3078,6 +3066,10 @@ function PopulatedList({
           estimatedRowHeight={showTimestamps ? 44 : 30}
           heightResetToken={showTimestamps}
           overlayScrollbar
+          // A drag unmounts its own source when it scrolls out of the window, and
+          // the browser cancels the gesture when that happens. Cheap for a few
+          // seconds, and it makes every row a reachable drop target.
+          renderAll={fm.dragKind !== null}
           renderItem={(row) => {
             const anim = treeAnimRows.get(row.key);
             if (row.kind === "folder") {
@@ -3124,12 +3116,13 @@ function PopulatedList({
                     onFolderReorderDrop={(node, place) =>
                       void fm.onFolderReorder(node, place)
                     }
-                    onDropFolderInto={(node) => {
+                    onDropFolderInto={(node, draggedPath) => {
                       // myne#281 — the dragged folder re-nests under the hovered
-                      // one. `fm.dragFolder` is the node the drag started from;
-                      // the guards (self/descendant, name collision, PATH_MAX)
+                      // one. The guards (self/descendant, name collision, PATH_MAX)
                       // live in `moveFolderTo` so the menu entry gets them too.
-                      const dragged = fm.dragFolderNode;
+                      // `draggedPath` is the dataTransfer fallback: a dragend that
+                      // fires mid-gesture clears the ref but not the payload.
+                      const dragged = fm.dragFolderNode ?? fm.folderNodeAt(draggedPath);
                       if (dragged === null) return;
                       void fm.moveFolderTo(dragged, node.path);
                     }}
@@ -3240,18 +3233,9 @@ function PopulatedList({
         {selectedTitle === null
           ? " "
           : t("notes.list.selectionAnnouncement", {
-              title: selectedTitle.trim() === "" ? t("notes.list.untitled") : selectedTitle,
+              title: selectedTitle.trim() === "" ? t("common.untitled") : selectedTitle,
             })}
       </div>
-      {fm.blockNotice !== null && (
-        <div
-          style={BLOCK_NOTICE_STYLE}
-          role="status"
-          onClick={fm.dismissBlock}
-        >
-          {fm.blockNotice}
-        </div>
-      )}
       {fm.caseMerge !== null && (
         <div ref={caseMergeDialogRef} style={CASE_MERGE_STYLE} role="alertdialog">
           <div>
@@ -3265,7 +3249,7 @@ function PopulatedList({
               style={HEADER_BUTTON_STYLE}
               onClick={fm.cancelCaseMerge}
             >
-              {t("notes.list.rename")}
+              {t("common.rename")}
             </button>
             <button
               type="button"
@@ -3310,7 +3294,7 @@ function PopulatedList({
               ? t("notes.list.trashConfirmBulkWarning")
               : t("notes.list.trashConfirmWarning")
           }
-          confirmLabel={t("notes.list.trashConfirmConfirm")}
+          confirmLabel={t("common.movetotrash")}
           onCancel={cancelKeyboardDelete}
           onConfirm={runKeyboardDelete}
         />
@@ -3454,7 +3438,7 @@ function NewFolderInput({
         data-testid="notes.new-folder-input"
         placeholder={
           parentPath === ""
-            ? t("notes.list.newFolderPlaceholder")
+            ? t("common.newfolder")
             : t("notes.list.newFolderInPlaceholder", { path: parentPath })
         }
         style={NEW_FOLDER_INPUT_STYLE}

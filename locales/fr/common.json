@@ -1811,12 +1811,6 @@
       "title": "Filtrer",
       "status": "Statut"
     },
-    "sortSheet": {
-      "title": "Trier",
-      "manual": "Ordre manuel",
-      "titleAsc": "Titre · A → Z",
-      "titleDesc": "Titre · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Note vide",
       "wordCount_one": "{{count}} mot · {{minutes}} min de lecture",
@@ -2730,8 +2724,7 @@
       "confirmBody": "Votre note actuelle sera d'abord enregistrée comme instantané, ce qui vous permettra d'annuler cette opération.",
       "confirmTitle": "Restaurer cet instantané ?",
       "decrypting": "Déchiffrement…",
-      "emptyState": "Aucun instantané pour l'instant. Les instantanés sont enregistrés automatiquement à mesure que vous éditez et conservés environ 7 jours. Ils sont chiffrés et disparaissent lorsque la note est définitivement supprimée.",
-      "encryptedSize": "Chiffré · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Cet instantané n'a pas pu être déchiffré.",
       "errorGeneric": "Une erreur s'est produite. Réessayez.",
       "errorIo": "Une erreur de disque s'est produite. Le disque est peut-être plein ou non inscriptible.",
@@ -5726,17 +5719,6 @@
     "addCondition": "+ Ajouter une condition",
     "createView": "Créer une vue"
   },
-  "snapshots": {
-    "today": "Aujourd'hui {{time}}",
-    "readError": "Impossible de lire l'historique des versions.",
-    "decryptError": "Impossible de déchiffrer cette version.",
-    "restoreError": "Impossible de restaurer cette version.",
-    "title": "Historique des versions",
-    "emptyState": "Aucune version antérieure pour l'instant. Les instantanés sont capturés automatiquement au fur et à mesure que vous modifiez.",
-    "hide": "Masquer",
-    "empty": "(vide)",
-    "restoreThisVersion": "Restaurer cette version"
-  },
   "restoreBackup": {
     "title": "Pas encore disponible sur mobile",
     "body": "La restauration depuis un fichier de sauvegarde n'est pas encore disponible sur mobile. Créez un coffre-fort ou récupérez avec votre phrase."
@@ -5840,7 +5822,6 @@
     "unlockingSubtitle": "Ouverture de votre coffre-fort.",
     "readyTitle": "Votre coffre-fort est prêt",
     "readyBody": "Tout ce que vous écrivez à partir d'ici est chiffré sur cet appareil avant d'être stocké ou synchronisé.",
-    "personalLabel": "Personnel",
     "openVault": "Ouvrir le coffre-fort",
     "backUpNow": "Sauvegarder maintenant"
   },

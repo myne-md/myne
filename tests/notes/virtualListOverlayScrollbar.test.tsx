@@ -83,3 +83,25 @@ describe("VirtualList: the overlay scroller drives the virtual window", () => {
     }
   });
 });
+
+describe("VirtualList: renderAll", () => {
+  // A drag's source row and its drop targets must exist as DOM nodes. The window
+  // removes both: the source unmounts and the browser cancels the gesture, and an
+  // off-screen folder cannot be a drop target.
+  it("renders every row, not the window, when asked", () => {
+    const items = Array.from({ length: 400 }, (_, i) => `row-${i}`);
+    const { container } = render(
+      <VirtualList items={items} renderItem={(i) => <span>{i}</span>} renderAll />,
+    );
+    expect(container.querySelectorAll("[data-vrow-key]").length).toBe(400);
+    expect(screen.getByText("row-399")).toBeDefined();
+  });
+
+  it("renders only the window by default, so the flag is what changed it", () => {
+    const items = Array.from({ length: 400 }, (_, i) => `row-${i}`);
+    const { container } = render(
+      <VirtualList items={items} renderItem={(i) => <span>{i}</span>} />,
+    );
+    expect(container.querySelectorAll("[data-vrow-key]").length).toBeLessThan(400);
+  });
+});

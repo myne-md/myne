@@ -59,15 +59,15 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // catalog entry; now an engine command so it is listed + rebindable. App.tsx
   // still suppresses the WebView's native Cmd+F app-wide (the engine only opens
   // the bar on the editor stage).
-  { id: "find.open", get label() { return i18n.t("commands.hotkeys.command.findInNote"); }, group: "General", defaultBindings: ["Mod-f"], rebindable: true },
+  { id: "find.open", get label() { return i18n.t("common.findinnote"); }, group: "General", defaultBindings: ["Mod-f"], rebindable: true },
 
   // Notes
   // Two default chords: Mod-t (new-tab convention) + Mod-n (the OS "new" chord,
   // formerly a separate hardcoded Cmd+N listener, folded in here — #184 C).
-  { id: "note.new-tab", get label() { return i18n.t("commands.hotkeys.command.newNote"); }, group: "Notes", defaultBindings: ["Mod-t", "Mod-n"], rebindable: true },
+  { id: "note.new-tab", get label() { return i18n.t("common.newnote"); }, group: "Notes", defaultBindings: ["Mod-t", "Mod-n"], rebindable: true },
 
   // Panes & Tabs
-  { id: "pane.close-tab", get label() { return i18n.t("commands.hotkeys.command.closeTab"); }, group: "Panes & Tabs", defaultBindings: ["Mod-w"], rebindable: true },
+  { id: "pane.close-tab", get label() { return i18n.t("common.closetab"); }, group: "Panes & Tabs", defaultBindings: ["Mod-w"], rebindable: true },
   { id: "pane.split-row", get label() { return i18n.t("commands.hotkeys.command.splitPaneRight"); }, group: "Panes & Tabs", defaultBindings: ["Mod-\\"], rebindable: true },
   // `Mod-Shift-|`, not `Mod-Shift-\` (myne#337). The chord a keydown produces is
   // built from `keyName(event)`, which reports the SHIFTED character — so
@@ -112,7 +112,7 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
   // named-workspaces (MYND-308): no default chord (rebindable only).
   { id: "workspace.save-as", get label() { return i18n.t("commands.hotkeys.command.saveWorkspaceAs"); }, group: "View", defaultBindings: [], rebindable: true },
   { id: "workspace.switch", get label() { return i18n.t("commands.hotkeys.command.switchWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
-  { id: "workspace.rename", get label() { return i18n.t("commands.hotkeys.command.renameWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
+  { id: "workspace.rename", get label() { return i18n.t("common.renameworkspace"); }, group: "View", defaultBindings: [], rebindable: true },
   { id: "workspace.delete", get label() { return i18n.t("commands.hotkeys.command.deleteWorkspace"); }, group: "View", defaultBindings: [], rebindable: true },
 
   // Editor formatting (#184: now REBINDABLE via the editor keymap Compartment —

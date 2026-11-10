@@ -1811,12 +1811,6 @@
       "title": "Filtro",
       "status": "Stato"
     },
-    "sortSheet": {
-      "title": "Ordina",
-      "manual": "Ordine manuale",
-      "titleAsc": "Titolo · A → Z",
-      "titleDesc": "Titolo · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Nota vuota",
       "wordCount_one": "{{count}} parola · {{minutes}} min di lettura",
@@ -2730,8 +2724,7 @@
       "confirmBody": "La tua nota attuale verrà prima salvata come istantanea, così potrai annullare questa operazione.",
       "confirmTitle": "Ripristinare questa istantanea?",
       "decrypting": "Decifratura…",
-      "emptyState": "Ancora nessuna istantanea. Le istantanee vengono salvate automaticamente mentre modifichi e conservate per circa 7 giorni. Sono crittografate e scompaiono quando la nota viene eliminata definitivamente.",
-      "encryptedSize": "Crittografata · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Impossibile decifrare questa istantanea.",
       "errorGeneric": "Qualcosa è andato storto. Riprova.",
       "errorIo": "Si è verificato un errore del disco. Il disco potrebbe essere pieno o non scrivibile.",
@@ -5726,17 +5719,6 @@
     "addCondition": "+ Aggiungi condizione",
     "createView": "Crea vista"
   },
-  "snapshots": {
-    "today": "Oggi {{time}}",
-    "readError": "Impossibile leggere la cronologia versioni.",
-    "decryptError": "Impossibile decifrare quella versione.",
-    "restoreError": "Impossibile ripristinare quella versione.",
-    "title": "Cronologia versioni",
-    "emptyState": "Ancora nessuna versione precedente. Le istantanee vengono acquisite automaticamente mentre modifichi.",
-    "hide": "Nascondi",
-    "empty": "(vuota)",
-    "restoreThisVersion": "Ripristina questa versione"
-  },
   "restoreBackup": {
     "title": "Non ancora disponibile su mobile",
     "body": "Il ripristino da un file di backup non è ancora disponibile su mobile. Crea una cassaforte o recupera con la tua frase."
@@ -5840,7 +5822,6 @@
     "unlockingSubtitle": "Apertura della tua cassaforte.",
     "readyTitle": "La tua cassaforte è pronta",
     "readyBody": "Tutto ciò che scrivi da qui viene cifrato su questo dispositivo prima di essere archiviato o sincronizzato.",
-    "personalLabel": "Personale",
     "openVault": "Apri la cassaforte",
     "backUpNow": "Esegui il backup ora"
   },

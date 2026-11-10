@@ -582,6 +582,13 @@
   height: 30px;
   font-family: var(--font-sans);
   font-size: var(--text-xs);
+  /* `start`, because a `<button>` centres its text and the label inside is
+     `flex: 1`: a trigger wider than its current option printed that option in
+     the middle of the box, which reads as a centred caption rather than a value.
+     Invisible while every trigger was content-sized; the event form's pickers are
+     the first that give one room to be centred in. The `data-wrap` variant
+     already carried this line for the same reason. */
+  text-align: start;
   color: var(--fg-2);
   background: var(--bg-1);
   border: 1px solid var(--line-2);
@@ -1583,4 +1590,538 @@
 .myne-text-link:focus-visible {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* =========================================================================
+   Calendar — the month grid and the day columns (myne-md/myne#1037)
+   ========================================================================= */
+
+/* The grid is a page, not a card: every week row divides the pane's height
+   rather than stacking on its content, and `min-height: 0` at each step is what
+   turns the `1fr` rows into the leftover space instead of the content's own
+   minimum. That chain is the reason this is a stylesheet and not the inline
+   objects it replaced — a percentage height inside a flowing frame resolves to
+   `auto`, which is the failure `PaneView` records on the tasks pane. */
+.myne-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-2);
+  box-sizing: border-box;
+}
+
+.myne-calendar__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.myne-calendar__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.myne-calendar__month {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  /* The weekday strip, then the weeks. The row COUNT is the grid's own
+     arithmetic (`calendar/grid.ts`), so it stays at the call site. */
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.myne-calendar__weekdays,
+.myne-calendar__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.myne-calendar__weekdays {
+  align-items: center;
+  padding-block-end: var(--space-1);
+}
+
+/* Left-aligned with the day numbers below it, at the cells' own inset: a
+   centred label sat over a grid whose numbers are all at the left edge. */
+.myne-calendar__weekday {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--fg-3);
+  padding-inline-start: var(--space-1);
+}
+
+.myne-calendar__weeks {
+  display: grid;
+  min-height: 0;
+}
+
+.myne-calendar__week {
+  min-height: 0;
+}
+
+/* ── The hour axis (day and week) ──────────────────────────────────────────
+   Three stacked rows: the day headers, the all-day band when the day has one,
+   and the scrolling hours. Every hour row is the same height, so two days'
+   14:00 sit level and a click lands on the hour it looks like it does. */
+.myne-calendar__timegrid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+/* The column COUNT is the view's - one day or seven - so it stays at the call
+   site; this is the shape those columns share. */
+.myne-calendar__days,
+.myne-calendar__allday,
+.myne-calendar__hours {
+  display: grid;
+  min-width: 0;
+}
+
+.myne-calendar__days {
+  align-items: center;
+  padding-block-end: var(--space-1);
+}
+
+.myne-calendar__dayhead {
+  min-width: 0;
+  padding-inline-start: var(--space-1);
+}
+
+.myne-calendar__allday {
+  border-block-end: 1px solid var(--line-1);
+}
+
+.myne-calendar__alldaycell {
+  min-width: 0;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-0);
+  border-inline-start: 1px solid var(--line-1);
+}
+
+.myne-calendar__hours {
+  position: relative;
+  overflow-y: auto;
+}
+
+.myne-calendar__labels {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The label sits ON its line, right-aligned against the axis, which is how a
+   time column reads: 14:00 names the hour BELOW it. */
+.myne-calendar__hourlabel {
+  display: block;
+  min-height: var(--space-7);
+  padding-inline-end: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  /* `9:00 AM` is the widest shape a 12-hour clock prints; wrapping it in the
+     gutter would make the label two lines tall and pull the axis off level. */
+  white-space: nowrap;
+}
+
+.myne-calendar__column {
+  /* The containing block for this day's block layer: a block's `top`/`height` are
+     percentages of THIS column, which is why an event can be 1.5 hours tall while
+     the slot it starts in is not. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-inline-start: 1px solid var(--line-1);
+}
+
+/* An hour, and a place to put something in it. The tint on hover is the whole
+   affordance: the row is what you click (or drag) to add at that hour. It is a
+   RULE and a target, never a container - a row inside it could not be taller than
+   the hour, which is the defect the block layer exists for. */
+.myne-calendar__slot {
+  position: relative;
+  min-height: var(--space-7);
+  padding: var(--space-0) var(--space-1);
+  border-block-start: 1px solid var(--line-1);
+  cursor: pointer;
+}
+
+/* Where the timed rows live: over the hours, not inside them, so an event occupies
+   the minutes it actually spans. `pointer-events: none` because the layer covers
+   the whole day - a press must reach the slot below it to start a create-drag -
+   and each block and its grips turn it back on for themselves. */
+.myne-calendar__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.myne-calendar__block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-height: var(--space-4);
+  pointer-events: auto;
+  overflow: hidden;
+  border-radius: var(--radius-1);
+  /* The body is the move target: a block travels by the pointer, and its edge
+     grips say so with their own cursor. */
+  cursor: grab;
+}
+
+.myne-calendar__block:active {
+  cursor: grabbing;
+}
+
+/* The chip fills its block: the block owns the geometry, the chip owns the row's
+   own look (spine, time, title) so a month cell and an hour axis draw one chip.
+
+   Inside a block the row has HEIGHT, so the clock and the title stack rather than
+   sharing one ellipsised line: `9:00 AM Fransaya gid…` is what an inline pair
+   produces in a 200px column, and the whole point of a spanning block is that the
+   hour has room to say what is in it. */
+.myne-calendar__block > .myne-calendar__chip {
+  flex: 1 1 auto;
+  height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-0);
+  white-space: normal;
+  text-align: start;
+}
+
+.myne-calendar__block > .myne-calendar__chip .myne-calendar__title {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* The edge you drag to move one instant. Invisible until the pointer is on the
+   block, because a hairline on every event in a week is a ladder, and 6px is the
+   band a pointer has to land in. */
+.myne-calendar__grip {
+  position: absolute;
+  inset-inline: 0;
+  height: 6px;
+  z-index: var(--z-local);
+  cursor: ns-resize;
+}
+
+.myne-calendar__grip[data-edge="start"] {
+  top: 0;
+}
+
+.myne-calendar__grip[data-edge="end"] {
+  bottom: 0;
+}
+
+.myne-calendar__grip:hover {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+/* The range a create-drag is drawing: an empty outline, because nothing exists
+   until the form is saved, and a filled one would claim it does. */
+.myne-calendar__ghost {
+  position: absolute;
+  inset-inline: var(--space-0);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-1);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.myne-calendar__slot:hover {
+  background: var(--bg-2);
+}
+
+/* Over the hour it belongs to rather than inside it: the field must not push
+   the hours below it out of alignment, since that alignment IS the axis. */
+.myne-calendar__slotform {
+  position: absolute;
+  inset-inline: var(--space-1);
+  top: var(--space-0);
+  z-index: var(--z-local);
+  background: var(--bg-1);
+}
+
+.myne-calendar__now {
+  position: absolute;
+  inset-inline: var(--space-0);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  pointer-events: none;
+  z-index: var(--z-local);
+}
+
+.myne-calendar__nowdot {
+  flex: 0 0 auto;
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.myne-calendar__nowrule {
+  flex: 1 1 auto;
+  border-block-start: 1px solid var(--accent);
+}
+
+.myne-calendar__nowtime {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--accent);
+}
+
+/* A grid line, not a card. Each cell draws its own right and bottom hairline,
+   so the divisions are one pixel wide everywhere and the cells are flush: the
+   gaps and rounded corners this replaced spent 6px between every day of a
+   surface whose whole job is fitting a month on one screen. */
+.myne-calendar__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-1);
+  border-inline-end: 1px solid var(--line-1);
+  border-block-end: 1px solid var(--line-1);
+  background: var(--bg-1);
+}
+
+/* The neighbouring months keep their events and lose their weight. */
+.myne-calendar__cell[data-outside="true"] {
+  background: var(--bg-2);
+}
+
+.myne-calendar__cell[data-outside="true"] .myne-calendar__daynum {
+  color: var(--fg-3);
+}
+
+.myne-calendar__cellhead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* The number sits on the same left edge as the weekday label above it, so the
+   column reads as one line rather than two centred stacks. Today's pill grows
+   AROUND the digits (negative start inset) instead of moving them. */
+.myne-calendar__daynum {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+  border-radius: var(--radius-pill);
+}
+
+.myne-calendar__cell[data-today="true"] .myne-calendar__daynum {
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: var(--weight-medium);
+  margin-inline-start: calc(var(--space-1) * -1);
+  padding-inline: var(--space-1);
+}
+
+/* Capture stays out of the way until the day it belongs to is the one under
+   the pointer. Forty-two resting `+` controls made a month read as a toolbar;
+   `:focus-within` is what keeps the keyboard path, since a tab into a hidden
+   control would otherwise land on nothing a user can see. */
+.myne-calendar__add {
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.myne-calendar__cell:hover .myne-calendar__add,
+.myne-calendar__cell:focus-within .myne-calendar__add {
+  opacity: 1;
+}
+
+/* A pointer that cannot hover has no way to reveal it: touch always shows. */
+@media (hover: none) {
+  .myne-calendar__add { opacity: 1; }
+}
+
+.myne-calendar__events {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  overflow: hidden;
+}
+
+/* An event row: a calendar-coloured spine, then the clock and the title. The
+   spine is the chip's own left border, bleeding to the cell's edge so a day's
+   events read as one column of colour.
+
+   The SURFACE is tinted from the same colour and nowhere else: the caller sets
+   `--calendar-colour` (a token's `var(--…)`, never a literal) and both the spine and
+   the wash come from it. Without the wash an event reads as transparent text
+   floating in a cell (owner, 2026-11-10), and a tint computed from a second value
+   is a spine and a body that disagree the first time one of them is edited. */
+.myne-btn.myne-calendar__chip {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--space-4);
+  gap: var(--space-1);
+  padding: var(--space-0) var(--space-1);
+  border: 0;
+  border-inline-start: 3px solid var(--calendar-colour, var(--line-2));
+  border-radius: 0;
+  background: color-mix(
+    in srgb,
+    var(--calendar-colour, var(--line-2)) var(--calendar-wash, 22%),
+    transparent
+  );
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  line-height: 1.3;
+  text-align: left;
+}
+
+.myne-calendar__time {
+  flex: 0 0 auto;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The second clock reads as a quieter line than the event's own time: it is the
+   same instant said twice, and the note's clock is the one that is stored. */
+.myne-calendar__home {
+  flex: 0 0 auto;
+  max-width: 100%;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.myne-calendar__title {
+  min-width: 0;
+  color: var(--fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.myne-calendar__more {
+  padding-inline-start: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--fg-3);
+}
+
+/* An event row is CONTENT, not chrome. The ghost variant's resting fill exists
+   so a quiet action still reads as a control; on an event it turned every row of
+   a month into a solid bar, so here the fill is the HOVER state and the
+   calendar's colour, drawn as the row's spine, is the identity. The selector is
+   spelled out to the ghost rule's own shape because the two must be comparable,
+   and this one comes later in the file. */
+.myne-btn.myne-calendar__chip[data-variant="ghost"]:enabled:not([role="menuitem"]) {
+  background: transparent;
+}
+
+.myne-btn.myne-calendar__chip[data-variant="ghost"]:enabled:not([role="menuitem"]):hover {
+  background: var(--bg-3);
+}
+
+/* An overlap is a fact about the schedule, so it tints the row rather than
+   asking the reader to compare two clocks. Last, so it outranks the hover
+   step: an overlapping row stays flagged under the pointer. */
+.myne-btn.myne-calendar__chip[data-conflicts="true"][data-variant="ghost"]:enabled:not([role="menuitem"]) {
+  background: var(--warning-soft);
+}
+
+
+/* =========================================================================
+   Event form — the calendar's event sheet (myne-md/myne#1037)
+   ========================================================================= */
+
+/* One row per field: the name on the left, its controls on the right, one grid
+   for the whole sheet so every control starts at the same x.
+
+   The stacked captions this replaces put five rows of widgets at five different
+   origins, and the end date had no name at all beyond a button reading "No
+   date" - which is not a name, it is a value nobody had chosen. */
+.myne-event-form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--space-3);
+  row-gap: var(--space-3);
+  align-items: start;
+}
+
+/* Level with the row's FIRST control rather than with the middle of the row: a
+   value column that wraps to a second line would otherwise drop its name down
+   the cluster. `min-height` is the control row's own height, not a spacing
+   step - it is what makes "level" mean something. */
+.myne-event-form__label {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  font-size: var(--text-sm);
+  color: var(--fg-2);
+}
+
+.myne-event-form__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* A row whose first line answers a question the second one qualifies (a start
+   and its clock mode). Stacked rather than wrapped, so the second line is where
+   it is in BOTH states and nothing moves under the pointer. */
+.myne-event-form__controls--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.myne-event-form__line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* The sheet asks two questions - WHEN, then HOW OFTEN - and the extra air above
+   the second is the only thing that says so. A rule between them would be a
+   second hairline in a dialog this short, competing with the footer's. */
+.myne-event-form__group {
+  margin-top: var(--space-2);
+}
+
+/* A refusal sits under the controls it belongs to and spans them, so it reads as
+   that row's answer rather than as the next row's name. */
+.myne-event-form__alert {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+/* The actions belong to the sheet, not to the last field: one hairline, and the
+   pair pinned to the trailing edge. */
+.myne-event-form__footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line-1);
 }

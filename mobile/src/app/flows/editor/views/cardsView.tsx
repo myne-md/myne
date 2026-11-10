@@ -79,12 +79,12 @@ export function MobileCardsView({
   const { t } = useTranslation();
   const columns = useMemo(() => displayColumns(def), [def]);
   const { stream, total } = useMemo(
-    () => buildViewStream(result, t("notes.views.cards.noValue")),
+    () => buildViewStream(result, t("common.novalue")),
     [result, t],
   );
 
   if (total === 0) {
-    return <MobileViewEmpty message={t("notes.views.cards.empty")} />;
+    return <MobileViewEmpty message={t("common.nonotesmatchthisview")} />;
   }
 
   return (
@@ -125,7 +125,7 @@ export function MobileCardsView({
                 />
               )}
               <div style={TITLE_STYLE}>
-                {row.title ?? t("notes.views.cards.untitled")}
+                {row.title || t("common.untitled")}
               </div>
               {columns.map((col) =>
                 hasDisplayableValue(row.values[col]) ? (

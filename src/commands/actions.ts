@@ -466,7 +466,7 @@ function notesAction(
 const findInNoteAction: CommandAction = {
   id: "editor.find",
   get label() {
-    return i18n.t("commands.actions.findInNote.label");
+    return i18n.t("common.findinnote");
   },
   get category() {
     return i18n.t("commands.actions.category.editor");

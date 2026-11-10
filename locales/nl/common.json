@@ -1743,12 +1743,6 @@
       "title": "Filteren",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sorteren",
-      "manual": "Handmatige volgorde",
-      "titleAsc": "Titel · A → Z",
-      "titleDesc": "Titel · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Lege notitie",
       "wordCount_one": "{{count}} woord · {{minutes}} min leestijd",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Je huidige notitie wordt eerst als momentopname opgeslagen, zodat je dit ongedaan kunt maken.",
       "confirmTitle": "Deze momentopname herstellen?",
       "decrypting": "Ontsleutelen…",
-      "emptyState": "Nog geen momentopnamen. Momentopnamen worden automatisch opgeslagen terwijl je bewerkt en ongeveer 7 dagen bewaard. Ze zijn versleuteld en verdwijnen wanneer de notitie definitief wordt verwijderd.",
-      "encryptedSize": "Versleuteld · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Deze momentopname kon niet worden ontsleuteld.",
       "errorGeneric": "Er is iets misgegaan. Probeer het opnieuw.",
       "errorIo": "Er is een schijffout opgetreden. De schijf is mogelijk vol of niet beschrijfbaar.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Voorwaarde toevoegen",
     "createView": "Weergave maken"
   },
-  "snapshots": {
-    "today": "Vandaag {{time}}",
-    "readError": "Kon versiegeschiedenis niet lezen.",
-    "decryptError": "Kon die versie niet ontsleutelen.",
-    "restoreError": "Kon die versie niet herstellen.",
-    "title": "Versiegeschiedenis",
-    "emptyState": "Nog geen eerdere versies. Momentopnamen worden automatisch vastgelegd terwijl je bewerkt.",
-    "hide": "Verbergen",
-    "empty": "(leeg)",
-    "restoreThisVersion": "Deze versie herstellen"
-  },
   "restoreBackup": {
     "title": "Nog niet beschikbaar op mobiel",
     "body": "Herstellen vanuit een back-upbestand is nog niet beschikbaar op mobiel. Maak een kluis aan of herstel met je herstelzin."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Je kluis wordt geopend.",
     "readyTitle": "Je kluis is klaar",
     "readyBody": "Alles wat je vanaf hier schrijft, wordt op dit apparaat versleuteld voordat het wordt opgeslagen of gesynchroniseerd.",
-    "personalLabel": "Persoonlijk",
     "openVault": "Kluis openen",
     "backUpNow": "Nu een back-up maken"
   },

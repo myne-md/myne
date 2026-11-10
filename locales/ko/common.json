@@ -1743,12 +1743,6 @@
       "title": "필터",
       "status": "상태"
     },
-    "sortSheet": {
-      "title": "정렬",
-      "manual": "수동 정렬",
-      "titleAsc": "제목 · A → Z",
-      "titleDesc": "제목 · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "빈 노트",
       "wordCount_one": "{{count}}단어 · 읽기 {{minutes}}분",
@@ -2623,8 +2617,7 @@
       "confirmBody": "현재 노트가 먼저 스냅샷으로 저장되므로 이 작업을 되돌릴 수 있습니다.",
       "confirmTitle": "이 스냅샷을 복원할까요?",
       "decrypting": "복호화하는 중…",
-      "emptyState": "아직 스냅샷이 없습니다. 스냅샷은 편집하는 동안 자동으로 저장되어 약 7일간 보관됩니다. 암호화되어 있으며, 노트를 영구 삭제하면 함께 사라집니다.",
-      "encryptedSize": "암호화됨 · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "이 스냅샷을 복호화할 수 없습니다.",
       "errorGeneric": "문제가 발생했습니다. 다시 시도하세요.",
       "errorIo": "디스크 오류가 발생했습니다. 디스크가 가득 찼거나 쓸 수 없는 상태일 수 있습니다.",
@@ -5564,17 +5557,6 @@
     "addCondition": "+ 조건 추가",
     "createView": "뷰 만들기"
   },
-  "snapshots": {
-    "today": "오늘 {{time}}",
-    "readError": "버전 기록을 읽지 못했습니다.",
-    "decryptError": "그 버전을 복호화하지 못했습니다.",
-    "restoreError": "그 버전을 복원하지 못했습니다.",
-    "title": "버전 기록",
-    "emptyState": "아직 이전 버전이 없습니다. 스냅샷은 편집하는 동안 자동으로 캡처됩니다.",
-    "hide": "숨기기",
-    "empty": "(비어 있음)",
-    "restoreThisVersion": "이 버전 복원"
-  },
   "restoreBackup": {
     "title": "아직 모바일에서 사용할 수 없습니다",
     "body": "백업 파일에서 복원하는 기능은 아직 모바일에서 사용할 수 없습니다. 보관함을 만들거나 복구 구문으로 복구하세요."
@@ -5672,7 +5654,6 @@
     "unlockingSubtitle": "볼트를 여는 중입니다.",
     "readyTitle": "볼트가 준비되었습니다",
     "readyBody": "지금부터 작성하는 모든 것은 저장되거나 동기화되기 전에 이 기기에서 암호화됩니다.",
-    "personalLabel": "개인",
     "openVault": "볼트 열기",
     "backUpNow": "지금 백업"
   },

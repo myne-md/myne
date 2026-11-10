@@ -65,8 +65,13 @@ test.describe("Apple Watch pending-capture drain", () => {
     // …and they REACH THE LIST. The drain used to reload the vault and throw
     // the result away, so the notes it created stayed invisible until something
     // else refreshed — a full decrypt of every note, for no effect.
-    await expect(page.getByText("Buy oat milk on the way home")).toBeVisible();
-    await expect(page.getByText("Idea: café não 🎙️")).toBeVisible();
+    //
+    // Two ROWS named "Untitled note", not the dictated text: a capture carries no
+    // `title:` frontmatter, and since 2026-11-08 the list title is frontmatter-only
+    // on both clients (owner decision, `note-title.ts`), so the dictation is the
+    // row's snippet rather than its name. Asserting the text here was asserting the
+    // old derivation and passing only because the row happened to be named after it.
+    await expect(page.getByText("Untitled note", { exact: true })).toHaveCount(2);
   });
 
   test("no queued captures → no notes created, no acks", async ({ page }) => {

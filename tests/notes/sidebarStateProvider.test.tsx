@@ -215,7 +215,11 @@ describe("useSelectedNote — create", () => {
     expect(result.current.justCreatedId).toBe("new-id");
     const row = result.current.cache.get("new-id");
     expect(row?.title).toBeNull(); // Untitled placeholder
-    expect(reindexNote).toHaveBeenCalledWith("new-id");
+    // The index registration used to be asserted here, as this provider's own
+    // `reindexNote(newId)` call. It moved to `noteCreate`, the chokepoint every
+    // create path crosses (myne-md/myne#1037), so the assertion lives with that
+    // module (`tests/notes/noteCreateIndexes.test.ts`) and this one would only
+    // be able to observe a mock.
   });
 
   it("a drawing create DOES enter rename, it has no in-note title field", async () => {

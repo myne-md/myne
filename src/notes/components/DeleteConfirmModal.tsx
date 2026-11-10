@@ -419,7 +419,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
 
   const displayTitle =
     noteTitle === null || noteTitle === undefined || noteTitle.trim() === ""
-      ? t("notes.deleteConfirm.untitled")
+      ? t("common.untitled")
       : noteTitle;
   const bodyLine = body ?? `“${displayTitle}”`;
 
@@ -449,7 +449,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onCancel}
             style={CANCEL_BUTTON_STYLE}
           >
-            {t("notes.deleteConfirm.cancel")}
+            {t("common.cancel")}
           </button>
           <button
             ref={confirmRef}

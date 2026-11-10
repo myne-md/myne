@@ -4,6 +4,10 @@
 
 import type { CSSProperties, DragEvent } from "react";
 
+/** The MIME a folder drag publishes its source path under, so a drop can resolve
+ *  it without the drag's ref (a `dragend` mid-gesture clears that). */
+export const FOLDER_DRAG_MIME = "application/x-myne-folder";
+
 /** Which half of the hovered row the cursor is over — the reorder insertion edge. */
 export function dragEdge(e: DragEvent<HTMLElement>): "above" | "below" {
   const rect = e.currentTarget.getBoundingClientRect();

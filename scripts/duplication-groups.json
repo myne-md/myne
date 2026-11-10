@@ -2,6 +2,13 @@
   "clones": {
     "verdicts": [
       {
+        "id": "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",
+        "lines": 10,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "The two sheets draw the same header, checkbox row, group separator and Done bar, and they shared that skeleton with SortSheet until the note-list sort was deleted (owner, 2026-11-10) — deleting one copy is what turned a trio into this pair. Consolidating them is owed work and its own change; the entry exists so the ratchet records the pair rather than licensing a further copy of it."
+      },
+      {
         "id": "protocol/src/agent_memory_catalog_blob.rs + protocol/src/agent_personality_blob.rs",
         "lines": 41,
         "copies": 2,
@@ -710,7 +717,7 @@
       },
       {
         "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
-        "lines": 40,
+        "lines": 42,
         "copies": 13,
         "verdict": "consolidate",
         "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
@@ -730,11 +737,11 @@
         "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
       },
       {
-        "id": "mobile/src/lib/eventWrite.ts + src/notes/createEvent.ts",
-        "lines": 10,
+        "id": "src/notes/agent/AgentHubList.tsx + src/notes/components/ChatHistoryModal.tsx",
+        "lines": 40,
         "copies": 2,
-        "verdict": "consolidate",
-        "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
+        "verdict": "justified",
+        "reason": "The two 40-line windows the detector pairs are not the same fragment: the AgentHubList window is the conversation-title state machine (one `case` per outcome, each setting its own notice) and the ChatHistoryModal window is the error/loading/empty trio of `<EmptyState>`s. They read as one skeleton only after the vocabulary pass because both now call the same `common.*` keys and the same `setState` shape. Extracting a component would need the title machine and three empty states under one interface, whose only shared part is i18n keys, and that hides which outcome sets which notice. myne-md/myne#1049 review pass."
       }
     ],
     "baseline": [
@@ -743,7 +750,6 @@
       "cli/src/windows_pipe.rs + src-tauri/src/win_pipe.rs",
       "client-core/src/accept-invite.ts + client-core/src/join-member-vault.ts",
       "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
-      "client-core/src/capabilities.ts + mobile/src/components/Icon.tsx",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + mobile/src/lib/attachments.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
       "client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts",
@@ -893,13 +899,10 @@
       "mobile/src/app/flows/IdentityFlow.tsx",
       "mobile/src/app/flows/MemorySheet.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx",
-      "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/app/flows/editor/sheets/ReorderRow.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/SyncSettingsPanels.tsx",
       "mobile/src/app/flows/UnlockFlow.tsx + mobile/src/screens/unlock/index.tsx",
-      "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/SortSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",
       "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/ViewsSheet.tsx",
       "mobile/src/app/flows/editor/sheets/FolderActionsSheet.tsx + mobile/src/app/flows/editor/sheets/NoteRowActionsSheet.tsx",
-      "mobile/src/app/flows/editor/sheets/SortSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",
       "mobile/src/components/FolderGlyph.tsx + src/notes/components/FolderGlyph.tsx",
       "mobile/src/components/SyncSettingsPanels.tsx + src/components/sync/DeviceManagementPanel.tsx",
       "mobile/src/components/SyncSettingsPanels.tsx + src/components/sync/MemberRosterPanel.tsx",

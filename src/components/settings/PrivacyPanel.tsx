@@ -241,40 +241,26 @@ function HideVaultNamesRow() {
       testId="settings.hide-vault-names"
       stateAttrs={{ "data-hidden": String(hidden), "data-keychain": keychain }}
       label={t("settings.privacy.hideVaultNamesLabel")}
-      // The critical sentence, and ONLY it (myne-md/myne#885). The row used to
-      // render 776 characters across four paragraphs under this label; the
-      // helper's own paragraph and the two that followed it move behind the
-      // question mark beside the label, unchanged, and this is the one sentence
-      // the row needs.
+      // ONE sentence on the row, and nothing behind a question mark (owner,
+      // 2026-11-08). The row used to carry 776 characters across four paragraphs,
+      // then (myne-md/myne#885) one sentence plus three behind the `?` beside the
+      // label; the owner's report is that the popover itself is the noise, so the
+      // `?` is gone too.
       //
-      // **The sentence kept is the DESTRUCTIVE one**, and the choice is the
-      // point rather than a preference. The three moved paragraphs include the
-      // residue caveat and the placeholder explanation, which are qualifications;
-      // this one is the act. `hideVaultNamesRow.test.tsx` has held since #411
-      // that a bound on a destructive switch may not be hidden behind an
-      // interaction, and the move does not overturn that: the warning stays on
-      // the row, and what goes behind the question mark is the detail around it.
+      // **The sentence kept is the DESTRUCTIVE one**: since #411 a bound on a
+      // destructive switch may not hide behind an interaction, and the warning is
+      // the act. The four limits left the screen and stay recorded in
+      // `threat-model.md` §7 (`decisions/clients/0799`).
       helper={t("settings.privacy.hideVaultNamesInline")}
-      // The moved paragraphs, verbatim: the same keys and the same English in a
-      // different slot, so nothing here went stale in translation.
-      explanation={[
-        t("settings.privacy.hideVaultNamesHelper"),
-        t("settings.privacy.hideVaultNamesErases"),
-        t("settings.privacy.hideVaultNamesResidue"),
-      ]}
-      control={(helperId, explanationId) => (
+      control={(helperId) => (
         <Switch
           checked={hidden}
           onChange={busy ? undefined : (next) => void toggle(next)}
           ariaLabel={t("settings.privacy.hideVaultNamesLabel")}
-          // Both descriptions: the sentence on the row and the copy behind the
-          // question mark. A screen reader reads the whole explanation without
-          // the disclosure ever being opened.
-          ariaDescribedBy={
-            explanationId === undefined
-              ? helperId
-              : `${helperId} ${explanationId}`
-          }
+          // The row's one sentence and nothing else: the explanation slot went
+          // with the `?`, so this row passes no `explanation` and the row hands
+          // back no `explanationId`.
+          ariaDescribedBy={helperId}
           testId="settings.hide-vault-names-toggle"
         />
       )}

@@ -1811,12 +1811,6 @@
       "title": "Filtrar",
       "status": "Estado"
     },
-    "sortSheet": {
-      "title": "Ordenar",
-      "manual": "Orden manual",
-      "titleAsc": "Título · A → Z",
-      "titleDesc": "Título · Z → A"
-    },
     "noteMenu": {
       "emptyNote": "Nota vacía",
       "wordCount_one": "{{count}} palabra · {{minutes}} min de lectura",
@@ -2730,8 +2724,7 @@
       "confirmBody": "Tu nota actual se guardará primero como una instantánea, para que puedas deshacer esto.",
       "confirmTitle": "¿Restaurar esta instantánea?",
       "decrypting": "Descifrando…",
-      "emptyState": "Aún no hay instantáneas. Las instantáneas se guardan automáticamente mientras editas y se conservan unos 7 días. Están cifradas y desaparecen cuando la nota se elimina de forma permanente.",
-      "encryptedSize": "Cifrada · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "No se pudo descifrar esta instantánea.",
       "errorGeneric": "Algo salió mal. Inténtalo de nuevo.",
       "errorIo": "Se produjo un error de disco. Puede que el disco esté lleno o que no se pueda escribir en él.",
@@ -5726,17 +5719,6 @@
     "addCondition": "+ Añadir condición",
     "createView": "Crear vista"
   },
-  "snapshots": {
-    "today": "Hoy {{time}}",
-    "readError": "No se pudo leer el historial de versiones.",
-    "decryptError": "No se pudo descifrar esa versión.",
-    "restoreError": "No se pudo restaurar esa versión.",
-    "title": "Historial de versiones",
-    "emptyState": "Aún no hay versiones anteriores. Las instantáneas se capturan automáticamente mientras editas.",
-    "hide": "Ocultar",
-    "empty": "(vacío)",
-    "restoreThisVersion": "Restaurar esta versión"
-  },
   "restoreBackup": {
     "title": "Aún no disponible en móvil",
     "body": "Restaurar desde un archivo de copia de seguridad aún no está disponible en móvil. Crea una bóveda o recupera con tu frase."
@@ -5840,7 +5822,6 @@
     "unlockingSubtitle": "Abriendo tu bóveda.",
     "readyTitle": "Tu bóveda está lista",
     "readyBody": "Todo lo que escribas a partir de ahora se cifra en este dispositivo antes de almacenarse o sincronizarse.",
-    "personalLabel": "Personal",
     "openVault": "Abrir bóveda",
     "backUpNow": "Hacer copia de seguridad ahora"
   },

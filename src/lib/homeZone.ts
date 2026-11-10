@@ -55,6 +55,23 @@ export function readHomeZone(): string | null {
   }
 }
 
+const listeners = new Set<() => void>();
+
+/**
+ * Listen for a change to the preference.
+ *
+ * A surface that reads the zone ONCE during render shows one clock until something
+ * unrelated re-renders it, and the setting is written on another screen entirely, so
+ * the write is what has to reach the calendar. This is the whole reason the module
+ * carries a subscriber list rather than a plain getter.
+ */
+export function subscribeHomeZone(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 /**
  * Store the home zone, or clear it when the value is empty or unknown.
  *
@@ -65,8 +82,12 @@ export function readHomeZone(): string | null {
 export function writeHomeZone(zone: string): void {
   try {
     const trimmed = zone.trim();
-    if (trimmed === "" || !isKnownZone(trimmed)) localStorage.removeItem(HOME_ZONE_KEY);
-    else localStorage.setItem(HOME_ZONE_KEY, trimmed);
+    const next = trimmed === "" || !isKnownZone(trimmed) ? null : trimmed;
+    if (next === null) localStorage.removeItem(HOME_ZONE_KEY);
+    else localStorage.setItem(HOME_ZONE_KEY, next);
+    // Announced even when the value is unchanged: a listener's job is to re-read, and
+    // a second write of the same zone costs one re-render and no divergence.
+    for (const listener of listeners) listener();
   } catch {
     // A WebView with no storage still shows one clock; nothing here is load-bearing.
   }

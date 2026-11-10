@@ -50,10 +50,10 @@ export function TemplatesSheet({
         <div key={tpl.id} style={{ borderTop: "1px solid var(--line-1)", padding: "10px 4px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {tpl.title || t("templates.manager.newTemplateName")}
+              {tpl.title || t("common.untitledtemplate")}
             </div>
             <button onClick={() => onUse(tpl.id)} style={btn("var(--accent)")}>{t("templates.use")}</button>
-            <button onClick={() => onEdit(tpl.id)} style={btn("var(--fg-2)")}>{t("templates.edit")}</button>
+            <button onClick={() => onEdit(tpl.id)} style={btn("var(--fg-2)")}>{t("common.edit")}</button>
           </div>
           {confirmDelete === tpl.id ? (
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>

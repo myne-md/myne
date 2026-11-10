@@ -229,8 +229,8 @@ export function ArchivePanel({
               style={HEADER_CLOSE_STYLE}
               data-panel-action="close"
               data-testid="archive.close"
-              title={t("notes.archive.close")}
-              aria-label={t("notes.archive.close")}
+              title={t("common.close")}
+              aria-label={t("common.close")}
               onClick={onClose}
             >
               <Icon name="x" size={16} />
@@ -293,10 +293,10 @@ export function ArchivePanel({
               <div key={r.noteUuid} style={ROW_STYLE}>
                 <span
                   style={ROW_TITLE_STYLE}
-                  title={r.title ?? t("notes.archive.untitled")}
+                  title={r.title ?? t("common.untitled")}
                 >
                   {r.title === null || r.title.trim() === ""
-                    ? t("notes.archive.untitled")
+                    ? t("common.untitled")
                     : r.title}
                 </span>
                 <span style={AGE_STYLE}>
@@ -347,7 +347,7 @@ export function ArchivePanel({
             ).length,
           })}
           warning={t("notes.archive.folderDeleteWarning")}
-          confirmLabel={t("notes.archive.folderDeleteConfirmCta")}
+          confirmLabel={t("common.movetotrash")}
           confirmTestId="archive.folder-delete-confirm"
           cancelTestId="archive.folder-delete-cancel"
           onCancel={() => setConfirmFolder(null)}

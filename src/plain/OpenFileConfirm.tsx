@@ -91,7 +91,7 @@ export function OpenFileConfirm({ path, onClose }: OpenFileConfirmProps) {
       title={t("plainFile.deeplink.title")}
       onClose={onClose}
       labelId="plain-file-deeplink-title"
-      closeLabel={t("plainFile.deeplink.cancel")}
+      closeLabel={t("common.cancel")}
       // Opened by an OS event rather than by the user, so it can land over an
       // already-open surface; the shared level would paint it under the
       // command palette while the focus trap still gave it the keyboard.
@@ -113,7 +113,7 @@ export function OpenFileConfirm({ path, onClose }: OpenFileConfirmProps) {
             data-testid="plain-file.deeplink.cancel"
             onClick={onClose}
           >
-            {t("plainFile.deeplink.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button
             variant="primary"

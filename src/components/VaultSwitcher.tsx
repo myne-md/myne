@@ -697,7 +697,7 @@ export function VaultSwitcher({
               v.last_unlock !== null ? formatRelativeTime(new Date(v.last_unlock)) : "";
             const caption = isSaving
               ? t("vaultSwitcher.switching")
-              : [lastSeen, v.published ? "" : t("vaultSwitcher.deviceOnly")]
+              : [lastSeen, v.published ? "" : t("common.deviceonly")]
                   .filter((part) => part !== "")
                   .join(" · ");
             return (

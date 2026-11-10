@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
+import { ActionRow, ActionRowSeparator } from "./ActionRow";
 
 /** Note-actions sheet (the ⋯ menu): Copy / Move / History / Export / Archive /
  *  Trash. Ported off the old right-panel footer so the panel matches the desktop
@@ -47,34 +47,52 @@ export function NoteActionsSheet({
   drawing?: DrawingMenuActions;
 }) {
   const { t } = useTranslation();
-  // Rows split into logical groups (produce / organize / destructive) by a
-  // heavier group separator — the mobile twin of the desktop ContextMenu `group`
-  // dividers. `groupTop` drops a row's top hairline when a separator precedes it.
-  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean; testId?: string }): ReactNode => (
-    <button
-      onClick={onClick}
-      disabled={busy}
-      data-testid={opts?.testId}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: opts?.groupTop ? "none" : "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "var(--font-sans)", fontSize: 16, color: opts?.danger ? "var(--danger)" : "var(--fg-1)" }}
-    >
-      {text}
-    </button>
-  );
-  const sep: ReactNode = <div aria-hidden style={{ height: 1, background: "var(--line-2)", margin: "7px 0" }} />;
   return (
     <Sheet onClose={onClose} padded={false}>
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
-          {row(copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard"), onCopy)}
-          {row(t("tasks.title"), onTasks, { testId: "editor.note-menu-tasks" })}
-          {row(t("editor.noteMenu.versionHistory"), onHistory)}
-          {row(t("export.pdf.title"), onExport)}
+          <ActionRow
+            icon="copy"
+            label={copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard")}
+            onClick={onCopy}
+            disabled={busy}
+          />
+          <ActionRow
+            icon="check"
+            label={t("common.tasks")}
+            onClick={onTasks}
+            disabled={busy}
+            testId="editor.note-menu-tasks"
+          />
+          {/* `rotate-ccw` is the glyph the desktop gives version history
+              (`src/screens/Editor.tsx`, action "version-history"). */}
+          <ActionRow
+            icon="rotate-ccw"
+            label={t("common.versionhistory")}
+            onClick={onHistory}
+            disabled={busy}
+          />
+          <ActionRow icon="download" label={t("export.pdf.title")} onClick={onExport} disabled={busy} />
           {drawing && (
             <>
-              {sep}
-              {row(t("editor.drawingMenu.toggleTheme"), () => { drawing.onToggleTheme(); onClose(); }, { groupTop: true, testId: "editor.drawing-menu-theme" })}
-              {row(t("editor.drawingMenu.reset"), () => { drawing.onReset(); onClose(); }, { danger: true, testId: "editor.drawing-menu-reset" })}
+              <ActionRowSeparator />
+              <ActionRow
+                icon="eye"
+                label={t("editor.drawingMenu.toggleTheme")}
+                onClick={() => { drawing.onToggleTheme(); onClose(); }}
+                groupTop
+                disabled={busy}
+                testId="editor.drawing-menu-theme"
+              />
+              <ActionRow
+                icon="rotate-ccw"
+                label={t("editor.drawingMenu.reset")}
+                onClick={() => { drawing.onReset(); onClose(); }}
+                danger
+                disabled={busy}
+                testId="editor.drawing-menu-reset"
+              />
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 18px 15px", flexWrap: "wrap" }} data-testid="editor.drawing-menu-bg">
                 <span style={{ fontSize: 16, color: "var(--fg-1)", fontFamily: "var(--font-sans)" }}>{t("editor.drawingMenu.background")}</span>
                 {CANVAS_BG_SWATCHES.map((c) => (
@@ -95,11 +113,24 @@ export function NoteActionsSheet({
               </div>
             </>
           )}
-          {sep}
-          {row(t("editor.noteMenu.moveToFolder"), onMove, { groupTop: true })}
-          {row(t("notes.archive.title"), onArchive)}
-          {sep}
-          {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}
+          <ActionRowSeparator />
+          <ActionRow
+            icon="folder"
+            label={t("editor.noteMenu.moveToFolder")}
+            onClick={onMove}
+            groupTop
+            disabled={busy}
+          />
+          <ActionRow icon="archive" label={t("notes.archive.title")} onClick={onArchive} disabled={busy} />
+          <ActionRowSeparator />
+          <ActionRow
+            icon="trash"
+            label={t("common.movetotrash")}
+            onClick={onTrash}
+            danger
+            groupTop
+            disabled={busy}
+          />
         </>
       )}
     </Sheet>

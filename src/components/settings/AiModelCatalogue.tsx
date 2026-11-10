@@ -442,7 +442,7 @@ function CatalogueRow(props: {
             onClick={() => cancelModelDownloadFor(props.artifact)}
             data-testid={`ai.download-cancel-${props.artifact}`}
           >
-            {t("settings.ai.downloadCancel")}
+            {t("common.cancel")}
           </Button>
         ) : (
           <>
@@ -457,7 +457,7 @@ function CatalogueRow(props: {
             <ModelPathButton
               path={props.path}
               label={props.label}
-              revealLabel={t("settings.ai.modelShowInFolder")}
+              revealLabel={t("common.showinfolder")}
               testId={`ai.model-provenance-${props.artifact}`}
               panelTestId={`ai.model-provenance-panel-${props.artifact}`}
             />
@@ -477,7 +477,7 @@ function CatalogueRow(props: {
                 onClick={() => void remove()}
                 data-testid={`ai.remove-button-${props.artifact}`}
               >
-                {t("settings.ai.modelRemove")}
+                {t("common.remove")}
               </Button>
             )}
           </>

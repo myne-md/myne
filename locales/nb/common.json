@@ -1743,12 +1743,6 @@
       "title": "Filter",
       "status": "Status"
     },
-    "sortSheet": {
-      "title": "Sorter",
-      "manual": "Manuell rekkefølge",
-      "titleAsc": "Tittel · A → Å",
-      "titleDesc": "Tittel · Å → A"
-    },
     "noteMenu": {
       "emptyNote": "Tomt notat",
       "wordCount_one": "{{count}} ord · {{minutes}} min lesing",
@@ -2623,8 +2617,7 @@
       "confirmBody": "Det nåværende notatet ditt lagres som et øyeblikksbilde først, så du kan angre dette.",
       "confirmTitle": "Gjenopprette dette øyeblikksbildet?",
       "decrypting": "Dekrypterer…",
-      "emptyState": "Ingen øyeblikksbilder ennå. Øyeblikksbilder lagres automatisk mens du redigerer, og beholdes i omtrent 7 dager. De er krypterte og forsvinner når notatet slettes permanent.",
-      "encryptedSize": "Kryptert · {{size}}",
+      "emptyState": "",
       "errorCannotDecrypt": "Dette øyeblikksbildet kunne ikke dekrypteres.",
       "errorGeneric": "Noe gikk galt. Prøv igjen.",
       "errorIo": "Det oppstod en diskfeil. Disken kan være full eller skrivebeskyttet.",
@@ -5567,17 +5560,6 @@
     "addCondition": "+ Legg til betingelse",
     "createView": "Opprett visning"
   },
-  "snapshots": {
-    "today": "I dag {{time}}",
-    "readError": "Kunne ikke lese versjonshistorikken.",
-    "decryptError": "Kunne ikke dekryptere den versjonen.",
-    "restoreError": "Kunne ikke gjenopprette den versjonen.",
-    "title": "Versjonshistorikk",
-    "emptyState": "Ingen tidligere versjoner ennå. Øyeblikksbilder tas automatisk mens du redigerer.",
-    "hide": "Skjul",
-    "empty": "(tomt)",
-    "restoreThisVersion": "Gjenopprett denne versjonen"
-  },
   "restoreBackup": {
     "title": "Ikke tilgjengelig på mobil ennå",
     "body": "Gjenoppretting fra en sikkerhetskopifil er ikke tilgjengelig på mobil ennå. Opprett et hvelv eller gjenopprett med frasen din."
@@ -5675,7 +5657,6 @@
     "unlockingSubtitle": "Åpner hvelvet ditt.",
     "readyTitle": "Hvelvet ditt er klart",
     "readyBody": "Alt du skriver herfra krypteres på denne enheten før det lagres eller synkroniseres.",
-    "personalLabel": "Personlig",
     "openVault": "Åpne hvelv",
     "backUpNow": "Sikkerhetskopier nå"
   },

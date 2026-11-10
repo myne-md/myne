@@ -413,7 +413,7 @@ export function VaultExportModal({
                 onClick={onClose}
                 data-testid="vault-export.cancel"
               >
-                {t("export.vault.setup.cancel")}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -458,7 +458,7 @@ export function VaultExportModal({
               >
                 {state.cancelling
                   ? t("export.vault.running.cancelling")
-                  : t("export.vault.running.cancel")}
+                  : t("common.cancel")}
               </Button>
             </div>
           </>
@@ -492,14 +492,14 @@ export function VaultExportModal({
                 }}
                 data-testid="vault-export.show-in-folder"
               >
-                {t("export.vault.summary.showInFolder")}
+                {t("common.showinfolder")}
               </Button>
               <Button
                 variant="primary"
                 onClick={onClose}
                 data-testid="vault-export.done"
               >
-                {t("export.vault.summary.done")}
+                {t("common.done")}
               </Button>
             </div>
           </>

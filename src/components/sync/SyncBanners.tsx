@@ -189,7 +189,7 @@ export function SyncBanners() {
               padding: 0,
             }}
           >
-            {t("sync.stale.dismiss")}
+            {t("common.dismiss")}
           </button>
         </div>
       )}

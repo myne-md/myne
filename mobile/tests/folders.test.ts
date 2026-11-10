@@ -6,8 +6,7 @@ import {
   orderedChildren,
   orderedChildKeys,
   childKey,
-  childOrderIndex,
-  reorderChildOrder,
+  reorderChildBeside,
   notesInSubtree,
 } from "../src/lib/folders";
 import type { OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
@@ -146,7 +145,11 @@ describe("interleave — MYND-596 full desktop parity", () => {
 });
 
 describe("reorder — MYND-596 container-keyed map", () => {
-  it("nudges a note within a subfolder, leaving the parent container untouched", () => {
+  // The arrow affordances this used to exercise are gone (owner, 2026-11-08): the
+  // same container rules now only run through a drop. Each case below keeps the
+  // behaviour it pinned and expressed it as `reorderChildBeside`, which shares one
+  // splice with the retired nudge.
+  it("rewrites only the dropped row's container, leaving the parent untouched", () => {
     const fo = new Map<string, string | null>([
       ["na", null],
       ["nb", null],
@@ -155,19 +158,14 @@ describe("reorder — MYND-596 container-keyed map", () => {
     ]);
     const tree = deriveTree(fo, [], []);
     const cache = cacheOf(["na", "nb", "x", "y"]);
-    // Container key is the FOLDED folder key ("sub/"); the entries are note UUIDs.
     const order = { "": ["na", "nb"], "sub/": ["x", "y"] };
-    // Move y UP within Sub/ (above x). Only the "sub/" sequence is rewritten; the
-    // root "" container is copied through verbatim (per-container LWW isolation).
-    const next = reorderChildOrder({
-      tree, itemOrder: order, cache, containerPath: "Sub/", rowKey: "y", delta: -1,
+    const next = reorderChildBeside({
+      tree, itemOrder: order, cache, containerPath: "Sub/", rowKey: "y", targetKey: "x", place: "above",
     });
     expect(next).toEqual({ "": ["na", "nb"], "sub/": ["y", "x"] });
   });
 
-  it("materializes the full container (folders included) on a root note nudge", () => {
-    // A root note nudge re-materializes the ROOT container in display order —
-    // which interleaves the unlisted Sub/ folder after the listed notes.
+  it("materializes the full container (folders included) on a root drop", () => {
     const fo = new Map<string, string | null>([
       ["na", null],
       ["nb", null],
@@ -176,14 +174,14 @@ describe("reorder — MYND-596 container-keyed map", () => {
     ]);
     const tree = deriveTree(fo, [], []);
     const cache = cacheOf(["na", "nb", "nc", "x"]);
-    const next = reorderChildOrder({
-      tree, itemOrder: { "": ["na", "nb", "nc"] }, cache, containerPath: null, rowKey: "nc", delta: -1,
+    const next = reorderChildBeside({
+      tree, itemOrder: { "": ["na", "nb", "nc"] }, cache, containerPath: null,
+      rowKey: "nc", targetKey: "nb", place: "above",
     });
-    // nc moves above nb; the unlisted "Sub/" folder trails the listed notes.
     expect(next).toEqual({ "": ["na", "nc", "nb", "Sub/"] });
   });
 
-  it("materializes an unlisted folder container on first reorder", () => {
+  it("materializes an unlisted folder container on first drop", () => {
     const fo = new Map<string, string | null>([
       ["1", "Apple/"],
       ["2", "Mango/"],
@@ -191,26 +189,74 @@ describe("reorder — MYND-596 container-keyed map", () => {
     ]);
     const tree = deriveTree(fo, [], []);
     const cache = new Map<string, OrderedNoteRecord>();
-    // No item_order → name order Apple, Mango, Zebra.
     expect(orderedChildKeys(tree, null, {}, cache)).toEqual(["Apple/", "Mango/", "Zebra/"]);
-    // Move Zebra UP (above Mango) — the whole container is now explicit.
-    const next = reorderChildOrder({
-      tree, itemOrder: {}, cache, containerPath: null, rowKey: "Zebra/", delta: -1,
+    const next = reorderChildBeside({
+      tree, itemOrder: {}, cache, containerPath: null, rowKey: "Zebra/", targetKey: "Mango/", place: "above",
     });
     expect(next).toEqual({ "": ["Apple/", "Zebra/", "Mango/"] });
   });
 
-  it("disables the boundary button and no-ops a boundary move", () => {
+  it("no-ops a drop onto itself", () => {
     const fo = new Map<string, string | null>([
       ["1", "Apple/"],
       ["2", "Mango/"],
     ]);
     const tree = deriveTree(fo, [], []);
     const cache = new Map<string, OrderedNoteRecord>();
-    const first = childOrderIndex({ tree, itemOrder: {}, cache, containerPath: null, rowKey: "Apple/" });
-    expect(first).toEqual({ index: 0, count: 2 });
-    // First row can't move up; last row can't move down.
-    expect(reorderChildOrder({ tree, itemOrder: {}, cache, containerPath: null, rowKey: "Apple/", delta: -1 })).toBeNull();
-    expect(reorderChildOrder({ tree, itemOrder: {}, cache, containerPath: null, rowKey: "Mango/", delta: 1 })).toBeNull();
+    expect(reorderChildBeside({
+      tree, itemOrder: {}, cache, containerPath: null, rowKey: "Apple/", targetKey: "Apple/", place: "above",
+    })).toBeNull();
+  });
+});
+
+describe("reorderChildBeside, a DROP, not a nudge (owner, 2026-11-08)", () => {
+  const fo = new Map<string, string | null>([
+    ["na", null],
+    ["nb", null],
+    ["nc", null],
+    ["nd", null],
+  ]);
+
+  it("places a dragged row below the row it was dropped on, in one write", () => {
+    const tree = deriveTree(fo, [], []);
+    const cache = cacheOf(["na", "nb", "nc", "nd"]);
+    const order = { "": ["na", "nb", "nc", "nd"] };
+    const next = reorderChildBeside({
+      tree, itemOrder: order, cache, containerPath: null,
+      rowKey: "na", targetKey: "nc", place: "below",
+    });
+    expect(next?.[""]).toEqual(["nb", "nc", "na", "nd"]);
+  });
+
+  it("places it above, so the two sides of a row are two different results", () => {
+    const tree = deriveTree(fo, [], []);
+    const cache = cacheOf(["na", "nb", "nc", "nd"]);
+    const order = { "": ["na", "nb", "nc", "nd"] };
+    const next = reorderChildBeside({
+      tree, itemOrder: order, cache, containerPath: null,
+      rowKey: "nd", targetKey: "nb", place: "above",
+    });
+    expect(next?.[""]).toEqual(["na", "nd", "nb", "nc"]);
+  });
+
+  it("refuses a drop onto itself and a target outside the container", () => {
+    const tree = deriveTree(fo, [], []);
+    const cache = cacheOf(["na", "nb", "nc", "nd"]);
+    const order = { "": ["na", "nb", "nc", "nd"] };
+    // Onto itself: no write, rather than a rewrite that equals the old order.
+    expect(
+      reorderChildBeside({
+        tree, itemOrder: order, cache, containerPath: null,
+        rowKey: "nb", targetKey: "nb", place: "below",
+      }),
+    ).toBeNull();
+    // A row that is not in this container: a drop into another folder is a
+    // `folder:` move, not an ordering write, so it must not be silently applied.
+    expect(
+      reorderChildBeside({
+        tree, itemOrder: order, cache, containerPath: "Other/",
+        rowKey: "nb", targetKey: "na", place: "below",
+      }),
+    ).toBeNull();
   });
 });

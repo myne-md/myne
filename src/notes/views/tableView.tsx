@@ -239,7 +239,7 @@ export function TableView({
   );
 
   const { stream, total } = useMemo(
-    () => buildViewStream(result, t("notes.views.table.noValue")),
+    () => buildViewStream(result, t("common.novalue")),
     [result, t],
   );
 
@@ -374,7 +374,7 @@ export function TableView({
   const rows = makeViewRowHandlers(onOpenNote, onContextMenu);
 
   if (total === 0) {
-    return <ViewEmpty message={t("notes.views.table.empty")} />;
+    return <ViewEmpty message={t("common.nonotesmatchthisview")} />;
   }
 
   const renderItem = (item: TableItem): ReactNode => {
@@ -433,14 +433,14 @@ export function TableView({
               testId="view.bulk-select-row"
               noteId={row.noteId}
               label={t("notes.views.bulk.selectRow", {
-                title: row.title ?? t("notes.views.cards.untitled"),
+                title: row.title ?? t("common.untitled"),
               })}
               checked={selected.has(row.noteId)}
               onToggle={() => toggleRow(row.noteId)}
             />
           )}
           <span style={NAME_TEXT_STYLE}>
-            {row.title ?? t("notes.views.cards.untitled")}
+            {row.title ?? t("common.untitled")}
           </span>
         </span>
         {columns.map((col) => {
@@ -467,7 +467,7 @@ export function TableView({
         <p key={entry.noteId} style={REFUSAL_STYLE} data-note-id={entry.noteId}>
           {t("notes.views.bulk.refusedLine", {
             title:
-              rowById.get(entry.noteId)?.title ?? t("notes.views.cards.untitled"),
+              rowById.get(entry.noteId)?.title ?? t("common.untitled"),
             reason: refusalSentence(entry.reason, t),
           })}
         </p>
@@ -497,7 +497,7 @@ export function TableView({
               {
                 title:
                   rowById.get(entry.noteId)?.title ??
-                  t("notes.views.cards.untitled"),
+                  t("common.untitled"),
               },
             )}
           </p>

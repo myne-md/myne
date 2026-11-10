@@ -163,6 +163,15 @@ const COPY_PRIMARY_STYLE: CSSProperties = {
   margin: 0,
 };
 
+/** The sentence and the "more about this" icon on one line, the icon trailing.
+ *  `flex-start` because the sentence wraps and a centred glyph would float. */
+const PRIMARY_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "var(--space-2)",
+};
+
 /** The disclosure trigger's row, on the primary paragraph's left edge. */
 const INPUT_LABEL_STYLE: CSSProperties = {
   fontSize: 12,
@@ -241,7 +250,11 @@ export function DeleteVaultConfirmForm({
       : onlyCopy
         ? {
             heading: t("settings.deleteVault.heading"),
-            eyebrow: t("settings.deleteVault.eyebrow"),
+            // No eyebrow here: "IRREVERSIBLE" over a sentence that already says
+            // "cannot be undone" shouts one fact twice. The two capability-shaped
+            // eyebrows below stay, because they name WHICH store, which no other
+            // line on the screen does.
+            eyebrow: null,
             primary: t("settings.deleteVault.copyPrimary"),
             primaryTestId: null,
             submit: inFlight
@@ -272,11 +285,14 @@ export function DeleteVaultConfirmForm({
 
      Absent in the partial-failure branch, where the copy around it is about
      recovering from a half-finished erase rather than about what the erase
-     destroys. One value, rendered by whichever layout asks for it: the panel
-     shape puts it on the heading's line (the icon means "more about THIS", so it
-     belongs beside the title it explains) and the inline shape puts it under the
-     disclosure it explains, because there is no heading of its own to attach to
-     there. */
+     destroys. One value, rendered by whichever layout asks for it, and in BOTH
+     shapes it is ICON-ONLY and sits at the trailing edge of the sentence it
+     explains (owner, 2026-11-08). It used to be a labelled button: under the
+     disclosure in the inline shape, and on the heading's line in the panel shape.
+     The label was the problem, "More about deleting this vault" is a whole
+     sentence of chrome next to the one sentence that matters, and the two of them
+     read as two steps. The icon means "more about THIS", the accessible name
+     still says it in words, and the popover carries the text either way. */
   const details =
     partialFailContext === null ? (
       <HelperDisclosure
@@ -287,7 +303,6 @@ export function DeleteVaultConfirmForm({
         descriptionId={detailsId}
         testId="delete-vault.details"
         triggerLabel={t("settings.deleteVault.detailsLabel")}
-        visibleLabel
       />
     ) : null;
 
@@ -314,7 +329,7 @@ export function DeleteVaultConfirmForm({
       {partialFailContext === null ? (
         <>
           {inline ? (
-            <>
+            <div style={PRIMARY_ROW_STYLE}>
               <p
                 style={COPY_PRIMARY_STYLE}
                 {...(copy.primaryTestId === null
@@ -324,12 +339,14 @@ export function DeleteVaultConfirmForm({
                 {copy.primary}
               </p>
               {details}
-            </>
+            </div>
           ) : (
             <>
-              <div style={EYEBROW_STYLE} data-testid="delete-vault.eyebrow">
-                {copy.eyebrow}
-              </div>
+              {copy.eyebrow !== null && (
+                <div style={EYEBROW_STYLE} data-testid="delete-vault.eyebrow">
+                  {copy.eyebrow}
+                </div>
+              )}
               <p
                 style={COPY_PRIMARY_STYLE}
                 {...(copy.primaryTestId === null
@@ -391,7 +408,7 @@ export function DeleteVaultConfirmForm({
                 disabled={inFlight}
                 data-testid="delete-vault.cancel"
               >
-                {t("settings.deleteVault.cancel")}
+                {t("common.cancel")}
               </Button>
             )}
             <Button
@@ -443,7 +460,7 @@ export function DeleteVaultConfirmForm({
               onClick={onContinueAfterPartial}
               data-testid="delete-vault.continue"
             >
-              {t("settings.deleteVault.continue")}
+              {t("common.continue")}
             </Button>
           </div>
         </>

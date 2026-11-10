@@ -319,7 +319,7 @@ export function UpdatingScreen({
                 onClick={onRetry}
                 data-testid="update.failed-retry"
               >
-                {t("update.failed.retry")}
+                {t("common.tryagain")}
               </Button>
             </div>
           </>

@@ -114,7 +114,7 @@ const JOIN_COPY_KEYS = [
   "identityHome.joinPhraseLabel",
   "identityHome.joinPasswordNote",
   "identityHome.joinSubmit",
-  "password.createForm.passwordLabel",
+  "common.masterpassword",
   "password.createForm.confirmLabel",
 ];
 
@@ -585,7 +585,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
       "identityHome.joinPasswordNote",
     );
     expect(screen.getByTestId("identity-flow.join.password-label").textContent).toBe(
-      "password.createForm.passwordLabel",
+      "common.masterpassword",
     );
     expect(screen.getByTestId("identity-flow.join.confirm-label").textContent).toBe(
       "password.createForm.confirmLabel",

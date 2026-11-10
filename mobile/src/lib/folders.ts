@@ -134,54 +134,35 @@ export function orderedChildKeys(
   return orderedChildren(tree, containerPath, itemOrder, cache).map(childKey);
 }
 
-/** The moved row's index within its container's display order + the container's
- *  child count — drives the move-up/move-down boundary-disable (index 0 / last).
- *  `index` is -1 when `rowKey` is not a current child. */
-export function childOrderIndex(params: {
-  tree: FolderTree;
-  itemOrder: ItemOrderMap;
-  cache: ReadonlyMap<string, OrderedNoteRecord>;
-  containerPath: string | null;
-  rowKey: string;
-}): { index: number; count: number } {
-  const { tree, itemOrder, cache, containerPath, rowKey } = params;
-  const keys = orderedChildKeys(tree, containerPath, itemOrder, cache);
-  const rowFold = itemOrderKey(rowKey);
-  return { index: keys.findIndex((k) => itemOrderKey(k) === rowFold), count: keys.length };
-}
-
 /**
- * Compute the next `item_order` MAP after nudging `rowKey` one slot up (`delta
- * -1`) or down (`delta +1`) within its container's display order — the move-up/
- * move-down affordance (MYND-596). `rowKey` is a note UUID or a child folder
- * DISPLAY path. Only that container's sequence is rewritten (shared
- * `computeItemOrderAfterReorder`); every other container is copied through, so a
- * per-container sync merge never clobbers a sibling container's order. Returns
- * `null` for a boundary no-op (already first / last) or an unknown row.
+ * The same rewrite for a row DROPPED onto another (owner, 2026-11-08: the arrows
+ * became a press-and-hold drag). Shares one splice and one container rule with the
+ * nudge, so a drag never touches a sibling container's order. `null` for a drop
+ * onto itself or onto a row outside this container: moving a note between folders
+ * is a `folder:` write, not an ordering one.
  */
-export function reorderChildOrder(params: {
+export function reorderChildBeside(params: {
   tree: FolderTree;
   itemOrder: ItemOrderMap;
   cache: ReadonlyMap<string, OrderedNoteRecord>;
   containerPath: string | null;
   rowKey: string;
-  delta: -1 | 1;
+  targetKey: string;
+  place: "above" | "below";
 }): Record<string, string[]> | null {
-  const { tree, itemOrder, cache, containerPath, rowKey, delta } = params;
+  const { tree, itemOrder, cache, containerPath, rowKey, targetKey, place } = params;
   const keys = orderedChildKeys(tree, containerPath, itemOrder, cache);
-  const rowFold = itemOrderKey(rowKey);
-  const index = keys.findIndex((k) => itemOrderKey(k) === rowFold);
-  const target = index + delta;
-  if (index < 0 || target < 0 || target >= keys.length) return null;
+  const folded = (k: string) => itemOrderKey(k);
+  const index = keys.findIndex((k) => folded(k) === folded(rowKey));
+  const targetIndex = keys.findIndex((k) => folded(k) === folded(targetKey));
+  if (index < 0 || targetIndex < 0 || index === targetIndex) return null;
   return computeItemOrderAfterReorder({
     itemOrder,
     container: containerKeyOf(containerPath),
-    // The display order EXCLUDING the moved row is the container's residual
-    // sequence the shared reorder splices `rowKey` back into.
     containerChildKeys: keys.filter((_, i) => i !== index),
     draggedKey: rowKey,
-    targetKey: keys[target]!,
-    place: delta < 0 ? "above" : "below",
+    targetKey,
+    place,
   });
 }
 

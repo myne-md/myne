@@ -1255,7 +1255,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     developerGated: true,
     panelId: "ai",
     topic: "advanced",
-    titleKey: "settings.memory.seed.rowTitle",
+    titleKey: "settings.memory.seed.title",
     descriptionKey: "settings.memory.seed.rowHelper",
     keywordsKey: "settings.search.keywords.aiMemory",
   },

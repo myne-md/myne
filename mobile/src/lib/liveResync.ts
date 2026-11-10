@@ -4,7 +4,7 @@
 // delivers it. When that fails (the screen does not know what the session holds,
 // or the delivery throws), the session's own text is the truth and the buffer is
 // rebuilt from it. What the buffer held that was never persisted exists nowhere
-// else, because mobile has no autosave and no snapshot, so it is kept as a
+// else, because mobile has no SNAPSHOT history, so it is kept as a
 // conflict copy FIRST and the buffer is replaced only after that copy exists.
 //
 // Extracted from the editor screen so a spec can drive every arm (the review

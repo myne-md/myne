@@ -88,6 +88,42 @@ function shiftInstant(value: string, days: number): string | null {
   return formatEventInstant(shifted);
 }
 
+/** Move one instant by minutes, rolling the date at midnight. A clock-less value
+ *  has only whole days to move by, so the remainder is dropped. */
+function shiftInstantMinutes(value: string, minutes: number): string | null {
+  const instant = parseEventInstant(value);
+  if (instant === null) return null;
+  if (instant.time === null) return shiftInstant(value, Math.trunc(minutes / 1440));
+  let day = instant.date;
+  let clock = Number(instant.time.slice(0, 2)) * 60 + Number(instant.time.slice(3, 5)) + minutes;
+  while (clock < 0) {
+    clock += 1440;
+    day = addDays(day, -1);
+  }
+  while (clock >= 1440) {
+    clock -= 1440;
+    day = addDays(day, 1);
+  }
+  const hh = String(Math.floor(clock / 60)).padStart(2, "0");
+  const mm = String(clock % 60).padStart(2, "0");
+  return formatEventInstant({ date: day, time: `${hh}:${mm}` });
+}
+
+/**
+ * Both edges move by the same minutes, so the duration survives. Minutes rather
+ * than days because the hour axis is a grid of them: 10:30 must land on 10:30, and
+ * a day boundary is the same shift with a larger number. `planDrag` stays whole-day
+ * for the month grid.
+ */
+export function planMoveTo(span: EventSpan, minutes: number): EventSpan | null {
+  if (minutes === 0) return span;
+  const start = shiftInstantMinutes(span.start, minutes);
+  if (start === null) return null;
+  const end = span.end === null ? null : shiftInstantMinutes(span.end, minutes);
+  if (span.end !== null && end === null) return null;
+  return { start, end, allDay: span.allDay };
+}
+
 /**
  * The span a drag of `days` produces: `start` and `end` move together, so a
  * two-hour meeting stays two hours and a three-day trip stays three days.
@@ -122,6 +158,30 @@ export function planResize(span: EventSpan, days: number): EventSpan | null {
   return { start: span.start, end, allDay: span.allDay };
 }
 
+/** A drag of an EDITING edge: that edge moves to `to`, the other stays, and an
+ *  inverted or empty span is refused. {@link planResize} moves by whole DAYS. */
+export function planEdgeResize(
+  span: EventSpan,
+  edge: "start" | "end",
+  to: string,
+): EventSpan | null {
+  const moved = parseEventInstant(to);
+  if (moved === null) return null;
+  const next: EventSpan =
+    edge === "start"
+      ? { start: formatEventInstant(moved), end: span.end, allDay: span.allDay }
+      : { start: span.start, end: formatEventInstant(moved), allDay: span.allDay };
+
+  const start = parseEventInstant(next.start);
+  if (start === null) return null;
+  if (next.end === null) return next;
+  const end = parseEventInstant(next.end);
+  if (end === null) return null;
+  // An empty interval is the shape a reader reports as `end-before-start`.
+  if (civilMs(end) <= civilMs(start)) return null;
+  return next;
+}
+
 /** A comparable stamp for an instant, so two spans can be ordered. */
 function civilMs(instant: { date: { year: number; month: number; day: number }; time: string | null }): number {
   const base = Date.UTC(instant.date.year, instant.date.month - 1, instant.date.day);
@@ -147,6 +207,24 @@ export async function applyEventMove(args: {
 
   // Flush BEFORE reading: a pane holding unsaved keystrokes has a newer body than
   // disk, and writing over the stale copy would be undone by the flush.
+  const source = await openEventWrite({ noteId, rendered, io });
+
+  if (next.start === rendered.start && next.end === rendered.end) return;
+
+  let bytes = patchFrontmatterField(encoder.encode(source), "start", next.start);
+  if (next.end !== null) bytes = patchFrontmatterField(bytes, "end", next.end);
+  await commitEventWrite({ noteId, source, body: decoder.decode(bytes), io });
+}
+
+/** Read the note and refuse unless it still says what the row was drawn from.
+ *  Both writers in this directory owe the same three steps (flush, read, verify),
+ *  and a second copy of the anchor check is a second place it can be dropped. */
+export async function openEventWrite(args: {
+  readonly noteId: string;
+  readonly rendered: EventSpan;
+  readonly io: EventWriteIo;
+}): Promise<string> {
+  const { noteId, rendered, io } = args;
   await io.flushDirtyPanes?.();
 
   const source = await io.readNote(noteId);
@@ -154,19 +232,23 @@ export async function applyEventMove(args: {
   if (range === null) throw new EventWriteRefused("start-missing", noteId);
   const read = readEventFromFmBody(source.slice(range.bodyStart, range.bodyEnd));
   if (read.state !== "ok") throw new EventWriteRefused("start-missing", noteId);
-
   if (formatEventInstant(read.event.start) !== rendered.start) {
     throw new EventWriteRefused("value-changed", noteId);
   }
-  if (read.event.end === null && next.end === null && next.start === rendered.start) {
-    return; // nothing to do
-  }
-  if (next.start === rendered.start && next.end === rendered.end) return;
+  return source;
+}
 
-  let bytes = patchFrontmatterField(encoder.encode(source), "start", next.start);
-  if (next.end !== null) bytes = patchFrontmatterField(bytes, "end", next.end);
-  const body = decoder.decode(bytes);
-
+/** Write `body` over `source`, refusing when disk moved past it: the pre-image's
+ *  hash is the expected-base guard, so a pull-apply between the read and the write
+ *  is a named refusal rather than an overwrite. */
+export async function commitEventWrite(args: {
+  readonly noteId: string;
+  readonly source: string;
+  readonly body: string;
+  readonly io: EventWriteIo;
+}): Promise<void> {
+  const { noteId, source, body, io } = args;
+  if (body === source) return;
   try {
     await io.writeNote(noteId, body, await sha256Hex(source));
   } catch (err) {

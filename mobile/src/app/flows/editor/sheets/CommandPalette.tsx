@@ -45,7 +45,7 @@ export function CommandPalette({
       void noteSearch(query)
         .then((hits) => {
           if (cancelled) return;
-          setNoteResults(hits.map((h) => ({ id: h.note_id, title: h.title || t("editor.untitledNote"), snippet: snippetOf.get(h.note_id) ?? "" })));
+          setNoteResults(hits.map((h) => ({ id: h.note_id, title: h.title || t("common.untitlednote"), snippet: snippetOf.get(h.note_id) ?? "" })));
         })
         .catch(() => {
           if (!cancelled) setNoteResults(searchNotes(q, notes, bodies));
