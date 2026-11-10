@@ -122,6 +122,30 @@ export function planResize(span: EventSpan, days: number): EventSpan | null {
   return { start: span.start, end, allDay: span.allDay };
 }
 
+/** A drag of an EDITING edge: that edge moves to `to`, the other stays, and an
+ *  inverted or empty span is refused. {@link planResize} moves by whole DAYS. */
+export function planEdgeResize(
+  span: EventSpan,
+  edge: "start" | "end",
+  to: string,
+): EventSpan | null {
+  const moved = parseEventInstant(to);
+  if (moved === null) return null;
+  const next: EventSpan =
+    edge === "start"
+      ? { start: formatEventInstant(moved), end: span.end, allDay: span.allDay }
+      : { start: span.start, end: formatEventInstant(moved), allDay: span.allDay };
+
+  const start = parseEventInstant(next.start);
+  if (start === null) return null;
+  if (next.end === null) return next;
+  const end = parseEventInstant(next.end);
+  if (end === null) return null;
+  // An empty interval is the shape a reader reports as `end-before-start`.
+  if (civilMs(end) <= civilMs(start)) return null;
+  return next;
+}
+
 /** A comparable stamp for an instant, so two spans can be ordered. */
 function civilMs(instant: { date: { year: number; month: number; day: number }; time: string | null }): number {
   const base = Date.UTC(instant.date.year, instant.date.month - 1, instant.date.day);
