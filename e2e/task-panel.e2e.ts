@@ -465,7 +465,11 @@ describeE2E("tp4 the task tab body fills the pane (myne-md/myne#534)", () => {
         await openTaskTab(s);
         // The undated task sits in its own "No date" section under the default
         // view, so it is present without touching a filter.
-        await s.waitForElement(testIdSelector("common.nodate"));
+        // **A TESTID, not a catalogue key.** An i18n consolidation pass rewrote
+        // this string to `common.nodate` because it reads like a translation key;
+        // the app renders `tasks.section.${item.section}` and nothing else, so the
+        // wait could not succeed (measured 2026-11-10, on develop's merge).
+        await s.waitForElement(testIdSelector("tasks.section.none"));
         await s.waitForElement(testIdSelector("tasks.row.text"));
 
         const geometry = await settleOn(
