@@ -314,7 +314,9 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
   const chip = (row: CalendarRow, showTime: boolean) => (
     <div
       key={`${row.noteId}:${row.start}`}
-      className="myne-calendar__chip"
+      // `myne-btn` carries the chip SKIN (spine, wash, type) from the shared sheet;
+      // the block owns the gesture, so the chip itself is not a control here.
+      className="myne-btn myne-calendar__chip"
       data-testid={`calendar.chip.${row.noteId}`}
       data-conflicts={row.conflicts ? "true" : undefined}
       // One variable for the spine and the wash, exactly as the desktop chip does.
