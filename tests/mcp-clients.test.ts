@@ -58,6 +58,29 @@ describe("the client roster", () => {
   });
 });
 
+describe("the connection name is escaped for the grammar it lands in", () => {
+  it("keeps a quote out of the JSON and YAML shapes", () => {
+    // An unescaped quote produces a config the client silently ignores, which is the
+    // copy-paste failure this module exists to remove, now with the person's own text
+    // as the trigger.
+    const json = mcpSnippet(presetById("claude-desktop")!, 'a"b');
+    expect(() => JSON.parse(json)).not.toThrow();
+    expect(JSON.parse(json).mcpServers.myne.env.MYNE_MCP_CONNECTION).toBe('a"b');
+    const yaml = mcpSnippet(presetById("hermes")!, 'a"b');
+    expect(yaml).toContain('MYNE_MCP_CONNECTION: "a\\"b"');
+  });
+
+  it("single-quotes a shell line only when the name needs it", () => {
+    // A plain name stays readable; a name with a space or a `;` cannot run extra
+    // words in the line the person is told to paste.
+    expect(mcpSnippet(GENERIC_CLIENT, "myne")).toBe("MYNE_MCP_CONNECTION=myne myne-mcp");
+    expect(mcpSnippet(GENERIC_CLIENT, "a b; rm -rf ~")).toBe(
+      "MYNE_MCP_CONNECTION='a b; rm -rf ~' myne-mcp",
+    );
+    expect(mcpSnippet(GENERIC_CLIENT, "it's")).toBe("MYNE_MCP_CONNECTION='it'\\''s' myne-mcp");
+  });
+});
+
 describe("the snippets", () => {
   it("emits the JSON mcpServers shape for Claude Desktop and Claude Code", () => {
     const expected =

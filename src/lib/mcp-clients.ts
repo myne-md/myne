@@ -171,21 +171,26 @@ export function presetById(id: string): McpClientPreset | null {
  * somebody else's file format.
  */
 export function mcpSnippet(preset: McpClientPreset, connection: string): string {
+  const jsonToken = JSON.stringify(connection).slice(1, -1);
+  const yamlToken = jsonToken;
+  const shellToken = /^[A-Za-z0-9._-]+$/.test(connection)
+    ? connection
+    : `'${connection.split("'").join(`'\\''`)}'`;
   switch (preset.shape) {
     case "json-mcpServers":
-      return `{"mcpServers":{"myne":{"command":"${MCP_BINARY}","env":{"${MCP_CONNECTION_ENV}":"${connection}"}}}}`;
+      return `{"mcpServers":{"myne":{"command":"${MCP_BINARY}","env":{"${MCP_CONNECTION_ENV}":"${jsonToken}"}}}}`;
     case "json-mcpServers-typed":
-      return `{"mcpServers":{"myne":{"type":"stdio","command":"${MCP_BINARY}","env":{"${MCP_CONNECTION_ENV}":"${connection}"}}}}`;
+      return `{"mcpServers":{"myne":{"type":"stdio","command":"${MCP_BINARY}","env":{"${MCP_CONNECTION_ENV}":"${jsonToken}"}}}}`;
     case "json-servers-typed":
-      return `{"servers":{"myne":{"type":"stdio","command":"${MCP_BINARY}","env":{"${MCP_CONNECTION_ENV}":"${connection}"}}}}`;
+      return `{"servers":{"myne":{"type":"stdio","command":"${MCP_BINARY}","env":{"${MCP_CONNECTION_ENV}":"${jsonToken}"}}}}`;
     case "json-mcp-servers-local":
-      return `{"$schema":"https://opencode.ai/config.json","mcp":{"servers":{"myne":{"type":"local","command":["${MCP_BINARY}"],"environment":{"${MCP_CONNECTION_ENV}":"${connection}"}}}}}`;
+      return `{"$schema":"https://opencode.ai/config.json","mcp":{"servers":{"myne":{"type":"local","command":["${MCP_BINARY}"],"environment":{"${MCP_CONNECTION_ENV}":"${jsonToken}"}}}}}`;
     case "yaml-mcp_servers":
-      return `mcp_servers:\n  myne:\n    command: "${MCP_BINARY}"\n    env:\n      ${MCP_CONNECTION_ENV}: "${connection}"`;
+      return `mcp_servers:\n  myne:\n    command: "${MCP_BINARY}"\n    env:\n      ${MCP_CONNECTION_ENV}: "${yamlToken}"`;
     case "command":
       // The one shape that is a shell line rather than a file body: a client
       // whose configuration nobody has listed gets the command and the variable,
       // which is what an MCP client needs and nothing more.
-      return `${MCP_CONNECTION_ENV}=${connection} ${MCP_BINARY}`;
+      return `${MCP_CONNECTION_ENV}=${shellToken} ${MCP_BINARY}`;
   }
 }
