@@ -4745,7 +4745,6 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/settings/McpSection.tsx",
       "src/components/settings/mcp-client-marks.tsx",
-      "src/components/settings/mcp-client-mark-images.ts",
       "src/lib/mcp-clients.ts",
       "src/lib/mcp-access.ts",
       "src/lib/prefs.ts",

@@ -737,7 +737,7 @@ export function McpSection({
                     data-testid="settings.mcp-client"
                     data-client={client.id}
                   >
-                    <ClientMark mark={client.mark} name={client.name} />
+                    <ClientMark name={client.name} />
                     <span>{client.name}</span>
                   </Button>
                 ))}
