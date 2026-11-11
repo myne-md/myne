@@ -60,18 +60,22 @@ fn a_charge_past_the_budget_saturates_rather_than_wrapping() {
 }
 
 #[test]
-fn the_ledger_stops_growing_past_its_cap_without_refusing_an_untracked_name() {
+fn the_ledger_stops_growing_past_its_cap_and_counts_the_name_that_arrived_last() {
     let mut ledger = BudgetLedger::default();
     for index in 0..MAX_TRACKED {
         ledger.charge(&format!("conn-{index}"), at(0), 5);
     }
     assert_eq!(ledger.tracked(), MAX_TRACKED);
-    // A name past the cap is not tracked, so it reads as a full budget: failing
-    // open for an untracked name is the safe direction here, because the grant
-    // check upstream is what decides whether the caller may read at all.
+
+    // A name past the cap IS counted: the entry closest to rolling gives way.
     ledger.charge("overflow", at(0), 5);
     assert_eq!(ledger.tracked(), MAX_TRACKED);
-    assert_eq!(ledger.remaining("overflow", at(0)), NOTES_PER_WINDOW);
+    assert_eq!(ledger.remaining("overflow", at(0)), NOTES_PER_WINDOW - 5);
+
+    // The evicted name reads a fresh window, like a restart does.
+    ledger.charge("conn-0", at(0), 5);
+    assert_eq!(ledger.tracked(), MAX_TRACKED);
+    assert_eq!(ledger.remaining("conn-0", at(0)), NOTES_PER_WINDOW - 5);
 }
 
 #[test]

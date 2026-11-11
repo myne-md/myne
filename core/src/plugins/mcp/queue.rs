@@ -71,10 +71,20 @@ pub fn enqueue(requests: &mut Vec<McpWriteRequest>, mut request: McpWriteRequest
             .iter()
             .filter(|row| row.connection == request.connection)
             .min_by_key(|row| row.requested_at)
-            .map(|row| (row.connection.clone(), row.folder.clone(), row.verb.clone()));
+            .map(|row| {
+                (
+                    row.connection.clone(),
+                    row.folder.clone(),
+                    row.verb.clone(),
+                    row.kind,
+                )
+            });
         match oldest_of_this_connection {
-            Some((connection, folder, verb)) => requests.retain(|row| {
-                !(row.connection == connection && row.folder == folder && row.verb == verb)
+            Some((connection, folder, verb, kind)) => requests.retain(|row| {
+                !(row.connection == connection
+                    && row.folder == folder
+                    && row.verb == verb
+                    && row.kind == kind)
             }),
             None => return false,
         }
