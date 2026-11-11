@@ -122,11 +122,7 @@ const V = {
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
   "src/components/settings/mcp-client-marks.tsx": [
     "adapted",
-    "Never mounted: it is imported only by `McpSection`, which `AiPanel` renders under `has(\"externalMcp\")`, absent on web. It carries two inline SVG paths and a monogram and makes no host call at all, so a hand-reached render would draw a glyph and nothing else.",
-  ],
-  "src/components/settings/mcp-client-mark-images.ts": [
-    "adapted",
-    "Never mounted: two base64 PNG data URIs consumed by `mcp-client-marks.tsx`, which only `McpSection` imports under `has(\"externalMcp\")`, absent on web. No host call, no fetch: the bytes are constants.",
+    "Never mounted: it is imported only by `McpSection`, which `AiPanel` renders under `has(\"externalMcp\")`, absent on web. It draws a monogram from the client's name and makes no host call at all, so a hand-reached render would draw two letters and nothing else.",
   ],
   "src/lib/mcp-clients.ts": [
     "adapted",
