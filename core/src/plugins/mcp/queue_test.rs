@@ -184,6 +184,67 @@ fn mcp_write_queue_a_request_is_a_proposal_and_carries_no_authority() {
 /// another client's attempt earned, so at the cap this connection's own oldest
 /// goes and a connection with no row of its own is REFUSED.
 #[test]
+fn mcp_write_queue_keeps_a_read_row_and_a_write_row_as_two_decisions() {
+    let mut rows = Vec::new();
+    assert!(enqueue(&mut rows, request("a", "Work/", "note_create", 10)));
+    assert!(enqueue(
+        &mut rows,
+        McpWriteRequest {
+            kind: protocol::McpRequestKind::Read,
+            ..request("a", "Work/", "note_create", 11)
+        }
+    ));
+    assert_eq!(
+        rows.len(),
+        2,
+        "one row per kind is kept, not one per triple"
+    );
+
+    let read = take(&mut rows, "a", "Work/", protocol::McpRequestKind::Read);
+    assert!(read.is_some());
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].kind, protocol::McpRequestKind::Write);
+    assert!(take(&mut rows, "a", "Work/", protocol::McpRequestKind::Write).is_some());
+    assert!(rows.is_empty());
+}
+
+#[test]
+fn mcp_write_queue_eviction_frees_one_kind_and_not_both() {
+    let mut rows = Vec::new();
+    assert!(enqueue(&mut rows, request("a", "Work/", "note_create", 0)));
+    assert!(enqueue(
+        &mut rows,
+        McpWriteRequest {
+            kind: protocol::McpRequestKind::Read,
+            ..request("a", "Work/", "note_create", 1)
+        }
+    ));
+    for index in 0..(MAX_PENDING_WRITES - 2) {
+        assert!(enqueue(
+            &mut rows,
+            request("a", &format!("F{index}/"), "note_create", 10 + index as u64)
+        ));
+    }
+    assert_eq!(rows.len(), MAX_PENDING_WRITES);
+
+    assert!(enqueue(&mut rows, request("a", "F9/", "note_create", 99)));
+    assert_eq!(rows.len(), MAX_PENDING_WRITES);
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.folder.eq_ignore_ascii_case("work/"))
+            .count(),
+        1,
+        "the read row for that folder survived the eviction of its write sibling"
+    );
+    assert_eq!(
+        rows.iter()
+            .find(|row| row.folder.eq_ignore_ascii_case("work/"))
+            .map(|row| row.kind),
+        Some(protocol::McpRequestKind::Read)
+    );
+}
+
+#[test]
 fn mcp_write_queue_refuses_rather_than_evicting_another_connections_row() {
     let mut queue = Vec::new();
     for index in 0..MAX_PENDING_WRITES {

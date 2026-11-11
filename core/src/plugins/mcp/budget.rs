@@ -79,17 +79,12 @@ pub struct BudgetLedger {
 impl BudgetLedger {
     /// What is left for `connection` at `now`, rolling the window if it elapsed.
     pub fn remaining(&mut self, connection: &str, now_ms: u64) -> u32 {
-        self.entry(connection)
-            .map(|spent| spent.remaining(now_ms))
-            .unwrap_or(NOTES_PER_WINDOW)
+        self.entry(connection, now_ms).remaining(now_ms)
     }
 
-    /// Record `notes` taken. Saturating: a charge past the budget is a debt the
-    /// next call refuses rather than an overflow.
+    /// Record `notes` taken. Saturating: a charge past the budget is a debt the next call refuses.
     pub fn charge(&mut self, connection: &str, now_ms: u64, notes: u32) {
-        if let Some(spent) = self.entry(connection) {
-            spent.charge(now_ms, notes);
-        }
+        self.entry(connection, now_ms).charge(now_ms, notes);
     }
 
     /// Test-only: in production nothing resets a budget except the process ending.
@@ -104,11 +99,23 @@ impl BudgetLedger {
         self.spent.len()
     }
 
-    fn entry(&mut self, connection: &str) -> Option<&mut Spent> {
+    fn entry(&mut self, connection: &str, now_ms: u64) -> &mut Spent {
         if !self.spent.contains_key(connection) && self.spent.len() >= MAX_TRACKED {
-            return None;
+            // The cap bounds the map: a full window for an untracked name fails open.
+            if let Some(oldest) = self
+                .spent
+                .iter()
+                .min_by_key(|(_, spent)| {
+                    spent
+                        .window_start
+                        .map_or(0, |start| now_ms.saturating_sub(start))
+                })
+                .map(|(name, _)| name.clone())
+            {
+                self.spent.remove(&oldest);
+            }
         }
-        Some(self.spent.entry(connection.to_string()).or_default())
+        self.spent.entry(connection.to_string()).or_default()
     }
 }
 

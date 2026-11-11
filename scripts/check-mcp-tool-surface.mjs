@@ -54,6 +54,10 @@ const read = (rel) => {
 };
 
 const TOOL_LIST_FILE = "mcp/src/tool_list.rs";
+// The core crate keeps its own copy of the catalog names so Settings can render one
+// switch per verb, and that copy is what the switch bank reads. A tenth verb added
+// to the catalog and not here would leave nine switches and no way to switch it off.
+const CATALOG_VERBS_FILE = "core/src/plugins/mcp/tools.rs";
 const TOOLS_TEST_FILE = "mcp/src/tools_test.rs";
 
 /// Written out here on purpose rather than derived from the file under test. A
@@ -156,6 +160,13 @@ function words(text) {
     .filter(Boolean);
 }
 
+/** Pull `CATALOG_VERBS` out of the core crate's tools module. */
+function declaredCatalogVerbs(source) {
+  const match = source.match(/pub const CATALOG_VERBS\s*:\s*\[&str;\s*\d+\]\s*=\s*\[([\s\S]*?)\];/);
+  if (!match) return null;
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+}
+
 /** Pull `EXPECTED_TOOLS` out of `tools_test.rs`. */
 function declaredToolRoster(source) {
   const match = source.match(/const\s+EXPECTED_TOOLS\s*:\s*\[\s*&str\s*;\s*\d+\s*\]\s*=\s*\[([\s\S]*?)\];/);
@@ -256,6 +267,27 @@ if (testRoster) {
   }
 }
 
+// ── the switch bank reads a third copy, and nothing else compares it ────────
+
+const catalogVerbs = declaredCatalogVerbs(read(CATALOG_VERBS_FILE));
+if (catalogVerbs === null) {
+  fail(`${CATALOG_VERBS_FILE}: could not find \`pub const CATALOG_VERBS: [&str; N] = […\]\` — did it get renamed?`);
+} else {
+  for (const name of catalogVerbs) {
+    if (!EXPECTED_TOOLS.includes(name)) {
+      fail(`${CATALOG_VERBS_FILE}: CATALOG_VERBS names \`${name}\`, which the catalog does not declare`);
+    }
+  }
+  for (const name of EXPECTED_TOOLS) {
+    if (!catalogVerbs.includes(name)) {
+      fail(
+        `${CATALOG_VERBS_FILE}: CATALOG_VERBS is missing \`${name}\`, so the Settings switch bank ` +
+          `renders one switch fewer than the catalog advertises and that verb cannot be switched off`,
+      );
+    }
+  }
+}
+
 // ── no capability outside the vault ─────────────────────────────────────────
 
 const capabilities = declaredCapabilities(testSource);
@@ -290,6 +322,6 @@ if (failures.length > 0) {
 
 const literalCount = stringLiterals(toolList).length;
 console.log(
-  `mcp tool surface: ok (${uniqueNames.length} tools, ${literalCount} string literal(s) scanned, ` +
-    `${capabilities.length} capability word(s) refused)`,
+  `mcp tool surface: ok (${uniqueNames.length} tools, ${catalogVerbs?.length ?? 0} catalog verb(s), ` +
+    `${literalCount} string literal(s) scanned, ${capabilities.length} capability word(s) refused)`,
 );

@@ -954,10 +954,10 @@ pub fn excerpt(body: &str, query: &str) -> String {
 /// The nine verbs the compiled catalog advertises, in catalog order
 /// (`mcp/src/tool_list.rs`), so Settings can render one switch per verb.
 ///
-/// Duplicated here rather than imported because the catalog lives in the shim
-/// crate, which is a separate binary by design: this process must not link it. The
-/// duplication is held in step by `catalog_verbs_agree_with_the_dispatch_table`
-/// below, which is the only thing that can notice the two drifting.
+/// Duplicated here rather than imported because the catalog lives in the shim crate,
+/// a separate binary by design: this process must not link it. `scripts/check-mcp-tool-
+/// surface.mjs` holds the copy against the catalog; the test below only compares it to
+/// the DISPATCH table, so it cannot see a tenth verb arriving in the catalog.
 pub const CATALOG_VERBS: [&str; 9] = [
     "note_search",
     "note_read",

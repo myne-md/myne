@@ -1001,6 +1001,67 @@ fn a_create_outside_the_write_grant_is_queued_and_nothing_is_written() {
 }
 
 #[test]
+fn a_search_into_a_folder_outside_the_grant_is_queued_as_a_read_request() {
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
+    fixture.open_door();
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    let reply = session.call(
+        1,
+        "note_search",
+        json!({ "query": "secret", "folder": OUT_OF_SCOPE_FOLDER }),
+    );
+    assert_eq!(reply["result"]["isError"], true, "reply: {reply}");
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "out_of_scope_folder",
+        "reply: {reply}"
+    );
+
+    let queued = queued_writes(&fixture);
+    assert_eq!(queued.len(), 1, "{queued:?}");
+    assert_eq!(queued[0].connection, CONNECTION);
+    assert_eq!(queued[0].folder, "private/");
+    assert_eq!(queued[0].verb, "note_search");
+    assert_eq!(queued[0].kind, protocol::McpRequestKind::Read);
+
+    let reply = session.call(
+        2,
+        "note_create",
+        json!({ "folder": OUT_OF_SCOPE_FOLDER, "title": "x", "body": "y" }),
+    );
+    assert_eq!(reply["result"]["isError"], true, "reply: {reply}");
+    assert_eq!(
+        queued_writes(&fixture).len(),
+        1,
+        "a refused write must not add a read card"
+    );
+}
+
+#[test]
+fn a_served_read_charges_the_process_budget() {
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
+    fixture.open_door();
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    let reply = session.call(
+        1,
+        "note_read",
+        json!({ "note_id": fixture.in_scope.as_str() }),
+    );
+    assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
+
+    let left = myne_core::plugins::mcp::budget::process_ledger()
+        .lock()
+        .expect("the budget ledger is not poisoned")
+        .remaining(CONNECTION, 0);
+    assert!(
+        left < myne_core::plugins::mcp::budget::NOTES_PER_WINDOW,
+        "a served note_read must charge the process ledger, got {left} of {0}",
+        myne_core::plugins::mcp::budget::NOTES_PER_WINDOW
+    );
+}
+
+#[test]
 fn an_append_takes_a_restore_point_and_the_restore_returns_the_prior_bytes() {
     let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
     fixture.open_door();

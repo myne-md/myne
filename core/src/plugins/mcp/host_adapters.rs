@@ -46,6 +46,7 @@ use async_trait::async_trait;
 
 use crate::host::HostCtx;
 use crate::plugins::agent::tools::SearchHit;
+use crate::plugins::mcp::tools::ToolName;
 use crate::plugins::notes::commands::note_read_from_host;
 use crate::plugins::notes::error::NoteReadError;
 use crate::plugins::notes::search_sync_core::note_search_core;
@@ -275,26 +276,27 @@ pub async fn door_call(app: DoorContext<'_>, call: WireCall<'_>) -> McpCallOutco
         // from one probing. Accepting removes that one folder from the exclusion set
         // (mcp external access rework, myne-md/myne#1052).
         McpCallOutcome::Refused(McpToolError::OutOfScopeFolder { folder }) => {
-            // The reason does NOT change when a row is stored: there is no
-            // `read_queued_for_review`, because the client's next action is the same
-            // either way (tell the person), and a second reason would be a second
-            // wire label for one situation. A failed store costs the card and
-            // nothing else, so the refusal stands either way.
-            // A failed store costs the card and nothing else, but it must not look
-            // like a successful enqueue: the refusal stands either way, so the error
-            // is logged at the point it happens rather than reason encoded on the
-            // wire (D9, myne-md/myne#1052).
-            if crate::plugins::prefs::commands::enqueue_mcp_read_request_from_host(
-                host,
-                state,
-                hooks,
-                call.connection.trim().to_string(),
-                folder.clone(),
-                call.tool.to_string(),
-                io,
-            )
-            .await
-            .is_err()
+            // A WRITE into a folder it may not read arrives here too, and it is not a
+            // read request: a card asking to read the folder would not answer the
+            // question the client asked, and the write it retries is still refused.
+            // So the card is queued for a read verb only.
+            //
+            // The reason does NOT change when a row is stored, because the client's
+            // next action is the same either way (tell the person). A failed store
+            // costs the card and nothing else, so it is logged where it happens rather
+            // than encoded as a second wire label for one situation.
+            if !ToolName::from_wire(call.tool).is_some_and(ToolName::is_write)
+                && crate::plugins::prefs::commands::enqueue_mcp_read_request_from_host(
+                    host,
+                    state,
+                    hooks,
+                    call.connection.trim().to_string(),
+                    folder.clone(),
+                    call.tool.to_string(),
+                    io,
+                )
+                .await
+                .is_err()
             {
                 tracing::warn!(
                     target: "myne::mcp",
