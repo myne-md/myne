@@ -46,13 +46,13 @@ Repo: https://github.com/myne-md/myne.git
 # Four build blocks, one per ABI, because F-Droid installs the highest
 # versionCode a device can run and therefore every architecture needs its own.
 # The digit order is F-Droid's (armeabi-v7a < arm64-v8a < x86 < x86_64), applied
-# by the `sed` in `prebuild`: 0.17.0 derives versionCode 17000, so the four APKs
-# carry 160001..160004 and `versionCode:` below is that final value, matching the
+# by the `sed` in `prebuild`: 0.18.0 derives versionCode 18000, so the four APKs
+# carry 180001..180004 and `versionCode:` below is that final value, matching the
 # changelog filenames in `fastlane/metadata/android/en-US/changelogs/`.
 Builds:
-  # armeabi-v7a, 32-bit ARM. versionCode 170001.
-  - versionName: 0.17.0
-    versionCode: 170001
+  # armeabi-v7a, 32-bit ARM. versionCode 180001.
+  - versionName: 0.18.0
+    versionCode: 180001
     # OWED: the commit SHA the release tag points at, e.g.
     # `git rev-parse v0.10.1`. A placeholder here fails `fdroid lint` by name.
     commit: REPLACE_WITH_RELEASE_COMMIT
@@ -131,9 +131,9 @@ Builds:
     # build's identity, since the NDK's clang is what links the shipped `.so`.
     ndk: 29.0.14206865
 
-  # arm64-v8a. versionCode 170002.
-  - versionName: 0.17.0
-    versionCode: 170002
+  # arm64-v8a. versionCode 180002.
+  - versionName: 0.18.0
+    versionCode: 180002
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
@@ -177,9 +177,9 @@ Builds:
       - cargo tauri android build --apk --split-per-abi --target aarch64
     ndk: 29.0.14206865
 
-  # x86 (emulator and some tablets). versionCode 170003.
-  - versionName: 0.17.0
-    versionCode: 170003
+  # x86 (emulator and some tablets). versionCode 180003.
+  - versionName: 0.18.0
+    versionCode: 180003
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
@@ -224,8 +224,8 @@ Builds:
     ndk: 29.0.14206865
 
   # x86_64 (emulator). versionCode 170004.
-  - versionName: 0.17.0
-    versionCode: 170004
+  - versionName: 0.18.0
+    versionCode: 180004
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
