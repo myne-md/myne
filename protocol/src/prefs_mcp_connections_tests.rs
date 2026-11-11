@@ -375,6 +375,14 @@ fn emit_mcp_connection_vectors_for_paste() {
         );
 
     // ---- parse_reject: what a reader MUST refuse -------------------
+    emit_ok(
+            &mut dump,
+            "disabled-verbs-canonicalised",
+            "The verbs a connection may not use are a canonical SET: an input that lists them out of order and repeats one re-encodes sorted and deduplicated, because two devices that switched the same verbs off must agree to the byte. Omitted entirely when empty, which is why every older case still parses.",
+            b"{\"approved_at\":5,\"disabled_verbs\":[\"note_move\",\"note_edit\",\"note_move\"],\"excluded_folders\":[\"Private/\"],\"model\":\"exclude\"}",
+            true,
+        );
+
     emit_reject(
             &mut dump,
             "reject-both-arrays",
