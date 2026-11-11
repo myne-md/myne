@@ -401,6 +401,18 @@ impl ToolName {
         )
     }
 
+    /// Whether this verb's answer carries note text, which is what the read
+    /// budget counts.
+    ///
+    /// Search and read, and nothing else: `vault_list` returns folder keys with
+    /// counts and `vault_state` returns sizes and a version, so neither hands over
+    /// a word of a note. Charging them would spend the budget on structure, and
+    /// not charging the two that do return text would make the budget a count of
+    /// calls wearing a count of notes as a name.
+    pub fn produces_notes(self) -> bool {
+        matches!(self, Self::NoteSearch | Self::NoteRead)
+    }
+
     /// The wire spelling of this verb.
     pub fn wire(self) -> &'static str {
         match self {
@@ -501,6 +513,16 @@ pub struct CallInputs<'a> {
     /// host composed without a writer, which is a wiring bug rather than something
     /// a client can act on.
     pub writer: Option<&'a dyn super::intent::McpNoteWriter>,
+    /// The process-wide read budget (mcp external access rework, myne-md/myne#1052).
+    ///
+    /// Supplied rather than reached for inside, so a test can drive its own ledger
+    /// instead of sharing the process's spending with every other test in this file.
+    /// Production passes [`super::budget::process_ledger`].
+    pub budget: &'a std::sync::Mutex<super::budget::BudgetLedger>,
+    /// The host's monotonic clock in milliseconds, read once per call by the
+    /// caller. `core/` may not touch a clock directly: the task/clock seam guard
+    /// holds that, and an `Instant` compiles for wasm32 and panics there.
+    pub now_ms: u64,
 }
 
 /// One decoded call, kept typed so the dispatch below cannot re-parse.
@@ -601,6 +623,41 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
         return McpCallOutcome::Refused(error);
     }
 
+    // **A verb the user switched off is refused here, before any argument is
+    // acted on.** It is checked after the grant and before the snapshots below, so
+    // a disabled verb costs no vault read, and it is checked against the WIRE name
+    // because that is what the stored set holds. Disabling a write verb is not a
+    // substitute for the write scope: it is refused rather than queued, since a
+    // queued proposal asks the person to grant something they just refused
+    // (myne-md/myne#1052).
+    if scope.is_verb_disabled(tool.wire()) {
+        return McpCallOutcome::Refused(McpToolError::VerbDisabled {
+            verb: tool.wire().to_string(),
+        });
+    }
+
+    // **The read budget is checked before anything is served and charged after**
+    // (mcp external access rework, myne-md/myne#1052). The cost of a call is only
+    // known once it has run, so this asks "is anything left" and the charge below
+    // records what was actually returned. A single call can therefore overshoot by
+    // at most one call's worth (fifty notes for a search, one for a read), and a
+    // caller that is already over is refused rather than served a partial answer.
+    let now_ms = inputs.now_ms;
+    if tool.produces_notes() {
+        let left = inputs
+            .budget
+            .lock()
+            .map(|mut ledger| ledger.remaining(connection, now_ms))
+            // A poisoned lock answers "nothing left", the direction the door's own
+            // rate limiter chooses: a refusal is recoverable, a drain is not.
+            .unwrap_or(0);
+        if left == 0 {
+            return McpCallOutcome::Refused(McpToolError::BudgetExhausted {
+                retry_after_seconds: super::budget::WINDOW_MS / 1000,
+            });
+        }
+    }
+
     // **A write verb resolves a SECOND scope before it touches anything.** The
     // read scope above bounds what a connection can see; the write grant beside it
     // bounds what it can change, and the two are resolved from the same stored
@@ -627,13 +684,18 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
         None
     };
 
+    // How many notes this call actually handed over, charged to the budget once
+    // the call has answered (see the check above for why the charge is late).
+    let mut notes_taken: u32 = 0;
     let result = match parsed {
-        Parsed::Search(request) => note_search(&scope, request, source)
-            .await
-            .map(|rows| to_value(&rows)),
-        Parsed::Read(request) => note_read(&scope, request, source)
-            .await
-            .map(|note| to_value(&note)),
+        Parsed::Search(request) => note_search(&scope, request, source).await.map(|rows| {
+            notes_taken = rows.len() as u32;
+            to_value(&rows)
+        }),
+        Parsed::Read(request) => note_read(&scope, request, source).await.map(|note| {
+            notes_taken = 1;
+            to_value(&note)
+        }),
         Parsed::List => vault_list(&scope, source)
             .await
             .map(|folders| to_value(&folders)),
@@ -732,6 +794,21 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
             }
         }
     };
+    // The budget is charged only for an answer that carried note text. A refusal
+    // costs nothing, which is what keeps a client retrying a refused call from
+    // spending the budget of the connection that shares its window.
+    if notes_taken > 0 {
+        match inputs.budget.lock() {
+            Ok(mut ledger) => ledger.charge(connection, now_ms, notes_taken),
+            // A poisoned lock is a previous panic, not a licence to serve the rest
+            // of the window uncharged: the charge is skipped AND the skip is said
+            // out loud, so a poisoned ledger is visible rather than silent.
+            Err(_) => tracing::warn!(
+                target: "myne::mcp",
+                "budget ledger poisoned; charge skipped"
+            ),
+        }
+    }
     match result {
         Ok(Ok(structured)) => McpCallOutcome::Result(call_tool_result(tool, structured)),
         // Unreachable for these types (no map with non-string keys, no NaN), and
@@ -872,4 +949,48 @@ pub fn excerpt(body: &str, query: &str) -> String {
         out.push_str(ELLIPSIS);
     }
     out.trim_end().to_string()
+}
+
+/// The nine verbs the compiled catalog advertises, in catalog order
+/// (`mcp/src/tool_list.rs`), so Settings can render one switch per verb.
+///
+/// Duplicated here rather than imported because the catalog lives in the shim crate,
+/// a separate binary by design: this process must not link it. `scripts/check-mcp-tool-
+/// surface.mjs` holds the copy against the catalog; the test below only compares it to
+/// the DISPATCH table, so it cannot see a tenth verb arriving in the catalog.
+pub const CATALOG_VERBS: [&str; 9] = [
+    "note_search",
+    "note_read",
+    "vault_list",
+    "vault_state",
+    "note_create",
+    "note_append",
+    "note_set_field",
+    "note_move",
+    "note_edit",
+];
+
+#[cfg(test)]
+#[test]
+fn catalog_verbs_agree_with_the_dispatch_table() {
+    // Two facts, and both matter to the switches on screen: the roster carries the
+    // nine catalog names, and exactly one of them is absent from this build, which
+    // the UI renders as a switch that says why. A tenth verb added to the catalog
+    // without a dispatch arm would otherwise appear on the screen as an enabled
+    // switch that answers version skew.
+    let unimplemented: Vec<&str> = CATALOG_VERBS
+        .iter()
+        .copied()
+        .filter(|name| ToolName::from_wire(name).is_none())
+        .collect();
+    assert_eq!(
+        unimplemented,
+        vec!["note_set_field"],
+        "the catalog and the dispatch table disagree: {unimplemented:?}"
+    );
+    for name in CATALOG_VERBS {
+        if let Some(tool) = ToolName::from_wire(name) {
+            assert_eq!(tool.wire(), name, "a verb answers a different wire name");
+        }
+    }
 }

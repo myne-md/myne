@@ -147,10 +147,29 @@
     "welcome.repairResidue.cancel": {
       "owner": "common.cancel",
       "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "settings.ai.externalAccess.back": {
+      "owner": "common.back",
+      "reason": "The wizard's control repeats a shared word; the shared key is the one to change (myne-md/myne#1052)."
+    },
+    "settings.ai.externalAccess.rootFolder": {
+      "owner": "common.vaultroot",
+      "reason": "The wizard's control repeats a shared word; the shared key is the one to change (myne-md/myne#1052)."
+    },
+    "settings.ai.externalAccess.requestDismiss": {
+      "owner": "common.dismiss",
+      "reason": "The wizard's control repeats a shared word; the shared key is the one to change (myne-md/myne#1052)."
+    },
+    "settings.ai.externalAccess.retry": {
+      "owner": "common.tryagain",
+      "reason": "The wizard's control repeats a shared word; the shared key is the one to change (myne-md/myne#1052)."
     }
   },
   "surfaces": {
-    "src/components/settings/settingsTopics.ts": 182,
+    "src/components/settings/settingsTopics.ts": {
+      "chars": 197,
+      "reason": "The topic label 'External access' is longer than the rail entry it replaced, and it is the name the tab strip shows (myne-md/myne#1052)."
+    },
     "src/components/settings/AboutPanel.tsx": 1252,
     "src/components/settings/AccountPanel.tsx": 1057,
     "src/components/settings/AiModelCatalogue.tsx": 410,
@@ -180,8 +199,10 @@
     "src/components/settings/HotkeysPanel.tsx": 687,
     "src/components/settings/LanguageSelect.tsx": 48,
     "src/components/settings/LineNumbersSettings.tsx": 128,
-    "src/components/settings/McpGrantDialog.tsx": 2330,
-    "src/components/settings/McpSection.tsx": 2223,
+    "src/components/settings/McpSection.tsx": {
+      "chars": 2420,
+      "reason": "The tab renders what the dialog and the section used to split: the read-budget sentence, the trademarks line and the re-approval notice are all inside it now, and the flow's five load-bearing lines moved here from the dialog (myne-md/myne#1052)."
+    },
     "src/components/settings/MemberPasswordSettings.tsx": 736,
     "src/components/settings/MemorySection.tsx": 1299,
     "src/components/settings/ModelPathButton.tsx": 29,

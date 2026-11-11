@@ -32,20 +32,29 @@ const {
   revokeMcpConnection,
   setMcpConnectionGrant,
   acceptMcpWriteRequest,
+  acceptMcpReadRequest,
   dismissMcpWriteRequest,
 } = vi.hoisted(() => ({
   readMcpExternalAccess: vi.fn(),
   readMcpGrantPreview: vi.fn(),
   revokeMcpConnection: vi.fn((_name: string) => Promise.resolve(true)),
   setMcpConnectionGrant: vi.fn(
-    (_name: string, _excludedFolders: string[], _writeFolders: string[]) =>
-      Promise.resolve(true),
+    (
+      _name: string,
+      _excludedFolders: string[],
+      _writeFolders: string[],
+      _disabledVerbs: string[],
+    ) => Promise.resolve(true),
+  ),
+  acceptMcpReadRequest: vi.fn((_connection: string, _folder: string) =>
+    Promise.resolve(true),
   ),
   acceptMcpWriteRequest: vi.fn((_connection: string, _folder: string) =>
     Promise.resolve(true),
   ),
-  dismissMcpWriteRequest: vi.fn((_connection: string, _folder: string) =>
-    Promise.resolve(true),
+  dismissMcpWriteRequest: vi.fn(
+    (_connection: string, _folder: string, _kind: "write" | "read") =>
+      Promise.resolve(true),
   ),
 }));
 
@@ -60,6 +69,7 @@ vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   revokeMcpConnection,
   setMcpConnectionGrant,
   acceptMcpWriteRequest,
+  acceptMcpReadRequest,
   dismissMcpWriteRequest,
 }));
 
@@ -77,6 +87,17 @@ function connection(overrides: Record<string, unknown> = {}) {
     lastUsedAt: 1_761_000_600,
     noteCount: 12,
     folderCount: 4,
+    tools: [
+      { verb: "note_search", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "note_read", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "vault_list", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "vault_state", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "note_create", enabled: true, availableInBuild: true, isWrite: true },
+      { verb: "note_append", enabled: true, availableInBuild: true, isWrite: true },
+      { verb: "note_set_field", enabled: false, availableInBuild: false, isWrite: false },
+      { verb: "note_move", enabled: true, availableInBuild: true, isWrite: true },
+      { verb: "note_edit", enabled: true, availableInBuild: true, isWrite: true },
+    ],
     ...overrides,
   };
 }
@@ -87,6 +108,8 @@ function view(connections: unknown[], writeRequests: unknown[] = []) {
     folders: ["", "Private/", "Projects/", "Projects/New/", "Work/"],
     noteCount: 40,
     writeRequests,
+    readBudget: { notesPerWindow: 300, windowSeconds: 900 },
+    toolCatalog: connection().tools,
   };
 }
 
@@ -97,6 +120,7 @@ function request(overrides: Record<string, unknown> = {}) {
     requestedAt: 1_761_000_900,
     summary: "Shopping list",
     verb: "note_create",
+    kind: "write",
     ...overrides,
   };
 }
@@ -130,9 +154,6 @@ describe("the external-access section", () => {
     expect(screen.getByTestId("settings.mcp-read-scope").textContent).toContain(
       "12",
     );
-    expect(screen.getByTestId("settings.mcp-excluded").textContent).toContain(
-      "Private/",
-    );
     expect(screen.getByTestId("settings.mcp-write-scope").textContent).toContain(
       "nowhere",
     );
@@ -164,12 +185,12 @@ describe("the external-access section", () => {
       view([connection()], [request()]),
     );
     renderSection();
-    const card = await screen.findByTestId("settings.mcp-write-request");
+    const card = await screen.findByTestId("settings.mcp-request");
     expect(card.textContent).toContain("claude-desktop");
     expect(card.textContent).toContain("inbox/");
     expect(card.textContent).toContain("Shopping list");
 
-    fireEvent.click(screen.getByTestId("settings.mcp-write-request-accept"));
+    fireEvent.click(screen.getByTestId("settings.mcp-request-accept"));
     await waitFor(() =>
       expect(acceptMcpWriteRequest).toHaveBeenCalledWith(
         "claude-desktop",
@@ -186,12 +207,13 @@ describe("the external-access section", () => {
       view([connection()], [request()]),
     );
     renderSection();
-    await screen.findByTestId("settings.mcp-write-request");
-    fireEvent.click(screen.getByTestId("settings.mcp-write-request-dismiss"));
+    await screen.findByTestId("settings.mcp-request");
+    fireEvent.click(screen.getByTestId("settings.mcp-request-dismiss"));
     await waitFor(() =>
       expect(dismissMcpWriteRequest).toHaveBeenCalledWith(
         "claude-desktop",
         "inbox/",
+        "write",
       ),
     );
     expect(acceptMcpWriteRequest).not.toHaveBeenCalled();
@@ -202,7 +224,7 @@ describe("the external-access section", () => {
     // would be furniture a person learns to skip.
     renderSection();
     await screen.findByTestId("settings.mcp-connection");
-    expect(screen.queryByTestId("settings.mcp-write-requests")).toBeNull();
+    expect(screen.queryByTestId("settings.mcp-requests")).toBeNull();
   });
 
   it("says the whole vault when nothing is left out, rather than nothing", async () => {
@@ -238,22 +260,28 @@ describe("the external-access section", () => {
     expect(screen.getByTestId("settings.mcp-read-scope").textContent).toContain(
       "older version",
     );
-    expect(screen.getByTestId("settings.mcp-reapprove")).toBeTruthy();
+    expect(screen.getByTestId("settings.mcp-edit")).toBeTruthy();
     expect(screen.queryByTestId("settings.mcp-excluded")).toBeNull();
   });
 
-  it("reports exclusions that name nothing without counting them as removed", async () => {
+  it("states what the read scope actually covers, and names no exclusion list", async () => {
+    // A stale exclusion takes nothing out, and the row no longer renders the list
+    // it named: the count is the EFFECT, so there is no sentence left that could
+    // claim a protection a renamed folder does not give.
     readMcpExternalAccess.mockResolvedValue(
       view([
         connection({
           excludedFolders: ["Private/", "Old/"],
           staleExcludedFolders: ["Old/"],
+          noteCount: 12,
         }),
       ]),
     );
     renderSection();
     await screen.findByTestId("settings.mcp-connection");
-    expect(screen.getByTestId("settings.mcp-stale").textContent).toContain("1");
+    expect(screen.getByTestId("settings.mcp-read-scope").textContent).toContain("12");
+    expect(screen.queryByTestId("settings.mcp-stale")).toBeNull();
+    expect(screen.queryByTestId("settings.mcp-excluded")).toBeNull();
   });
 
   it("has no row offering to add the folders created since approval", async () => {
@@ -292,71 +320,246 @@ describe("the external-access section", () => {
 });
 
 describe("the approval dialog", () => {
-  it("shows the host's counts and both bounds, and approves the host's set", async () => {
+  it("walks the three steps and approves with the scope the person chose", async () => {
     readMcpGrantPreview.mockResolvedValue({
       noteCount: 412,
       folderCount: 38,
-      excludedCount: 2,
-      // Deliberately NOT the dialog's own picker state: the assertion below is
-      // that the set written comes from here, because the host owns the rule (a
-      // folder takes its subtree with it, an entry naming nothing is dropped).
-      excludedFolders: ["Private/", "Archive/"],
+      excludedCount: 0,
+      excludedFolders: [],
+      folders: ["", "Projects/", "Work/"],
     });
-    const approved: Array<[string, string[]]> = [];
     renderSection();
     await screen.findByTestId("settings.mcp-add");
     fireEvent.click(screen.getByTestId("settings.mcp-add"));
 
-    const counts = await screen.findByTestId("settings.mcp-grant-counts");
-    expect(counts.getAttribute("data-note-count")).toBe("412");
-    expect(counts.getAttribute("data-folder-count")).toBe("38");
-    expect(counts.getAttribute("data-excluded-count")).toBe("2");
-    // The rule, stated plainly: what the user creates later is shared.
-    expect(
-      screen.getByTestId("settings.mcp-grant-later-folders").textContent,
-    ).toContain("create later");
-    expect(
-      screen.getByTestId("settings.mcp-grant-outside-myne").textContent,
-    ).toContain("outside Myne");
+    // Step 1 is the client cards, and all six are offered at once: the grid is
+    // three across and two down, so nothing hides behind a "show more".
+    await screen.findByTestId("settings.mcp-step-clients");
+    expect(screen.getAllByTestId("settings.mcp-client")).toHaveLength(6);
 
-    // A name is required: the reserved fallback must not be approvable.
-    fireEvent.change(screen.getByTestId("settings.mcp-grant-name"), {
-      target: { value: "unnamed-client" },
-    });
+    fireEvent.click(screen.getAllByTestId("settings.mcp-client")[0]);
+    // Step 2 carries that client's own shape and its config path.
+    await screen.findByTestId("settings.mcp-step-config");
+    expect(screen.getByTestId("settings.mcp-snippet").textContent).toContain("mcpServers");
+    expect(screen.getByTestId("settings.mcp-config-path").textContent).toContain(
+      "claude_desktop_config.json",
+    );
+    // The name is a label rather than a credential, and the step says so once.
+    expect(screen.getByTestId("settings.mcp-name-claim").textContent).toContain(
+      "not a password",
+    );
+    fireEvent.click(screen.getByTestId("settings.mcp-flow-next"));
+
+    // Step 3 states what is shared, in one access list rather than a read scope and
+    // a write scope.
+    await screen.findByTestId("settings.mcp-step-scope");
+    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("412");
+    expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
+    // The switches are the host's catalog, and one verb this build cannot serve
+    // is off with a reason rather than offered as a control that does nothing.
+    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(9);
     expect(
-      (screen.getByTestId("settings.mcp-grant-approve") as HTMLButtonElement)
-        .disabled,
+      (screen.getByTestId("settings.mcp-tool-note_set_field") as HTMLInputElement).disabled,
     ).toBe(true);
-    fireEvent.change(screen.getByTestId("settings.mcp-grant-name"), {
-      target: { value: "claude-desktop" },
-    });
 
-    setMcpConnectionGrant.mockImplementation((name, excludedFolders) => {
-      approved.push([name, excludedFolders]);
-      return Promise.resolve(true);
-    });
-    fireEvent.click(screen.getByTestId("settings.mcp-grant-approve"));
-    await waitFor(() => expect(approved).toHaveLength(1));
-    expect(approved[0]).toEqual(["claude-desktop", ["Private/", "Archive/"]]);
-  });
-
-  it("starts a re-approval from the exclusions already stored", async () => {
-    // One click on Approve must not silently widen a grant to the whole vault, so
-    // the dialog seeds itself from the stored set rather than from an empty
-    // picker. Asserted on the preview call, which is what the picker state drives.
-    renderSection();
-    await screen.findByTestId("settings.mcp-connection");
-    fireEvent.click(screen.getByTestId("settings.mcp-edit"));
-    await waitFor(() =>
-      expect(readMcpGrantPreview).toHaveBeenCalledWith(["Private/"]),
+    fireEvent.click(screen.getByTestId("settings.mcp-tool-note_edit"));
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    // One list, derived into the two fields the grant carries: the write scope is
+    // what was ticked, and everything else is left out of reads.
+    expect(setMcpConnectionGrant).toHaveBeenCalledWith(
+      "claude-desktop",
+      ["Private/", "Projects/", "Projects/New/", "Work/"],
+      [],
+      ["note_edit"],
     );
   });
 
-  it("opens a legacy grant's approval from the stored allow list, not from nothing", async () => {
+  it("marks the steps already behind the person as done", async () => {
+    // The strip has to answer "where am I" without reading three titles: a step
+    // that is finished carries a check and `data-done`, the current one carries
+    // `aria-current`, and the ones ahead carry neither.
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+
+    await screen.findByTestId("settings.mcp-step-clients");
+    expect(screen.getByTestId("settings.mcp-step-1").getAttribute("aria-current")).toBe("step");
+    expect(screen.getByTestId("settings.mcp-step-1").hasAttribute("data-done")).toBe(false);
+
+    fireEvent.click(screen.getAllByTestId("settings.mcp-client")[0]);
+    await screen.findByTestId("settings.mcp-step-config");
+
+    expect(screen.getByTestId("settings.mcp-step-1").getAttribute("data-done")).toBe("true");
+    expect(screen.getByTestId("settings.mcp-step-2").getAttribute("aria-current")).toBe("step");
+    expect(screen.getByTestId("settings.mcp-step-3").hasAttribute("data-done")).toBe(false);
+  });
+
+  it("goes back to a step already walked, and never forward past one", async () => {
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    await screen.findByTestId("settings.mcp-step-clients");
+
+    // On step 1 nothing is behind you, so no step in the strip is a way forward.
+    expect((screen.getByTestId("settings.mcp-step-3") as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getAllByTestId("settings.mcp-client")[0]);
+    await screen.findByTestId("settings.mcp-step-config");
+
+    // Step 1 is walkable now, and step 3 still is not: it decides what the grant
+    // covers, so it cannot be reached before step 2 has been answered.
+    expect((screen.getByTestId("settings.mcp-step-2") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId("settings.mcp-step-1"));
+    await screen.findByTestId("settings.mcp-step-clients");
+  });
+
+  it("picks folders in place, as chips over a scrolling list", async () => {
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    await screen.findByTestId("settings.mcp-step-clients");
+    fireEvent.click(screen.getAllByTestId("settings.mcp-client")[0]);
+    await screen.findByTestId("settings.mcp-step-config");
+    fireEvent.click(screen.getByTestId("settings.mcp-flow-next"));
+    await screen.findByTestId("settings.mcp-step-scope");
+
+    // One access list, folded: the rectangle states its count and opens in place.
+    expect(screen.queryByTestId("settings.mcp-access-picker")).toBeNull();
+    fireEvent.click(screen.getByTestId("settings.mcp-access-picker-toggle"));
+    const box = await screen.findByTestId("settings.mcp-access-picker");
+
+    const option = screen
+      .getAllByTestId("settings.mcp-access-picker-option")
+      .find((node) => node.getAttribute("data-value") === "Private/");
+    expect(option).toBeTruthy();
+    fireEvent.click(option!);
+
+    // Choosing one turns it into a chip inside the same rectangle, and the options
+    // stay there rather than a panel closing over the form.
+    expect(box.getAttribute("data-testid")).toBe("settings.mcp-access-picker");
+    expect(screen.getByTestId("settings.mcp-access-picker-chip").textContent).toContain(
+      "Private/",
+    );
+  });
+
+  it("keeps the longer account behind the row's question mark", async () => {
+    // The surface's copy says five things; the rest of what a person needs to
+    // know sits one click away on the row's own disclosure, not on a second
+    // hand-rolled panel.
+    renderSection();
+    const trigger = await screen.findByTestId("settings.mcp-enable-explain");
+    // Collapsed it is in the document and named by the row, so assistive tech
+    // reads it without a click; `data-open` is what "opened" means.
+    expect(
+      screen.getByTestId("settings.mcp-enable-explanation").getAttribute("data-open"),
+    ).toBeNull();
+    fireEvent.click(trigger);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("settings.mcp-enable-explanation").getAttribute("data-open"),
+      ).toBe("true"),
+    );
+  });
+
+  it("reaches Approve even when the host cannot answer with a count", async () => {
+    // The defect this rework fixes: the previous screen disabled its accept while
+    // the count was missing and left it disabled for good after a failed read, so
+    // the person read "choose folders before I will let you approve" from a
+    // screen that never said so. The host resolves the exclusion set at the
+    // write, so a missing count costs the number and nothing else.
+    readMcpGrantPreview.mockRejectedValue(new Error("host is busy"));
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
+    fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
+
+    const scope = await screen.findByTestId("settings.mcp-scope-line");
+    await waitFor(() => expect(scope.textContent).toContain("create later"));
+    expect(
+      (screen.getByTestId("settings.mcp-approve") as HTMLButtonElement).disabled,
+    ).toBe(false);
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+  });
+
+  it("shows the switch bank on a vault that has never approved a connection", async () => {
+    // First run: no stored row to read a catalog from, and an empty switch bank
+    // here would be a blank decision on the one screen a new user sees.
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
+    fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
+    await screen.findByTestId("settings.mcp-step-scope");
+    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(9);
+  });
+
+  it("offers the raw command behind the other-clients disclosure", async () => {
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    await screen.findByTestId("settings.mcp-step-clients");
+    expect(screen.queryByTestId("settings.mcp-generic-command")).toBeNull();
+    fireEvent.click(screen.getByTestId("settings.mcp-other-clients-toggle"));
+    expect(screen.getByTestId("settings.mcp-generic-command").textContent).toContain(
+      "MYNE_MCP_CONNECTION=myne",
+    );
+  });
+
+  it("renders a read request with its own sentence and accepts it as a read", async () => {
+    // The two kinds move the grant in opposite directions, so the card has to say
+    // which one it is and the accept has to call the matching command.
+    readMcpExternalAccess.mockResolvedValue(
+      view([connection()], [request({ kind: "read", verb: "note_search", folder: "Private/" })]),
+    );
+    renderSection();
+    await screen.findByTestId("settings.mcp-request");
+    expect(screen.getByTestId("settings.mcp-request").getAttribute("data-kind")).toBe("read");
+    fireEvent.click(screen.getByTestId("settings.mcp-request-accept"));
+    await waitFor(() =>
+      expect(acceptMcpReadRequest).toHaveBeenCalledWith("claude-desktop", "Private/"),
+    );
+    expect(acceptMcpWriteRequest).not.toHaveBeenCalled();
+  });
+  it("starts a re-approval from what the grant may already read, not from its write side", async () => {
+    // The one access list is the READABLE set. Seeding it from `write_folders` was the
+    // regression this test now pins the other way: every grant the previous dialog
+    // approved writes nowhere, so one click on Edit then Approve narrowed a
+    // whole-vault connection to the vault root, and every later call answered
+    // out-of-scope. This fixture may read everything except Private/, so the step
+    // opens holding exactly that, and approving it again changes nothing.
+    renderSection();
+    await screen.findByTestId("settings.mcp-connection");
+    fireEvent.click(screen.getByTestId("settings.mcp-edit"));
+    await screen.findByTestId("settings.mcp-step-scope");
+    await waitFor(() => expect(readMcpGrantPreview).toHaveBeenCalledWith(["Private/"]));
+
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    // The verb this build cannot dispatch is NOT written into the grant: it was never
+    // the person's choice, and persisting it would silently switch the verb off for
+    // every build that implements it later.
+    expect(setMcpConnectionGrant).toHaveBeenCalledWith(
+      "claude-desktop",
+      ["Private/"],
+      ["Projects/", "Projects/New/", "Work/"],
+      ["note_create", "note_append", "note_move", "note_edit"],
+    );
+  });
+
+  it("keeps a legacy grant read-only through a re-approval", async () => {
+    // The host serves a legacy grant as "writes nowhere". The one access list cannot
+    // say that by itself, so every write verb starts switched off and the person has
+    // to switch one on for the re-approval to grant the write half.
     readMcpExternalAccess.mockResolvedValue(
       view([
         connection({
-          name: "editor-plugin",
           legacy: true,
           legacyFolders: ["Projects/"],
           excludedFolders: [],
@@ -366,10 +569,48 @@ describe("the approval dialog", () => {
       ]),
     );
     renderSection();
-    fireEvent.click(await screen.findByTestId("settings.mcp-reapprove"));
-    // A legacy grant has no exclusion list to seed, and inventing one from the
-    // allow list would invert the meaning. It starts empty: the user chooses what
-    // to leave out under the new rule.
-    await waitFor(() => expect(readMcpGrantPreview).toHaveBeenCalledWith([]));
+    await screen.findByTestId("settings.mcp-connection");
+    fireEvent.click(screen.getByTestId("settings.mcp-edit"));
+    fireEvent.click(await screen.findByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    expect(setMcpConnectionGrant).toHaveBeenCalledWith(
+      "claude-desktop",
+      ["Private/", "Projects/New/", "Work/"],
+      ["Projects/"],
+      ["note_create", "note_append", "note_move", "note_edit"],
+    );
+  });
+
+  it("opens a legacy grant's scope from the stored allow list, not from nothing", async () => {
+    // A legacy grant stored the folders it COULD read, and this build stores the
+    // folders it may NOT. Seeding the step empty would read as "leave nothing
+    // out", which is a one-click approval of the whole vault; the honest
+    // translation is every folder minus what it could read.
+    readMcpExternalAccess.mockResolvedValue(
+      view([
+        connection({
+          legacy: true,
+          legacyFolders: ["Projects/"],
+          excludedFolders: [],
+          noteCount: 0,
+          folderCount: 0,
+        }),
+      ]),
+    );
+    renderSection();
+    await screen.findByTestId("settings.mcp-connection");
+    expect(screen.getByTestId("settings.mcp-read-scope").textContent).toContain(
+      "older version",
+    );
+    fireEvent.click(screen.getByTestId("settings.mcp-edit"));
+    await screen.findByTestId("settings.mcp-step-scope");
+    // The one list opens holding exactly what that grant could read, with the rest
+    // of the vault excluded from reads by derivation.
+    fireEvent.click(screen.getByTestId("settings.mcp-access-picker-toggle"));
+    const options = screen.getAllByTestId("settings.mcp-access-picker-option");
+    const selected = options
+      .filter((node) => node.getAttribute("data-selected") === "true")
+      .map((node) => node.getAttribute("data-value"));
+    expect(selected).toEqual(["Projects/"]);
   });
 });

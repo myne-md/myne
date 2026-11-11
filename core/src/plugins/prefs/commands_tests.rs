@@ -4339,6 +4339,7 @@ fn mcp_connection_grants_round_trip_and_revoke_leaves_the_others() {
             String::from("claude-desktop"),
             vec![String::from("Work/"), String::from("Projects/")],
             Vec::new(),
+            Vec::new(),
             &io,
             &host,
         )
@@ -4352,6 +4353,7 @@ fn mcp_connection_grants_round_trip_and_revoke_leaves_the_others() {
             &hooks,
             String::from("lm-studio"),
             vec![String::from("Archive/")],
+            Vec::new(),
             Vec::new(),
             &io,
             &host,
@@ -4451,6 +4453,7 @@ fn a_decomposed_connection_name_is_stored_and_revoked_as_one_entry() {
             decomposed.clone(),
             vec![String::from("Work/")],
             Vec::new(),
+            Vec::new(),
             &io,
             &host,
         )
@@ -4498,6 +4501,7 @@ fn an_empty_connection_name_is_refused_on_both_paths() {
                 String::new(),
                 Vec::new(),
                 Vec::new(),
+                Vec::new(),
                 &io,
                 &host,
             )
@@ -4538,6 +4542,7 @@ fn a_write_folder_outside_the_read_scope_is_refused_at_approval() {
                 String::from("claude-desktop"),
                 vec![String::from("Projects/")],
                 vec![String::from("Projects/")],
+                Vec::new(),
                 &io,
                 &host,
             )
@@ -4555,6 +4560,7 @@ fn a_write_folder_outside_the_read_scope_is_refused_at_approval() {
                 String::from("claude-desktop"),
                 vec![String::from("Projects/")],
                 vec![String::from("Projects/2026/")],
+                Vec::new(),
                 &io,
                 &host,
             )
@@ -4579,6 +4585,7 @@ fn a_write_folder_outside_the_read_scope_is_refused_at_approval() {
             String::from("claude-desktop"),
             vec![String::from("Archive/")],
             vec![String::from("Projects/")],
+            Vec::new(),
             &io,
             &host,
         )
@@ -4643,6 +4650,7 @@ fn mcp_a_write_folder_excluded_from_ai_is_refused_at_the_writer() {
             String::from("claude-desktop"),
             Vec::new(),
             vec![String::from("Private")],
+            Vec::new(),
             &io,
             &host,
         )
@@ -4680,6 +4688,7 @@ fn mcp_a_write_folder_excluded_from_ai_is_refused_at_the_writer() {
             String::from("claude-desktop"),
             Vec::new(),
             vec![String::from("Private")],
+            Vec::new(),
             &io,
             &host,
         )
@@ -4709,6 +4718,7 @@ fn mcp_grant_folder_paths_are_rerooted_when_a_folder_is_renamed() {
             &hooks,
             String::from("claude-desktop"),
             vec![String::from("Private"), String::from("Privatestuff")],
+            Vec::new(),
             Vec::new(),
             &io,
             &host,
@@ -4789,6 +4799,7 @@ fn mcp_write_queue_queues_then_accepts_and_extends_by_one_folder() {
             String::from("claude-desktop"),
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             &io,
             &host,
         )
@@ -4824,6 +4835,7 @@ fn mcp_write_queue_queues_then_accepts_and_extends_by_one_folder() {
             String::from("Inbox/"),
             String::from("note_create"),
             String::from("Shopping list"),
+            protocol::McpRequestKind::Write,
             &io,
             &host,
         )
@@ -4904,6 +4916,7 @@ fn mcp_write_queue_dismiss_and_revoke_leave_no_orphans() {
             String::from("claude-desktop"),
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             &io,
             &host,
         )
@@ -4918,6 +4931,7 @@ fn mcp_write_queue_dismiss_and_revoke_leave_no_orphans() {
             String::from("Inbox/"),
             String::from("note_create"),
             String::new(),
+            protocol::McpRequestKind::Write,
             &io,
             &host,
         )
@@ -4929,6 +4943,7 @@ fn mcp_write_queue_dismiss_and_revoke_leave_no_orphans() {
             &hooks,
             String::from("claude-desktop"),
             String::from("Inbox/"),
+            protocol::McpRequestKind::Write,
             &io,
             &host,
         )
@@ -4955,6 +4970,7 @@ fn mcp_write_queue_dismiss_and_revoke_leave_no_orphans() {
             &hooks,
             String::from("claude-desktop"),
             String::from("Inbox/"),
+            protocol::McpRequestKind::Write,
             &io,
             &host,
         )
@@ -4969,6 +4985,7 @@ fn mcp_write_queue_dismiss_and_revoke_leave_no_orphans() {
             String::from("Inbox/"),
             String::from("note_create"),
             String::new(),
+            protocol::McpRequestKind::Write,
             &io,
             &host,
         )
@@ -5035,6 +5052,7 @@ fn a_used_connection_is_stamped_once_per_window() {
             &hooks,
             String::from("claude-desktop"),
             vec![String::from("Work/")],
+            Vec::new(),
             Vec::new(),
             &io,
             &host,

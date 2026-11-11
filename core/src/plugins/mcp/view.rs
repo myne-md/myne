@@ -42,6 +42,38 @@ use super::scope::{
 };
 use super::write_scope::resolve_write_scope;
 
+/// One verb, as the approval screen's switch bank renders it.
+///
+/// Two independent facts, and the screen needs both because they read the same way
+/// on a switch and mean different things: `enabled` is what the PERSON chose, and
+/// `available_in_build` is what this build can serve at all. A verb that is off
+/// because the build has no implementation shows a reason rather than a control
+/// that would do nothing (mcp external access rework, myne-md/myne#1052).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpToolSwitchView {
+    /// The wire name, which is what the grant stores.
+    pub verb: String,
+    /// Not disabled by the stored grant. This is the switch's position.
+    pub enabled: bool,
+    /// This build dispatches the verb.
+    pub available_in_build: bool,
+    /// Whether the verb changes the vault, so the screen can group reads from
+    /// writes without a second roster.
+    pub is_write: bool,
+}
+
+/// The read budget as the screen states it, so the number shown is the number
+/// enforced rather than a copy that can drift from the constant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpReadBudgetView {
+    /// Notes one connection may take out per window.
+    pub notes_per_window: u32,
+    /// Length of that window, in seconds.
+    pub window_seconds: u64,
+}
+
 /// One approved connection, as the connection list renders it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,6 +112,9 @@ pub struct McpConnectionView {
     pub note_count: usize,
     /// Folders of the vault the scope covers right now.
     pub folder_count: usize,
+    /// One entry per catalog verb, in catalog order, with the person's choice and
+    /// this build's capability kept apart.
+    pub tools: Vec<McpToolSwitchView>,
 }
 
 /// The section's whole payload.
@@ -106,6 +141,13 @@ pub struct McpExternalAccessView {
     /// the card renders, and an Accept that the host then refuses would be a
     /// promise the surface cannot keep.
     pub write_requests: Vec<McpWriteRequestView>,
+    /// The read budget, so the surface states the cap it enforces.
+    pub read_budget: McpReadBudgetView,
+    /// The verb catalog on its own, every switch enabled. The approval flow needs
+    /// it for a connection that does not exist yet: a first-run vault has no
+    /// stored row to read a catalog from, and a switch bank built from one would
+    /// be empty on exactly the screen a new user sees.
+    pub tool_catalog: Vec<McpToolSwitchView>,
 }
 
 /// One queued out-of-scope write, as the card renders it.
@@ -123,6 +165,10 @@ pub struct McpWriteRequestView {
     pub summary: String,
     /// The verb it called, so the card can say what was attempted.
     pub verb: String,
+    /// `write` or `read`: which direction accepting moves the grant, and therefore
+    /// which sentence the card shows and which command its accept calls
+    /// (mcp external access rework, myne-md/myne#1052).
+    pub kind: String,
 }
 
 /// What a candidate exclusion list would leave readable, before it is written.
@@ -210,6 +256,10 @@ pub fn external_access_view(
             requested_at: request.requested_at,
             summary: request.summary.clone(),
             verb: request.verb.clone(),
+            kind: match request.kind {
+                protocol::McpRequestKind::Write => "write".to_string(),
+                protocol::McpRequestKind::Read => "read".to_string(),
+            },
         })
         .collect();
     McpExternalAccessView {
@@ -217,6 +267,24 @@ pub fn external_access_view(
         folders: existing.into_iter().collect(),
         note_count: records.values().filter(|record| record.live).count(),
         write_requests,
+        read_budget: McpReadBudgetView {
+            notes_per_window: super::budget::NOTES_PER_WINDOW,
+            window_seconds: super::budget::WINDOW_MS / 1000,
+        },
+        tool_catalog: super::tools::CATALOG_VERBS
+            .iter()
+            .map(|verb| {
+                let available = super::tools::ToolName::from_wire(verb).is_some();
+                McpToolSwitchView {
+                    verb: (*verb).to_string(),
+                    enabled: available,
+                    available_in_build: available,
+                    is_write: super::tools::ToolName::from_wire(verb)
+                        .map(|tool| tool.is_write())
+                        .unwrap_or(false),
+                }
+            })
+            .collect(),
     }
 }
 
@@ -236,8 +304,24 @@ fn request_is_actionable(prefs: &PrefsView, request: &McpWriteRequest) -> bool {
         &prefs.mcp_connections,
         &quiet_folders(prefs),
     );
-    super::queue::accept_target(grant, &request.folder, |folder| scope.covers_folder(folder))
-        .is_ok()
+    match request.kind {
+        // A write request is actionable when the folder is readable, because the
+        // write grant may never exceed the read scope.
+        protocol::McpRequestKind::Write => {
+            super::queue::accept_target(grant, &request.folder, |folder| {
+                scope.covers_folder(folder)
+            })
+            .is_ok()
+        }
+        // A read request is actionable when accepting it would NARROW the exclusion
+        // list by exactly the folder it names. A folder kept out by another surface's
+        // list, or by a parent's exclusion, is not: accepting either would widen more
+        // than the card says, so the row is not offered and the person edits the
+        // scope themselves.
+        protocol::McpRequestKind::Read => {
+            super::queue::accept_read_target(grant, &request.folder, &quiet_folders(prefs)).is_ok()
+        }
+    }
 }
 
 /// One row, resolved against the vault as it is now.
@@ -300,7 +384,33 @@ fn connection_view(
         } else {
             scope.readable_folder_count(existing)
         },
+        tools: tool_switches(&scope),
     }
+}
+
+/// The switch bank for one connection: every catalog verb, once.
+///
+/// A verb this build does not dispatch is reported with `enabled: false`
+/// regardless of the stored set, because a switch shown on for something the host
+/// answers as version skew is the overstatement the whole feature is written
+/// against. The stored set is still reported through `enabled`, so a person who
+/// had switched such a verb on in a later build and came back does not see it
+/// silently rewritten.
+fn tool_switches(scope: &ConnectionScope) -> Vec<McpToolSwitchView> {
+    super::tools::CATALOG_VERBS
+        .iter()
+        .map(|verb| {
+            let available = super::tools::ToolName::from_wire(verb).is_some();
+            McpToolSwitchView {
+                verb: (*verb).to_string(),
+                enabled: available && !scope.is_verb_disabled(verb),
+                available_in_build: available,
+                is_write: super::tools::ToolName::from_wire(verb)
+                    .map(|tool| tool.is_write())
+                    .unwrap_or(false),
+            }
+        })
+        .collect()
 }
 
 /// What `excluded` leaves readable, before anything is written.

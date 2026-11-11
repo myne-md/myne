@@ -25,6 +25,7 @@ fn grant(folders: &[&str], approved_at: u64, last_used_at: Option<u64>) -> McpCo
         approved_at,
         last_used_at,
         write_folders: vec![],
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -45,6 +46,7 @@ fn exclusion_grant(
         approved_at,
         last_used_at,
         write_folders: vec![],
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -65,6 +67,7 @@ fn writable_grant(excluded: &[&str], write: &[&str], approved_at: u64) -> McpCon
             .iter()
             .map(|f| alloc::string::String::from(*f))
             .collect(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -372,6 +375,14 @@ fn emit_mcp_connection_vectors_for_paste() {
         );
 
     // ---- parse_reject: what a reader MUST refuse -------------------
+    emit_ok(
+            &mut dump,
+            "disabled-verbs-canonicalised",
+            "The verbs a connection may not use are a canonical SET: an input that lists them out of order and repeats one re-encodes sorted and deduplicated, because two devices that switched the same verbs off must agree to the byte. Omitted entirely when empty, which is why every older case still parses.",
+            b"{\"approved_at\":5,\"disabled_verbs\":[\"note_move\",\"note_edit\",\"note_move\"],\"excluded_folders\":[\"Private/\"],\"model\":\"exclude\"}",
+            true,
+        );
+
     emit_reject(
             &mut dump,
             "reject-both-arrays",
@@ -726,4 +737,114 @@ fn the_map_is_not_emitted_when_empty_and_a_malformed_value_rejects() {
                 "accepted {bad:?}"
             );
         }
+}
+
+// ---------------------------------------------------------------------------
+// The disabled-verb set (mcp external access rework, myne-md/myne#1052)
+// ---------------------------------------------------------------------------
+
+/// A grant in the exclusion model with a verb set, in the wire order a client
+/// sends rather than the canonical one, so the encoder's set semantics are what
+/// the assertions measure.
+fn verb_grant(excluded: &[&str], disabled: &[&str]) -> McpConnectionGrant {
+    McpConnectionGrant {
+        model: McpScopeModel::Exclude,
+        folders: vec![],
+        excluded_folders: excluded
+            .iter()
+            .map(|f| alloc::string::String::from(*f))
+            .collect(),
+        approved_at: 1765432100,
+        last_used_at: None,
+        write_folders: vec![],
+        disabled_verbs: disabled
+            .iter()
+            .map(|v| alloc::string::String::from(*v))
+            .collect(),
+    }
+}
+
+#[test]
+fn the_disabled_verb_set_is_a_canonical_set_that_rides_after_approved_at() {
+    // Key order is the format (`approved_at` < `disabled_verbs` <
+    // `excluded_folders`), and the set encoding sorts and dedupes, so two
+    // spellings of one restriction are one set of bytes.
+    let grant = verb_grant(&["Private/"], &["note_move", "note_edit", "note_edit"]);
+    let text = alloc::string::String::from_utf8(canonical_encode_mcp_connection_grant(&grant))
+        .expect("canonical bytes are UTF-8");
+    assert_eq!(
+        text,
+        "{\"approved_at\":1765432100,\"disabled_verbs\":[\"note_edit\",\"note_move\"],\
+\"excluded_folders\":[\"Private/\"],\"model\":\"exclude\"}"
+    );
+
+    let (decoded, consumed) =
+        parse_mcp_connection_grant(text.as_bytes()).expect("the grant round-trips");
+    assert_eq!(consumed, text.len());
+    assert_eq!(
+        decoded.disabled_verbs,
+        vec![
+            alloc::string::String::from("note_edit"),
+            alloc::string::String::from("note_move")
+        ]
+    );
+    assert_eq!(
+        canonical_encode_mcp_connection_grant(&decoded),
+        text.as_bytes().to_vec()
+    );
+}
+
+#[test]
+fn no_disabled_verbs_omits_the_member_and_decodes_as_all_enabled() {
+    // This is the direction that matters most: absent means EVERY verb is
+    // available, because that is the reading every grant written before the
+    // member existed has to keep. The opposite default would turn an upgrade
+    // into a revocation.
+    let grant = exclusion_grant(&["Private/"], 1765432100, None);
+    let text = alloc::string::String::from_utf8(canonical_encode_mcp_connection_grant(&grant))
+        .expect("canonical bytes are UTF-8");
+    assert!(
+        !text.contains("disabled_verbs"),
+        "an empty verb set must cost no bytes: {text}"
+    );
+    let (decoded, _) = parse_mcp_connection_grant(text.as_bytes()).expect("decodes");
+    assert!(
+        decoded.disabled_verbs.is_empty(),
+        "an absent verb set is all-enabled, which is also the empty set's reading"
+    );
+}
+
+#[test]
+fn a_legacy_grant_may_not_carry_a_disabled_verb_set() {
+    // A legacy grant serves nothing until it is approved again, so a verb set
+    // beside one restricts nothing. Refused at the decoder for the same reason
+    // a write list is, and the same grant without it still decodes.
+    let legacy_with_verbs =
+        b"{\"approved_at\":1765432100,\"disabled_verbs\":[\"note_edit\"],\"folders\":[]}";
+    assert!(parse_mcp_connection_grant(legacy_with_verbs).is_none());
+
+    let legacy = b"{\"approved_at\":1765432100,\"folders\":[]}";
+    assert!(parse_mcp_connection_grant(legacy).is_some());
+}
+
+#[test]
+fn a_repeated_disabled_verb_set_is_refused() {
+    let twice = b"{\"approved_at\":1765432100,\"disabled_verbs\":[\"note_edit\"],\"disabled_verbs\":[\"note_move\"],\"model\":\"exclude\"}";
+    assert!(parse_mcp_connection_grant(twice).is_none());
+}
+
+#[test]
+fn a_verb_name_this_build_does_not_know_is_stored_verbatim_and_narrows_nothing() {
+    // The codec keeps what it was given, canonicalized. Recognising a name is
+    // the tool layer's job, and an unknown one is inert there rather than an
+    // error here: refusing it in the codec would mean a downgrade that reads a
+    // future verb's name loses the whole prefs blob.
+    let grant = verb_grant(&[], &["note_teleport"]);
+    let text = alloc::string::String::from_utf8(canonical_encode_mcp_connection_grant(&grant))
+        .expect("canonical bytes are UTF-8");
+    let (decoded, _) = parse_mcp_connection_grant(text.as_bytes()).expect("decodes");
+    assert_eq!(
+        decoded.disabled_verbs,
+        vec![alloc::string::String::from("note_teleport")]
+    );
 }

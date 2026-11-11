@@ -191,6 +191,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // external-mcp-connection task 13: the queued out-of-scope writes a
             // person accepts (which extends one grant by one folder) or dismisses.
             commands::accept_mcp_write_request,
+            // The queue's READ kind: accepting it takes one folder OFF the read
+            // scope's exclusion list, the mirror of the write accept above.
+            commands::accept_mcp_read_request,
             commands::dismiss_mcp_write_request,
         ])
         .build()

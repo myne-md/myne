@@ -1,57 +1,36 @@
-// Settings > AI > External access (external-mcp-connection, myne-md/myne#923).
+// Settings > AI > External access, as its own topic (mcp external access rework,
+// myne-md/myne#1052; original section myne-md/myne#923).
 //
-// The user-facing half of the `myne-mcp` surface: the master switch, the list of
-// approved connections with what each may read, when each was last used, and the
-// revoke that takes one away. The one-time approval screen it opens is
-// `McpGrantDialog`.
+// # The shape of this surface
 //
-// # Placement, and the two gates that put it there
+// Resting state is the connection list plus anything waiting for a decision. Adding
+// a connection is a three-step flow that runs in its OWN modal
+// area: pick the client, get that client's config path and snippet, then decide
+// what it may use. Running it inline rather than in a dialog over Settings is why
+// this file has no `onDialogOpenChange`: there is no nested modal left to tell the
+// shell about.
 //
-// A section inside the AI panel's Limits topic rather than a panel of its own.
-// The PRD says so ("in Settings, under AI, in its own section"), and the topic is
-// the panel's boundary topic: Limits already holds "what AI can read" and "what a
-// chat may cost", and this is the third answer to the same question, asked about a
-// different program. Developer mode is the other gate and it is structural rather
-// than a condition here: the whole AI panel lives in the rail's `developer` group,
-// so the panel cannot be open with the mode off (`CliPanel`'s header records the
-// same mechanism). What this file gates is the CAPABILITY: `externalMcp` is absent
-// on web and mobile, and an absent capability omits the section rather than
-// greying it (`decisions.md` 2026-07-26).
+// # The one thing the accept must never do
 //
-// # The copy is the load-bearing part
+// Wait on a host read. `mcp_grant_preview` supplies the note count, and a failed
+// read used to leave the previous build's Approve button disabled with nothing on
+// screen saying why, which reads as "choose folders before I will let you approve".
+// The host resolves the exclusion set at the write either way, so the count is the
+// friendly extra and the claim is the sentence that renders without it.
 //
-// Three facts have to survive translation, because each one is a place the product
-// could imply a guarantee it cannot keep:
+// # The five claims that survive
 //
-//   - **Myne does not control what the tool does with what it reads.** The
-//     connected program is separately distributed, unaudited from Myne's side, and
-//     has its own outbound path; `src-tauri/src/no_egress.rs` binds this WebView
-//     and nothing else. This is stated on the section AND again at the approval,
-//     because the approval is the moment the decision is made.
-//   - **A connection name is a label, not a credential.** A token, a pairing code
-//     or a peer check is defeated by construction by any program running as the
-//     same OS user, so the section must not read as an authentication mechanism.
-//   - **Nothing is inherited.** The grant is device-local; a second computer starts
-//     with no approval. That bug would have shipped three times in this tree, so
-//     the sentence is unconditional rather than shown only when a second device
-//     exists.
-//
-// # What is deliberately not here
-//
-// The write grant (a later slice) belongs to the connection list but not to this
-// task's boundary: the write summary says "nothing" until the host has a write
-// scope to report, because a row that implied one it could not enforce would be
-// the overstatement the whole feature is written against.
-//
-// There is also no "add the folders created since you approved this" row any
-// more, and its absence is a decision rather than an omission: the grant lists
-// the folders to LEAVE OUT, so a folder created afterwards is already covered.
-// The row that used to offer to add it would now be offering to add nothing.
+// One line each, at the decision each belongs to, and none behind a disclosure:
+// what a connected tool does with what it reads is outside Myne (the switch); a
+// name is a label, not a password (the name field); approvals are on this device
+// (the list footer); what is shared grows with the vault (the scope line); writing
+// is a named list and every write keeps a restore point (the write disclosure).
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { formatRelativeTime } from "../../notes/components/relativeTime";
 import {
+  acceptMcpReadRequest,
   acceptMcpWriteRequest,
   dismissMcpWriteRequest,
   revokeMcpConnection,
@@ -59,21 +38,37 @@ import {
 } from "../../lib/prefs";
 import {
   readMcpExternalAccess,
+  readMcpGrantPreview,
   type McpConnectionView,
   type McpExternalAccessView,
+  type McpGrantPreview,
   type McpWriteRequestView,
 } from "../../lib/mcp-access";
-import { McpGrantDialog } from "./McpGrantDialog";
+import {
+  DEFAULT_CONNECTION_NAME,
+  GENERIC_CLIENT,
+  MCP_CLIENT_PRESETS,
+  mcpSnippet,
+  presetById,
+  type McpClientPreset,
+} from "../../lib/mcp-clients";
+import { ClientMark } from "./mcp-client-marks";
 import { Button } from "../primitives/Button";
+import { EmptyState } from "../primitives/EmptyState";
+import { ModalShell } from "../primitives/ModalShell";
+import { Icon } from "../primitives/Icon";
+import { IconButton } from "../primitives/IconButton";
+import { Input } from "../primitives/Input";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { MultiSelectBox } from "../primitives/MultiSelectBox";
+import { ScrollArea } from "../primitives/ScrollArea";
+import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import { SettingsSection } from "./SettingsSection";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 
-// The snippet is the one value on this surface a user copies by hand into another
-// program's config file, so it is mono, selectable and never truncated. Same shape
-// `CliAccessSettings` gives its `export PATH=…` line, and for the same reason: the
-// app cannot edit the other program's configuration, so this is the whole remedy.
 const CODE_STYLE: CSSProperties = {
   display: "block",
   marginTop: "var(--space-2)",
@@ -85,17 +80,11 @@ const CODE_STYLE: CSSProperties = {
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
   overflowX: "auto",
-  // Wrapping rather than scrolling: the env var is near the end of the line, and
-  // the one part the user must get right is the part a horizontal scrollbar
-  // hides.
   whiteSpace: "pre-wrap",
   wordBreak: "break-all",
   userSelect: "all",
 };
 
-// One row of the connection list. A hairline rather than a card: the section is
-// already the group, and a stack of `--paper-2` cards inside it reads as nested
-// furniture (`PRODUCT.md` allows the fill and the hairline, not decoration).
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -116,8 +105,6 @@ const NAME_STYLE: CSSProperties = {
   fontSize: "var(--text-base)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
   color: "var(--fg-1)",
-  // A declared name is free text: wrap rather than push the revoke button out of
-  // the row.
   minWidth: 0,
   overflowWrap: "anywhere",
 };
@@ -129,48 +116,227 @@ const ACTIONS_STYLE: CSSProperties = {
   flexShrink: 0,
 };
 
+const CARD_GRID_STYLE: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-2)",
+};
+
+const CARD_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  padding: "var(--space-2)",
+  minWidth: 0,
+  textAlign: "left",
+  font: "inherit",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  cursor: "pointer",
+  transition: "border-color var(--duration-fast) var(--ease-standard)",
+};
+
+/** The steps already behind the user read as done, not merely inactive: accent
+ *  metal and a check, so the strip answers "where am I" without reading titles. */
+const TIMELINE_STEP_DONE_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  flex: 1,
+  minWidth: 0,
+  padding: "var(--space-2) var(--space-2)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+  background: "transparent",
+  border: "1px solid transparent",
+  borderRadius: "var(--radius-2)",
+};
+
+/** One row per verb, with air between them: nine switched stacked edge to edge read
+ *  as one block of chrome. */
+const TOOL_LIST_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+};
+
+const TOOL_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+  padding: "var(--space-1) 0",
+};
+
+/** The four paragraphs behind the row's question mark: the longer account the
+ *  surface's own copy left out on purpose (`myne-md/myne#1052`). */
+const EXPLANATION_KEYS = [
+  "settings.ai.externalAccess.outsideMyne",
+  "settings.ai.externalAccess.infoOneDoor",
+  "settings.ai.externalAccess.infoNotACredential",
+  "settings.ai.externalAccess.infoClientTools",
+  "settings.ai.externalAccess.infoBudget",
+] as const;
+
+/** The wizard's action row: pinned to the bottom of the scrolling step body, so
+ *  Approve is reachable on a short window instead of being scrolled off the
+ *  dialog (myne-md/myne#1052). */
+const FLOW_ACTIONS_STYLE: CSSProperties = {
+  ...ACTIONS_STYLE,
+  position: "sticky",
+  bottom: 0,
+  marginTop: "var(--space-2)",
+  paddingTop: "var(--space-2)",
+  // The modal card's OWN surface (`--bg-2` in client-core/src/components.css), not
+  // a neighbouring rung: one rung off paints the row as a visible band.
+  background: "var(--bg-2)",
+  borderTop: "1px solid var(--line-1)",
+};
+
+/** One slot on the track: the button fills it so a click anywhere on the segment
+ *  counts, and the slot itself never shrinks below its share. */
+const TIMELINE_SLOT_STYLE: CSSProperties = {
+  display: "flex",
+  flex: 1,
+  minWidth: 0,
+};
+
+/** The timeline track: one bar, the active step filled inside it. */
+const TIMELINE_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "stretch",
+  gap: "var(--space-1)",
+  padding: "var(--space-1)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  marginBottom: "var(--space-4)",
+};
+
+const TIMELINE_STEP_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  flex: 1,
+  minWidth: 0,
+  padding: "var(--space-2) var(--space-3)",
+  borderRadius: "var(--radius-1)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-3)",
+};
+
+const TIMELINE_STEP_ACTIVE_STYLE: CSSProperties = {
+  ...TIMELINE_STEP_STYLE,
+  color: "var(--fg-1)",
+  background: "var(--paper)",
+  boxShadow: "inset 0 0 0 1px var(--accent)",
+};
+
+/** The numbered disc beside a step's label, in the track's own metal. */
+const TIMELINE_INDEX_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "var(--space-5)",
+  height: "var(--space-5)",
+  borderRadius: "var(--radius-pill)",
+  border: "1px solid var(--line-1)",
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  flexShrink: 0,
+};
+
+/** One disclosure that holds CONTENT rather than helper copy. */
+function Collapsible({
+  label,
+  detail,
+  testId,
+  children,
+}: {
+  label: string;
+  detail: string;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: "var(--space-3)" }}>
+      <Button
+        variant="ghost"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        data-testid={`${testId}-toggle`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-2)",
+          width: "100%",
+          justifyContent: "flex-start",
+          padding: "var(--space-2) 0",
+          fontSize: "var(--text-sm)",
+          textAlign: "left",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-flex",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform var(--duration-fast) var(--ease-standard)",
+            color: "var(--fg-3)",
+          }}
+        >
+          <Icon name="chevron-down" size={14} />
+        </span>
+        <span>{label}</span>
+        <span style={{ color: "var(--fg-3)" }}>{detail}</span>
+      </Button>
+      {open && <div style={{ marginTop: "var(--space-2)" }}>{children}</div>}
+    </div>
+  );
+}
+
+/** One step, and the values the flow is carrying. */
+interface FlowState {
+  step: 1 | 2 | 3;
+  /** `null` at step 1; a preset id once one is chosen. */
+  presetId: string | null;
+  /** A connection being re-approved, whose name may not be edited. */
+  editing: string | null;
+  name: string;
+  /** The single access list: every folder the connection may touch, read and
+   *  write alike. The grant's two fields are derived from it (`derivedGrant`). */
+  access: string[];
+  disabled: string[];
+}
+
 export interface McpSectionProps {
+  /** Told when the setup modal opens or closes, so the Settings shell can gate
+   *  its own Esc handler on it (`myne-md/myne#1052`). */
+  onDialogOpenChange?: (open: boolean) => void;
   /** `cli_enabled`: the ONE master switch for external access, on both doors. */
   enabled: boolean;
   onSetEnabled: (next: boolean) => void;
   /** Panel toast surface (wired by `AiPanel`; omitted in dev and in stories). */
   onShowToast?: (message: string) => void;
-  /**
-   * Raised while the approval dialog is up.
-   *
-   * The Settings shell and `ModalShell` both listen for Esc on `window`, so an
-   * ungated shell closes itself and the child dialog on one press. The shell uses
-   * this to stand down while the dialog owns the key, the same contract
-   * `AiPanel`'s provider consent uses.
-   */
-  onDialogOpenChange?: (open: boolean) => void;
-}
-
-/** The config line a client pastes, naming the connection this row approves. */
-function mcpSnippet(name: string): string {
-  // Written as one literal with the name spliced in, because the shape of a
-  // client's config is not ours to paraphrase and the user pastes it verbatim.
-  return `{"mcpServers":{"myne":{"command":"myne-mcp","env":{"MYNE_MCP_CONNECTION":${JSON.stringify(name)}}}}}`;
 }
 
 export function McpSection({
+  onDialogOpenChange,
   enabled,
   onSetEnabled,
   onShowToast,
-  onDialogOpenChange,
 }: McpSectionProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<McpExternalAccessView | null>(null);
   const [failed, setFailed] = useState(false);
-  const [revoking, setRevoking] = useState<string | null>(null);
-  // Which queued request is mid-decision, keyed `connection\u0000folder`. One at a
-  // time, because two writes to `vault.prefs` in flight would race the nonce.
-  const [deciding, setDeciding] = useState<string | null>(null);
-  const [snippetFor, setSnippetFor] = useState<string | null>(null);
-  // `null` = closed, `"new"` = declaring a connection, a row = re-approving one.
-  const [approving, setApproving] = useState<McpConnectionView | "new" | null>(
-    null,
-  );
+  const [busy, setBusy] = useState(false);
+  const [flow, setFlow] = useState<FlowState | null>(null);
+  const [preview, setPreview] = useState<McpGrantPreview | null>(null);
+
 
   const reload = useCallback(() => {
     let alive = true;
@@ -181,9 +347,9 @@ export function McpSection({
         setFailed(false);
       })
       .catch(() => {
-        // A failed read is NOT rendered as "nothing is approved": those are
-        // different facts, and the second one would tell the user their vault is
-        // closed to external clients when it may not be.
+        // A failed read is NOT "nothing is approved": those are different facts,
+        // and the second would tell the person their vault is closed to external
+        // clients when it may not be.
         if (alive) setFailed(true);
       });
     return () => {
@@ -193,80 +359,180 @@ export function McpSection({
 
   useEffect(() => reload(), [reload]);
 
-  const decide = async (
-    request: McpWriteRequestView,
-    accept: boolean,
-  ) => {
-    setDeciding(`${request.connection}\u0000${request.folder}`);
+  useEffect(() => {
+    onDialogOpenChange?.(flow !== null);
+    return () => onDialogOpenChange?.(false);
+  }, [flow !== null, onDialogOpenChange]);
+
+  // The count the scope step states, recomputed by the host as folders are
+  // ticked. Deliberately decorative: a missing count costs the number and never
+  // the accept (see the file header).
+  // What the one list means to the grant underneath: the selected folders are the
+  // write scope, and every folder it does not name is excluded from reads, so one
+  // list answers both questions. A folder created later is in neither, which keeps
+  // the old rule that a new folder is readable without a second approval.
+  const derived = useMemo(() => {
+    if (flow === null) return { excluded: [] as string[], write: [] as string[] };
+    // The whole vault, from the view: the preview's own `folders` are what the
+    // CURRENT exclusion set leaves readable, so deriving from it would be circular.
+    const known = view?.folders ?? [];
+    const chosen = new Set(flow.access);
+    return {
+      excluded: known.filter((folder) => !chosen.has(folder) && folder !== ""),
+      write: flow.access,
+    };
+  }, [flow, preview, view]);
+
+  useEffect(() => {
+    if (flow === null || flow.step !== 3) return;
+    let alive = true;
+    readMcpGrantPreview(derived.excluded)
+      .then((next) => {
+        if (alive) setPreview(next);
+      })
+      .catch(() => {
+        if (alive) setPreview(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [flow?.step, derived.excluded]);
+
+  const pending = view?.writeRequests ?? [];
+
+  const startNew = () =>
+    setFlow({
+      step: 1,
+      presetId: null,
+      editing: null,
+      name: "",
+      access: [],
+      disabled: [],
+    });
+
+  const startEdit = (row: McpConnectionView) => {
+    // The list is the READABLE set: seeding it from `write_folders` narrowed a whole-vault
+    // grant to the root. Write verbs stay on only where it already writes what it reads.
+    const readable = row.legacy
+      ? row.legacyFolders
+      : (view?.folders ?? []).filter(
+          (folder) => folder !== "" && !row.excludedFolders.includes(folder),
+        );
+    const switchedOff = (row.tools ?? [])
+      .filter((tool) => tool.availableInBuild && !tool.enabled)
+      .map((tool) => tool.verb);
+    // Write verbs stay on only where the grant already writes everywhere it reads, so
+    // the one list cannot hand over a folder the stored write scope did not name.
+    const writesEverywhere = readable.every((folder) => row.writeFolders.includes(folder));
+    const mayWrite = !row.legacy && readable.length > 0 && writesEverywhere;
+    const writeOff = mayWrite
+      ? []
+      : (row.tools ?? []).filter((tool) => tool.isWrite).map((tool) => tool.verb);
+    const disabled = [...new Set([...switchedOff, ...writeOff])];
+    setFlow({
+      // A connection already approved has its client, its name and its scope, so
+      // editing starts at the step that decides something.
+      step: 3,
+      presetId: null,
+      editing: row.name,
+      name: row.name,
+      access: readable,
+      disabled,
+    });
+  };
+
+  const chooseClient = (preset: McpClientPreset) =>
+    setFlow((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            step: 2,
+            presetId: preset.id,
+            name: preset.id === GENERIC_CLIENT.id ? DEFAULT_CONNECTION_NAME : preset.id,
+          },
+    );
+
+  const approve = async () => {
+    if (flow === null) return;
+    const name = flow.name.trim();
+    if (name.length === 0) return;
+    setBusy(true);
+    try {
+      const accepted = await setMcpConnectionGrant(
+        name,
+        derived.excluded,
+        derived.write,
+        flow.disabled,
+      );
+      if (!accepted) {
+        onShowToast?.(t("settings.ai.externalAccess.grantFailed"));
+        return;
+      }
+      setFlow(null);
+      setPreview(null);
+      reload();
+    } catch {
+      onShowToast?.(t("settings.ai.externalAccess.grantFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = async (request: McpWriteRequestView, accept: boolean) => {
+    setBusy(true);
     try {
       if (accept) {
-        const widened = await acceptMcpWriteRequest(
-          request.connection,
-          request.folder,
-        );
-        // A stale row reports `false`: its grant is gone or the folder has been
-        // excluded since, and the host dropped it either way. Saying "now
-        // writable" there would be a promise the stored grant does not carry.
+        const widened =
+          request.kind === "read"
+            ? await acceptMcpReadRequest(request.connection, request.folder)
+            : await acceptMcpWriteRequest(request.connection, request.folder);
         onShowToast?.(
           widened
-            ? t("settings.ai.externalAccess.writeRequestAccepted", {
+            ? t("settings.ai.externalAccess.requestAccepted", {
                 folder: folderLabel(request.folder, t),
                 connection: request.connection,
               })
-            : t("settings.ai.externalAccess.writeRequestStale"),
+            : t("settings.ai.externalAccess.requestStale"),
         );
       } else {
-        await dismissMcpWriteRequest(request.connection, request.folder);
+        await dismissMcpWriteRequest(request.connection, request.folder, request.kind);
       }
     } catch {
-      onShowToast?.(t("settings.ai.externalAccess.writeRequestFailed"));
+      onShowToast?.(t("settings.ai.externalAccess.requestFailed"));
     } finally {
-      setDeciding(null);
-      // The host is the only authority for what the queue now holds.
+      setBusy(false);
       reload();
     }
   };
 
   const revoke = async (name: string) => {
-    setRevoking(name);
+    setBusy(true);
     try {
       await revokeMcpConnection(name);
-      setSnippetFor((open) => (open === name ? null : open));
     } catch {
       onShowToast?.(t("settings.ai.externalAccess.revokeFailed"));
     } finally {
-      setRevoking(null);
-      // Re-read whatever happened: on success the row is gone, on failure the row
-      // is unchanged, and the host is the only authority for both.
+      setBusy(false);
       reload();
     }
   };
 
-  // Keep the shell's Esc gate in step with the dialog, and clear it on unmount:
-  // the shell's flag outlives this section, so an unmount with the dialog open
-  // would leave Esc gated for the rest of the session.
-  useEffect(() => {
-    onDialogOpenChange?.(approving !== null);
-    return () => onDialogOpenChange?.(false);
-  }, [approving, onDialogOpenChange]);
+  const preset = flow?.presetId === null || flow?.presetId === undefined
+    ? null
+    : presetById(flow.presetId);
 
-  const approve = async (
-    name: string,
-    excludedFolders: string[],
-    writeFolders: string[],
-  ): Promise<boolean> => {
-    let accepted = false;
-    try {
-      accepted = await setMcpConnectionGrant(name, excludedFolders, writeFolders);
-    } catch {
-      onShowToast?.(t("settings.ai.externalAccess.grantFailed"));
-      return false;
+  const scopeLine = useMemo(() => {
+    if (preview !== null) {
+      return t("settings.ai.externalAccess.scopeLine", {
+        count: preview.noteCount,
+        folders: preview.folderCount,
+      });
     }
-    if (!accepted) return false;
-    setApproving(null);
-    reload();
-    return true;
-  };
+    // The claim without the number: it is true whether or not the host answered,
+    // and it is the sentence the consent rests on.
+    return t("settings.ai.externalAccess.scopeLineWords");
+  }, [preview, t]);
 
   return (
     <SettingsSection
@@ -283,167 +549,390 @@ export function McpSection({
             ? t("settings.ai.externalAccess.helperOn")
             : t("settings.ai.externalAccess.helperOff")
         }
-        explanation={[
-          t("settings.ai.externalAccess.explanationShared"),
-          t("settings.ai.externalAccess.explanationLabel"),
-          t("settings.ai.externalAccess.explanationDevice"),
-        ]}
-        control={(helperId, explanationId) => (
+        explanation={EXPLANATION_KEYS.map((key) => t(key))}
+        control={(helperId) => (
           <Switch
             checked={enabled}
             onChange={onSetEnabled}
             ariaLabel={t("settings.ai.externalAccess.label")}
-            ariaDescribedBy={
-              explanationId === undefined
-                ? helperId
-                : `${helperId} ${explanationId}`
-            }
+            ariaDescribedBy={helperId}
             testId="settings.mcp-enable-toggle"
           />
         )}
       />
 
-      {/* The bound, stated on the section and never behind a disclosure: a limit
-          the reader has to click for is a limit most readers never see. */}
-      <p style={HELPER_STYLE} data-testid="settings.mcp-outside-myne">
-        {t("settings.ai.externalAccess.outsideMyne")}
-      </p>
-
+      {/* A failed read is NOT an empty vault: this branch exists so the screen never
+          tells the user nothing is approved when the truth is that nothing answered. */}
       {failed && (
         <div style={BLOCK_STYLE} data-testid="settings.mcp-failed">
           <p style={HELPER_STYLE}>{t("settings.ai.externalAccess.readFailed")}</p>
           <div style={ACTIONS_STYLE}>
-            <Button
-              variant="secondary"
-              onClick={() => reload()}
-              data-testid="settings.mcp-retry"
-            >
-              {t("common.tryagain")}
+            <Button variant="secondary" onClick={() => reload()} data-testid="settings.mcp-retry">
+              {t("settings.ai.externalAccess.retry")}
             </Button>
           </div>
         </div>
       )}
 
-      {/* The queue of writes a connection attempted into a folder it may read but
-          not write (task 13). Above the connection list on purpose: it is the one
-          thing on this surface that is WAITING for the person, and a row below
-          three connection cards reads as furniture. Nothing here has been applied,
-          and each accept widens one grant by exactly one folder. */}
-      {enabled && !failed && view !== null && view.writeRequests.length > 0 && (
+      {enabled && !failed && flow === null && pending.length > 0 && (
         <div
           style={BLOCK_STYLE}
-          data-testid="settings.mcp-write-requests"
-          data-request-count={String(view.writeRequests.length)}
+          data-testid="settings.mcp-requests"
+          data-request-count={String(pending.length)}
         >
-          <p style={LABEL_STYLE} data-testid="settings.mcp-write-requests-title">
-            {t("settings.ai.externalAccess.writeRequestsTitle", {
-              count: view.writeRequests.length,
-            })}
+          <p style={LABEL_STYLE} data-testid="settings.mcp-requests-title">
+            {t("settings.ai.externalAccess.requestsTitle", { count: pending.length })}
           </p>
-          {view.writeRequests.map((request) => {
-            const key = `${request.connection}\u0000${request.folder}`;
-            const folder = folderLabel(request.folder, t);
-            return (
-              <div
-                key={key}
-                style={ROW_STYLE}
-                data-testid="settings.mcp-write-request"
-                data-connection={request.connection}
-              >
-                <p style={HELPER_STYLE}>
-                  {request.summary.length > 0
-                    ? t("settings.ai.externalAccess.writeRequestLineTyped", {
+          {pending.map((request) => (
+            <div
+              key={`${request.connection}\u0000${request.folder}\u0000${request.kind}`}
+              style={ROW_STYLE}
+              data-testid="settings.mcp-request"
+              data-kind={request.kind}
+            >
+              <p style={HELPER_STYLE}>
+                {request.kind === "read"
+                  ? t("settings.ai.externalAccess.requestLineRead", {
+                      connection: request.connection,
+                      folder: folderLabel(request.folder, t),
+                    })
+                  : request.summary.length > 0
+                    ? t("settings.ai.externalAccess.requestLineWriteTyped", {
                         connection: request.connection,
-                        verb: verbLabel(request.verb, t),
-                        folder,
+                        folder: folderLabel(request.folder, t),
                         summary: request.summary,
                       })
-                    : t("settings.ai.externalAccess.writeRequestLine", {
+                    : t("settings.ai.externalAccess.requestLineWrite", {
                         connection: request.connection,
-                        verb: verbLabel(request.verb, t),
-                        folder,
+                        folder: folderLabel(request.folder, t),
                       })}
-                </p>
-                <div style={ACTIONS_STYLE}>
-                  <Button
-                    variant="primary"
-                    onClick={() => void decide(request, true)}
-                    disabled={deciding !== null}
-                    data-testid="settings.mcp-write-request-accept"
-                  >
-                    {t("settings.ai.externalAccess.writeRequestAccept", { folder })}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => void decide(request, false)}
-                    disabled={deciding !== null}
-                    data-testid="settings.mcp-write-request-dismiss"
-                  >
-                    {t("common.dismiss")}
-                  </Button>
-                </div>
+              </p>
+              <div style={ACTIONS_STYLE}>
+                <Button
+                  variant="primary"
+                  disabled={busy}
+                  onClick={() => void decide(request, true)}
+                  data-testid="settings.mcp-request-accept"
+                >
+                  {t("settings.ai.externalAccess.requestAccept")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void decide(request, false)}
+                  data-testid="settings.mcp-request-dismiss"
+                >
+                  {t("settings.ai.externalAccess.requestDismiss")}
+                </Button>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Only while the feature is ON. With the toggle off, "no connection is
-          approved" is a sentence about a list nobody could have added to, and the
-          helper above has already said the door is shut; the owner read it as one
-          redundant line too many under an obviously-off switch (myne-md/myne#1020).
-          It also used to carry "approving one is what lets a tool read this vault,
-          minus the folders you leave out", which is `helperOn`'s own sentence
-          restated. */}
-      {!failed && enabled && view !== null && view.connections.length === 0 && (
-        <p style={HELPER_STYLE} data-testid="settings.mcp-empty">
-          {t("settings.ai.externalAccess.empty")}
-        </p>
+      {enabled && !failed && flow === null && view !== null && view.connections.length === 0 && (
+        <div data-testid="settings.mcp-empty">
+          <EmptyState
+            variant="firstRun"
+            icon="share-2"
+            size="sm"
+            frame={false}
+            title={t("settings.ai.externalAccess.empty")}
+            body={t("settings.ai.externalAccess.emptyBody")}
+            action={
+              <Button variant="primary" onClick={startNew} data-testid="settings.mcp-add">
+                {t("settings.ai.externalAccess.addConnection")}
+              </Button>
+            }
+          />
+        </div>
       )}
 
-      {enabled && (
-        <div style={ACTIONS_STYLE} data-testid="settings.mcp-add-row">
-          <Button
-            variant="secondary"
-            onClick={() => setApproving("new")}
-            data-testid="settings.mcp-add"
+      {/* ── the three steps, in their own modal ─────────────────────────── */}
+      {enabled && flow !== null && (
+        <ModalShell
+          open
+          title={t("settings.ai.externalAccess.addConnection")}
+          onClose={() => setFlow(null)}
+          labelId="settings-mcp-flow-title"
+          width={640}
+          testId="settings.mcp-flow-modal"
+        >
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
+          data-testid="settings.mcp-flow"
+          data-step={String(flow.step)}
+        >
+          <div style={TIMELINE_STYLE} data-testid="settings.mcp-step-strip" role="list">
+            {[1, 2, 3].map((step) => {
+              const done = step < flow.step;
+              const current = step === flow.step;
+              return (
+                <span key={step} role="listitem" style={TIMELINE_SLOT_STYLE}>
+                  <Button
+                    variant="ghost"
+                    aria-current={current ? "step" : undefined}
+                    data-done={done ? "true" : undefined}
+                    // Backwards only: a step is walkable once it was walked through.
+                    disabled={!done}
+                    onClick={() =>
+                      setFlow((existing) =>
+                        existing === null ? existing : { ...existing, step: step as 1 | 2 | 3 },
+                      )
+                    }
+                    style={
+                      current
+                        ? TIMELINE_STEP_ACTIVE_STYLE
+                        : done
+                          ? TIMELINE_STEP_DONE_STYLE
+                          : TIMELINE_STEP_STYLE
+                    }
+                    data-testid={`settings.mcp-step-${step}`}
+                  >
+                    <span
+                      style={{
+                        ...TIMELINE_INDEX_STYLE,
+                        ...(current
+                          ? { border: "1px solid var(--accent)", color: "var(--fg-1)" }
+                          : done
+                            ? {
+                                border: "1px solid var(--accent)",
+                                background: "var(--accent)",
+                                color: "var(--accent-on)",
+                              }
+                            : {}),
+                      }}
+                    >
+                      {done ? <Icon name="circle-check" size={14} /> : String(step)}
+                    </span>
+                    <span
+                      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    >
+                      {t(`settings.ai.externalAccess.step${step}Title`)}
+                    </span>
+                  </Button>
+                </span>
+              );
+            })}
+          </div>
+
+          <ScrollArea
+            style={{ maxHeight: "56vh" }}
+            // The action row is sticky to this scroller's bottom edge, so a
+            // focused switch must stop above it (2.4.11).
+            contentStyle={{ scrollPaddingBottom: "var(--space-7)" }}
           >
-            {t("settings.ai.externalAccess.addConnection")}
-          </Button>
+          {flow.step === 1 && (
+            <div data-testid="settings.mcp-step-clients">
+              <p style={LABEL_STYLE}>{t("settings.ai.externalAccess.step1Question")}</p>
+              <div style={CARD_GRID_STYLE} role="radiogroup">
+                {MCP_CLIENT_PRESETS.map((client) => (
+                  <Button
+                    key={client.id}
+                    variant="secondary"
+                    role="radio"
+                    aria-checked={flow.presetId === client.id}
+                    style={CARD_STYLE}
+                    onClick={() => chooseClient(client)}
+                    data-testid="settings.mcp-client"
+                    data-client={client.id}
+                  >
+                    <ClientMark name={client.name} />
+                    <span>{client.name}</span>
+                  </Button>
+                ))}
+              </div>
+              <p
+                style={{ ...HELPER_STYLE, marginTop: "var(--space-2)" }}
+                data-testid="settings.mcp-trademarks"
+              >
+                {t("settings.ai.externalAccess.trademarks")}
+              </p>
+              <Collapsible
+                label={GENERIC_CLIENT.name}
+                detail={t("settings.ai.externalAccess.otherClientsDetail")}
+                testId="settings.mcp-other-clients"
+              >
+                <p style={HELPER_STYLE}>{t("settings.ai.externalAccess.otherClientsHelper")}</p>
+                <code style={CODE_STYLE} data-testid="settings.mcp-generic-command">
+                  {mcpSnippet(GENERIC_CLIENT, DEFAULT_CONNECTION_NAME)}
+                </code>
+              </Collapsible>
+              <div style={FLOW_ACTIONS_STYLE}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setFlow(null)}
+                  data-testid="settings.mcp-flow-cancel"
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {flow.step === 2 && preset !== null && (
+            <div data-testid="settings.mcp-step-config">
+              <p style={LABEL_STYLE} data-testid="settings.mcp-config-path">
+                {t("settings.ai.externalAccess.configPath", { path: preset.configPath })}
+              </p>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-2)" }}>
+                <code style={{ ...CODE_STYLE, flex: 1 }} data-testid="settings.mcp-snippet">
+                  {mcpSnippet(preset, flow.name.trim() || DEFAULT_CONNECTION_NAME)}
+                </code>
+                <CopyButton text={mcpSnippet(preset, flow.name.trim() || DEFAULT_CONNECTION_NAME)} />
+              </div>
+              <p style={HELPER_STYLE} data-testid="settings.mcp-name-claim">
+                {t("settings.ai.externalAccess.nameClaim")}
+              </p>
+              <div style={{ marginTop: "var(--space-2)" }}>
+                <label style={LABEL_STYLE} htmlFor="mcp-connection-name">
+                  {t("settings.ai.externalAccess.nameLabel")}
+                </label>
+                <Input
+                  id="mcp-connection-name"
+                  mono
+                  value={flow.name}
+                  onChange={(event) =>
+                    setFlow((current) =>
+                      current === null ? current : { ...current, name: event.target.value },
+                    )
+                  }
+                  data-testid="settings.mcp-connection-name"
+                />
+              </div>
+              {preset.clientSideToolList && (
+                <p style={HELPER_STYLE} data-testid="settings.mcp-client-tools-note">
+                  {t("settings.ai.externalAccess.clientToolsNote", { name: preset.name })}
+                </p>
+              )}
+              <div style={FLOW_ACTIONS_STYLE}>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setFlow((current) => (current === null ? current : { ...current, step: 1 }))
+                  }
+                  data-testid="settings.mcp-flow-back"
+                >
+                  {t("settings.ai.externalAccess.back")}
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={flow.name.trim().length === 0}
+                  onClick={() =>
+                    setFlow((current) => (current === null ? current : { ...current, step: 3 }))
+                  }
+                  data-testid="settings.mcp-flow-next"
+                >
+                  {t("settings.ai.externalAccess.next")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {flow.step === 3 && (
+            <div data-testid="settings.mcp-step-scope">
+              <p style={HELPER_STYLE} data-testid="settings.mcp-scope-line">
+                {scopeLine}
+              </p>
+              <p style={HELPER_STYLE} data-testid="settings.mcp-write-restore">
+                {t("settings.ai.externalAccess.writeRestore")}
+              </p>
+
+              <MultiSelectBox
+                collapsible
+                options={folderOptions(view?.folders ?? [], t)}
+                selected={flow.access}
+                onChange={(next) =>
+                  setFlow((current) => (current === null ? current : { ...current, access: next }))
+                }
+                label={t("settings.ai.externalAccess.accessLabel")}
+                emptySummary={t("settings.ai.externalAccess.accessNothing")}
+                searchPlaceholder={t("settings.ai.externalAccess.findFolder")}
+                emptyText={t("settings.ai.externalAccess.noFolderMatches")}
+                maxListHeight={240}
+                testId="settings.mcp-access-picker"
+              />
+
+              <div style={{ marginTop: "var(--space-3)" }}>
+                <p style={LABEL_STYLE}>{t("settings.ai.externalAccess.toolsLabel")}</p>
+                <div
+                  style={TOOL_LIST_STYLE}
+                  data-testid="settings.mcp-tools"
+                  data-tool-count={String(toolRoster(view, flow).length)}
+                >
+                  {toolRoster(view, flow).map((tool) => (
+                    <div
+                      key={tool.verb}
+                      style={TOOL_ROW_STYLE}
+                      data-testid="settings.mcp-tool"
+                      data-verb={tool.verb}
+                    >
+                      <span style={{ ...HELPER_STYLE, margin: 0 }}>
+                        {verbLabel(tool.verb, t)}
+                        {!tool.availableInBuild && (
+                          <span style={{ color: "var(--fg-3)" }}>
+                            {` · ${t("settings.ai.externalAccess.toolUnavailable")}`}
+                          </span>
+                        )}
+                      </span>
+                      <Switch
+                        checked={tool.enabled}
+                        disabled={!tool.availableInBuild || busy}
+                        onChange={(next) =>
+                          setFlow((current) => {
+                            if (current === null) return current;
+                            const disabled = next
+                              ? current.disabled.filter((verb) => verb !== tool.verb)
+                              : [...current.disabled, tool.verb];
+                            return { ...current, disabled };
+                          })
+                        }
+                        ariaLabel={verbLabel(tool.verb, t)}
+                        testId={`settings.mcp-tool-${tool.verb}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p style={HELPER_STYLE} data-testid="settings.mcp-tools-note">
+                  {t("settings.ai.externalAccess.toolsNote", {
+                    count: view?.readBudget?.notesPerWindow ?? 0,
+                    minutes: Math.round((view?.readBudget?.windowSeconds ?? 0) / 60),
+                  })}
+                </p>
+              </div>
+
+              <div style={FLOW_ACTIONS_STYLE}>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setFlow((current) =>
+                      current === null ? current : { ...current, step: current.editing === null ? 2 : 3 },
+                    )
+                  }
+                  data-testid="settings.mcp-flow-back"
+                >
+                  {t("settings.ai.externalAccess.back")}
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={busy || flow.name.trim().length === 0}
+                  onClick={() => void approve()}
+                  data-testid="settings.mcp-approve"
+                >
+                  {t("settings.ai.externalAccess.approve")}
+                </Button>
+              </div>
+            </div>
+          )}
+          </ScrollArea>
         </div>
+        </ModalShell>
       )}
 
-      <McpGrantDialog
-        open={approving !== null}
-        connection={
-          approving === null || approving === "new"
-            ? null
-            : {
-                name: approving.name,
-                // A legacy grant is re-approved from its OWN reach: the seed is
-                // (every folder) minus (what it could read), because that is the
-                // exclusion list whose reading equals what the stored grant named.
-                // Seeding it empty is what made "one click to fix it" turn an
-                // approval of `Work/` into an approval of the whole vault, with the
-                // preview's note count the only sign.
-                excludedFolders: approving.legacy
-                  ? legacyExclusionSeed(view?.folders ?? [], approving.legacyFolders)
-                  : approving.excludedFolders,
-                writeFolders: approving.writeFolders,
-              }
-        }
-        folders={view?.folders ?? []}
-        onApprove={approve}
-        onClose={() => setApproving(null)}
-      />
-
-      {!failed && view !== null && view.connections.length > 0 && (
+      {enabled && !failed && flow === null && view !== null && view.connections.length > 0 && (
         <div
           style={BLOCK_STYLE}
           data-testid="settings.mcp-connections"
-          // A COUNT, never a name: renderers already put the name on screen, but a
-          // `data-*` would also put it in every screenshot and CI failure artefact
-          // (src/AGENTS.md "Test observability").
           data-connection-count={String(view.connections.length)}
         >
           {view.connections.map((row, index) => (
@@ -457,18 +946,8 @@ export function McpSection({
                 <span style={NAME_STYLE}>{row.name}</span>
                 <div style={ACTIONS_STYLE}>
                   <Button
-                    variant="ghost"
-                    aria-expanded={snippetFor === row.name}
-                    onClick={() =>
-                      setSnippetFor((open) => (open === row.name ? null : row.name))
-                    }
-                    data-testid="settings.mcp-snippet-toggle"
-                  >
-                    {t("settings.ai.externalAccess.snippetToggle")}
-                  </Button>
-                  <Button
                     variant="secondary"
-                    disabled={revoking !== null}
+                    disabled={busy}
                     onClick={() => void revoke(row.name)}
                     data-testid="settings.mcp-revoke"
                   >
@@ -476,45 +955,9 @@ export function McpSection({
                   </Button>
                 </div>
               </div>
-
               <p style={HELPER_STYLE} data-testid="settings.mcp-read-scope">
                 {readScopeLabel(row, t)}
               </p>
-              {/* One entry point to the approval screen per row, and its label is
-                  the act: a legacy grant has to be approved again under this
-                  model, and a current one is edited. Without this a user who
-                  later creates a folder they want left out would have no way to
-                  say so except revoking and re-approving by hand. */}
-              {row.legacy ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => setApproving(row)}
-                  data-testid="settings.mcp-reapprove"
-                >
-                  {t("settings.ai.externalAccess.approveAgain")}
-                </Button>
-              ) : (
-                <div style={ACTIONS_STYLE}>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setApproving(row)}
-                    data-testid="settings.mcp-edit"
-                  >
-                    {t("settings.ai.externalAccess.editExclusions")}
-                  </Button>
-                </div>
-              )}
-              {!row.legacy && row.excludedFolders.length > 0 && (
-                <p style={HELPER_STYLE} data-testid="settings.mcp-excluded">
-                  {t("settings.ai.externalAccess.excludedLine", {
-                    count: row.excludedFolders.length,
-                    folders: row.excludedFolders.join(", "),
-                  })}
-                </p>
-              )}
-              {/* The write scope, beside the read scope and below it: the order of
-                  the two sentences is the order of the decision, and "write
-                  nowhere" is stated rather than left to the absence of a line. */}
               <p style={HELPER_STYLE} data-testid="settings.mcp-write-scope">
                 {row.legacy || row.writeFolders.length === 0
                   ? t("settings.ai.externalAccess.writeNone")
@@ -523,101 +966,132 @@ export function McpSection({
                       folders: row.writeFolders.join(", "),
                     })}
               </p>
-
+              <p style={HELPER_STYLE} data-testid="settings.mcp-tools-scope">
+                {toolsLine(row, t)}
+              </p>
               <WhenLine row={row} />
-              {row.staleExcludedFolders.length > 0 && (
-                <p style={HELPER_STYLE} data-testid="settings.mcp-stale">
-                  {t("settings.ai.externalAccess.staleExclusion", {
-                    count: row.staleExcludedFolders.length,
-                  })}
-                </p>
-              )}
-
-              {snippetFor === row.name && (
-                <div>
-                  <p style={HELPER_STYLE}>
-                    {t("settings.ai.externalAccess.snippetHelper")}
-                  </p>
-                  <code style={CODE_STYLE} data-testid="settings.mcp-snippet">
-                    {mcpSnippet(row.name)}
-                  </code>
-                </div>
-              )}
+              <div style={ACTIONS_STYLE}>
+                <Button
+                  variant="secondary"
+                  onClick={() => startEdit(row)}
+                  data-testid="settings.mcp-edit"
+                >
+                  {row.legacy
+                    ? t("settings.ai.externalAccess.approveAgain")
+                    : t("settings.ai.externalAccess.editExclusions")}
+                </Button>
+              </div>
             </div>
           ))}
+          <p style={HELPER_STYLE} data-testid="settings.mcp-device-claim">
+            {t("settings.ai.externalAccess.deviceClaim")}
+          </p>
+          {/* The primary lives in the zero state, so a second connection needs its
+              own way back in: without this the list would be the last word for
+              anyone who ever approved one. */}
+          <div style={{ marginTop: "var(--space-2)" }}>
+            <Button
+              variant="secondary"
+              onClick={startNew}
+              data-testid="settings.mcp-add"
+            >
+              {t("settings.ai.externalAccess.addConnection")}
+            </Button>
+          </div>
         </div>
       )}
     </SettingsSection>
   );
 }
 
-/**
- * "May read 412 notes in 38 folders", or the honest empty form.
- *
- * Under the allow-list model an empty set meant "nothing", so `readNothing` was
- * the only empty case. Now an empty set means the whole vault and the empty case
- * is the opposite one (every folder left out), plus the legacy row, which this
- * build serves as nothing at all. All three say so in words rather than being
- * inferred from a zero.
- */
-/**
- * A folder key as a person reads it: the root gets a name, and a key keeps its
- * slashes because that is how the sidebar shows it.
- */
+/** The snippet's copy control: feedback lands on the control, not in a toast. */
+function CopyButton({ text }: { text: string }) {
+  const { t } = useTranslation();
+  const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => {
+    if (!confirmed) return;
+    const timer = window.setTimeout(() => setConfirmed(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [confirmed]);
+  return (
+    <IconButton
+      icon="copy"
+      label={t("settings.ai.externalAccess.copySnippet")}
+      confirmed={confirmed}
+      onClick={() => {
+        // The copy confirms itself: a tick on the control, and the shared helper
+        // announces it. No toast for a success.
+        void copyText(clipboardWriteText, text, {
+          // Silent on both sides: the tick on the control IS the feedback
+          // (`agent-tooling` copy rule), so nothing is announced twice.
+          onSuccess: { kind: "silent", reason: "the control shows a tick" },
+          onFailure: { kind: "silent", reason: "a failed copy leaves the control un-ticked" },
+        }).then((ok) => {
+          if (ok) setConfirmed(true);
+        });
+      }}
+      testId="settings.mcp-copy"
+    />
+  );
+}
+
+/** The switch bank for a connection being edited, or the catalog for a new one. */
+function toolRoster(
+  view: McpExternalAccessView | null,
+  flow: FlowState,
+): { verb: string; enabled: boolean; availableInBuild: boolean }[] {
+  const stored = view?.connections.find((row) => row.name === flow.editing)?.tools ?? [];
+  if (stored.length > 0) {
+    return stored.map((tool) => ({
+      verb: tool.verb,
+      // The switch bank reflects the flow's own edits, not the stored state.
+      enabled: tool.availableInBuild && !flow.disabled.includes(tool.verb),
+      availableInBuild: tool.availableInBuild,
+    }));
+  }
+  // A connection that is not approved yet has no stored row, so the switches come
+  // from the host's own catalog: a first-run vault has no connection to borrow one
+  // from, and an empty switch bank on the first approval screen is the failure this
+  // field exists to remove.
+  const catalog = view?.toolCatalog ?? [];
+  return catalog.map((tool) => ({
+    verb: tool.verb,
+    enabled: tool.availableInBuild && !flow.disabled.includes(tool.verb),
+    availableInBuild: tool.availableInBuild,
+  }));
+}
+
+function folderOptions(
+  folders: readonly string[],
+  t: (key: string, options?: Record<string, unknown>) => string,
+): SelectOption<string>[] {
+  return folders.map((folder) => ({
+    value: folder,
+    label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
+  }));
+}
+
 function folderLabel(
   folder: string,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  return folder === "" ? t("common.vaultroot") : folder;
+  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder;
 }
 
-/**
- * The exclusion list a legacy grant is re-approved from.
- *
- * A legacy grant stored the folders it COULD read; this build stores the folders
- * it MAY NOT read. The honest translation is `every folder` minus `what it could
- * read`, and it has to happen here because the stored shape cannot say it: seeding
- * the dialog empty reads as "leave nothing out", which is a one-click approval of
- * the whole vault, and the preview's note count is the only thing that would say
- * so. Subtree-aware in both directions, because an approval that named `Work/` also
- * read `Work/2026/`.
- *
- * A legacy grant naming nothing keeps nothing out on purpose: "read nothing
- * everywhere" has no exclusion-list form, so it re-approves as the whole vault and
- * the preview count is the guard. That grant could not read anything at all, which
- * makes the whole vault a widening the person is shown before they click.
- */
-function legacyExclusionSeed(
-  allFolders: readonly string[],
-  legacyFolders: readonly string[],
-): string[] {
-  const readable = (folder: string): boolean =>
-    legacyFolders.some(
-      (allowed) =>
-        folder === allowed ||
-        (allowed !== "" && folder.startsWith(`${allowed.replace(/\/$/, "")}/`)),
-    );
-  return allFolders.filter((folder) => !readable(folder));
-}
-
-/**
- * A queued request's verb as a sentence fragment.
- *
- * The verb is a wire identifier (`note_create`), and printing it would put a tool
- * name in the middle of a sentence a person is deciding about. An unknown verb
- * falls back to the identifier rather than to a guess: a build that has not learnt
- * a verb yet should say so plainly.
- */
 function verbLabel(
   verb: string,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
   const known = [
+    "note_search",
+    "note_read",
+    "vault_list",
+    "vault_state",
     "note_create",
     "note_append",
-    "note_edit",
-    "note_move",
     "note_set_field",
+    "note_move",
+    "note_edit",
   ];
   if (!known.includes(verb)) return verb;
   return t(`settings.ai.externalAccess.verb.${verb}`);
@@ -625,30 +1099,29 @@ function verbLabel(
 
 function readScopeLabel(
   row: McpConnectionView,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  if (row.legacy) {
-    return t("settings.ai.externalAccess.needsReapproval");
-  }
-  if (row.folderCount === 0) {
-    return t("settings.ai.externalAccess.readNothing");
-  }
-  if (row.excludedFolders.length === 0) {
-    return t("settings.ai.externalAccess.wholeVault");
-  }
+  if (row.legacy) return t("settings.ai.externalAccess.needsReapproval");
+  if (row.folderCount === 0) return t("settings.ai.externalAccess.readNothing");
+  if (row.excludedFolders.length === 0) return t("settings.ai.externalAccess.wholeVault");
   return t("settings.ai.externalAccess.readSummary", {
     count: row.noteCount,
     folders: row.folderCount,
   });
 }
 
-/**
- * Both durable facts about a connection, on one line.
- *
- * `lastUsedAt` is the host's stamp from the last call that reached the door, so
- * `null` means "not since it was approved" rather than "never": the approval is
- * itself a fact, and the line states it either way.
- */
+function toolsLine(
+  row: McpConnectionView,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const off = (row.tools ?? []).filter((tool) => tool.availableInBuild && !tool.enabled);
+  if (off.length === 0) return t("settings.ai.externalAccess.toolsAll");
+  return t("settings.ai.externalAccess.toolsOff", {
+    count: off.length,
+    verbs: off.map((tool) => verbLabel(tool.verb, t)).join(", "),
+  });
+}
+
 function WhenLine({ row }: { row: McpConnectionView }) {
   const { t } = useTranslation();
   const approved = formatRelativeTime(new Date(row.approvedAt * 1000));

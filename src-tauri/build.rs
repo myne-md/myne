@@ -232,6 +232,7 @@ fn main() {
                 // external-mcp-connection task 13: the queued out-of-scope write
                 // decisions. Both must name the same command as the handler above.
                 "accept_mcp_write_request",
+                "accept_mcp_read_request",
                 "dismiss_mcp_write_request",
             ]),
         )

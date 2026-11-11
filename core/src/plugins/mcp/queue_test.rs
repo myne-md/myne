@@ -18,6 +18,7 @@ fn request(connection: &str, folder: &str, verb: &str, requested_at: u64) -> Mcp
         requested_at,
         summary: String::new(),
         verb: verb.to_string(),
+        kind: protocol::McpRequestKind::Write,
     }
 }
 
@@ -29,6 +30,7 @@ fn grant(model: McpScopeModel, write_folders: &[&str]) -> protocol::McpConnectio
         approved_at: 1_765_432_100,
         last_used_at: None,
         write_folders: write_folders.iter().map(|f| f.to_string()).collect(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -89,15 +91,33 @@ fn mcp_write_queue_take_matches_any_spelling_of_the_folder() {
         &mut queue,
         request("claude-desktop", "Work/", "note_append", 1),
     );
-    let taken = take(&mut queue, "claude-desktop", " projects ").expect("the row is found");
+    let taken = take(
+        &mut queue,
+        "claude-desktop",
+        " projects ",
+        protocol::McpRequestKind::Write,
+    )
+    .expect("the row is found");
     assert_eq!(taken.folder, "projects/");
     assert_eq!(queue.len(), 1, "the other connection row is untouched");
     assert!(
-        take(&mut queue, "lm-studio", "Work/").is_none(),
+        take(
+            &mut queue,
+            "lm-studio",
+            "Work/",
+            protocol::McpRequestKind::Write
+        )
+        .is_none(),
         "a row belongs to the connection that caused it"
     );
     assert!(
-        take(&mut queue, "claude-desktop", "Nowhere/").is_none(),
+        take(
+            &mut queue,
+            "claude-desktop",
+            "Nowhere/",
+            protocol::McpRequestKind::Write
+        )
+        .is_none(),
         "an unknown folder is a stale click, not an error"
     );
 }
@@ -164,6 +184,67 @@ fn mcp_write_queue_a_request_is_a_proposal_and_carries_no_authority() {
 /// another client's attempt earned, so at the cap this connection's own oldest
 /// goes and a connection with no row of its own is REFUSED.
 #[test]
+fn mcp_write_queue_keeps_a_read_row_and_a_write_row_as_two_decisions() {
+    let mut rows = Vec::new();
+    assert!(enqueue(&mut rows, request("a", "Work/", "note_create", 10)));
+    assert!(enqueue(
+        &mut rows,
+        McpWriteRequest {
+            kind: protocol::McpRequestKind::Read,
+            ..request("a", "Work/", "note_create", 11)
+        }
+    ));
+    assert_eq!(
+        rows.len(),
+        2,
+        "one row per kind is kept, not one per triple"
+    );
+
+    let read = take(&mut rows, "a", "Work/", protocol::McpRequestKind::Read);
+    assert!(read.is_some());
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].kind, protocol::McpRequestKind::Write);
+    assert!(take(&mut rows, "a", "Work/", protocol::McpRequestKind::Write).is_some());
+    assert!(rows.is_empty());
+}
+
+#[test]
+fn mcp_write_queue_eviction_frees_one_kind_and_not_both() {
+    let mut rows = Vec::new();
+    assert!(enqueue(&mut rows, request("a", "Work/", "note_create", 0)));
+    assert!(enqueue(
+        &mut rows,
+        McpWriteRequest {
+            kind: protocol::McpRequestKind::Read,
+            ..request("a", "Work/", "note_create", 1)
+        }
+    ));
+    for index in 0..(MAX_PENDING_WRITES - 2) {
+        assert!(enqueue(
+            &mut rows,
+            request("a", &format!("F{index}/"), "note_create", 10 + index as u64)
+        ));
+    }
+    assert_eq!(rows.len(), MAX_PENDING_WRITES);
+
+    assert!(enqueue(&mut rows, request("a", "F9/", "note_create", 99)));
+    assert_eq!(rows.len(), MAX_PENDING_WRITES);
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.folder.eq_ignore_ascii_case("work/"))
+            .count(),
+        1,
+        "the read row for that folder survived the eviction of its write sibling"
+    );
+    assert_eq!(
+        rows.iter()
+            .find(|row| row.folder.eq_ignore_ascii_case("work/"))
+            .map(|row| row.kind),
+        Some(protocol::McpRequestKind::Read)
+    );
+}
+
+#[test]
 fn mcp_write_queue_refuses_rather_than_evicting_another_connections_row() {
     let mut queue = Vec::new();
     for index in 0..MAX_PENDING_WRITES {
@@ -222,7 +303,13 @@ fn mcp_write_queue_take_clears_every_verb_queued_for_the_folder() {
     ));
     assert_eq!(queue.len(), 3);
 
-    let taken = take(&mut queue, "claude-desktop", "inbox/").expect("the row is found");
+    let taken = take(
+        &mut queue,
+        "claude-desktop",
+        "inbox/",
+        protocol::McpRequestKind::Write,
+    )
+    .expect("the row is found");
     assert_eq!(
         taken.requested_at, 6,
         "the newest of the two is the row the card showed"
@@ -232,4 +319,68 @@ fn mcp_write_queue_take_clears_every_verb_queued_for_the_folder() {
         "no phantom row survives for the folder the person decided about"
     );
     assert_eq!(queue.len(), 1, "another folder is untouched");
+}
+
+// ── the read kind: accepting NARROWS the exclusion list (myne-md/myne#1052) ──
+
+/// A grant whose read scope leaves `excluded` out.
+fn read_grant(excluded: &[&str]) -> protocol::McpConnectionGrant {
+    protocol::McpConnectionGrant {
+        model: McpScopeModel::Exclude,
+        folders: Vec::new(),
+        excluded_folders: excluded.iter().map(|f| f.to_string()).collect(),
+        approved_at: 1_765_432_100,
+        last_used_at: None,
+        write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
+    }
+}
+
+#[test]
+fn accepting_a_read_request_removes_exactly_the_folder_it_names() {
+    use super::accept_read_target;
+    let grant = read_grant(&["Archive/", "Private/"]);
+    let next = accept_read_target(Some(&grant), "Private/", &[]).expect("actionable");
+    // Canonical form: the exclusion list is lower-cased with a trailing slash, so
+    // the stored value is what the resolver compares against.
+    assert_eq!(next, vec!["archive/".to_string()]);
+}
+
+#[test]
+fn a_read_accept_is_refused_when_accepting_would_widen_more_than_the_card_says() {
+    use super::{accept_read_target, ReadAcceptRefusal};
+    // A parent folder is the stored exclusion: removing it would reveal its
+    // siblings, which the card never named.
+    let grant = read_grant(&["Projects/"]);
+    assert_eq!(
+        accept_read_target(Some(&grant), "Projects/2026/", &[]),
+        Err(ReadAcceptRefusal::CoveredByParent)
+    );
+    // Another surface excluded it (Myne's own AI, the terminal client): accepting
+    // here would have to edit that list, and the card never mentioned it.
+    let grant = read_grant(&[]);
+    assert_eq!(
+        accept_read_target(Some(&grant), "Private/", &["Private/".to_string()]),
+        Err(ReadAcceptRefusal::ExcludedElsewhere)
+    );
+    // Already readable: a stale row, not a decision.
+    let grant = read_grant(&[]);
+    assert_eq!(
+        accept_read_target(Some(&grant), "Work/", &[]),
+        Err(ReadAcceptRefusal::NotExcluded)
+    );
+}
+
+#[test]
+fn a_read_accept_of_a_revoked_or_legacy_grant_changes_nothing() {
+    use super::{accept_read_target, ReadAcceptRefusal};
+    assert_eq!(
+        accept_read_target(None, "Work/", &[]),
+        Err(ReadAcceptRefusal::NoGrant)
+    );
+    let legacy = grant(McpScopeModel::Folders, &[]);
+    assert_eq!(
+        accept_read_target(Some(&legacy), "Work/", &[]),
+        Err(ReadAcceptRefusal::Legacy)
+    );
 }

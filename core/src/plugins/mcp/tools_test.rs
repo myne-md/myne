@@ -41,6 +41,7 @@ fn grant(excluded: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -54,6 +55,7 @@ fn legacy_grant(folders: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -597,6 +599,16 @@ fn inputs<'a>(
         archived_folders: &[],
         quiet_folders: &[],
         writer: None,
+        // Each call gets its OWN ledger, leaked on purpose: a shared one would make
+        // every test in this file spend the same budget and a test that reads a note
+        // twice would depend on how many tests ran before it. A test that wants to
+        // see the budget refuse builds an exhausted ledger itself.
+        // A fixed reading: the tests drive the budget arithmetic themselves, and a
+        // real clock here would make the window tests time-dependent.
+        now_ms: 0,
+        budget: Box::leak(Box::new(std::sync::Mutex::new(
+            super::budget::BudgetLedger::default(),
+        ))),
     }
 }
 
@@ -862,4 +874,168 @@ fn a_grant_written_under_the_allow_list_model_is_refused_rather_than_read_as_a_d
             "{tool}: a sentence a human reads must name the product"
         );
     }
+}
+
+// ── the verb switches and the read budget (myne-md/myne#1052) ──────────────
+
+/// A grant with some verbs switched off, in the exclusion model.
+fn grant_with_disabled(excluded: &[&str], disabled: &[&str]) -> McpConnectionGrant {
+    McpConnectionGrant {
+        model: McpScopeModel::Exclude,
+        folders: Vec::new(),
+        excluded_folders: excluded.iter().map(|f| f.to_string()).collect(),
+        approved_at: 1_700_000_000,
+        last_used_at: None,
+        write_folders: Vec::new(),
+        disabled_verbs: disabled.iter().map(|v| v.to_string()).collect(),
+    }
+}
+
+#[test]
+fn a_switched_off_verb_is_refused_with_its_own_reason_and_the_others_still_serve() {
+    // The switch is the whole feature: disabling one verb must not disable the
+    // connection, and the refusal has to be distinguishable from "no grant",
+    // because the caller's next action differs (stop, versus ask the user).
+    let mut map = BTreeMap::new();
+    map.insert(
+        "claude-desktop".to_string(),
+        grant_with_disabled(&[], &["note_read"]),
+    );
+    let source = Source::new(&[("live", Some("Projects"), "alpha body")]);
+    let search_args = serde_json::json!({ "query": "alpha" });
+    let read_args = serde_json::json!({ "note_id": "live" });
+    let mut read_inputs = inputs(&map, "claude-desktop", "note_read", &read_args);
+    read_inputs.budget = Box::leak(Box::new(Mutex::new(
+        crate::plugins::mcp::budget::BudgetLedger::default(),
+    )));
+
+    let searched = block_on(call_tool(
+        inputs(&map, "claude-desktop", "note_search", &search_args),
+        &source,
+    ));
+    assert!(
+        matches!(searched, McpCallOutcome::Result(_)),
+        "an enabled read verb must still serve: {searched:?}"
+    );
+
+    let refused = block_on(call_tool(read_inputs, &source));
+    match refused {
+        McpCallOutcome::Refused(error) => {
+            assert_eq!(
+                error,
+                McpToolError::VerbDisabled {
+                    verb: "note_read".into()
+                }
+            );
+            assert_ne!(error.reason(), McpToolError::NoGrant.reason());
+            assert_ne!(
+                error.reason(),
+                McpToolError::BudgetExhausted {
+                    retry_after_seconds: 0
+                }
+                .reason()
+            );
+        }
+        other => panic!("a switched-off verb must be refused, not served: {other:?}"),
+    }
+}
+
+#[test]
+fn a_verb_name_the_build_does_not_know_disables_nothing() {
+    // A grant written by a newer build (or hand-edited) carries a verb this one
+    // has never heard of. It can never match, so it must not refuse anything:
+    // the alternative is a stored name that turns into a policy.
+    let mut map = BTreeMap::new();
+    map.insert(
+        "claude-desktop".to_string(),
+        grant_with_disabled(&[], &["note_teleport"]),
+    );
+    let source = Source::new(&[("live", Some("Projects"), "alpha body")]);
+    let args = serde_json::json!({ "query": "alpha" });
+    let outcome = block_on(call_tool(
+        inputs(&map, "claude-desktop", "note_search", &args),
+        &source,
+    ));
+    assert!(
+        matches!(outcome, McpCallOutcome::Result(_)),
+        "an unknown disabled verb must not refuse a real one: {outcome:?}"
+    );
+}
+
+#[test]
+fn an_exhausted_budget_refuses_a_note_read_and_does_not_refuse_the_folder_list() {
+    // The budget counts notes, not calls, so the verbs that return no note text
+    // keep working: structure is still available to an agent that has read its
+    // fill, and that is what keeps the refusal from looking like a broken server.
+    let mut map = BTreeMap::new();
+    map.insert("claude-desktop".to_string(), grant_with_disabled(&[], &[]));
+    let source = Source::new(&[("live", Some("Projects"), "alpha body")]);
+    let ledger: &'static Mutex<crate::plugins::mcp::budget::BudgetLedger> = Box::leak(Box::new(
+        Mutex::new(crate::plugins::mcp::budget::BudgetLedger::default()),
+    ));
+    ledger.lock().unwrap().charge(
+        "claude-desktop",
+        0,
+        crate::plugins::mcp::budget::NOTES_PER_WINDOW,
+    );
+
+    let read_args = serde_json::json!({ "note_id": "live" });
+    let mut read_inputs = inputs(&map, "claude-desktop", "note_read", &read_args);
+    read_inputs.budget = ledger;
+    let refused = block_on(call_tool(read_inputs, &source));
+    match refused {
+        McpCallOutcome::Refused(McpToolError::BudgetExhausted {
+            retry_after_seconds,
+        }) => assert_eq!(
+            retry_after_seconds,
+            crate::plugins::mcp::budget::WINDOW_MS / 1000
+        ),
+        other => panic!("an over-budget read must be refused: {other:?}"),
+    }
+
+    let list_args = serde_json::json!({});
+    let mut list_inputs = inputs(&map, "claude-desktop", "vault_list", &list_args);
+    list_inputs.budget = ledger;
+    let listed = block_on(call_tool(list_inputs, &source));
+    assert!(
+        matches!(listed, McpCallOutcome::Result(_)),
+        "the structure verbs return no note text, so an empty budget must not stop them: {listed:?}"
+    );
+}
+
+#[test]
+fn a_served_note_is_charged_to_the_budget_and_a_refusal_is_not() {
+    // The charge is what makes the budget real, and the "refusal costs nothing"
+    // half is what stops a retry loop from spending a connection's window.
+    let mut map = BTreeMap::new();
+    map.insert("claude-desktop".to_string(), grant_with_disabled(&[], &[]));
+    let source = Source::new(&[("live", Some("Projects"), "alpha body")]);
+    let ledger: &'static Mutex<crate::plugins::mcp::budget::BudgetLedger> = Box::leak(Box::new(
+        Mutex::new(crate::plugins::mcp::budget::BudgetLedger::default()),
+    ));
+
+    let read_args = serde_json::json!({ "note_id": "live" });
+    let mut read_inputs = inputs(&map, "claude-desktop", "note_read", &read_args);
+    read_inputs.budget = ledger;
+    assert!(matches!(
+        block_on(call_tool(read_inputs, &source)),
+        McpCallOutcome::Result(_)
+    ));
+    assert_eq!(
+        ledger.lock().unwrap().remaining("claude-desktop", 0),
+        crate::plugins::mcp::budget::NOTES_PER_WINDOW - 1
+    );
+
+    // A refused read (an id that is not there) leaves the budget untouched.
+    let missing = serde_json::json!({ "note_id": "nope" });
+    let mut missing_inputs = inputs(&map, "claude-desktop", "note_read", &missing);
+    missing_inputs.budget = ledger;
+    assert!(matches!(
+        block_on(call_tool(missing_inputs, &source)),
+        McpCallOutcome::Refused(_)
+    ));
+    assert_eq!(
+        ledger.lock().unwrap().remaining("claude-desktop", 0),
+        crate::plugins::mcp::budget::NOTES_PER_WINDOW - 1
+    );
 }

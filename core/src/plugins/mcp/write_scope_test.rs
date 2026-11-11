@@ -31,6 +31,7 @@ fn read_only_grant(excluded: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -43,6 +44,7 @@ fn writable_grant(excluded: &[&str], write: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: write.iter().map(|f| f.to_string()).collect(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -56,6 +58,7 @@ fn legacy_grant(folders: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
     }
 }
 

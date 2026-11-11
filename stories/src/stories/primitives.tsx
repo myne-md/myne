@@ -18,6 +18,7 @@ import { Tooltip } from "@app/components/primitives/Tooltip";
 import { Spinner } from "@app/components/Spinner";
 import { CredentialField } from "@app/components/primitives/CredentialField";
 import { EmptyState } from "@app/components/primitives/EmptyState";
+import { MultiSelectBox } from "@app/components/primitives/MultiSelectBox";
 import { Skeleton } from "@app/components/primitives/Skeleton";
 import { AnchoredPanel } from "@app/components/primitives/AnchoredPanel";
 import { FieldLabel, SectionLabel } from "@app/components/primitives/FieldLabel";
@@ -87,6 +88,32 @@ function AnchoredPanelDemo() {
 }
 
 const BUTTON_VARIANTS = ["primary", "secondary", "ghost", "danger"] as const;
+
+const FOLDERS = [
+  { value: "", label: "Vault root" },
+  { value: "Private/", label: "Private/" },
+  { value: "Projects/", label: "Projects/" },
+  { value: "Projects/New/", label: "Projects/New/" },
+  { value: "Work/", label: "Work/" },
+];
+
+/** The box owns nothing: the caller keeps the selection, which is the contract the
+ *  settings surface relies on when two pickers seed from one flow state. */
+function MultiSelectBoxDemo() {
+  const [selected, setSelected] = useState<string[]>(["Projects/"]);
+  return (
+    <div style={{ width: 360 }}>
+      <MultiSelectBox
+        options={FOLDERS}
+        selected={selected}
+        onChange={setSelected}
+        label="Folders to leave out"
+        searchPlaceholder="Find a folder"
+        emptyText="No folder matches"
+      />
+    </div>
+  );
+}
 
 export const PRIMITIVE_STORIES: StoryDescriptor[] = [
   {
@@ -456,6 +483,20 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
         <div style={{ width: 280 }}>
           <Skeleton lines={3} />
         </div>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/multiselectbox/in-place",
+    group: "primitives",
+    surface: "MultiSelectBox",
+    state: "in-place",
+    description:
+      "A multi-select that is part of the form rather than a panel over it: the chosen values sit as chips at the top of one bordered box and the options scroll inside the same box. It exists because `SearchableSelect`'s anchored panel covers the lines the person is deciding about and closes on an outside click, which is wrong for a scope being composed while three other fields are on screen (myne-md/myne#1052). Click an option to add a chip, click a chip to remove it, and type in the field to filter: the list never leaves the box. The listbox carries aria-multiselectable and every option aria-selected, so the state is not colour-only.",
+    tags: ["primitives", "multi-select", "chips", "in-place", "folders", "scope", "multiselectbox"],
+    render: () => (
+      <Row>
+        <MultiSelectBoxDemo />
       </Row>
     ),
   },
