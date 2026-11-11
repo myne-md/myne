@@ -175,6 +175,7 @@ const TOOL_ROW_STYLE: CSSProperties = {
 /** The four paragraphs behind the row's question mark: the longer account the
  *  surface's own copy left out on purpose (`myne-md/myne#1052`). */
 const EXPLANATION_KEYS = [
+  "settings.ai.externalAccess.outsideMyne",
   "settings.ai.externalAccess.infoOneDoor",
   "settings.ai.externalAccess.infoNotACredential",
   "settings.ai.externalAccess.infoClientTools",
@@ -832,6 +833,9 @@ export function McpSection({
             <div data-testid="settings.mcp-step-scope">
               <p style={HELPER_STYLE} data-testid="settings.mcp-scope-line">
                 {scopeLine}
+              </p>
+              <p style={HELPER_STYLE} data-testid="settings.mcp-write-restore">
+                {t("settings.ai.externalAccess.writeRestore")}
               </p>
 
               <MultiSelectBox
