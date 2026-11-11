@@ -118,8 +118,12 @@ export const AI_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
   { id: "models", labelKey: "settings.ai.groupModels" },
   { id: "limits", labelKey: "settings.ai.groupLimits" },
   // Its own topic, out of Limits: what an external AI tool may do is a different
-  // question from what Myne's own AI may read (myne-md/myne#1052).
-  { id: "externalAccess", labelKey: "settings.ai.sections.externalAccess" },
+  // question from what Myne's own AI may read (myne-md/myne#1052); absent without the sidecar.
+  {
+    id: "externalAccess",
+    labelKey: "settings.ai.sections.externalAccess",
+    liveOn: ["externalMcp"],
+  },
   { id: "advanced", labelKey: "settings.ai.groupAdvanced" },
 ];
 
