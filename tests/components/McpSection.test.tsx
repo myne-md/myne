@@ -527,23 +527,57 @@ describe("the approval dialog", () => {
     );
     expect(acceptMcpWriteRequest).not.toHaveBeenCalled();
   });
-  it("starts a re-approval from what the grant may already write, not from nothing", async () => {
-    // One click on Approve must not silently widen a grant, so the one access list
-    // seeds itself from the write scope the grant already had, never from its wider
-    // read scope. This fixture may read everything except Private/ and may write
-    // nowhere, so the seed is empty and every folder outside the root falls out of
-    // reads: a single list can only say "these folders, both ways", and narrowing is
-    // the direction a re-approval is allowed to move.
+  it("starts a re-approval from what the grant may already read, not from its write side", async () => {
+    // The one access list is the READABLE set. Seeding it from `write_folders` was the
+    // regression this test now pins the other way: every grant the previous dialog
+    // approved writes nowhere, so one click on Edit then Approve narrowed a
+    // whole-vault connection to the vault root, and every later call answered
+    // out-of-scope. This fixture may read everything except Private/, so the step
+    // opens holding exactly that, and approving it again changes nothing.
     renderSection();
     await screen.findByTestId("settings.mcp-connection");
     fireEvent.click(screen.getByTestId("settings.mcp-edit"));
-    await waitFor(() =>
-      expect(readMcpGrantPreview).toHaveBeenCalledWith([
-        "Private/",
-        "Projects/",
-        "Projects/New/",
-        "Work/",
+    await screen.findByTestId("settings.mcp-step-scope");
+    await waitFor(() => expect(readMcpGrantPreview).toHaveBeenCalledWith(["Private/"]));
+
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    // The verb this build cannot dispatch is NOT written into the grant: it was never
+    // the person's choice, and persisting it would silently switch the verb off for
+    // every build that implements it later.
+    expect(setMcpConnectionGrant).toHaveBeenCalledWith(
+      "claude-desktop",
+      ["Private/"],
+      ["Projects/", "Projects/New/", "Work/"],
+      ["note_create", "note_append", "note_move", "note_edit"],
+    );
+  });
+
+  it("keeps a legacy grant read-only through a re-approval", async () => {
+    // The host serves a legacy grant as "writes nowhere". The one access list cannot
+    // say that by itself, so every write verb starts switched off and the person has
+    // to switch one on for the re-approval to grant the write half.
+    readMcpExternalAccess.mockResolvedValue(
+      view([
+        connection({
+          legacy: true,
+          legacyFolders: ["Projects/"],
+          excludedFolders: [],
+          noteCount: 0,
+          folderCount: 0,
+        }),
       ]),
+    );
+    renderSection();
+    await screen.findByTestId("settings.mcp-connection");
+    fireEvent.click(screen.getByTestId("settings.mcp-edit"));
+    fireEvent.click(await screen.findByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    expect(setMcpConnectionGrant).toHaveBeenCalledWith(
+      "claude-desktop",
+      ["Private/", "Projects/New/", "Work/"],
+      ["Projects/"],
+      ["note_create", "note_append", "note_move", "note_edit"],
     );
   });
 
