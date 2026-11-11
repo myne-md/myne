@@ -120,13 +120,17 @@ const V = {
     "Never rendered: the panel is a `developer`-group rail entry carrying `capability: \"cliAccess\"`, which is absent on web, so the rail drops it and nothing here ever mounts. It ships in the bundle (it is the composition root for the CLI block, one small file inside the settings chunk that does ship) and the block it renders carries the same capability gate. Moved out of PrivacyPanel by `decisions/ui/0678`; the web verdict is unchanged by the move, since the capability gate was already what kept the terminal surface off this client.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
-  "src/components/settings/McpGrantDialog.tsx": [
+  "src/components/settings/mcp-client-marks.tsx": [
     "adapted",
-    "Never mounted: it is rendered by `McpSection`, which `AiPanel` only renders under `has(\"externalMcp\")` — absent on web. It ships in the bundle; its only host call is `mcp_grant_preview`, part of the `mcp` plugin the wasm dispatcher refuses wholesale, so a hand-reached invoke answers a typed refusal rather than an empty count.",
+    "Never mounted: it is imported only by `McpSection`, which `AiPanel` renders under `has(\"externalMcp\")`, absent on web. It draws a monogram from the client's name and makes no host call at all, so a hand-reached render would draw two letters and nothing else.",
+  ],
+  "src/lib/mcp-clients.ts": [
+    "adapted",
+    "Data, and unreachable: only the external-access tab imports it, and that tab is omitted on web. It is string literals (config paths, snippet shapes, source URLs) with no host call, so nothing in it can reach the vault, the network or the disk on any client.",
   ],
   "src/components/settings/McpSection.tsx": [
     "adapted",
-    "Never mounted: `AiPanel` renders it under `has(\"externalMcp\")`, which is absent on web, so the section is omitted rather than greyed (`decisions.md` 2026-07-26). It ships in the bundle and its two reads are `mcp_external_access` / `mcp_grant_preview`, which the wasm dispatcher refuses for the whole `mcp` plugin, so even a hand-reached invoke answers a typed refusal rather than nothing.",
+    "Never mounted: `AiPanel` renders it under `has(\"externalMcp\")`, which is absent on web, so the tab is omitted rather than greyed (`decisions.md` 2026-07-26). It ships in the bundle and its three reads are `mcp_external_access` / `mcp_grant_preview` and the prefs writes behind them, which the wasm dispatcher refuses for the whole `mcp` plugin, so even a hand-reached invoke answers a typed refusal rather than nothing. The approval flow and the client roster live in it and in `src/lib/mcp-clients.ts`, both behind the same gate.",
   ],
   "src/components/settings/HelperDisclosure.tsx": [
     "ported",

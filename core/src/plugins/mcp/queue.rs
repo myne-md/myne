@@ -25,7 +25,7 @@
 // which the tool layer consults first. This module is only the bookkeeping between
 // "the host refused it" and "a person decided".
 
-use protocol::{McpConnectionGrant, McpWriteRequest};
+use protocol::{McpConnectionGrant, McpRequestKind, McpWriteRequest};
 
 use crate::folder_key::canonical_input_folder;
 
@@ -57,7 +57,8 @@ pub fn enqueue(requests: &mut Vec<McpWriteRequest>, mut request: McpWriteRequest
     requests.retain(|existing| {
         !(existing.connection == request.connection
             && existing.folder == request.folder
-            && existing.verb == request.verb)
+            && existing.verb == request.verb
+            && existing.kind == request.kind)
     });
     if requests.len() >= MAX_PENDING_WRITES {
         // At the cap, room is made inside THIS connection's own share and never
@@ -70,10 +71,20 @@ pub fn enqueue(requests: &mut Vec<McpWriteRequest>, mut request: McpWriteRequest
             .iter()
             .filter(|row| row.connection == request.connection)
             .min_by_key(|row| row.requested_at)
-            .map(|row| (row.connection.clone(), row.folder.clone(), row.verb.clone()));
+            .map(|row| {
+                (
+                    row.connection.clone(),
+                    row.folder.clone(),
+                    row.verb.clone(),
+                    row.kind,
+                )
+            });
         match oldest_of_this_connection {
-            Some((connection, folder, verb)) => requests.retain(|row| {
-                !(row.connection == connection && row.folder == folder && row.verb == verb)
+            Some((connection, folder, verb, kind)) => requests.retain(|row| {
+                !(row.connection == connection
+                    && row.folder == folder
+                    && row.verb == verb
+                    && row.kind == kind)
             }),
             None => return false,
         }
@@ -96,11 +107,12 @@ pub fn take(
     requests: &mut Vec<McpWriteRequest>,
     connection: &str,
     folder: &str,
+    kind: McpRequestKind,
 ) -> Option<McpWriteRequest> {
     let key = canonical_input_folder(folder);
     let mut taken: Option<McpWriteRequest> = None;
     requests.retain(|request| {
-        if request.connection != connection || request.folder != key {
+        if request.connection != connection || request.folder != key || request.kind != kind {
             return true;
         }
         // Stored order is newest-first per (connection, folder), which is the
@@ -152,6 +164,67 @@ pub fn accept_target(
         return Err(AcceptRefusal::NotReadable);
     }
     Ok(())
+}
+
+/// Why a queued READ request cannot be accepted as it stands
+/// (mcp external access rework, myne-md/myne#1052).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReadAcceptRefusal {
+    /// No grant under that name.
+    NoGrant,
+    /// A grant in the retired allow-list model: re-approval is the only rewrite.
+    Legacy,
+    /// The folder is already readable, so there is nothing to widen. A stale row.
+    NotExcluded,
+    /// The folder is out because of `ai_excluded_folders` or
+    /// `cli_excluded_folders`, not because of THIS grant. Accepting would have to
+    /// edit another surface's exclusion, on a card that never mentioned it.
+    ExcludedElsewhere,
+    /// A PARENT folder is the stored exclusion. Removing the parent would also
+    /// reveal its siblings, which is more than the card names, so this is refused
+    /// and the person edits the scope themselves.
+    CoveredByParent,
+}
+
+/// What accepting one read request would change: the new exclusion list, or why it
+/// cannot be accepted.
+///
+/// The mirror of [`accept_target`], and the same discipline: the decision is made
+/// against the grant as it is NOW, never against what the row claimed when it was
+/// queued. Accepting can only ever NARROW the exclusion list by exactly one entry,
+/// never re-derive it from the caller's request.
+pub fn accept_read_target(
+    grant: Option<&McpConnectionGrant>,
+    folder: &str,
+    quiet: &[String],
+) -> Result<Vec<String>, ReadAcceptRefusal> {
+    let Some(grant) = grant else {
+        return Err(ReadAcceptRefusal::NoGrant);
+    };
+    if !matches!(grant.model, protocol::McpScopeModel::Exclude) {
+        return Err(ReadAcceptRefusal::Legacy);
+    }
+    let key = canonical_input_folder(folder);
+    let quiet_set: std::collections::BTreeSet<String> =
+        crate::folder_key::canonical_excluded(quiet)
+            .into_iter()
+            .collect();
+    if crate::folder_key::exclusions_cover(&quiet_set, &key) {
+        return Err(ReadAcceptRefusal::ExcludedElsewhere);
+    }
+    let stored: std::collections::BTreeSet<String> =
+        crate::folder_key::canonical_excluded(&grant.excluded_folders)
+            .into_iter()
+            .collect();
+    if stored.contains(&key) {
+        let mut next: Vec<String> = stored.into_iter().filter(|entry| entry != &key).collect();
+        next.sort();
+        return Ok(next);
+    }
+    if crate::folder_key::exclusions_cover(&stored, &key) {
+        return Err(ReadAcceptRefusal::CoveredByParent);
+    }
+    Err(ReadAcceptRefusal::NotExcluded)
 }
 
 #[cfg(test)]

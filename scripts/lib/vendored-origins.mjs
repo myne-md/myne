@@ -78,6 +78,15 @@ export const VENDORED_ORIGINS = new Map([
   ],
   ["http://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
   ["https://scripts.sil.org", "SIL OFL licence text in a bundled font's metadata"],
+  // The external-MCP setup step's client presets (`src/lib/mcp-clients.ts`). Each carries the page
+  // its configuration shape was read from, plus the date, as provenance rather than as a link: the
+  // string is never rendered and never fetched, and the preset test fails when one is missing.
+  ["https://modelcontextprotocol.io", "MCP client presets: the reference stdio-server page the generic shape was read from"],
+  ["https://docs.anthropic.com", "MCP client preset (Claude Code): the page its configuration shape was read from"],
+  ["https://cursor.com", "MCP client preset (Cursor): the page its configuration shape was read from"],
+  ["https://opencode.ai", "MCP client preset (opencode): its documented configuration shape, plus the $schema URL the snippet carries"],
+  ["https://code.visualstudio.com", "MCP client preset (VS Code): the page its configuration shape was read from"],
+  ["https://hermes-agent.nousresearch.com", "MCP client preset (Hermes): the page its configuration shape was read from"],
   ["https://raw.githubusercontent.com", "vendored doc links"],
   [
     "https://dequeuniversity.com",

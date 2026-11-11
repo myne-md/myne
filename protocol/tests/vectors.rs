@@ -11637,6 +11637,13 @@ fn encode_one_request(request: &protocol::McpWriteRequest) -> Vec<u8> {
         ",\"folder\":\"{}\"",
         escape_json_for_vectors(&request.folder)
     ));
+    // `kind` rides between `folder` and `requested_at`, and only a READ row carries it:
+    // the write case is the default, so a row queued before the member existed keeps
+    // its meaning. Without this clone of the encoder the runner passed every case while
+    // silently re-encoding a read row as a write one, which the read-kind case caught.
+    if let Some(token) = request.kind.canonical_token() {
+        out.push_str(&format!(",\"kind\":\"{}\"", escape_json_for_vectors(token)));
+    }
     out.push_str(&format!(",\"requested_at\":{}", request.requested_at));
     if !request.summary.is_empty() {
         out.push_str(&format!(

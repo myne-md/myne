@@ -137,6 +137,25 @@ pub enum McpToolError {
     /// client is indistinguishable from a probing one.
     #[serde(rename = "write_queued_for_review")]
     WriteQueuedForReview { folder: String },
+    /// The connection may not call this verb: the person turned it off on the
+    /// approval screen (mcp external access rework, myne-md/myne#1052).
+    ///
+    /// Its own reason rather than `no_grant`, because the caller's next action
+    /// differs and it is not the connection: this one is approved and readable, and
+    /// the person has to switch the verb back on if they want it used. A plain
+    /// refusal here would read to the model as a scope bug and it would retry.
+    #[serde(rename = "verb_disabled")]
+    VerbDisabled { verb: String },
+    /// The connection has spent its note budget for this window (mcp external
+    /// access rework, myne-md/myne#1052).
+    ///
+    /// A distinct reason from a scope refusal because the caller's next action is
+    /// to wait, not to ask the user for anything: the folder is readable, the verb
+    /// is on, and the only thing that changed is how much has already been taken.
+    /// Answered as a refusal rather than an empty result, because an empty result
+    /// would read to the model as "your vault is empty" and it would search again.
+    #[serde(rename = "budget_exhausted")]
+    BudgetExhausted { retry_after_seconds: u64 },
     /// The host could not read the index or the note. Collapsed into one label on
     /// purpose: the internal cause is an IO or decode detail that must not cross
     /// to a process Myne does not ship (`core/AGENTS.md` "Error modelling").
@@ -169,6 +188,8 @@ impl McpToolError {
             McpToolError::NoteOpenInEditor { .. } => "note_open_in_editor",
             McpToolError::OutOfScopeFolder { .. } => "out_of_scope_folder",
             McpToolError::WriteQueuedForReview { .. } => "write_queued_for_review",
+            McpToolError::VerbDisabled { .. } => "verb_disabled",
+            McpToolError::BudgetExhausted { .. } => "budget_exhausted",
             McpToolError::VaultUnavailable => "vault_unavailable",
         }
     }
@@ -268,6 +289,41 @@ impl McpToolError {
                  written: Myne queued the change as a proposal in its review card, and the user \
                  can accept it there."
             }
+            McpToolError::VerbDisabled { verb } => {
+                // The verb is a WIRE name the caller already sent, so naming it
+                // echoes nothing it does not have. The remedy names where the switch
+                // is, because the connection tab is one tab in a panel the agent
+                // cannot see.
+                match verb.as_str() {
+                    "note_create" | "note_append" | "note_edit" | "note_move" => {
+                        "That change was switched off for this connection in Myne: ask the user to \
+                         turn it back on under Settings, AI, External access, then call this tool \
+                         again."
+                    }
+                    _ => {
+                        "Reading through that tool was switched off for this connection in Myne: \
+                         ask the user to turn it back on under Settings, AI, External access, then \
+                         call this tool again."
+                    }
+                }
+            }
+            McpToolError::BudgetExhausted {
+                retry_after_seconds,
+            } => {
+                // The number is minutes rather than seconds because the reader is a
+                // person the agent relays this to, and the window is a quarter of an
+                // hour: a second count of nine hundred is not something anyone can
+                // act on. Rounded up, so the sentence never promises a wait shorter
+                // than the one that is actually left.
+                if *retry_after_seconds >= 120 {
+                    "This connection has read as many notes as Myne allows in one window, so nothing \
+                     was returned: ask the user whether to wait for the budget to refill after \
+                     Settings, AI, External access, or to read fewer notes per call."
+                } else {
+                    "This connection has read as many notes as Myne allows in one window, so nothing \
+                     was returned: wait for the budget to refill, then call this tool again."
+                }
+            }
             McpToolError::VaultUnavailable => {
                 "Myne could not read the vault for this call: unlock the vault in the Myne app \
                  and call this tool again."
@@ -313,6 +369,12 @@ mod tests {
             },
             McpToolError::WriteQueuedForReview {
                 folder: "Projects".into(),
+            },
+            McpToolError::VerbDisabled {
+                verb: "note_edit".into(),
+            },
+            McpToolError::BudgetExhausted {
+                retry_after_seconds: 900,
             },
             McpToolError::VaultUnavailable,
         ]

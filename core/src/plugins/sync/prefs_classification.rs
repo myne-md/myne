@@ -743,6 +743,7 @@ mod tests {
                 approved_at: 1_765_432_100,
                 last_used_at: None,
                 write_folders: Vec::new(),
+                disabled_verbs: Vec::new(),
             },
         );
         assert_eq!(
@@ -767,6 +768,7 @@ mod tests {
                 approved_at: 1_765_432_150,
                 last_used_at: Some(1_765_432_200),
                 write_folders: Vec::new(),
+                disabled_verbs: Vec::new(),
             },
         );
         let merged = merge_prefs(&local, &PrefsView::default());

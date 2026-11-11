@@ -63,6 +63,25 @@ export interface McpConnectionView {
   noteCount: number;
   /** Folders of the vault the scope covers right now. */
   folderCount: number;
+  /**
+   * One entry per catalog verb, in catalog order. `enabled` is the person's choice
+   * and `availableInBuild` is what this build can serve at all, and the two are
+   * separate on purpose: a verb this build has no implementation for must render
+   * with a reason rather than as a switch that would do nothing.
+   */
+  tools: McpToolSwitchView[];
+}
+
+/** One verb's switch state. Mirrors `McpToolSwitchView`. */
+export interface McpToolSwitchView {
+  /** The wire name the grant stores. */
+  verb: string;
+  /** Not switched off by the stored grant. */
+  enabled: boolean;
+  /** This build dispatches the verb. */
+  availableInBuild: boolean;
+  /** The verb changes the vault, so the step can group reads from writes. */
+  isWrite: boolean;
 }
 
 /** The section's whole payload. Mirrors `McpExternalAccessView`. */
@@ -77,6 +96,16 @@ export interface McpExternalAccessView {
    * the ones it can accept right now.
    */
   writeRequests: McpWriteRequestView[];
+  /**
+   * The read budget the host enforces, so the surface states the number that is
+   * actually applied rather than a copy that can drift from a constant.
+   */
+  readBudget: { notesPerWindow: number; windowSeconds: number };
+  /**
+   * The verb catalog on its own, every switch enabled. The approval flow needs it
+   * for a connection that does not exist yet.
+   */
+  toolCatalog: McpToolSwitchView[];
 }
 
 /** What a candidate exclusion list would leave readable. Mirrors `McpGrantPreview`. */
@@ -131,22 +160,12 @@ export interface McpWriteRequestView {
   summary: string;
   /** The verb it called. */
   verb: string;
+  /**
+   * Which direction accepting moves the grant: a write request adds the folder to
+   * the write list, a read request takes it off the exclusion list.
+   */
+  kind: "write" | "read";
 }
-
-/**
- * What a fresh render shows before the host answers: no connections, no folders.
- *
- * Deliberately NOT used as a fallback for a FAILED read. "Nothing is approved" and
- * "the read failed" are different facts, and a screen that showed the first while
- * the second were true would tell the user their vault is closed to external
- * clients when it may not be.
- */
-export const EMPTY_MCP_ACCESS: McpExternalAccessView = {
-  connections: [],
-  folders: [],
-  noteCount: 0,
-  writeRequests: [],
-};
 
 /** The connection list, with per-connection scope and last use. */
 export async function readMcpExternalAccess(): Promise<McpExternalAccessView> {
@@ -154,6 +173,12 @@ export async function readMcpExternalAccess(): Promise<McpExternalAccessView> {
   // Defensive defaults: the host is the only writer of this shape, and a field
   // missing from it is a build skew rather than a state the UI should crash on.
   return {
+    toolCatalog: (wire?.toolCatalog ?? []).map((tool) => ({
+      verb: tool.verb ?? "",
+      enabled: tool.enabled ?? false,
+      availableInBuild: tool.availableInBuild ?? false,
+      isWrite: tool.isWrite ?? false,
+    })),
     connections: (wire?.connections ?? []).map((row) => ({
       name: row.name,
       legacy: row.legacy ?? false,
@@ -165,9 +190,19 @@ export async function readMcpExternalAccess(): Promise<McpExternalAccessView> {
       lastUsedAt: row.lastUsedAt ?? null,
       noteCount: row.noteCount ?? 0,
       folderCount: row.folderCount ?? 0,
+      tools: (row.tools ?? []).map((tool) => ({
+        verb: tool.verb ?? "",
+        enabled: tool.enabled ?? false,
+        availableInBuild: tool.availableInBuild ?? false,
+        isWrite: tool.isWrite ?? false,
+      })),
     })),
     folders: wire?.folders ?? [],
     noteCount: wire?.noteCount ?? 0,
+    readBudget: {
+      notesPerWindow: wire?.readBudget?.notesPerWindow ?? 0,
+      windowSeconds: wire?.readBudget?.windowSeconds ?? 0,
+    },
     // Only the requests the host can still accept: a row whose grant is gone, or
     // whose folder has been excluded since, is not a decision this surface can
     // offer, and the host filters it out before it gets here.
@@ -177,6 +212,9 @@ export async function readMcpExternalAccess(): Promise<McpExternalAccessView> {
       requestedAt: row.requestedAt ?? 0,
       summary: row.summary ?? "",
       verb: row.verb ?? "",
+      // A build skew where the host sends no kind: read it as a write request,
+      // which is what every row written before the read kind existed means.
+      kind: row.kind === "read" ? "read" : "write",
     })),
   };
 }

@@ -2031,9 +2031,17 @@ export async function setMcpConnectionGrant(
   name: string,
   excludedFolders: readonly string[],
   writeFolders: readonly string[],
+  /**
+   * The verbs to switch OFF for this connection, as wire names
+   * (`note_edit`, `note_move`, ...). Always sent, like `writeFolders`: an omitted
+   * field would read on the host as "every verb is on", so a re-approval would
+   * silently turn back on whatever the person had switched off.
+   */
+  disabledVerbs: readonly string[] = [],
 ): Promise<boolean> {
   return await writePref<boolean>("plugin:prefs|set_mcp_connection_grant", {
     name,
+    disabledVerbs: [...disabledVerbs],
     excludedFolders: [...excludedFolders],
 // An ALLOW list, and the opposite sense to the field above: empty here means "write nowhere", while an empty
 // exclusion list means "read everything". Always sent, never omitted: an omitted field would read as "write
@@ -2105,8 +2113,29 @@ export async function rewriteMcpFolderPaths(
 export async function dismissMcpWriteRequest(
   connection: string,
   folder: string,
+  /** Which row to drop: one folder can be waiting for both kinds at once. */
+  kind: "write" | "read",
 ): Promise<boolean> {
   return await writePref<boolean>("plugin:prefs|dismiss_mcp_write_request", {
+    connection,
+    folder,
+    kind,
+  });
+}
+
+/**
+ * Accept a queued READ request: the folder stops being left out of that
+ * connection's read scope.
+ *
+ * A separate command from {@link acceptMcpWriteRequest} on purpose. The two move
+ * the grant in opposite directions, and a single accept with a mode flag is the
+ * shape where the wrong flag silently widens what the person meant to narrow.
+ */
+export async function acceptMcpReadRequest(
+  connection: string,
+  folder: string,
+): Promise<boolean> {
+  return await writePref<boolean>("plugin:prefs|accept_mcp_read_request", {
     connection,
     folder,
   });

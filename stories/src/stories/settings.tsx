@@ -52,8 +52,8 @@ import { LineNumbersSettings } from "@app/components/settings/LineNumbersSetting
 import { MemorySection } from "@app/components/settings/MemorySection";
 import { SeedMemoryWizard } from "@app/components/settings/SeedMemoryWizard";
 import { SeedMemoryCard } from "@app/notes/components/SeedMemoryCard";
-import { McpGrantDialog } from "@app/components/settings/McpGrantDialog";
 import { McpSection } from "@app/components/settings/McpSection";
+import { ClientMark } from "@app/components/settings/mcp-client-marks";
 import { NetworkPanel } from "@app/components/settings/NetworkPanel";
 import { NewNoteLocationSettings } from "@app/components/settings/NewNoteLocationSettings";
 import { PeriodicNotesSettings } from "@app/components/settings/PeriodicNotesSettings";
@@ -792,7 +792,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "McpSection",
     state: "default",
     description:
-      "The external-access section under Settings → AI → Limits: the master switch for the myne-mcp door, one queued write a connection attempted outside its write scope (a proposal, with Accept widening exactly that one grant by exactly that one folder), three approved connections with what each may read, what it may write and when it was last used, and per-connection Revoke plus the setup snippet a client's config pastes. A connection's name is a label rather than a credential, and the section states plainly what Myne does not control about what a connected tool does with what it reads.",
+      "The external-access tab under Settings → AI, its own topic since the rework: the master switch for the myne-mcp door, one queued write a connection attempted outside its write scope (a proposal, with Accept widening exactly that one grant by exactly that one folder), three approved connections with what each may read, what it may write and when it was last used, and per-connection Revoke plus the setup snippet a client's config pastes. A connection's name is a label rather than a credential, and the section states plainly what Myne does not control about what a connected tool does with what it reads.",
     tags: [
       "settings",
       "ai",
@@ -820,7 +820,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "McpSection",
     state: "disabled",
     description:
-      "The same section with the master switch OFF: the switch, the line saying nothing is approved, and the setup snippet, with no connection rows and no second sentence restating that nothing can reach the vault. Look for the paragraph that used to sit under the Off switch being gone.",
+      "The same tab with the master switch OFF: the switch, the line saying what it does, and no connection rows, no request cards and no second sentence restating that nothing can reach the vault.",
     tags: ["settings", "ai", "mcp", "external-access", "off", "developer-mode"],
     fixture: PREFS_FIXTURE,
     render: () => (
@@ -834,65 +834,24 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "settings/mcpgrantdialog/default",
+    id: "settings/mcpclientmarks/glyphs",
     group: "settings",
-    surface: "McpGrantDialog",
-    state: "default",
+    surface: "mcp-client-marks",
+    state: "glyphs",
     description:
-      "The one-time approval screen for an external MCP connection: the counts the host resolved (notes, folders, exclusions) rather than a description of the rule, the folder exclusions chosen before approving, the folders it may write in (an allow list, offered only from what stays readable), and the two bounds stated plainly. The read set is a deny list, so a folder created later is already inside the approval; the write set is the opposite, an allow list where a folder created later is not writable until it is named. What the connected tool does with what it reads is outside Myne.",
-    tags: [
-      "settings",
-      "ai",
-      "mcp",
-      "external-access",
-      "consent",
-      "scope",
-      "exclusions",
-      "frozen-snapshot",
-    ],
-    fixture: MCP_FIXTURE,
+      "The monograms on the approval flow's client cards, drawn from each client's own name. An earlier version inlined the vendors' artwork and their brand colours; that is somebody else's protected work regardless of the disclaimer beside it, so the bundle now carries no third-party mark and the names are the reference (`myne-md/myne#1052`, `myne-md/myne#183`). Two letters at most, uppercase, `aria-hidden` because the card's label is the accessible name, and every card the same size so the grid does not jump.",
+    tags: ["settings", "ai", "mcp", "external-access", "icons", "monochrome"],
+    fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <McpGrantDialog
-          open
-          connection={null}
-          folders={["", "Archive/", "Projects/", "Projects/Deep/", "Work/"]}
-          onApprove={async () => true}
-          onClose={action("onClose")}
-        />
-      </Frame>
-    ),
-  },
-  {
-    id: "settings/mcpgrantdialog/with-write-scope",
-    group: "settings",
-    surface: "McpGrantDialog",
-    state: "with-write-scope",
-    description:
-      "The same approval screen re-opened for a connection that already holds a write grant: the allowed folders start from what is stored rather than from an empty picker, because an empty write picker on a re-approval would silently revoke every write the connection had. The write picker offers only folders the connection may also read, and its helper says that an empty selection means reading without changing anything.",
-    tags: [
-      "settings",
-      "ai",
-      "mcp",
-      "external-access",
-      "write-scope",
-      "allow-list",
-      "re-approval",
-    ],
-    fixture: MCP_FIXTURE,
-    render: () => (
-      <Frame>
-        <McpGrantDialog
-          open
-          connection={{
-            name: "claude-desktop",
-            excludedFolders: ["Archive/"],
-            writeFolders: ["Projects/", "Work/"],
-          }}
-          folders={["", "Archive/", "Projects/", "Projects/Deep/", "Work/"]}
-          onApprove={async () => true}
-          onClose={action("onClose")}
-        />
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <ClientMark name="Claude Desktop" />
+          <ClientMark name="VS Code" />
+          <ClientMark name="Cursor" />
+          <ClientMark name="OpenCode" />
+          <ClientMark name="Hermes" />
+          <ClientMark name="Some MCP client" />
+        </div>
       </Frame>
     ),
   },

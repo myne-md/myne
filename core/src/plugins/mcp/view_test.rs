@@ -37,6 +37,7 @@ fn grant(excluded: &[&str], last_used_at: Option<u64>) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at,
         write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
     }
 }
 
@@ -49,6 +50,7 @@ fn legacy_grant(folders: &[&str]) -> McpConnectionGrant {
         approved_at: 1_700_000_000,
         last_used_at: None,
         write_folders: Vec::new(),
+        disabled_verbs: Vec::new(),
     }
 }
 

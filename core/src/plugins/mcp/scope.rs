@@ -102,6 +102,11 @@ pub struct ConnectionScope {
     /// The grant exists but was written under the retired allow-list model.
     legacy: bool,
     excluded: BTreeSet<String>,
+    /// The verbs the user turned OFF at approval (mcp external access rework,
+    /// myne-md/myne#1052). Carried on the scope so the check sits beside
+    /// [`require_granted`](Self::require_granted) rather than in each of the nine
+    /// verbs, and so the Settings view reports the set the tools enforce.
+    disabled_verbs: BTreeSet<String>,
 }
 
 impl ConnectionScope {
@@ -129,6 +134,22 @@ impl ConnectionScope {
     /// The excluded folder keys, sorted.
     pub fn excluded(&self) -> &BTreeSet<String> {
         &self.excluded
+    }
+
+    /// The verbs the stored grant has turned off, sorted.
+    pub fn disabled_verbs(&self) -> &BTreeSet<String> {
+        &self.disabled_verbs
+    }
+
+    /// Whether a verb may not be called on this connection.
+    ///
+    /// Compared against the WIRE spelling, because that is what the grant stores
+    /// and what a caller names. A name this build does not know is inert: it can
+    /// never match a verb that exists, so it cannot widen anything, and refusing
+    /// instead of ignoring would make an old grant unreadable to a newer build
+    /// for no gain.
+    pub fn is_verb_disabled(&self, verb: &str) -> bool {
+        self.disabled_verbs.contains(verb)
     }
 
     /// Whether a folder, given in ANY casing and with or without a trailing
@@ -238,6 +259,10 @@ impl ConnectionScope {
                 .into_iter()
                 .map(|folder| canonical_folder(&folder))
                 .collect(),
+            // The approval preview asks what a folder set would leave readable;
+            // verb switches are a separate question and an approval act writes
+            // both, so the preview deliberately models the read scope alone.
+            disabled_verbs: BTreeSet::new(),
         }
     }
 
@@ -302,6 +327,7 @@ pub fn resolve_scope_with_quiet(
             granted: false,
             legacy: false,
             excluded: BTreeSet::new(),
+            disabled_verbs: BTreeSet::new(),
         };
     };
     if matches!(grant.model, McpScopeModel::Folders) {
@@ -310,6 +336,7 @@ pub fn resolve_scope_with_quiet(
             granted: false,
             legacy: true,
             excluded: BTreeSet::new(),
+            disabled_verbs: BTreeSet::new(),
         };
     }
     let mut excluded: BTreeSet<String> = grant
@@ -323,6 +350,15 @@ pub fn resolve_scope_with_quiet(
         granted: true,
         legacy: false,
         excluded,
+        // Stored verb names are already canonical (sorted, deduped, NFC) on the
+        // way in, and a verb is ASCII, so re-canonicalising here costs nothing
+        // and keeps the two sides independent of who wrote the bytes.
+        disabled_verbs: grant
+            .disabled_verbs
+            .iter()
+            .map(|verb| verb.trim().to_string())
+            .filter(|verb| !verb.is_empty())
+            .collect(),
     }
 }
 

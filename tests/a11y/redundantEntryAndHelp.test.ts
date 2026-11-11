@@ -40,6 +40,20 @@ const OUTBOUND: Record<string, { help: boolean; what: string }> = {
   "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF": { help: false, what: "a model card for the on-demand tag model, shown beside the AI model picker" },
   "https://huggingface.co/openai/whisper-base": { help: false, what: "a model card, shown beside the transcription model" },
   "https://ollama.com": { help: false, what: "a third-party runtime's home page" },
+  // The client roster's per-client documentation URLs (mcp external access rework,
+  // myne-md/myne#1052). They are a PROVENANCE record rather than a link the app
+  // offers: each one names where that client's configuration shape was read, is
+  // rendered nowhere, and is never opened by a user. They are classified rather
+  // than removed because the entry is what lets a later reader tell a verified
+  // shape from a remembered one.
+  "https://modelcontextprotocol.io/docs/develop/connect-local-servers": { help: false, what: "the MCP local-server page, provenance for the generic and Claude Desktop shapes" },
+  "https://docs.anthropic.com/en/docs/claude-code/mcp": { help: false, what: "Claude Code's MCP page, provenance for its snippet shape" },
+  "https://cursor.com/docs/mcp": { help: false, what: "Cursor's MCP page, provenance for its required stdio type" },
+  "https://opencode.ai/docs/mcp-servers/": { help: false, what: "OpenCode's MCP page, provenance for its nested local-server shape" },
+  // The `$schema` URL inside the snippet itself, not a link the app offers.
+  "https://opencode.ai/config.json": { help: false, what: "OpenCode's config schema id, written into the snippet verbatim" },
+  "https://code.visualstudio.com/docs/copilot/reference/mcp-configuration": { help: false, what: "VS Code's MCP configuration reference, provenance for its native servers key" },
+  "https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp": { help: false, what: "Hermes' MCP page, provenance for its YAML mcp_servers map" },
 };
 
 // Every client tree, because the roster entry for 3.2.6 claims `web` among

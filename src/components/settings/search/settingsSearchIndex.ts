@@ -1231,7 +1231,9 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
-    topic: "limits",
+    // Its own topic since the rework (myne-md/myne#1052): the entry lands on the
+    // tab that holds the switch rather than on Limits, which no longer carries it.
+    topic: "externalAccess",
     testid: "settings.mcp-enable",
     titleKey: "settings.ai.externalAccess.label",
     descriptionKey: "settings.ai.externalAccess.helperOff",

@@ -4744,7 +4744,8 @@ export const ROSTER = Object.freeze([
     title: "External MCP access: the connection list, the grant and revocation",
     paths: [
       "src/components/settings/McpSection.tsx",
-      "src/components/settings/McpGrantDialog.tsx",
+      "src/components/settings/mcp-client-marks.tsx",
+      "src/lib/mcp-clients.ts",
       "src/lib/mcp-access.ts",
       "src/lib/prefs.ts",
       "core/src/plugins/mcp/view.rs",
