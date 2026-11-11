@@ -410,10 +410,8 @@ export function McpSection({
     });
 
   const startEdit = (row: McpConnectionView) => {
-    // The list is the READABLE set: every grant the old dialog approved writes nowhere,
-    // so seeding from `write_folders` narrowed a whole-vault grant to the vault root.
-    // A verb this build cannot dispatch was never the person's choice, and a grant that
-    // may write nowhere keeps its write verbs off rather than gaining them here.
+    // The list is the READABLE set: seeding it from `write_folders` narrowed a whole-vault
+    // grant to the root. Write verbs stay on only where it already writes what it reads.
     const readable = row.legacy
       ? row.legacyFolders
       : (view?.folders ?? []).filter(
@@ -422,7 +420,10 @@ export function McpSection({
     const switchedOff = (row.tools ?? [])
       .filter((tool) => tool.availableInBuild && !tool.enabled)
       .map((tool) => tool.verb);
-    const mayWrite = !row.legacy && row.writeFolders.length > 0;
+    // Write verbs stay on only where the grant already writes everywhere it reads, so
+    // the one list cannot hand over a folder the stored write scope did not name.
+    const writesEverywhere = readable.every((folder) => row.writeFolders.includes(folder));
+    const mayWrite = !row.legacy && readable.length > 0 && writesEverywhere;
     const writeOff = mayWrite
       ? []
       : (row.tools ?? []).filter((tool) => tool.isWrite).map((tool) => tool.verb);
@@ -729,7 +730,7 @@ export function McpSection({
                     key={client.id}
                     variant="secondary"
                     role="radio"
-                    aria-checked={false}
+                    aria-checked={flow.presetId === client.id}
                     style={CARD_STYLE}
                     onClick={() => chooseClient(client)}
                     data-testid="settings.mcp-client"
