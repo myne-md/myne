@@ -207,7 +207,7 @@ fn emit_mcp_write_request_vectors_for_paste() {
     dump.push_str("  \"schema\": \"mcp-write-request\",\n");
     dump.push_str("  \"protocol_version\": \"v0.1\",\n");
     dump.push_str("  \"spec_section\": \"protocol.md §9.5.2 (mcp_write_requests canonical JSON inside vault.prefs)\",\n");
-    dump.push_str("  \"description\": \"Pins protocol::prefs::parse_mcp_write_request, the canonical-JSON decoder for one entry of the mcp_write_requests array inside vault.prefs (external MCP write queue, myne-md/myne#923 task 13, decisions/ai/0752). A queued entry is a PROPOSAL, never a pending write: accepting one extends that connection's write grant by exactly the folder it names. parse_ok cases pin the decoded request as its canonical re-encoding (member order connection < folder < requested_at < summary < verb, summary omitted when empty) plus the exact consumed byte count; parse_reject cases pin the inputs a reader MUST refuse rather than read generously: an unknown member, a repeated member, and a request missing a required member.\",\n");
+    dump.push_str("  \"description\": \"Pins protocol::prefs::parse_mcp_write_request, the canonical-JSON decoder for one entry of the mcp_write_requests array inside vault.prefs (external MCP write queue, myne-md/myne#923 task 13, decisions/ai/0752). A queued entry is a PROPOSAL, never a pending write: accepting one extends that connection's write grant by exactly the folder it names. parse_ok cases pin the decoded request as its canonical re-encoding (member order connection < folder < kind < requested_at < summary < verb, kind and summary omitted when empty) plus the exact consumed byte count; parse_reject cases pin the inputs a reader MUST refuse rather than read generously: an unknown member, a repeated member, and a request missing a required member.\",\n");
     dump.push_str("  \"cases\": [\n");
 
     let emit_ok = |dump: &mut alloc::string::String, slug: &str, desc: &str, input: &[u8]| {
@@ -272,6 +272,24 @@ fn emit_mcp_write_request_vectors_for_paste() {
             "member-order-not-enforced",
             "the decoder reads what an encoder wrote, so a differently ordered object decodes to the same canonical bytes",
             br#"{"verb":"note_set_field","summary":"due: 2026-11-01","requested_at":7,"folder":"projects/","connection":"a"}"#,
+        );
+    emit_ok(
+            &mut dump,
+            "read-kind",
+            "a READ request: the grant did not cover the folder for a read, so the card asks to remove it from the exclusion set rather than to add it to the write list. kind rides between folder and requested_at.",
+            br#"{"connection":"claude-desktop","folder":"inbox/","kind":"read","requested_at":1765432100,"verb":"note_read"}"#,
+        );
+    emit_ok(
+            &mut dump,
+            "write-kind-omitted",
+            "a row that names kind: write decodes to the bytes of a row that omits it: write is the default, so a row queued before the member existed keeps its meaning and re-encodes byte for byte.",
+            br#"{"connection":"a","folder":"b/","kind":"write","requested_at":1,"verb":"note_create"}"#,
+        );
+    emit_reject(
+            &mut dump,
+            "unknown-kind",
+            "a kind this build does not know: reading it as a write would ask the person to widen the wrong half of the grant, so the field is refused rather than defaulted.",
+            br#"{"connection":"a","folder":"b/","kind":"delete","requested_at":1,"verb":"note_create"}"#,
         );
     emit_reject(
             &mut dump,
