@@ -409,7 +409,24 @@ export function McpSection({
       disabled: [],
     });
 
-  const startEdit = (row: McpConnectionView) =>
+  const startEdit = (row: McpConnectionView) => {
+    // The list is the READABLE set: every grant the old dialog approved writes nowhere,
+    // so seeding from `write_folders` narrowed a whole-vault grant to the vault root.
+    // A verb this build cannot dispatch was never the person's choice, and a grant that
+    // may write nowhere keeps its write verbs off rather than gaining them here.
+    const readable = row.legacy
+      ? row.legacyFolders
+      : (view?.folders ?? []).filter(
+          (folder) => folder !== "" && !row.excludedFolders.includes(folder),
+        );
+    const switchedOff = (row.tools ?? [])
+      .filter((tool) => tool.availableInBuild && !tool.enabled)
+      .map((tool) => tool.verb);
+    const mayWrite = !row.legacy && row.writeFolders.length > 0;
+    const writeOff = mayWrite
+      ? []
+      : (row.tools ?? []).filter((tool) => tool.isWrite).map((tool) => tool.verb);
+    const disabled = [...new Set([...switchedOff, ...writeOff])];
     setFlow({
       // A connection already approved has its client, its name and its scope, so
       // editing starts at the step that decides something.
@@ -417,13 +434,10 @@ export function McpSection({
       presetId: null,
       editing: row.name,
       name: row.name,
-      // A grant approved under the old split fills the one list from its WRITE
-      // side, which is the narrower of the two: showing the wider read scope as
-      // the starting point would pre-select folders the person never named for
-      // writing.
-      access: row.legacy ? row.legacyFolders : row.writeFolders,
-      disabled: (row.tools ?? []).filter((tool) => !tool.enabled).map((tool) => tool.verb),
+      access: readable,
+      disabled,
     });
+  };
 
   const chooseClient = (preset: McpClientPreset) =>
     setFlow((current) =>
