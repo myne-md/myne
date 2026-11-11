@@ -839,18 +839,18 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "mcp-client-marks",
     state: "glyphs",
     description:
-      "The marks on the approval flow's client cards: a real path in the brand's own colour where one exists (Claude and VS Code from simple-icons, Cursor from simple-icons v15, OpenCode from its own published favicon), and Hermes on Nous Research's crest, which is a raster and is therefore painted with the theme's own foreground through a mask rather than shown as an image, so it is ink on a dark card and ink on a light one. The tile that used to sit around each mark is gone: the card is already a rectangle. The monogram branch is what a client with no usable mark falls back to. Both branches are the same size so a grid of cards does not jump, both are aria-hidden because the card's label is the accessible name, and no third-party logo file enters the bundle: the paths are inlined path data and nothing is fetched at runtime. The brand colour is the one deliberate exception to the token sheet, because a brand mark in the product accent would be a false claim about whose mark it is.",
+      "The monograms on the approval flow's client cards, drawn from each client's own name. An earlier version inlined the vendors' artwork and their brand colours; that is somebody else's protected work regardless of the disclaimer beside it, so the bundle now carries no third-party mark and the names are the reference (`myne-md/myne#1052`, `myne-md/myne#183`). Two letters at most, uppercase, `aria-hidden` because the card's label is the accessible name, and every card the same size so the grid does not jump.",
     tags: ["settings", "ai", "mcp", "external-access", "icons", "monochrome"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <ClientMark mark="claude" name="Claude Desktop" />
-          <ClientMark mark="visualstudiocode" name="VS Code" />
-          <ClientMark mark="cursor" name="Cursor" />
-          <ClientMark mark="opencode" name="OpenCode" />
-          <ClientMark mark="nousresearch" name="Hermes" />
-          <ClientMark mark={null} name="Some MCP client" />
+          <ClientMark name="Claude Desktop" />
+          <ClientMark name="VS Code" />
+          <ClientMark name="Cursor" />
+          <ClientMark name="OpenCode" />
+          <ClientMark name="Hermes" />
+          <ClientMark name="Some MCP client" />
         </div>
       </Frame>
     ),

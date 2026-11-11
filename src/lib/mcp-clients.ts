@@ -26,9 +26,6 @@ export interface McpClientPreset {
   id: string;
   /** Display name. Product names are not translated. */
   name: string;
-  /** Key into the mark table; `null` draws a monogram rather than a redrawn
-   *  trademark. */
-  mark: string | null;
   /** Where the person registers the server, as a path they can open. */
   configPath: string;
   /**
@@ -67,7 +64,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
   {
     id: "claude-desktop",
     name: "Claude Desktop",
-    mark: "claude",
     configPath: "~/Library/Application Support/Claude/claude_desktop_config.json",
     shape: "json-mcpServers",
     source: "https://modelcontextprotocol.io/docs/develop/connect-local-servers",
@@ -77,7 +73,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
   {
     id: "claude-code",
     name: "Claude Code",
-    mark: "claude",
     configPath: "~/.claude.json",
     shape: "json-mcpServers",
     source: "https://docs.anthropic.com/en/docs/claude-code/mcp",
@@ -87,7 +82,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
   {
     id: "cursor",
     name: "Cursor",
-    mark: "cursor",
     configPath: "~/.cursor/mcp.json",
     // Cursor's docs make `type` required for a stdio entry; omitting it is the
     // copy-paste failure this shape exists to prevent.
@@ -99,7 +93,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
   {
     id: "opencode",
     name: "OpenCode",
-    mark: "opencode",
     // The global config file its docs name; a project may carry its own.
     configPath: "opencode.jsonc",
     // V2 nests servers under `mcp.servers` and does NOT put names directly under
@@ -114,7 +107,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
   {
     id: "vscode",
     name: "VS Code",
-    mark: "visualstudiocode",
     configPath: ".vscode/mcp.json",
     // VS Code's NATIVE shape: top-level `servers`, and `type` required. Its
     // portable Copilot format uses `mcpServers` instead, which is a different
@@ -127,7 +119,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
   {
     id: "hermes",
     name: "Hermes",
-    mark: "nousresearch",
     configPath: "~/.hermes/config.yaml",
     // YAML, and `mcp_servers` in snake case: a JSON block beside this client's
     // config is rejected, which is how this preset came to exist.
@@ -145,7 +136,6 @@ export const MCP_CLIENT_PRESETS: readonly McpClientPreset[] = [
 export const GENERIC_CLIENT: McpClientPreset = {
   id: "other",
   name: "Other clients",
-  mark: null,
   configPath: "",
   shape: "command",
   // No single page documents every client, so the source is the protocol
