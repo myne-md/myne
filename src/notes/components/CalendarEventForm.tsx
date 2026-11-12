@@ -91,8 +91,13 @@ export type EventFormValues = {
 
 /** Which field failed, and why. `field` is what the surface focuses. */
 export type EventFormRefusal = {
-  readonly field: "title" | "start" | "end" | "remind";
-  readonly reason: "title-required" | "start-unreadable" | "end-before-start" | "lead-beyond-horizon";
+  readonly field: "title" | "start" | "end" | "calendar" | "remind";
+  readonly reason:
+    | "title-required"
+    | "start-unreadable"
+    | "end-before-start"
+    | "calendar-required"
+    | "lead-beyond-horizon";
   /** Present for `lead-beyond-horizon`, so the message can state the limit. */
   readonly horizonDays?: number;
 };
@@ -101,7 +106,9 @@ export type EventFormPlan =
   | { readonly ok: true; readonly input: NewEventInput }
   | { readonly ok: false; readonly refusal: EventFormRefusal };
 
-/** An empty form for `date`, which is what a click on a cell opens. */
+/** An empty form for `date`, which is what a click on a cell opens. The calendar
+ *  is seeded from the vault's own list, because a NEW event must carry one
+ *  (owner, 2026-11-11). */
 export function emptyEventForm(date: string, calendar: string | null = null): EventFormValues {
   return {
     title: "",
@@ -188,13 +195,22 @@ function instantOf(date: string, time: string | null): EventInstant | null {
  * The horizon is a parameter with the tier's own default so a caller (a test, a
  * future server) can state its own without editing this module, the same
  * discipline `readEventFromFmBody`'s options follow.
+ *
+ * `requireCalendar` is the CREATE rule (owner, 2026-11-11: "calendaari olmayan bir
+ * event olusturulamamali"), off by default so an EXISTING event that carries no
+ * calendar stays editable: a hand-written note is not a record to refuse.
  */
 export function planEventForm(
   values: EventFormValues,
   horizonDays: number = REMINDER_HORIZON_DAYS,
+  options: { readonly requireCalendar?: boolean } = {},
 ): EventFormPlan {
   const title = values.title.trim();
   if (title === "") return { ok: false, refusal: { field: "title", reason: "title-required" } };
+
+  if (options.requireCalendar === true && (values.calendar === null || values.calendar === "")) {
+    return { ok: false, refusal: { field: "calendar", reason: "calendar-required" } };
+  }
 
   const start = instantOf(values.startDate, values.startTime);
   if (start === null) return { ok: false, refusal: { field: "start", reason: "start-unreadable" } };
@@ -300,7 +316,9 @@ export function CalendarEventForm({
   }, []);
 
   const submit = useCallback(async () => {
-    const current = planEventForm(values);
+    const current = planEventForm(values, REMINDER_HORIZON_DAYS, {
+      requireCalendar: mode === "create",
+    });
     if (!current.ok) {
       setRefusal(current.refusal);
       return;
@@ -476,25 +494,49 @@ export function CalendarEventForm({
 
         <span className="myne-event-form__label">{t("calendar.form.calendarLabel")}</span>
         <div className="myne-event-form__controls">
-          <Select
-            aria-label={t("calendar.form.calendarLabel")}
-            value={values.calendar === null ? NO_CALENDAR : CALENDAR_PREFIX + values.calendar}
-            options={[
-              { value: NO_CALENDAR, label: t("calendar.form.noCalendar") },
-              // The row's own name first when the vault does not know it (a note
-              // hand-written elsewhere), so opening this form cannot silently
-              // reassign an event to a different calendar.
-              ...(values.calendar !== null && !calendars.includes(values.calendar)
-                ? [{ value: CALENDAR_PREFIX + values.calendar, label: values.calendar }]
-                : []),
-              ...calendars.map((name) => ({ value: CALENDAR_PREFIX + name, label: name })),
-            ]}
-            onChange={(chosen) =>
-              patch({ calendar: chosen === NO_CALENDAR ? null : chosen.slice(CALENDAR_PREFIX.length) })
-            }
-            testId="calendar.form.calendar"
-            style={{ minWidth: "12.5em" }}
-          />
+          {/* A vault with no calendar yet gets a NAME field instead of an empty
+              menu: an event must belong to a calendar (owner, 2026-11-11) and zero
+              options would make that rule impossible to satisfy here. */}
+          {calendars.length === 0 && mode === "create" ? (
+            <Input
+              aria-label={t("calendar.form.calendarLabel")}
+              placeholder={t("calendar.form.calendarPlaceholder")}
+              value={values.calendar ?? ""}
+              onChange={(event) => patch({ calendar: event.target.value === "" ? null : event.target.value })}
+              invalid={refusal?.field === "calendar"}
+              aria-invalid={refusal?.field === "calendar" ? true : undefined}
+              data-testid="calendar.form.calendarName"
+              style={{ minWidth: "12.5em" }}
+            />
+          ) : (
+            <Select
+              aria-label={t("calendar.form.calendarLabel")}
+              value={values.calendar === null ? NO_CALENDAR : CALENDAR_PREFIX + values.calendar}
+              options={[
+                // "No calendar" is offered only where it can be kept: on an event
+                // that already has none. A create always belongs to one, so the
+                // empty option there would be a choice the form then refuses.
+                ...(mode === "edit" ? [{ value: NO_CALENDAR, label: t("calendar.form.noCalendar") }] : []),
+                // The row's own name first when the vault does not know it (a note
+                // hand-written elsewhere), so opening this form cannot silently
+                // reassign an event to a different calendar.
+                ...(values.calendar !== null && !calendars.includes(values.calendar)
+                  ? [{ value: CALENDAR_PREFIX + values.calendar, label: values.calendar }]
+                  : []),
+                ...calendars.map((name) => ({ value: CALENDAR_PREFIX + name, label: name })),
+              ]}
+              onChange={(chosen) =>
+                patch({ calendar: chosen === NO_CALENDAR ? null : chosen.slice(CALENDAR_PREFIX.length) })
+              }
+              testId="calendar.form.calendar"
+              style={{ minWidth: "12.5em" }}
+            />
+          )}
+          {refusal?.field === "calendar" && (
+            <p role="alert" className="myne-event-form__alert" data-testid="calendar.form.calendarAlert">
+              {t("calendar.form.calendarRequired")}
+            </p>
+          )}
         </div>
 
         <span className="myne-event-form__label myne-event-form__group">
@@ -634,7 +676,7 @@ export function CalendarEventForm({
           <Button variant="ghost" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" disabled={busy} onClick={() => void submit()}>
+          <Button variant="primary" disabled={busy} onClick={() => void submit()} data-testid="calendar.form.save">
             {t("calendar.form.save")}
           </Button>
         </div>

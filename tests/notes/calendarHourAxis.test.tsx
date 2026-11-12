@@ -142,28 +142,87 @@ describe("the hour axis", () => {
     cleanup();
   });
 
-  it("captures at the hour that was clicked, not at the pane's default", async () => {
+  it("opens the form at the hour that was clicked, not at the pane's default", async () => {
     const { host, cleanup } = await renderPane(dayPane());
     const fourteen = slot(host, 14)!;
     await act(async () => {
       fourteen.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    const field = host.querySelector(".myne-calendar__slotform input") as HTMLInputElement | null;
-    expect(field).not.toBeNull();
+    // The click opens the SAME form the `+` opens, seeded with the hour under the
+    // pointer: one way to make an event, and the write is what the assertion below
+    // reads - a form that saved 09:00 would look identical on screen.
+    expect(
+      host.querySelector('[data-testid="calendar.form.startTime"]')?.getAttribute("data-value"),
+    ).toBe("14:00");
 
+    const field = host.querySelector(".myne-event-form input") as HTMLInputElement;
     await act(async () => {
       // React tracks the value through its own setter, so the input is driven the
       // way a person drives it rather than by assigning `.value`.
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       setter.call(field, "Design review");
-      field!.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      field!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      host.querySelector<HTMLElement>('[data-testid="calendar.form.save"]')!.click();
     });
 
     await vi.waitFor(() => expect(created).toHaveLength(1));
     expect(created[0]).toContain("start: 2026-11-05 14:00");
+    cleanup();
+  });
+
+  // The `+` beside a date in the week and day headers (owner, 2026-11-11: "weekly
+  // viewde tarihlerin yanindaki + isareti calismiyor"). It set the inline capture
+  // at an hour of `null`, and the hour axis only drew that field inside a slot
+  // whose hour matched — so the button was a no-op in exactly the two views that
+  // have a header row.
+  it("opens the form from the + beside a day's date", async () => {
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const plus = host.querySelector<HTMLElement>('[aria-label="Add an event on 2026-11-06"]');
+    expect(plus).not.toBeNull();
+    await act(async () => {
+      plus!.click();
+    });
+    expect(
+      host.querySelector('[data-testid="calendar.form.startDate"]')?.getAttribute("data-value"),
+    ).toBe("2026-11-06");
+    cleanup();
+  });
+
+  // A block under an hour has one line of height, and the clock used to take it:
+  // a 20-minute event drew as "14:20" with no name in it (owner, 2026-11-11). The
+  // pane marks the short block and the stylesheet's compact rule spends the line
+  // on the title; what a jsdom test can hold is the marker and the presence of the
+  // title, since the paint itself is the stylesheet's.
+  it("marks a block under an hour compact, and keeps its title", async () => {
+    rangeRows = [
+      {
+        ...timedRow,
+        noteId: "n3",
+        title: "Standup",
+        start: "2026-11-05 14:20",
+        end: "2026-11-05 14:40",
+      },
+    ];
+    const { host, cleanup } = await renderPane(dayPane());
+    const block = host.querySelector('[data-testid="calendar.block"]') as HTMLElement;
+    expect(block.getAttribute("data-compact")).toBe("true");
+    expect(block.textContent).toContain("Standup");
+    // The clock the compact shape hides is still the block's tooltip, so the hour
+    // is not lost with the line it used to occupy.
+    expect(block.getAttribute("title")).toContain("Standup");
+    expect(block.getAttribute("title")).toContain("2:20");
+    cleanup();
+  });
+
+  it("leaves an hour-long block in the two-line shape", async () => {
+    const { host, cleanup } = await renderPane(dayPane());
+    const block = host.querySelector('[data-testid="calendar.block"]') as HTMLElement;
+    expect(block.getAttribute("data-compact")).toBeNull();
+    expect(block.textContent).toContain("Design review");
     cleanup();
   });
 });

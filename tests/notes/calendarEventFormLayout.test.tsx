@@ -143,6 +143,7 @@ describe("a repeat rule the picker cannot build", () => {
     const { host, cleanup } = await render(
       <CalendarEventForm
         initial={formFromRow({ title: "Standup", start: "2026-11-05 09:00", repeat: "every other blue moon" })}
+        mode="edit"
         onSubmit={onSubmit}
         onClose={() => undefined}
       />,
@@ -159,6 +160,7 @@ describe("a repeat rule the picker cannot build", () => {
     const { host, cleanup } = await render(
       <CalendarEventForm
         initial={formFromRow({ title: "Standup", start: "2026-11-05 09:00", repeat: "every other blue moon" })}
+        mode="edit"
         onSubmit={onSubmit}
         onClose={() => undefined}
       />,

@@ -1460,7 +1460,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarEventForm",
     state: "empty",
     description:
-      "The event form as a cell click opens it: one name per row on the left and its controls on the right, so the sheet reads down one column of controls instead of five stacked captions at five origins. All day is chosen, which is why no time control is drawn, and the end is an OFFER rather than an empty value - a field reading `No date` gave no way to tell it from the start date above it. The recurrence picker offers the closed vocabulary rather than a text field, so a rule Myne cannot read is not a rule a user can type.",
+      "The event form as a cell click opens it: one name per row on the left and its controls on the right, so the sheet reads down one column of controls instead of five stacked captions at five origins. All day is chosen, which is why no time control is drawn, and the end is an OFFER rather than an empty value - a field reading `No date` gave no way to tell it from the start date above it. The recurrence picker offers the closed vocabulary rather than a text field, so a rule Myne cannot read is not a rule a user can type. The calendar row is where a NEW event gets its calendar, which it must have: a vault that knows none yet names one here, and one that knows several is offered them rather than a free-text box.",
     tags: ["notes", "calendar", "form", "event", "capture"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
@@ -1510,7 +1510,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "month",
     description:
-      "The month view of November 2026 at a desktop pane's size: whole weeks starting Monday, every week row dividing the pane's height rather than stacking on its content, days divided by hairlines rather than gaps, a three-day trip drawing in all three of its cells, an overlap tinted, and a recurring occurrence carrying its repeat glyph. Each calendar name draws its own spine of token colour, so a theme change repaints the grid with the rest of the app, and the day a pointer is over is the only one offering `+`.",
+      "The month view of November 2026 at a desktop pane's size: whole weeks starting Monday, every week row dividing the pane's height rather than stacking on its content, days divided by hairlines rather than gaps, a three-day trip drawing in all three of its cells, an overlap tinted, and a recurring occurrence carrying its repeat glyph. Each calendar name tints its events' whole background with its own token colour, so a theme change repaints the grid with the rest of the app, and the day a pointer is over is the only one offering `+`.",
     tags: ["notes", "calendar", "pane", "month", "grid", "events", "recurrence", "full-height"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
@@ -1529,7 +1529,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "week",
     description:
-      "The week view around 5 November 2026: seven columns on ONE hour axis, so 10:00 is the same line across the week and an empty hour is a place a pointer can put something. A timed event is a BLOCK over the minutes it spans rather than a row pinned inside the hour it starts in, so nine till ten covers the hour after nine; two rows sharing minutes split the column's width instead of one covering the other. Pressing empty space and dragging draws a range that opens the form in it; dragging an event's body moves the whole span, day and time together, and dragging its top or bottom edge moves that instant alone. The three-day trip draws in the all-day band above the axis rather than at a made-up midnight, overlapping rows are tinted, and each row carries its calendar's colour on its spine.",
+      "The week view around 5 November 2026: seven columns on ONE hour axis, so 10:00 is the same line across the week and an empty hour is a place a pointer can put something. A timed event is a BLOCK over the minutes it spans rather than a row pinned inside the hour it starts in, so nine till ten covers the hour after nine; two rows sharing minutes split the column's width instead of one covering the other. Clicking an empty hour opens the event form at that minute, pressing and dragging draws a range that opens the form in it; dragging an event's body moves the whole span, day and time together, and dragging its top or bottom edge moves that instant alone. A block under an hour spends its one line on the title rather than on the clock. The three-day trip draws in the all-day band above the axis rather than at a made-up midnight, overlapping rows are tinted, and each row's whole background carries its calendar's colour.",
     tags: ["notes", "calendar", "pane", "week", "hour-axis", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
@@ -1548,7 +1548,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "day",
     description:
-      "The day view: one column with the hours named down its axis, opened where the day starts rather than at midnight, so a 14:00 event starts level with the label that says so, covers its own hour of the axis, and an empty hour is a target. Each hour offers capture at itself; a drag down the column draws a range and opens the form in it, and an all-day event sits in the band above the axis rather than at a made-up hour.",
+      "The day view: one column with the hours named down its axis, opened where the day starts rather than at midnight, so a 14:00 event starts level with the label that says so, covers its own hour of the axis, and an empty hour is a target. Each hour opens the event form at itself; a drag down the column draws a range and opens the form in it, and an all-day event sits in the band above the axis rather than at a made-up hour.",
     tags: ["notes", "calendar", "pane", "day", "hour-axis", "capture", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (
@@ -1567,7 +1567,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "CalendarPane",
     state: "agenda",
     description:
-      "The agenda of the next 30 days from 5 November 2026: one row per day, each offering capture on + (which opens an inline title field). A multi-day trip appears once, on the day it begins, because the agenda answers what starts on a day rather than what fills it. The unreadable group at the foot names a note that claims to be an event and does not parse, which is surfaced rather than dropped.",
+      "The agenda of the next 30 days from 5 November 2026: one row per day, each offering the day's own `+`, which opens the event form on it. A multi-day trip appears once, on the day it begins, because the agenda answers what starts on a day rather than what fills it. The unreadable group at the foot names a note that claims to be an event and does not parse, which is surfaced rather than dropped.",
     tags: ["notes", "calendar", "pane", "agenda", "capture", "events"],
     fixture: CALENDAR_FIXTURE,
     render: () => (

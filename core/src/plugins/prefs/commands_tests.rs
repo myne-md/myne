@@ -5157,3 +5157,82 @@ fn an_unapproved_connection_stamps_nothing() {
         );
     });
 }
+
+// The calendar's visibility entry (owner, 2026-11-11). The pane's "which
+// calendars this view draws" control writes `hidden.<name>`, and the setter
+// refused every such key while the client threw the refusal away: unticking a
+// calendar re-ticked itself and no event ever left the grid.
+#[test]
+fn set_calendar_visibility_persists_and_clears() {
+    rt().block_on(async {
+        let (tmp, state) = make_temp_vault_with_unlocked_state(0x3c).await;
+        let hooks = noop_hooks();
+        let io = crate::vault_io::StdVaultIo;
+        let host = crate::host::NoopHost;
+
+        set_calendar_setting_with_dir(
+            tmp.path(),
+            &state,
+            &hooks,
+            String::from("hidden.Work"),
+            Some(String::from("1")),
+            &io,
+            &host,
+        )
+        .await
+        .expect("hiding a calendar must reach vault.prefs");
+
+        let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+            .await
+            .expect("read prefs");
+        assert_eq!(
+            stored
+                .calendar_settings
+                .get("hidden.Work")
+                .map(String::as_str),
+            Some("1"),
+            "the entry the view filters on has to be the entry that was written"
+        );
+
+        // Shown again: the entry is REMOVED, never set to a second spelling of the
+        // default. A stored `0` is what the reader would treat as its opposite.
+        set_calendar_setting_with_dir(
+            tmp.path(),
+            &state,
+            &hooks,
+            String::from("hidden.Work"),
+            None,
+            &io,
+            &host,
+        )
+        .await
+        .expect("showing a calendar again");
+        let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+            .await
+            .expect("read prefs");
+        assert!(!stored.calendar_settings.contains_key("hidden.Work"));
+
+        // A value the reader would read as its own opposite is refused rather than
+        // stored, and so is a name no reader would ever match.
+        for (setting, value) in [
+            ("hidden.Work", Some(String::from("0"))),
+            ("hidden.Work/hide", Some(String::from("1"))),
+            ("hidden.", Some(String::from("1"))),
+        ] {
+            let refused = set_calendar_setting_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from(setting),
+                value,
+                &io,
+                &host,
+            )
+            .await;
+            assert!(
+                matches!(refused, Err(PrefsWriteError::InvalidValue)),
+                "{setting} must not be stored"
+            );
+        }
+    });
+}

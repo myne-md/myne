@@ -198,19 +198,18 @@ describe("dragging empty hour space", () => {
     cleanup();
   });
 
-  it("leaves a plain press as the inline capture it always was", async () => {
+  it("opens the form at the minute a plain press landed on", async () => {
     const { host, cleanup } = await renderPane();
     const nine = host.querySelector('[data-hour="9"]')!;
     pointer(nine, "pointerdown", 540);
     pointer(window, "pointerup", 540);
-    expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
 
-    // The click that follows a press-release is what captures, and a drag must not
-    // reach here - the drag already answered with the form.
-    act(() => {
-      nine.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    expect(host.querySelector(".myne-calendar__slotform input")).not.toBeNull();
+    // A press that does not move is a TAP at that minute, and the one thing it
+    // opens is the event form - there is no inline title field any more (owner,
+    // 2026-11-11), so a tap and a drag differ in the range they seed, not in what
+    // they open.
+    expect(host.querySelector('[data-testid="calendar.form"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="calendar.form.startTime"]')?.getAttribute("data-value")).toBe("09:00");
     cleanup();
   });
 });

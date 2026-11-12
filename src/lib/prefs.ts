@@ -481,9 +481,11 @@ export interface PrefsView {
   /**
    * The calendar's own settings (myne-md/myne#1037), a flat map the client owns
    * both halves of: `day_reminder_anchor` (an `HH:MM` wall-clock time, the hour
-   * an all-day event's relative reminder counts back from) and
+   * an all-day event's relative reminder counts back from),
    * `colours.<calendar name>` (a design-TOKEN name, never a colour literal, so a
-   * custom theme repaints the calendar with everything else).
+   * custom theme repaints the calendar with everything else) and
+   * `hidden.<calendar name>` (`1` while the view draws that calendar nowhere; its
+   * ABSENCE is "shown", never a stored `0`).
    *
    * Flat and per setting for the same reason as `periodic_notes`: the Phase 2
    * field clock is `calendar_settings/<key>`, so a colour edit on one device and
