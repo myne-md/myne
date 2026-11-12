@@ -10,9 +10,12 @@
 // and how a month lays out; this file draws what those functions say, which is why
 // a cell and an agenda line cannot disagree about a multi-day span.
 //
-// **A cell click captures, a row click opens its form.** Capture is one gesture (a
-// `+`, an inline title, Enter) that writes the same bytes the full form would; the
-// month grid gives it a day, the hour axis gives it an hour.
+// **One way to make an event: the form.** A cell click, an hour click and the `+`
+// beside a date all open `CalendarEventForm`, seeded with the day and hour that
+// were pointed at. There is no inline title field (owner, 2026-11-11: "isim sadece
+// dialog olarak acilmali"): a one-line box in a cell had nowhere to say which
+// calendar, and inside an hour slot its own height clipped it. A press-and-drag
+// still draws its range and then opens the form in it.
 //
 // **Locked shows a shell with no data.** The query is slot-gated host-side, so a
 // locked vault gets a refusal rather than content; the pane says so instead of
@@ -31,7 +34,6 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { IconButton } from "../../components/primitives/IconButton";
-import { Input } from "../../components/primitives/Input";
 import { SearchableSelect } from "../../components/primitives/SearchableSelect";
 import { Segmented } from "../../components/primitives/Segmented";
 import {
@@ -75,7 +77,6 @@ import {
   weekdayOf,
   type CivilDate,
 } from "@myne/dialect/civilDate";
-import { parseEventInstant } from "@myne/dialect/event";
 import {
   calendarViewOf,
   type CalendarView,
@@ -129,8 +130,13 @@ type DisplayRow = CalendarRow & { readonly task?: VaultTask };
  *  opens a calendar to answer. */
 const AGENDA_DAYS = 30;
 
-/** A captured event's default hour: the all-day reminder anchor's own. */
-const CAPTURE_HOUR = "09:00";
+/** The hour a bare day click seeds the form with: the all-day reminder anchor's
+ *  own, which is when a person's day starts. */
+const NEW_EVENT_HOUR = "09:00";
+
+/** Under this span a block has one line of height, so it spends it on the title
+ *  rather than on the clock (see the stylesheet's compact rule). */
+const COMPACT_BLOCK_MINUTES = 60;
 
 /** How many chips a month cell shows before it counts the rest. */
 const CELL_CHIPS = 3;
@@ -171,9 +177,6 @@ export function CalendarPane({
   );
   const [range, setRange] = useState<CalendarRange | null>(null);
   const [error, setError] = useState<"locked" | "failed" | null>(null);
-  const [capturing, setCapturing] = useState<string | null>(null);
-  /** The hour a click landed on; `null` means a day was clicked, not an hour. */
-  const [captureHour, setCaptureHour] = useState<string | null>(null);
   // The gesture in flight: which row, and whether the user is moving or resizing it.
   const [drag, setDrag] = useState<{
     row: CalendarRow;
@@ -211,17 +214,13 @@ export function CalendarPane({
   );
   const [failure, setFailure] = useState<EventWriteRefusal | null>(null);
   /**
-   * The full form's seed values, or `null` when it is closed.
-   *
-   * Deliberately separate from `capturing`: a click on a cell is the fast path (a
-   * title and nothing else), and the form is the deliberate one. Both write through
-   * `createEvent`, so the two paths produce the same record.
+   * The form's seed values, or `null` when it is closed. One dialog for the fast
+   * gesture and the deliberate one: they differ only in what they seed it with.
    */
   const [composing, setComposing] = useState<EventFormValues | null>(null);
   /** The range a create-drag is drawing, or `null`. */
   const [creating, setCreating] = useState<{ date: string; from: number; to: number } | null>(null);
-  /** Set while a create-drag ran, so its release does not also open the inline
-   *  capture field. */
+  /** Set while a create-drag ran, so its release does not also open the form. */
   const draggedRef = useRef(false);
   /** The event whose form is open for EDITING, or `null`. A chip opens this rather
    *  than the markdown note, which the owner wants visible only on export. */
@@ -229,8 +228,6 @@ export function CalendarPane({
   /** The time the user typed for a retimed occurrence, held per row. */
   const [retime, setRetime] = useState<string>("");
   const [reload, setReload] = useState(0);
-  const [draft, setDraft] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const view = calendarViewOf(item);
   const window = useMemo(() => windowForView(view, anchor, AGENDA_DAYS), [view, anchor]);
@@ -260,10 +257,6 @@ export function CalendarPane({
       cancelled = true;
     };
   }, [window.start, window.end, nonce, reload]);
-
-  useEffect(() => {
-    if (capturing !== null) inputRef.current?.focus();
-  }, [capturing]);
 
   /**
    * A due-bearing task drawn as a row.
@@ -450,7 +443,7 @@ export function CalendarPane({
       onDrawn: (from, to) => {
         setCreating(null);
         setComposing({
-          ...emptyEventForm(date),
+          ...emptyEventForm(date, calendars[0] ?? null),
           startTime: clockOf(from),
           endDate: date,
           endTime: clockOf(to),
@@ -458,7 +451,7 @@ export function CalendarPane({
       },
       onTap: (minute) => {
         setCreating(null);
-        openCapture(date, Math.floor(minute / 60));
+        openNewEvent(date, minute);
       },
     });
   };
@@ -524,36 +517,16 @@ export function CalendarPane({
     });
   };
 
-  const commitCapture = useCallback(
-    async (date: string) => {
-      const title = draft.trim();
-      if (title === "") {
-        setCapturing(null);
-        setCaptureHour(null);
-        return;
-      }
-      const start = parseEventInstant(`${date} ${captureHour ?? CAPTURE_HOUR}`);
-      if (start === null) {
-        setError("failed");
-        return;
-      }
-      try {
-        await createEvent({ title, start });
-        setDraft("");
-        setCapturing(null);
-        setCaptureHour(null);
-      } catch {
-        setError("failed");
-      }
-    },
-    [draft, captureHour],
-  );
-
-  /** One gesture, two grains: a day from the grid, an hour from the axis. */
-  const openCapture = (date: string, hour: number | null = null) => {
-    setCapturing(date);
-    setCaptureHour(hour === null ? null : hourValue(hour));
-    setDraft("");
+  /**
+   * THE way to make an event: open the form for a day, and for the hour a gesture
+   * named. Every new-event gesture in this pane lands here.
+   */
+  const openNewEvent = (date: string, minute: number | null = null) => {
+    setComposing({
+      ...emptyEventForm(date, calendars[0] ?? null),
+      startTime:
+        minute === null ? NEW_EVENT_HOUR : clockOf(Math.min(minute, DAY_MINUTES - 1)),
+    });
   };
 
   const heading = useMemo(() => {
@@ -577,28 +550,6 @@ export function CalendarPane({
       }
     }
   }, [view, anchor, t, locale]);
-
-  const captureField = (date: string) => (
-    <Input
-      ref={inputRef}
-      aria-label={t("calendar.capture.title")}
-      placeholder={t("calendar.capture.placeholder")}
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          void commitCapture(date);
-        }
-        if (event.key === "Escape") {
-          setCapturing(null);
-          setCaptureHour(null);
-          setDraft("");
-        }
-      }}
-      onBlur={() => void commitCapture(date)}
-    />
-  );
 
   // The preference lives in `localStorage` and Settings writes it from another screen,
   // so the calendar SUBSCRIBES: reading it once during render left an open calendar on
@@ -750,7 +701,7 @@ export function CalendarPane({
           icon="plus"
           label={t("calendar.capture.on", { date })}
           iconSize={12}
-          onClick={() => openCapture(date)}
+          onClick={() => openNewEvent(date)}
         />
       </div>
     );
@@ -771,11 +722,11 @@ export function CalendarPane({
         event.preventDefault();
         void dropOn(cell.date);
       }}
-      // Empty space in a day captures. A month cell has one line of room, so what
-      // it opens is the inline title, where a week column opens the full form.
+      // Empty space in a day opens the form for it, which is the same dialog the
+      // `+` and the header's own `+` open: one way to make an event.
       onClick={(event) => {
         if (event.target !== event.currentTarget) return;
-        openCapture(cell.date);
+        openNewEvent(cell.date);
       }}
     >
       <div className="myne-calendar__cellhead">
@@ -786,11 +737,10 @@ export function CalendarPane({
             icon="plus"
             label={t("calendar.capture.on", { date: cell.date })}
             iconSize={11}
-            onClick={() => openCapture(cell.date)}
+            onClick={() => openNewEvent(cell.date)}
           />
         </span>
       </div>
-      {capturing === cell.date && captureField(cell.date)}
       <div className="myne-calendar__events">
         {cell.rows.slice(0, CELL_CHIPS).map((row) => chip(row, true, false))}
       </div>
@@ -874,6 +824,15 @@ export function CalendarPane({
         // no layout) can assert what the block covers instead of reading pixels.
         data-start-minute={block.startMin}
         data-end-minute={block.endMin}
+        // Under an hour the block has one line of height and the clock was taking
+        // it, so a 20-minute event drew with no name (owner, 2026-11-11).
+        data-compact={minutes < COMPACT_BLOCK_MINUTES ? "true" : undefined}
+        // The clock the compact shape hides, kept where a pointer can reach it.
+        title={
+          minutes < COMPACT_BLOCK_MINUTES
+            ? `${formatWallClockTime(block.row.start.slice(11), display)} ${title}`
+            : undefined
+        }
         style={{
           top: `${(block.startMin / DAY_MINUTES) * 100}%`,
           height: `${(minutes / DAY_MINUTES) * 100}%`,
@@ -901,7 +860,12 @@ export function CalendarPane({
   };
 
   const renderTimeGrid = (cells: ReturnType<typeof weekRow>) => {
-    const gridStyle = { gridTemplateColumns: `var(--space-7) repeat(${cells.length}, minmax(0, 1fr))` };
+    // The gutter is one width for both grids this function renders: the day header
+    // row and the hour rows are separate grids, so an intrinsic track would resolve
+    // differently in each and the days would stop lining up with their own axis.
+    const gridStyle = {
+      gridTemplateColumns: `var(--calendar-gutter) repeat(${cells.length}, minmax(0, 1fr))`,
+    };
     const band = cells.some((cell) => cell.rows.some((row) => rowHour(row) === null));
     const nowMinute = minuteOfDay(now.slice(0, 16).replace("T", " "));
     return (
@@ -941,25 +905,23 @@ export function CalendarPane({
               // A block moves by the POINTER here: the hour axis can express 10:30.
             >
               {HOURS.map((hour) => {
-                const open = capturing === cell.date && captureHour === hourValue(hour);
                 return (
                   <div
                     key={hour}
                     data-hour={hour}
                     className="myne-calendar__slot"
                     onPointerDown={(event) => beginCreate(event, cell.date)}
-                    // A TARGET, not a control: `currentTarget` keeps the field's own.
+                    // A TARGET, not a control: `currentTarget` keeps a press on a
+                    // block's own body out of here.
                     onClick={(event) => {
                       if (event.target !== event.currentTarget) return;
                       if (draggedRef.current) {
                         draggedRef.current = false;
                         return;
                       }
-                      openCapture(cell.date, hour);
+                      openNewEvent(cell.date, hour * 60);
                     }}
-                  >
-                    {open && <div className="myne-calendar__slotform">{captureField(cell.date)}</div>}
-                  </div>
+                  />
                 );
               })}
               {/* Its own layer, because a slot is an hour tall and an event is not. */}
@@ -1041,7 +1003,6 @@ export function CalendarPane({
             >
               {dayHeader(day.date)}
             </div>
-            {capturing === day.date && <div style={{ padding: "var(--space-1) 0" }}>{captureField(day.date)}</div>}
             {day.rows.map((row) => (
               <div key={`${row.noteId}-${row.start}`} style={{ padding: "var(--space-0) 0" }}>
                 {chip(row, true)}
@@ -1122,7 +1083,7 @@ export function CalendarPane({
         return;
       case "n":
       case "N":
-        openCapture(today);
+        openNewEvent(today);
         event.preventDefault();
         return;
       default:
@@ -1192,7 +1153,16 @@ export function CalendarPane({
               for (const name of calendars) {
                 if (shown.has(name) !== isCalendarVisible(settings, name)) {
                   const entry = hiddenSettingFor(name, !shown.has(name));
-                  void setCalendarSetting(entry.key, entry.value);
+                  // Reported, not thrown away: the box re-ticks itself from the
+                  // stored value, so a refusal nothing announces looks like a
+                  // control that never worked.
+                  void setCalendarSetting(entry.key, entry.value).catch(() => {
+                    toast({
+                      message: t("calendar.calendarsToggleFailed"),
+                      variant: "error",
+                      testId: "calendar.calendars-toast",
+                    });
+                  });
                 }
               }
               setReload((n) => n + 1);

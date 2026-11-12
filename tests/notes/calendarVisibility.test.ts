@@ -86,8 +86,28 @@ describe("the event form's calendar row", () => {
     expect(plan.ok && plan.input.calendar).toBe("Work");
   });
 
-  it("emits no calendar at all when the row is left on 'no calendar'", () => {
-    const plan = planEventForm({ ...emptyEventForm("2026-11-05", null), startTime: "09:00", title: "Standup" });
+  it("refuses to create an event with no calendar", () => {
+    // Owner, 2026-11-11: "calendaari olmayan bir event olusturulamamali". The
+    // calendar is what colours the event and what the view filter switches off, so
+    // an event without one is a row nothing can find or hide.
+    const plan = planEventForm(
+      { ...emptyEventForm("2026-11-05", null), startTime: "09:00", title: "Standup" },
+      undefined,
+      { requireCalendar: true },
+    );
+    expect(plan.ok).toBe(false);
+    expect(plan.ok === false && plan.refusal).toMatchObject({
+      field: "calendar",
+      reason: "calendar-required",
+    });
+  });
+
+  it("still lets an event that already has no calendar be edited", () => {
+    // The rule is about CREATING. A note hand-written elsewhere carries no
+    // calendar, and refusing to save it back would make it uneditable rather than
+    // fixing its colour.
+    const plan = planEventForm({ ...emptyEventForm("2026-11-05", null), startTime: "09:00", title: "Coffee" });
+    expect(plan.ok).toBe(true);
     expect(plan.ok && plan.input.calendar).toBeNull();
   });
 

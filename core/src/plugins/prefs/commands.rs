@@ -4591,10 +4591,18 @@ pub(crate) async fn set_periodic_note_setting_with_dir(
 }
 
 /// The settings the calendar map carries (myne-md/myne#1037). Unlike
-/// [`PERIOD_SETTINGS`] one of them is namespaced by an entity: a colour belongs
-/// to a `calendar:` name, so the key is `colours.<name>`.
+/// [`PERIOD_SETTINGS`] two of them are namespaced by an entity: a colour and a
+/// visibility flag each belong to a `calendar:` name, so the keys are
+/// `colours.<name>` and `hidden.<name>`.
 const CALENDAR_ANCHOR_SETTING: &str = "day_reminder_anchor";
 const CALENDAR_COLOUR_PREFIX: &str = "colours.";
+/// The namespace a switched-off calendar's entry lives under
+/// (`src/notes/calendar/visibility.ts`): `1` means hidden, and a SHOWN calendar
+/// is the absence of the entry rather than a `0`, because a second spelling of
+/// the default is a second state to merge across devices.
+const CALENDAR_HIDDEN_PREFIX: &str = "hidden.";
+/// The one value a [`CALENDAR_HIDDEN_PREFIX`] entry may carry.
+const CALENDAR_HIDDEN_VALUE: &str = "1";
 
 /// Slot::Unlocked-gated setter for one `calendar_settings` entry
 /// (myne-md/myne#1037). `Some(value)` sets it, `None` removes the key, which the
@@ -4603,11 +4611,12 @@ const CALENDAR_COLOUR_PREFIX: &str = "colours.";
 /// non-load-bearing.
 ///
 /// Host-side validation exists because the codec deliberately performs none, and
-/// the three rules are each a key that nothing would ever read:
+/// the four rules are each a key that nothing would ever read:
 ///
-/// * the setting must be [`CALENDAR_ANCHOR_SETTING`] or carry the
-///   [`CALENDAR_COLOUR_PREFIX`] namespace, so a typo cannot write an entry that
-///   is dead on arrival;
+/// * the setting must be [`CALENDAR_ANCHOR_SETTING`], carry the
+///   [`CALENDAR_COLOUR_PREFIX`] namespace or carry the
+///   [`CALENDAR_HIDDEN_PREFIX`] one, so a typo cannot write an entry that is
+///   dead on arrival;
 /// * the anchor must be `HH:MM` in 24-hour wall clock, the same shape the client
 ///   writes, because a value the reader cannot parse is a preference that
 ///   silently does nothing;
@@ -4616,6 +4625,9 @@ const CALENDAR_COLOUR_PREFIX: &str = "colours.";
 ///   digits, `-`), because the token sheet is the client's and membership is
 ///   resolved there. A hex literal is therefore refused here rather than stored
 ///   and ignored: the calendar binds to design tokens, never to a literal.
+/// * a visibility flag must be exactly [`CALENDAR_HIDDEN_VALUE`] (or absent). The
+///   reader treats every other value as shown, so a `0` stored here would be a
+///   preference that reads as its own opposite.
 ///
 /// The NAME is user text (a calendar label) and is never logged; see
 /// src-tauri/AGENTS.md "Secret-handling logging discipline".
@@ -4717,7 +4729,8 @@ pub(crate) async fn set_calendar_setting_with_dir(
 ) -> Result<(), PrefsWriteError> {
     let is_anchor = setting == CALENDAR_ANCHOR_SETTING;
     let colour_name = setting.strip_prefix(CALENDAR_COLOUR_PREFIX);
-    if !is_anchor && colour_name.is_none() {
+    let hidden_name = setting.strip_prefix(CALENDAR_HIDDEN_PREFIX);
+    if !is_anchor && colour_name.is_none() && hidden_name.is_none() {
         return Err(PrefsWriteError::InvalidValue);
     }
     if is_anchor {
@@ -4737,12 +4750,28 @@ pub(crate) async fn set_calendar_setting_with_dir(
             }
         }
     }
+    if let Some(name) = hidden_name {
+        if !is_legal_calendar_name(name) {
+            return Err(PrefsWriteError::InvalidValue);
+        }
+        if let Some(v) = value.as_deref() {
+            if v != CALENDAR_HIDDEN_VALUE {
+                return Err(PrefsWriteError::InvalidValue);
+            }
+        }
+    }
 
     let cleared = value.is_none();
     // The logged entry is the setting's own kind, never the calendar name: a
     // calendar label is user text (AS3-class vault structure) and the name is
     // the only part of this key a person typed.
-    let logged_kind = if is_anchor { "anchor" } else { "colour" };
+    let logged_kind = if is_anchor {
+        "anchor"
+    } else if colour_name.is_some() {
+        "colour"
+    } else {
+        "hidden"
+    };
 
     update_prefs_with_dir(
         vault_dir,

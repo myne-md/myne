@@ -5757,9 +5757,7 @@
     "locked": "Unlock the vault to see the calendar.",
     "loadFailed": "The calendar could not be read. Your vault has not changed.",
     "capture": {
-      "on": "Add an event on {{date}}",
-      "title": "Event title",
-      "placeholder": "What is happening"
+      "on": "Add an event on {{date}}"
     },
     "unreadable": {
       "heading": "{{count}} event could not be read",
@@ -5861,7 +5859,9 @@
       "minute": "Minute",
       "editTitle": "Edit event",
       "calendarLabel": "Calendar",
-      "noCalendar": "No calendar"
+      "noCalendar": "No calendar",
+      "calendarPlaceholder": "Name a calendar, such as Personal",
+      "calendarRequired": "Give the event a calendar. It is what colours the event, and what this view can switch off."
     },
     "occurrenceOf": "One occurrence of a series, on {{date}}",
     "occurrence": {
@@ -5917,7 +5917,8 @@
     "taskRow": "A task due {date}",
     "composeOn": "Add an event on {date}",
     "calendarsToggle": "Calendars shown",
-    "calendarsToggleHelper": "Untick one to take it off this view. Nothing is deleted."
+    "calendarsToggleHelper": "Untick one to take it off this view. Nothing is deleted.",
+    "calendarsToggleFailed": "That calendar was not switched. It is still as it was."
   },
   "identityForget": {
     "body": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device.",

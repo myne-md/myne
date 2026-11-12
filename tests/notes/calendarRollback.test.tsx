@@ -333,22 +333,27 @@ describe("the pane as a calendar", () => {
 });
 
 describe("starting an event from the grid", () => {
-  it("captures on the day and hour whose empty space was clicked", async () => {
+  it("opens the form on the day and hour whose empty space was clicked", async () => {
     const { host, cleanup } = await renderPane(
       <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
     );
     // The week view is an hour axis, so the target is one cell of it: the 6th at
     // 11:00. The claim is the same one this test has always made - the note lands
     // where the user pointed rather than on today - and it now holds for the hour
-    // as well as the day.
+    // as well as the day, through the form rather than an inline field.
     const slot = host.querySelector('[data-date="2026-11-06"] [data-hour="11"]') as HTMLElement;
     act(() => {
       slot.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await act(async () => {});
-    const field = host.querySelector(".myne-calendar__slotform input") as HTMLInputElement;
-    expect(field).not.toBeNull();
+    expect(
+      host.querySelector('[data-testid="calendar.form.startDate"]')?.getAttribute("data-value"),
+    ).toBe("2026-11-06");
+    expect(
+      host.querySelector('[data-testid="calendar.form.startTime"]')?.getAttribute("data-value"),
+    ).toBe("11:00");
 
+    const field = host.querySelector(".myne-event-form input") as HTMLInputElement;
     await act(async () => {
       // React tracks the value through its own setter, so the field is driven the
       // way a person drives it rather than by assigning `.value`.
@@ -357,7 +362,7 @@ describe("starting an event from the grid", () => {
       field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      host.querySelector<HTMLElement>('[data-testid="calendar.form.save"]')!.click();
     });
 
     await vi.waitFor(() => expect(created).toHaveLength(1));
