@@ -20,6 +20,16 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string, opts?: Record<string, unknown>) => (opts ? `${key}:${JSON.stringify(opts)}` : key) }),
 }));
 
+// The opener seam, mocked at the module boundary the component imports: the
+// manual route's whole value is reaching a browser, so the assertion is on the
+// seam rather than on an `<a href>` that the WebView would drop.
+const { openUrl } = vi.hoisted(() => ({ openUrl: vi.fn(() => Promise.resolve()) }));
+vi.mock("../../src/platform/opener", () => ({
+  openUrl,
+  openPath: vi.fn(),
+  revealItemInDir: vi.fn(),
+}));
+
 import { UpdatingScreen } from "../../src/screens/UpdatingScreen";
 import type { UpdateProgressState } from "../../src/hooks/useUpdateAvailable";
 
@@ -171,6 +181,26 @@ describe("the failed phase", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByTestId("update.failed-back"));
     expect(onBackToUnlock).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the manual route in a browser, not as a dead anchor", async () => {
+    // Myne's WebView drops an anchor with no handler, so the one control whose
+    // whole purpose is reaching a browser is a button that calls the opener seam
+    // (myne-md/myne#1059). Asserted by behaviour rather than by tag name: the
+    // failure this replaces was an anchor that looked right and did nothing.
+    openUrl.mockClear();
+    render(
+      <UpdatingScreen
+        phase="failed"
+        version="0.10.1"
+        onRetry={vi.fn()}
+        onBackToUnlock={vi.fn()}
+      />,
+    );
+    const link = screen.getByTestId("update.failed-manual");
+    expect(link.getAttribute("href")).toBe("https://myne.md/download/");
+    fireEvent.click(link);
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/download/");
   });
 
   it("draws no bar at all: the install is not running, so there is nothing to measure", () => {
