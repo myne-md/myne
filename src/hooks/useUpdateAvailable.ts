@@ -210,10 +210,19 @@ export function useUpdateAvailable({
     listen<UpdateProgress>(UPDATE_PROGRESS_EVENT, (event) => {
       const tick = event.payload;
       if (tick.phase === "downloading") {
-        setProgress({
-          phase: "downloading",
-          downloaded: tick.downloaded,
-          total: tick.total,
+        setProgress((prev) => {
+          // NEVER BACKWARDS (myne-md/myne#1059): two installs used to emit on
+          // this one event name and the renderer took whichever arrived last,
+          // so the bar ran forwards and back at once. The host refuses a second
+          // install now; a readout that cannot regress is still the property
+          // this screen is supposed to have on its own.
+          const floor = prev.phase === "downloading" ? prev.downloaded : 0;
+          return {
+            phase: "downloading",
+            downloaded: Math.max(floor, tick.downloaded),
+            // A tick with no total does not erase one an earlier tick measured.
+            total: tick.total ?? prev.total,
+          };
         });
       } else {
         // The byte counts stay from the last tick: the screen shows a full bar
