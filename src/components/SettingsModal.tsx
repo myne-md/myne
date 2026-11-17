@@ -402,8 +402,14 @@ const RAIL_STYLE: CSSProperties = {
   minHeight: 0,
 };
 
-// The tab list, beneath the search box. Scrolls independently if the panel set
-// ever outgrows the rail height.
+// The tab list, beneath the search box. Scrolls independently when the panel set
+// outgrows the rail height (myne-md/myne#1061).
+//
+// `minHeight: 0` on this box and `flex: 1` are what give it a definite height, and
+// that height is why the rows must not shrink: in a flex column the items shrink
+// by default to fit before anything overflows, so the rail compressed every row to
+// its label's height — no padding, icons touching, the last rows cut off — instead
+// of scrolling. `overflowY: auto` alone never had a chance to do anything.
 const RAIL_NAV_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -412,11 +418,18 @@ const RAIL_NAV_STYLE: CSSProperties = {
   overflowY: "auto",
   flex: 1,
   minHeight: 0,
+  overscrollBehavior: "contain",
 };
 
 const RAIL_ITEM_BASE_STYLE: CSSProperties = {
   width: "100%",
   height: 40,
+  // The row's height and padding are a fixed rhythm, not something the flex
+  // algorithm negotiates when the list is longer than the rail.
+  flexShrink: 0,
+  boxSizing: "border-box",
+  // The row's height and padding are a fixed rhythm, not something the flex
+  // algorithm negotiates when the list is longer than the rail.
   padding: "0 var(--space-5)",
   border: 0,
   background: "transparent",
@@ -443,6 +456,7 @@ const RAIL_ITEM_SELECTED_STYLE: CSSProperties = {
 // Not a tab (no `role="tab"`, absent from `itemRefs`), so ↑/↓ tab cycling
 // skips it.
 const RAIL_GROUP_HEADER_STYLE: CSSProperties = {
+  flexShrink: 0,
   padding: "var(--space-4) var(--space-5) var(--space-2)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-xs)",
