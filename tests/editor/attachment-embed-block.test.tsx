@@ -184,7 +184,8 @@ describe("embedIsAlone", () => {
 });
 
 describe("ownLineInsertion", () => {
-  const at = (doc: string, pos: number) => ownLineInsertion(Text.of(doc.split("\n")), pos, "X");
+  const at = (doc: string, pos: number, block = false) =>
+    ownLineInsertion(Text.of(doc.split("\n")), pos, "X", block);
 
   it("adds nothing when the line is empty", () => {
     expect(at("a\n\nb", 2)).toEqual({ insert: "X", anchor: 3 });
@@ -206,6 +207,19 @@ describe("ownLineInsertion", () => {
 
   it("adds no trailing newline when only whitespace follows", () => {
     expect(at("hello   ", 5)).toEqual({ insert: "\nX", anchor: 7 });
+  });
+
+  it("leaves a block with a line under it when it lands at the end of the note", () => {
+    // A block owns its whole line, so with nothing after it a click below it, or
+    // a paste there, resolves to the nearest position that exists — above the
+    // image. Measured on `Paragraph one.\n![[photo]]`: the paste landed at the
+    // START of the paragraph (myne-md/myne#1063).
+    expect(at("hello", 5, true)).toEqual({ insert: "\nX\n", anchor: 7 });
+    expect(at("hello   ", 5, true)).toEqual({ insert: "\nX\n", anchor: 7 });
+  });
+
+  it("leaves a mid-note block alone, since a line already follows it", () => {
+    expect(at("a\n\nb", 2, true)).toEqual({ insert: "X", anchor: 3 });
   });
   it("protects the whole replaced span, indent included, on an indented block embed", async () => {
     // The block decoration replaces `[line.from, line.to)` while the atomic
