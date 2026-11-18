@@ -65,7 +65,10 @@ const WRAP_STYLE: CSSProperties = {
   // mispositioned element.
   position: "fixed",
   insetInline: 0,
-  bottom: "calc(var(--space-5) + var(--space-6))",
+  // `--notice-stack-h` is the height the bottom-centre notice column published
+  // while something is showing there (myne-md/myne#1060), so an offer and a
+  // warning never land on top of each other. Zero when the column is empty.
+  bottom: "calc(var(--notice-stack-h, 0px) + var(--space-5) + var(--space-6))",
   display: "flex",
   justifyContent: "center",
   // The row spans the window, so it must not swallow clicks aimed at the editor

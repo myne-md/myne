@@ -38,7 +38,7 @@
 //    so dismissing it would restore exactly the silence the refusal exists to
 //    break.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "../../platform/event";
 import { ReconcileBanner } from "./ReconcileBanner";
@@ -49,13 +49,10 @@ import { useTorState } from "../../hooks/useTorState";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { isSyncStale } from "../../lib/sync-staleness";
 import { resetPersonIdentityState } from "./personIdentityState";
+import { NoticeCard, NoticeStack } from "../notices/NoticeStack";
 
-const STACK_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-  padding: "var(--space-2) var(--space-4) 0",
-};
+// The stack itself is `NoticeStack` (bottom centre, see that file's header). This
+// component's job is now only to decide WHICH notices exist.
 
 export function SyncBanners() {
   const { t } = useTranslation();
@@ -140,7 +137,7 @@ export function SyncBanners() {
   }
 
   return (
-    <div style={STACK_STYLE}>
+    <NoticeStack>
       {/* First in the stack: it is the only banner here that means nothing is
           leaving the device at all. */}
       <TorStatusBanner posture={torPosture} />
@@ -153,119 +150,51 @@ export function SyncBanners() {
         onDismiss={() => setIntegrity(false)}
       />
       {showStale && (
-        // `role="alert"`: unlike the progress strips above, this one is telling
+        // `role="alert"`: unlike the progress notices above, this one is telling
         // the user something is wrong right now and has been for days.
-        <div
+        // No date, no elapsed count — AS15 keeps per-device sync clocks off
+        // screen, and the stored timestamp exists to answer the threshold rather
+        // than to be rendered.
+        <NoticeCard
+          severity="warning"
           role="alert"
-          data-testid="sync.stale-warning"
-          style={{
-            display: "flex",
-            gap: "var(--space-2)",
-            alignItems: "baseline",
-            padding: "var(--space-3) var(--space-4)",
-            borderRadius: "var(--radius-2)",
-            border: "1px solid var(--warning)",
-            background: "var(--bg-2)",
-            color: "var(--fg-1)",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-          }}
+          testId="sync.stale-warning"
+          onDismiss={() => setStaleDismissed(true)}
+          dismissLabel={t("common.dismiss")}
+          dismissTestId="sync.stale-dismiss"
         >
-          {/* No date, no elapsed count — AS15 keeps per-device sync clocks off
-              screen, and the stored timestamp exists to answer the threshold
-              rather than to be rendered. */}
-          <span style={{ flex: 1 }}>{t("sync.stale.body")}</span>
-          <button
-            type="button"
-            onClick={() => setStaleDismissed(true)}
-            data-testid="sync.stale-dismiss"
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--fg-3)",
-              cursor: "pointer",
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
-              padding: 0,
-            }}
-          >
-            {t("common.dismiss")}
-          </button>
-        </div>
+          {t("sync.stale.body")}
+        </NoticeCard>
       )}
       {showMaterialising && materialising !== null && (
         // `role="status"`, not `alert`: this is progress, not a problem, and an
         // assertive live region would interrupt a screen reader every 250 ms.
-        <div
-          role="status"
-          data-testid="sync.materialising"
-          data-done={materialising.done}
-          data-total={materialising.total}
-          style={{
-            display: "flex",
-            gap: "var(--space-2)",
-            padding: "var(--space-3) var(--space-4)",
-            borderRadius: "var(--radius-2)",
-            border: "1px solid var(--line-1)",
-            background: "var(--bg-2)",
-            color: "var(--fg-2)",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-          }}
-        >
-          <span>
+        <div data-done={materialising.done} data-total={materialising.total}>
+          <NoticeCard severity="info" testId="sync.materialising">
             {t("sync.materialising", {
               done: materialising.done,
               total: materialising.total,
             })}
-          </span>
+          </NoticeCard>
         </div>
       )}
       {credentialAmbiguous && (
         // No `onDismiss`, deliberately. The condition does not resolve on its
         // own and every later cycle re-refuses, so a dismiss button would let
-        // the user restore the silence this banner exists to break — on the one
+        // the user restore the silence this notice exists to break — on the one
         // client (web) where the recovery phrase is not a backstop.
-        <div
-          role="alert"
-          data-testid="sync.credential-ambiguous"
-          style={{
-            display: "flex",
-            gap: "var(--space-2)",
-            padding: "var(--space-3) var(--space-4)",
-            borderRadius: "var(--radius-2)",
-            border: "1px solid var(--warning)",
-            background: "var(--bg-2)",
-            color: "var(--fg-1)",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-          }}
-        >
-          <span>{t("sync.credentialAmbiguous")}</span>
-        </div>
+        <NoticeCard severity="warning" role="alert" testId="sync.credential-ambiguous">
+          {t("sync.credentialAmbiguous")}
+        </NoticeCard>
       )}
       {rekeyedElsewhere && (
         // Informational, not an alarm: nothing went wrong and nothing was lost.
         // The user (or their other device) upgraded this vault's format, and
         // this session's keys are simply the previous generation's.
-        <div
-          role="status"
-          data-testid="sync.vault-rekeyed"
-          style={{
-            display: "flex",
-            gap: "var(--space-2)",
-            padding: "var(--space-3) var(--space-4)",
-            borderRadius: "var(--radius-2)",
-            border: "1px solid var(--line-1)",
-            background: "var(--bg-2)",
-            color: "var(--fg-1)",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-sm)",
-          }}
-        >
-          <span>{t("sync.vaultRekeyed")}</span>
-        </div>
+        <NoticeCard severity="info" role="status" testId="sync.vault-rekeyed">
+          {t("sync.vaultRekeyed")}
+        </NoticeCard>
       )}
-    </div>
+    </NoticeStack>
   );
 }
