@@ -922,7 +922,7 @@
     "src/screens/AuthShell.tsx": 92,
     "src/screens/CreateVault.tsx": 240,
     "src/screens/DeviceRevoked.tsx": 50,
-    "src/screens/Editor.tsx": 2061,
+    "src/screens/Editor.tsx": 2062,
     "src/screens/FirstRun.tsx": 45,
     "src/screens/IdentityHome.tsx": 243,
     "src/screens/PendingApproval.tsx": 58,
