@@ -5,37 +5,9 @@
 // (E2E asserts it by full-literal equality). Penpot skipped per the owner
 // directive; built against design tokens.
 
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { SYNC_INTEGRITY_ALERT } from "../../lib/load-bearing-copy";
-import { HOVER_TRANSITION } from "../primitives/hoverSurface";
-import { interactiveSurface } from "../primitives/interactiveSurface";
-
-const STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "flex-start",
-  gap: "var(--space-2)",
-  background: "var(--warning-soft)",
-  border: "1px solid var(--warning)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-4)",
-  fontSize: "var(--text-base)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--fg-1)",
-};
-
-const DISMISS_STYLE: CSSProperties = {
-  marginInlineStart: "auto",
-  background: "transparent",
-  border: 0,
-  color: "var(--fg-3)",
-  cursor: "pointer",
-  fontSize: "var(--text-lg)",
-  lineHeight: 1,
-  padding: "0 var(--space-1)",
-  transition: HOVER_TRANSITION,
-};
+import { NoticeCard } from "../notices/NoticeStack";
 
 interface IntegrityAlertBannerProps {
   /** Whether the alert is active (an integrity failure was raised). */
@@ -47,21 +19,18 @@ interface IntegrityAlertBannerProps {
 export function IntegrityAlertBanner({ present, onDismiss }: IntegrityAlertBannerProps) {
   const { t } = useTranslation();
   if (!present) return null;
+  // The one message here that is a WARNING rather than a status: it says the
+  // server's answer was refused, so it keeps `alert` and the warning border.
   return (
-    <div role="alert" data-testid="sync.integrity-alert" style={STYLE}>
-      <span>{SYNC_INTEGRITY_ALERT}</span>
-      {onDismiss && (
-        <button
-          type="button"
-          aria-label={t("common.dismiss")}
-          onClick={onDismiss}
-          style={DISMISS_STYLE}
-          {...interactiveSurface()}
-          data-testid="sync.integrity-alert-dismiss"
-        >
-          ×
-        </button>
-      )}
-    </div>
+    <NoticeCard
+      severity="warning"
+      role="alert"
+      testId="sync.integrity-alert"
+      onDismiss={onDismiss}
+      dismissLabel={onDismiss ? t("common.dismiss") : undefined}
+      dismissTestId="sync.integrity-alert-dismiss"
+    >
+      {SYNC_INTEGRITY_ALERT}
+    </NoticeCard>
   );
 }
