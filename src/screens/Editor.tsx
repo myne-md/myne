@@ -2489,9 +2489,10 @@ function EditorChrome({
           visible until then. No confirm-discard dialog - the flush is
           automatic. */}
       {switching && <SwitchingOverlay />}
-      {/* Sync banners (MYND-426 reconcile / MYND-427 integrity), above the
-          three-pane row. Non-blocking + dismissable; renders nothing while sync
-          is off (the common case). */}
+      {/* Sync notices (MYND-426 reconcile / MYND-427 integrity). They render
+          into the bottom-centre column now rather than a band above the panes
+          (myne-md/myne#1060), so this line no longer occupies a row of the
+          editor; it still renders nothing at all while sync is off. */}
       <SyncBanners />
       {/* Desktop self-update left this chrome (myne-md/myne#870). The notice
           floats at the bottom centre now and `App.tsx` mounts it, because the
