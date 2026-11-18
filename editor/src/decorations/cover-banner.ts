@@ -39,8 +39,8 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import { readCoverFromFmBody } from "@myne/dialect/surgery";
 import i18n from "@myne/editor/i18n";
 import { attachmentUrl } from "@myne/editor/host/notes/attachmentRef";
@@ -150,7 +150,7 @@ export function coverBannerState(
  * pending placeholder to a real blob URL, and a widget that compares equal
  * would keep the stale src forever (#211).
  */
-class CoverBannerWidget extends WidgetType {
+class CoverBannerWidget extends LineHeightWidget {
   constructor(private readonly url: string | null) {
     super();
   }

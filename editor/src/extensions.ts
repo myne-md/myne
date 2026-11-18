@@ -26,6 +26,7 @@ import "./base.css";
 
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
 import { selectionRemeasure } from "./selection-remeasure";
+import { selectionBand, selectionMarksWidgets } from "./selection-band";
 import {
   defaultKeymap,
   history,
@@ -273,6 +274,14 @@ export function myneExtensions(opts?: {
     //      decoration / cursor-aware-reveal layers run.
     EditorState.allowMultipleSelections.of(true),
     drawSelection(),
+    // myne-md/myne#1062: the band is a decoration over the selected characters,
+    // so it ends at the last character of each line instead of stretching to the
+    // content column's right edge. `theme.ts` retires the layer's rectangles and
+    // keeps its caret and iOS drag handles.
+    selectionBand(),
+    // The same seam's other half: a block widget is a sibling of the lines, so
+    // the band cannot reach it and a selected image would look unselected.
+    selectionMarksWidgets(),
     // myne#660: give the layer above a second look after a selection change
     // that moved the line's DOM with it. Immediately after `drawSelection()`
     // deliberately, it exists only to correct that layer, and reading the two
