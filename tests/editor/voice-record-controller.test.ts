@@ -159,7 +159,7 @@ describe("startVoiceRecording", () => {
     await startVoiceRecording(view);
     await Promise.resolve();
     clipCb!(imported(ID, "clip1.wav"));
-    expect(view.state.doc.toString()).toBe(`![[att:${ID}|clip1.wav]]`);
+    expect(view.state.doc.toString()).toBe(`![[att:${ID}|clip1.wav]]\n`);
     // The catalog cache is seeded so the embed resolves to its player immediately.
     expect(view.state.field(catalogField)!.get(ID)!.contentType).toBe("audio/wav");
     lastBarOpts!.onCancel();
@@ -229,7 +229,7 @@ describe("finishRecording (Stop)", () => {
     // calls the package's own `voiceNoteFilename`), so what this asserts is that
     // stop was reached — the naming convention has its own test.
     expect(voiceStop).toHaveBeenCalledOnce();
-    expect(view.state.doc.toString()).toBe(`![[att:${ID}|final.wav]]`);
+    expect(view.state.doc.toString()).toBe(`![[att:${ID}|final.wav]]\n`);
     expect(barHandle.teardown).toHaveBeenCalled();
     expect(isRecording()).toBe(false);
     view.destroy();

@@ -1147,7 +1147,7 @@
     "editor/src/attachments/image-zoom-controller.ts": 68,
     "editor/src/attachments/image-zoom.ts": 62,
     "editor/src/attachments/insert-placeholder.ts": 32,
-    "editor/src/attachments/insert.ts": 236,
+    "editor/src/attachments/insert.ts": 241,
     "editor/src/attachments/lightbox.ts": 120,
     "editor/src/attachments/meetingBar.ts": 63,
     "editor/src/attachments/paste-drop.ts": 80,

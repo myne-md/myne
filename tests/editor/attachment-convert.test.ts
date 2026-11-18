@@ -79,7 +79,9 @@ describe("insertEmbedsForOutcomes", () => {
     // the cursor sits after `X`, so the insert breaks the line rather than
     // leaving the embed inside that prose.
     expect(view.state.doc.toString()).toBe(
-      `X\n![[att:${ID_A}|a.png]]\n![[att:${ID_B}|b.png]]`,
+      // Trailing newline: the last embed is the end of the note, so the insert
+      // leaves a line under it (myne-md/myne#1063).
+      `X\n![[att:${ID_A}|a.png]]\n![[att:${ID_B}|b.png]]\n`,
     );
     view.destroy();
   });

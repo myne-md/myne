@@ -100,7 +100,10 @@ describe("insertEmbedsForOutcomes", () => {
       before,
     );
     expect(view.state.doc.toString()).toBe(
-      `seed\n![[att:${ID_A}|one.png]]\n![[att:${ID_B}|two.png]]`,
+      // The trailing newline is the own-line rule reaching the END of the note
+      // (myne-md/myne#1063): a block with nothing after it strands the caret
+      // above it, so the insert leaves a line to paste into.
+      `seed\n![[att:${ID_A}|one.png]]\n![[att:${ID_B}|two.png]]\n`,
     );
     view.destroy();
   });
@@ -120,7 +123,7 @@ describe("insertEmbedsForOutcomes", () => {
     // CLAMPED position, which is what makes it worth asserting here: the clamp
     // and the placement have to compose, and a clamp that ran after the
     // placement would break the line at the wrong offset.
-    expect(view.state.doc.toString()).toBe(`ab\n![[att:${ID_A}|x.png]]`);
+    expect(view.state.doc.toString()).toBe(`ab\n![[att:${ID_A}|x.png]]\n`);
     view.destroy();
   });
 });
@@ -147,7 +150,7 @@ describe("importAndInsert", () => {
       0,
     );
     expect(outcomes.map((o) => o.ok)).toEqual([true, false]);
-    expect(view.state.doc.toString()).toBe(`![[att:${ID_A}|good.png]]`);
+    expect(view.state.doc.toString()).toBe(`![[att:${ID_A}|good.png]]\n`);
     // A mixed batch produces a "1 added · 1 skipped: …" toast.
     expect(showAttachmentToast).toHaveBeenCalledWith("1 added · 1 skipped: unsupported type");
     view.destroy();
@@ -248,7 +251,7 @@ describe("paste handler (domEventHandlers)", () => {
     firePaste(view, fakeDataTransfer({ items: [fileItem(file)], files: [file] }));
     await flush();
     expect(importCalls).toBe(1);
-    expect(view.state.doc.toString()).toBe(`![[att:${ID_A}|pasted.png]]`);
+    expect(view.state.doc.toString()).toBe(`![[att:${ID_A}|pasted.png]]\n`);
     view.destroy();
   });
 });
@@ -288,7 +291,7 @@ describe("drop handler (domEventHandlers)", () => {
     const file = new File([new Uint8Array([9])], "dropped.png", { type: "image/png" });
     fireDrop(view, fakeDataTransfer({ files: [file] }));
     await flush();
-    expect(view.state.doc.toString()).toBe(`![[att:${ID_B}|dropped.png]]`);
+    expect(view.state.doc.toString()).toBe(`![[att:${ID_B}|dropped.png]]\n`);
     view.destroy();
   });
 });

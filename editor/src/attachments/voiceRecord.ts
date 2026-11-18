@@ -52,7 +52,7 @@ function insertVoiceEmbed(view: EditorView, imported: ImportedAttachment): void 
   const embed = emitAttachmentEmbed(imported.id, imported.filename);
   const at = view.state.selection.main.head;
   // Its own line, like every other embed Myne writes (myne-md/myne#604).
-  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embed);
+  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embed, true);
   view.dispatch({
     changes: { from: at, insert },
     selection: { anchor },
