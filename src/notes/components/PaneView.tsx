@@ -680,7 +680,20 @@ export function PaneView({
       return next === prev.text ? prev : { text: next, base: prev.text };
     });
   }, []);
-  const [loading, setLoading] = useState<boolean>(false);
+  // A pane that MOUNTS with a note already active has no body for it yet, and the
+  // effect that reads one runs after the first paint. Between those two moments
+  // the editor would render an EMPTY document, and a reader clicking into it
+  // puts a selection anchor at position 0; the body then arrives underneath the
+  // gesture and the release extends that anchor to the clicked point, so the
+  // note opens with everything from its first character to the click selected -
+  // and scrolled to the top (myne-md/myne#1071). Starting in the loading state
+  // when a note is already active removes the window rather than the symptom:
+  // there is no document to click into until the body for THIS note is there.
+  //
+  // Defaulted from `activeId` and not `true`: a pane that mounts with no note
+  // selected has nothing to load, and a loading flash on every split would be a
+  // regression of its own.
+  const [loading, setLoading] = useState<boolean>(activeId !== null);
 
   // Persistent-view swap (MYND-534). One long-lived CMEditor per pane; on a
   // markdown→markdown note switch we cache the outgoing note's EditorState (undo +

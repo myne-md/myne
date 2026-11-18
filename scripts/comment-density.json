@@ -798,7 +798,7 @@
     "src/notes/components/NoteRow.tsx": 312,
     "src/notes/components/OutlineTab.tsx": 48,
     "src/notes/components/PaneTree.tsx": 25,
-    "src/notes/components/PaneView.tsx": 1257,
+    "src/notes/components/PaneView.tsx": 1270,
     "src/notes/components/ProposalDiffBody.tsx": 37,
     "src/notes/components/SaveStatus.tsx": 104,
     "src/notes/components/SeedMemoryCard.tsx": 29,
