@@ -35,7 +35,8 @@ import {
   StateEffect,
   StateField,
 } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import i18n from "@myne/editor/i18n";
 import {
   editorFocusChanged,
@@ -129,7 +130,7 @@ export function taskQueryBlocks(state: EditorState): TaskQueryBlock[] {
   return blocks;
 }
 
-class TaskQueryWidget extends WidgetType {
+class TaskQueryWidget extends LineHeightWidget {
   constructor(
     private readonly queryKey: string,
     private readonly render: TaskQueryRender | undefined,

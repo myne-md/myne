@@ -45,8 +45,8 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import type { SyntaxNode } from "@lezer/common";
 import { isCursorLine, isInsideRange } from "./cursor-aware";
 import {
@@ -271,7 +271,7 @@ const footnoteClickHandler = EditorView.domEventHandlers({
 
 // --- 3. EOD "Footnotes" block widget (StateField) -------------------------
 
-class FootnoteListWidget extends WidgetType {
+class FootnoteListWidget extends LineHeightWidget {
   constructor(private readonly model: FootnoteModel) {
     super();
   }
