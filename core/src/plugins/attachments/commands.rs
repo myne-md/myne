@@ -25,8 +25,8 @@
 use super::compress::{self, CompressOutcome};
 use super::error::{
     AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentExportError,
-    AttachmentImportError, AttachmentRenameError, AttachmentServeError, AttachmentUnusedListError,
-    CatalogListError,
+    AttachmentImportError, AttachmentPlacementError, AttachmentRenameError, AttachmentServeError,
+    AttachmentUnusedListError, CatalogListError,
 };
 use super::extract_types::ExtractedText;
 use super::sniff::sniff_content_type;
@@ -43,9 +43,10 @@ use protocol::{
     SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
     VAULT_META_ACCOUNT_HASH_LEN,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use unicode_normalization::UnicodeNormalization;
 // Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use crate::host::tauri_host::TauriHost;
@@ -1068,6 +1069,9 @@ pub struct CatalogEntry {
     pub created_at: u64,
     /// Display filename.
     pub filename: String,
+    /// The vault folder this attachment is filed in, canonical with a trailing
+    /// `/`, or empty for the vault root (myne-md/myne#1075).
+    pub folder: String,
     /// File size in bytes.
     pub size: u64,
 }
@@ -1145,6 +1149,7 @@ pub(crate) async fn catalog_list_with_dir(
             content_type: meta.content_type,
             created_at: meta.created_at,
             filename: meta.filename,
+            folder: meta.folder,
             size: meta.size,
         })
         .collect();
@@ -1403,6 +1408,7 @@ pub(crate) async fn attachment_unused_list_with_dir(
             content_type: meta.content_type,
             created_at: meta.created_at,
             filename: meta.filename,
+            folder: meta.folder,
             size: meta.size,
         })
         .collect();
@@ -2227,6 +2233,204 @@ pub(crate) async fn attachment_rename_with_dir(
     Ok(())
 }
 
+// ---- attachment_set_folders (myne-md/myne#1075) --------------------------
+
+/// One assignment in an [`attachment_set_folders`] batch: file this attachment
+/// under this folder. An empty `folder` is the vault root.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentFolderAssignment {
+    /// Attachment-id, lowercase hex (the `attachment://<id>` path).
+    pub id: String,
+    /// Canonical folder path with a trailing `/`, or empty for the root.
+    pub folder: String,
+}
+
+/// The canonical form of a folder as this field stores it: NFC, no empty
+/// segments, a trailing `/` on every non-empty result, and **display case
+/// preserved**.
+///
+/// Not [`crate::folder_key::canonical_folder`], and the difference is the whole
+/// reason this function exists: that one lowercases, because it produces a
+/// MATCHING KEY (`Private/` and `private/` must not be two exclusions). This one
+/// produces a value a person sees, so `Ders Notları/` keeps its capitalisation.
+///
+/// `None` means the string is not a folder path at all: a `.` or `..` segment (it
+/// would name a parent the vault does not have), a backslash (a segment
+/// separator on a platform this vault may be opened on, and never one here), or a
+/// NUL. The caller reports that as `InvalidFolder` rather than repairing it,
+/// because silently dropping a `..` segment turns one path into another one.
+fn canonical_display_folder(folder: &str) -> Option<String> {
+    let trimmed = folder.trim();
+    if trimmed.is_empty() {
+        return Some(String::new());
+    }
+    if trimmed.contains('\0') || trimmed.contains('\\') {
+        return None;
+    }
+    let mut out = String::new();
+    for segment in trimmed.split('/') {
+        if segment.is_empty() {
+            continue;
+        }
+        if segment == "." || segment == ".." {
+            return None;
+        }
+        if !out.is_empty() {
+            out.push('/');
+        }
+        out.push_str(segment);
+    }
+    if out.is_empty() {
+        return Some(String::new());
+    }
+    out.push('/');
+    Some(out.nfc().collect::<String>())
+}
+
+/// File a batch of attachments into vault folders.
+///
+/// **One command for two acts**, because they are the same write: the
+/// multi-select move in the library hands several ids one destination, and a
+/// folder rename hands each row under the old path its rewritten one. A single
+/// destination would not express the second, and two commands would duplicate
+/// the guard, the version bump and the write.
+///
+/// All-or-nothing on validation: every id and every folder is checked before the
+/// catalog is touched, so a batch with one bad row writes nothing. Assignments
+/// that would not change anything are skipped, so a no-op move does not churn a
+/// `version` and does not bump the local-change hook.
+pub async fn attachment_set_folders_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    assignments: Vec<AttachmentFolderAssignment>,
+) -> Result<(), AttachmentPlacementError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentPlacementError::from)?;
+    let result = attachment_set_folders_with_dir(io, host, &dir, state, assignments).await;
+    // §11.4: a placement change is a catalog mutation and must push.
+    if result.is_ok() {
+        hooks.bump_local_change();
+    }
+    result
+}
+
+/// IPC wrapper. Delegates; `attachmentSetFolders` is the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn attachment_set_folders<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    assignments: Vec<AttachmentFolderAssignment>,
+) -> Result<(), AttachmentPlacementError> {
+    attachment_set_folders_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        hooks.inner(),
+        assignments,
+    )
+    .await
+}
+
+/// Testable core of [`attachment_set_folders`].
+pub(crate) async fn attachment_set_folders_with_dir(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    assignments: Vec<AttachmentFolderAssignment>,
+) -> Result<(), AttachmentPlacementError> {
+    // Validate the WHOLE batch first: a folder path that cannot be stored must
+    // not leave half a move behind.
+    let mut wanted: Vec<(String, String)> = Vec::with_capacity(assignments.len());
+    for assignment in &assignments {
+        let attachment_id = hex_decode_id(&assignment.id).ok_or_else(|| {
+            tracing::debug!(stage = "id_parse", error_kind = "InvalidId");
+            AttachmentPlacementError::InvalidId
+        })?;
+        let folder = canonical_display_folder(&assignment.folder).ok_or_else(|| {
+            tracing::debug!(stage = "folder_parse", error_kind = "InvalidFolder");
+            AttachmentPlacementError::InvalidFolder
+        })?;
+        wanted.push((hex_encode(&attachment_id), folder));
+    }
+    if wanted.is_empty() {
+        return Ok(());
+    }
+
+    // SYNC-6 writer-guard (MYND-32): bound across the catalog write below.
+    let (_slots_guard, shared, _vmh) = state
+        .hold_unlocked_shared_singleton_material()
+        .await
+        .ok_or(AttachmentPlacementError::Locked)?;
+
+    let (meta_version, account_number_hash) =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok((v, h)) => (v, h),
+            Err(MetaParseFailed) => return Err(AttachmentPlacementError::InvalidVaultMeta),
+        };
+
+    let _write_guard = catalog_write_mutex().lock().await;
+    let _quiesce = crate::singleton_quiesce::shared().await;
+
+    let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_path = vault_dir.join("vault.attachments");
+    let mut catalog = read_catalog_for_write(io, &catalog_path, &catalog_key, &account_number_hash)
+        .await
+        .map_err(|e| match e {
+            CatalogWriteRefusal::Io(io_error_kind) => {
+                AttachmentPlacementError::Io { io_error_kind }
+            }
+            CatalogWriteRefusal::Undecodable => AttachmentPlacementError::CatalogUndecodable,
+        })?;
+
+    let now = host.now_unix_secs();
+    let mut changed = 0usize;
+    for (id_hex, folder) in &wanted {
+        let Some(entry) = catalog
+            .entries
+            .get_mut(id_hex)
+            .filter(|e| !e.is_tombstone())
+        else {
+            return Err(AttachmentPlacementError::AttachmentNotFound);
+        };
+        if entry.folder == *folder {
+            continue;
+        }
+        entry.folder = folder.clone();
+        // The filename-LWW discriminator is not what orders this field, but a
+        // placement change moves the entry's wall-clock stamp the way a rename
+        // does, and a peer that only understands `updated_at` then still sees a
+        // mutation.
+        entry.updated_at = Some(now);
+        // Causal bump (§9.10.2): a move is a mutation of the id, so it outranks a
+        // stale copy that predates it.
+        entry.version += 1;
+        changed += 1;
+    }
+    if changed == 0 {
+        return Ok(());
+    }
+
+    let catalog_bytes = encode_attachments_catalog_versioned(
+        meta_version,
+        &catalog_key,
+        &account_number_hash,
+        &catalog,
+    )
+    .map_err(|_| AttachmentPlacementError::EncodeFailed)?;
+    io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
+        .await
+        .map_err(AttachmentPlacementError::from)?;
+
+    tracing::info!(stage = "success", event = "attachments_placed", changed);
+    Ok(())
+}
+
 // ---- attachment_serve (phase3-web-client task 44) ------------------------
 
 /// One attachment's decrypted bytes plus the type they may be SERVED as.
@@ -3044,6 +3248,38 @@ mod tests {
         super::attachment_rename_with_dir(io(), &host(), vault_dir, state, id, filename).await
     }
 
+    /// The catalog as it is on disk, decoded with the vault's own key, so a test
+    /// can assert a field the IPC view does not carry (the causal version). The
+    /// key comes from the live state rather than from a copied constant, so the
+    /// assertion is about the bytes this vault wrote.
+    async fn read_catalog_raw(vault_dir: &Path, state: &VaultRuntimeState) -> AttachmentsCatalog {
+        let (_guard, shared, _vmh) = state
+            .hold_unlocked_shared_singleton_material()
+            .await
+            .expect("state is unlocked");
+        let (meta_version, account_number_hash) =
+            match read_account_number_hash(io(), &vault_dir.join("vault.meta")).await {
+                Ok(Ok(pair)) => pair,
+                _ => panic!("vault.meta must read"),
+            };
+        let catalog_key = shared.derive(meta_version, SubkeyRole::AttachmentsCatalogKey);
+        read_catalog(
+            &vault_dir.join("vault.attachments"),
+            &catalog_key,
+            &account_number_hash,
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn attachment_set_folders_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        assignments: Vec<super::AttachmentFolderAssignment>,
+    ) -> Result<(), AttachmentPlacementError> {
+        super::attachment_set_folders_with_dir(io(), &host(), vault_dir, state, assignments).await
+    }
+
     async fn attachment_export_with_dir(
         vault_dir: &Path,
         state: &VaultRuntimeState,
@@ -3819,6 +4055,153 @@ mod tests {
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0].id, imported.id);
             assert_eq!(rows[0].filename, "renamed.png");
+        });
+    }
+
+    // ---- attachment_set_folders (myne-md/myne#1075) --------------------
+
+    #[test]
+    fn set_folders_files_an_attachment_and_bumps_its_version() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("ders.pdf".to_string()),
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(imported.size, PNG_BYTES.len() as u64);
+
+            attachment_set_folders_with_dir(
+                tmp.path(),
+                &state,
+                vec![super::AttachmentFolderAssignment {
+                    id: imported.id.clone(),
+                    // Display case is preserved and the trailing slash is added:
+                    // this is a path a person sees, not a matching key.
+                    folder: "  Ders Notları  ".to_string(),
+                }],
+            )
+            .await
+            .expect("placement succeeds");
+
+            let rows = catalog_list_with_dir(tmp.path(), &state).await.unwrap();
+            assert_eq!(rows[0].folder, "Ders Notları/");
+
+            // A move is a mutation of the id, so it must outrank a stale copy.
+            let entries = read_catalog_raw(tmp.path(), &state).await;
+            assert_eq!(entries.entries[&imported.id].version, 2);
+        });
+    }
+
+    #[test]
+    fn set_folders_to_the_same_folder_writes_nothing() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("a.png".to_string()),
+                },
+            )
+            .await
+            .unwrap();
+            let id = imported.id.clone();
+            let place = |folder: &str| super::AttachmentFolderAssignment {
+                id: id.clone(),
+                folder: folder.to_string(),
+            };
+            attachment_set_folders_with_dir(tmp.path(), &state, vec![place("Inbox/")])
+                .await
+                .expect("first placement");
+            attachment_set_folders_with_dir(tmp.path(), &state, vec![place("Inbox/")])
+                .await
+                .expect("second placement is a no-op");
+            let entries = read_catalog_raw(tmp.path(), &state).await;
+            // Import is 1, the first placement 2, and the no-op adds nothing.
+            assert_eq!(entries.entries[&id].version, 2);
+        });
+    }
+
+    #[test]
+    fn set_folders_refuses_a_path_that_is_not_canonical() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("a.png".to_string()),
+                },
+            )
+            .await
+            .unwrap();
+            for bad in ["../escape/", "a/../b/", "back\\slash/"] {
+                let result = attachment_set_folders_with_dir(
+                    tmp.path(),
+                    &state,
+                    vec![super::AttachmentFolderAssignment {
+                        id: imported.id.clone(),
+                        folder: bad.to_string(),
+                    }],
+                )
+                .await;
+                assert!(
+                    matches!(result, Err(AttachmentPlacementError::InvalidFolder)),
+                    "{bad} must be refused, got {result:?}"
+                );
+            }
+            // And nothing was written by any of them.
+            let rows = catalog_list_with_dir(tmp.path(), &state).await.unwrap();
+            assert_eq!(rows[0].folder, "");
+        });
+    }
+
+    #[test]
+    fn set_folders_is_all_or_nothing_on_a_bad_row() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("a.png".to_string()),
+                },
+            )
+            .await
+            .unwrap();
+            let result = attachment_set_folders_with_dir(
+                tmp.path(),
+                &state,
+                vec![
+                    super::AttachmentFolderAssignment {
+                        id: imported.id.clone(),
+                        folder: "Inbox/".to_string(),
+                    },
+                    super::AttachmentFolderAssignment {
+                        id: imported.id.clone(),
+                        folder: "../no/".to_string(),
+                    },
+                ],
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(AttachmentPlacementError::InvalidFolder)
+            ));
+            let rows = catalog_list_with_dir(tmp.path(), &state).await.unwrap();
+            assert_eq!(
+                rows[0].folder, "",
+                "the good row must not have landed either"
+            );
         });
     }
 
