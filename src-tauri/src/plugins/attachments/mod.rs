@@ -104,6 +104,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
+            // myne-md/myne#1075: file a batch of attachments into vault
+            // folders. One command for the multi-select move and for the
+            // folder-rename re-root, because they are the same write.
+            commands::attachment_set_folders,
             // MYND-173: export one attachment's decrypted bytes to a
             // user-chosen destination (Save As). Type-agnostic — the
             // generic file-card's Export action and the image/PDF Save-As

@@ -13,6 +13,7 @@
 
 import { patchFolderField, patchUpdatedField } from "../dialect";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
+import { rerootAttachmentFolders } from "../lib/attachments";
 import {
   mutateDeliberateFolders,
   rewriteMcpFolderPaths,
@@ -313,6 +314,15 @@ export type FolderRenameResult = {
    * caller has to say it out loud rather than let the vault look consistent.
    */
   mcpScopeRewriteFailed?: boolean;
+  /**
+   * The attachment re-root failed, AFTER the rename committed (myne-md/myne#1075).
+   *
+   * Its own flag because its own consequence: an attachment that still names the
+   * old folder drops out of the library's tree and out of an agent's scope, and
+   * nothing reconciles it later. The notes are right and the vault looks
+   * consistent, which is exactly why it has to be said.
+   */
+  attachmentFolderRewriteFailed?: boolean;
 };
 
 /** A note with its decrypted body — the input the transactional rename planner
@@ -631,7 +641,22 @@ export async function renameFolder(
   // So: keyed on the RENAME (`renamePrefix` is stated whenever the paths differ,
   // and a no-op rename states nothing), independent of both flags, awaited rather
   // than fire-and-forget, retried once, and a second failure reported.
+  // Attachments filed under the folder move with it, for the same reason and with
+  // a worse failure mode: a row that still names the old path leaves the
+  // library's new tree and leaves any agent scoped to that folder, silently.
+  let attachmentFoldersRewritten = true;
   const reRoot = plan.deliberateMutation.renamePrefix?.[0];
+  if (reRoot !== undefined) {
+    try {
+      await rerootAttachmentFolders(reRoot.from, reRoot.to);
+    } catch {
+      try {
+        await rerootAttachmentFolders(reRoot.from, reRoot.to);
+      } catch {
+        attachmentFoldersRewritten = false;
+      }
+    }
+  }
   if (reRoot !== undefined) {
     let rewritten = true;
     try {
@@ -662,5 +687,6 @@ export async function renameFolder(
     nextDeliberate: plan.nextDeliberate,
     deliberateWriteFailed,
     mcpScopeRewriteFailed: !mcpScopeRewritten,
+    attachmentFolderRewriteFailed: !attachmentFoldersRewritten,
   };
 }

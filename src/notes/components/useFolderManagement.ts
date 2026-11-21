@@ -655,6 +655,12 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // out of is now readable. Nothing reconciles it later, so the user is told
         // where to look instead of being told the rename is done.
         reportBlocked(i18n.t("notes.folderManagement.mcpScopeRewriteFailed"));
+      } else if (result.attachmentFolderRewriteFailed === true) {
+        // Third failure, third consequence: the notes moved and the exclusions
+        // moved, but an attachment still names the folder's OLD path, so it has
+        // left the library's tree and any agent scoped to that folder. Nothing
+        // reconciles it later, because a second rename keys off the current path.
+        reportBlocked(i18n.t("notes.folderManagement.attachmentFolderRewriteFailed"));
       }
     },
     [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap, reorderRemap],

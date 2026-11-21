@@ -28,6 +28,12 @@ export interface CatalogEntry {
   created_at: number;
   /** Display filename. */
   filename: string;
+  /**
+   * The vault folder this attachment is filed in, canonical with a trailing `/`,
+   * or `""` for the vault root (myne-md/myne#1075). The same path a note
+   * carries, which is what lets a folder mean one set for notes and files.
+   */
+  folder: string;
   /** File size in bytes. */
   size: number;
 }
@@ -269,6 +275,93 @@ export async function attachmentRename(
   filename: string,
 ): Promise<void> {
   await invoke<void>("plugin:attachments|attachment_rename", { id, filename });
+}
+
+/**
+ * Re-root every attachment filed under a folder, after that folder is renamed.
+ *
+ * A folder rename rewrites the notes in the same transaction, and an attachment
+ * that still names the old path is left pointing at a folder the vault no longer
+ * has: it disappears from the library's new tree and it stops being readable by
+ * an agent scoped to that folder, silently. Nothing reconciles it later, because
+ * the next rename keys off the folder's CURRENT path.
+ *
+ * Per row, not per prefix, because subfolders must survive: `A/` becoming `B/`
+ * has to move a row under `A/Sub/` to `B/Sub/` rather than flatten it onto `B/`.
+ * Reads the catalog first, so a vault with no attachments costs one IPC call and
+ * writes nothing.
+ *
+ * Resolves with how many rows moved. Never throws on an empty catalog.
+ */
+export async function rerootAttachmentFolders(
+  from: string,
+  to: string,
+): Promise<number> {
+  const prefix = from.endsWith("/") ? from : `${from}/`;
+  const next = to.endsWith("/") ? to : `${to}/`;
+  if (prefix === next) return 0;
+  const rows = await catalogList();
+  const assignments: AttachmentFolderAssignment[] = [];
+  for (const row of rows) {
+    if (!row.folder) continue;
+    // Case-insensitively, because the catalog keeps DISPLAY case while the
+    // rename is keyed on a path a person typed. A case-sensitive test here is
+    // the same fail-open the MCP re-root has: the row keeps naming the old
+    // folder and quietly leaves the scope it was in.
+    if (!row.folder.toLowerCase().startsWith(prefix.toLowerCase())) continue;
+    assignments.push({ id: row.id, folder: next + row.folder.slice(prefix.length) });
+  }
+  await attachmentSetFolders(assignments);
+  return assignments.length;
+}
+
+/** One assignment in a {@link attachmentSetFolders} batch (myne-md/myne#1075). */
+export interface AttachmentFolderAssignment {
+  /** Attachment-id, lowercase hex. */
+  id: string;
+  /** Canonical folder path with a trailing `/`, or `""` for the vault root. */
+  folder: string;
+}
+
+/** Error surface of {@link attachmentSetFolders} — mirror of `AttachmentPlacementError`. */
+export type AttachmentPlacementError =
+  | { kind: "Locked" }
+  | { kind: "InvalidId" }
+  /** The folder is not a canonical path: a `..` or `.` segment, a backslash, a
+   *  NUL, or a path that is empty after trimming. Refused rather than repaired,
+   *  because silently dropping a `..` turns one path into another one. */
+  | { kind: "InvalidFolder" }
+  | { kind: "AttachmentNotFound" }
+  | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
+  | { kind: "InvalidVaultMeta" }
+  | { kind: "EncodeFailed" }
+  /** `vault.attachments` exists and no copy of it decoded (myne#308): the paths
+   *  that REWRITE the catalog refuse rather than rebuild from the empty base. */
+  | { kind: "CatalogUndecodable" };
+
+/**
+ * File a batch of attachments into vault folders (Slot::Unlocked-gated,
+ * myne-md/myne#1075).
+ *
+ * Not exported yet, on purpose and temporarily: the library's multi-select move
+ * is its second caller and lands in the branch above this one, so until then the
+ * folder rename is the only thing that writes a placement. `check-export-callers`
+ * keeps a new file at zero unreferenced exports, and an exemption recorded for a
+ * consumer that does not exist yet is the shape that outlives its reason.
+ *
+ * One command for two acts, because they are the same write: the multi-select
+ * move hands several ids one destination, and a folder rename hands each row
+ * under the old path its rewritten one. All-or-nothing on validation, so a batch
+ * with one bad row writes nothing, and an assignment that would change nothing is
+ * skipped rather than bumping a version for free.
+ */
+async function attachmentSetFolders(
+  assignments: readonly AttachmentFolderAssignment[],
+): Promise<void> {
+  if (assignments.length === 0) return;
+  await invoke<void>("plugin:attachments|attachment_set_folders", {
+    assignments,
+  });
 }
 
 /**
