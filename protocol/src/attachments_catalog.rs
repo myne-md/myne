@@ -186,6 +186,15 @@ pub struct AttachmentMeta {
     /// Display filename (NFC). Free-form; duplicates across attachments
     /// are permitted (the id is the key). Empty on a tombstone.
     pub filename: String,
+    /// The vault folder this attachment lives in, canonical with a trailing
+    /// slash, or empty for the root (myne-md/myne#1075).
+    ///
+    /// The SAME path a note carries, not a second tree: that is what lets "the
+    /// agent may read `Ders Notları/`" name one set for typed notes and imported
+    /// files alike. Additive like `scope` (§9.10.2): emitted only when set, so a
+    /// root row and any pre-#1075 catalog encode byte-identically, and an older
+    /// reader drops the key. `decisions/protocol/0800` carries the cost of that.
+    pub folder: String,
     /// File size in bytes (integer; no floats). Zero on a tombstone.
     pub size: u64,
     /// Filename-LWW discriminator for the sync merge — UNIX seconds,
@@ -217,6 +226,7 @@ impl AttachmentMeta {
             created_at,
             deleted_at: None,
             filename,
+            folder: String::new(),
             size,
             updated_at: None,
             version: 0,
@@ -251,6 +261,7 @@ impl AttachmentMeta {
             created_at: self.created_at,
             deleted_at: Some(deleted_at),
             filename: String::new(),
+            folder: String::new(),
             size: 0,
             updated_at: None,
             version: self.version + 1,
@@ -407,6 +418,11 @@ fn canonical_json_encode(catalog: &AttachmentsCatalog) -> Vec<u8> {
         }
         out.extend_from_slice(b",\"filename\":");
         push_json_string(&mut out, &meta.filename.nfc().collect::<String>());
+        // Canonical order: "fi" < "fo" < "sc". Emitted only when set.
+        if !meta.folder.is_empty() {
+            out.extend_from_slice(b",\"folder\":");
+            push_json_string(&mut out, &meta.folder.nfc().collect::<String>());
+        }
         // Between `filename` and `size`, which is where the canonical order puts
         // "scope"; emitted only for `chat`, so the library shape is unchanged.
         if let Some(token) = meta.scope.wire_token() {
@@ -583,6 +599,7 @@ impl Parser<'_> {
         let mut size: Option<u64> = None;
         let mut updated_at: Option<u64> = None;
         let mut version: u64 = 0;
+        let mut folder = String::new();
         let mut scope = AttachmentScope::Library;
 
         if self.peek() == Some(b'}') {
@@ -598,6 +615,16 @@ impl Parser<'_> {
                 "created_at" => created_at = Some(self.parse_uint()?),
                 "deleted_at" => deleted_at = Some(self.parse_uint()?),
                 "filename" => filename = Some(self.parse_string()?),
+                // Tolerance covers the VALUE, like `scope`: a later version may
+                // spell this as an object, and §9.10.2 says an unreadable
+                // additive value reads as the default, not as a lost catalog.
+                "folder" => {
+                    if self.peek() == Some(b'"') {
+                        folder = self.parse_string()?;
+                    } else {
+                        self.skip_value()?;
+                    }
+                }
                 "size" => size = Some(self.parse_uint()?),
                 "updated_at" => updated_at = Some(self.parse_uint()?),
                 "version" => version = self.parse_uint()?,
@@ -646,6 +673,7 @@ impl Parser<'_> {
             created_at: created_at?,
             deleted_at,
             filename: filename?,
+            folder,
             size: size?,
             updated_at,
             version,
@@ -1149,6 +1177,65 @@ mod tests {
         let decoded = canonical_json_decode(fwd).expect("forward-compat decode");
         assert_eq!(decoded.entries.len(), 1);
         assert_eq!(decoded.entries["aa"].size, 2);
+    }
+
+    // ---- folder (myne-md/myne#1075, §9.10.2) ----
+
+    #[test]
+    fn a_row_at_the_vault_root_carries_no_folder_key() {
+        // Byte-identity with the pre-#1075 shape is the whole point of an
+        // additive field: an absent folder must cost nothing on disk.
+        let catalog = AttachmentsCatalog {
+            entries: BTreeMap::from([(
+                "aa".to_string(),
+                AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2),
+            )]),
+        };
+        let bytes = canonical_json_encode(&catalog);
+        assert!(
+            !String::from_utf8_lossy(&bytes).contains("folder"),
+            "a root attachment must not emit the key: {}",
+            String::from_utf8_lossy(&bytes)
+        );
+    }
+
+    #[test]
+    fn a_folder_round_trips_and_sits_between_filename_and_scope() {
+        let mut meta = AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2).in_chat();
+        meta.folder = "Ders Notları/".to_string();
+        let catalog = AttachmentsCatalog {
+            entries: BTreeMap::from([("aa".to_string(), meta.clone())]),
+        };
+        let bytes = canonical_json_encode(&catalog);
+        let text = String::from_utf8_lossy(&bytes);
+        let filename = text.find("\"filename\"").expect("filename");
+        let folder = text.find("\"folder\"").expect("folder");
+        let scope = text.find("\"scope\"").expect("scope");
+        assert!(
+            filename < folder && folder < scope,
+            "canonical order: {text}"
+        );
+        assert_eq!(
+            canonical_json_decode(&bytes).expect("decode").entries["aa"],
+            meta
+        );
+    }
+
+    #[test]
+    fn a_folder_that_is_not_a_string_reads_as_the_root() {
+        // Tolerance covers the value, not only the keys this version knows: a
+        // later version may spell this field as an object, and losing the whole
+        // catalog over it would lose files the user still owns.
+        let odd = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","folder":{"nested":1},"size":2}}"#;
+        let decoded = canonical_json_decode(odd).expect("tolerated decode");
+        assert_eq!(decoded.entries["aa"].folder, "");
+    }
+
+    #[test]
+    fn a_tombstone_scrubs_the_folder() {
+        let mut meta = AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2);
+        meta.folder = "Private/".to_string();
+        assert_eq!(meta.into_tombstone(9).folder, "");
     }
 
     #[test]
