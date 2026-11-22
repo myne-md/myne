@@ -833,7 +833,7 @@
     "src/notes/graphAdapter.ts": 34,
     "src/notes/graphColorGroups.ts": 187,
     "src/notes/graphOverlay.ts": 61,
-    "src/notes/home/HomeSurface.tsx": 42,
+    "src/notes/home/HomeSurface.tsx": 58,
     "src/notes/home/cardBodies.tsx": 45,
     "src/notes/import/ImportSourcePicker.tsx": 24,
     "src/notes/import/ImporterOnboardingOffer.tsx": 20,

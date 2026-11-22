@@ -19,7 +19,7 @@
 // list. Both write `prefs.home_cards`, so there is one arrangement and no
 // second source of truth to reconcile.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CustomizeRow, useDragReorder } from "../../components/settings/CustomizeList";
 import { Icon } from "../../components/primitives/Icon";
@@ -38,12 +38,39 @@ import { HOME_CARD_BODIES } from "./cardBodies";
 /** The column count the grid is laid out on. A card spans one or two of them. */
 const COLUMNS = 2;
 
+/**
+ * The breakpoint under which the grid is ONE column.
+ *
+ * A two-column card grid at 390 px gives each card 180 px, which is narrower than
+ * a filename. The card keeps its stored span and simply cannot express it: the
+ * span is a desktop arrangement, and a phone re-flows rather than re-arranging
+ * what the user chose.
+ */
+const NARROW_PX = 600;
+
 export function HomeSurface() {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const [editing, setEditing] = useState(false);
 
   const cards = useMemo(() => resolveHomeCards(prefs.home_cards), [prefs.home_cards]);
+  // **Measured on the surface's OWN box, not the window.** A window-based
+  // breakpoint is wrong twice over: this surface can be a narrow pane beside a
+  // note on a wide screen, and the story catalogue pins the story's width while
+  // the browser window stays wide. `ResizeObserver` answers the question that
+  // actually decides the layout, which is how much room the surface has.
+  const [narrow, setNarrow] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (el === null) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth;
+      setNarrow(width < NARROW_PX);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // **Every edit writes the WHOLE list.** The stored value is one ordered array,
   // so a partial write would be a second shape to keep in step; `setHomeCards`
@@ -62,7 +89,7 @@ export function HomeSurface() {
 
   if (editing) {
     return (
-      <div data-testid="home.edit" style={{ height: "100%", overflowY: "auto" }}>
+      <div ref={rootRef} data-testid="home.edit" style={{ height: "100%", overflowY: "auto" }}>
         <Header
           title={t("notes.home.arrangeTitle")}
           action={
@@ -176,7 +203,7 @@ export function HomeSurface() {
   }
 
   return (
-    <div data-testid="home.surface" style={{ height: "100%", overflowY: "auto" }}>
+    <div ref={rootRef} data-testid="home.surface" style={{ height: "100%", overflowY: "auto" }}>
       <Header
         title={t("notes.home.title")}
         action={
@@ -197,12 +224,16 @@ export function HomeSurface() {
           data-testid="home.cards"
           style={{
             display: "grid",
-            gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${narrow ? 1 : COLUMNS}, minmax(0, 1fr))`,
+            // Cards size to their content. Without this a grid row stretches every
+            // card to the tallest one, so a one-line card on a sparse vault is a
+            // 280-pixel box with one sentence in it.
+            alignItems: "start",
             gap: "var(--space-3)",
           }}
         >
           {cards.map((card) => (
-            <CardShell key={card.id} card={card} />
+            <CardShell key={card.id} card={card} narrow={narrow} />
           ))}
         </div>
       )}
@@ -218,18 +249,17 @@ export function HomeSurface() {
  * pretending to be empty, because "no data" and "I cannot draw this" are
  * different answers and only one of them is a bug.
  */
-function CardShell({ card }: { card: HomeCard }) {
+function CardShell({ card, narrow }: { card: HomeCard; narrow: boolean }) {
   const { t } = useTranslation();
   const spec = homeCardSpec(card.kind);
   return (
     <section
       data-testid={`home.card.${card.id}`}
       style={{
-        gridColumn: `span ${Math.min(card.span, COLUMNS)}`,
+        gridColumn: `span ${narrow ? 1 : Math.min(card.span, COLUMNS)}`,
         display: "flex",
         flexDirection: "column",
         gap: "var(--space-2)",
-        minHeight: "calc(var(--space-9) * 2)",
         padding: "var(--space-3)",
         border: "1px solid var(--line-1)",
         borderRadius: "var(--radius-2)",

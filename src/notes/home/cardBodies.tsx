@@ -102,7 +102,7 @@ function useTitles(): ReadonlyMap<string, string> {
   return titles;
 }
 
-function RecentNotesCard() {
+export function RecentNotesCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const titles = useTitles();
@@ -122,7 +122,7 @@ function RecentNotesCard() {
   );
 }
 
-function FavoritesCard() {
+export function FavoritesCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const titles = useTitles();
@@ -143,7 +143,7 @@ function FavoritesCard() {
   );
 }
 
-function TodaysTasksCard() {
+export function TodaysTasksCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const tasks = useLiveVaultTasks();
@@ -175,7 +175,7 @@ function TodaysTasksCard() {
   );
 }
 
-function CalendarAgendaCard() {
+export function CalendarAgendaCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const titles = useTitles();
@@ -239,7 +239,7 @@ function useCatalog(): readonly CatalogEntry[] | null {
   return rows;
 }
 
-function RecentFilesCard() {
+export function RecentFilesCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const rows = useCatalog();
@@ -272,7 +272,7 @@ function RecentFilesCard() {
   );
 }
 
-function ReferenceSetsCard() {
+export function ReferenceSetsCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const rows = useCatalog();
@@ -311,7 +311,7 @@ function ReferenceSetsCard() {
   );
 }
 
-function SavedViewsCard() {
+export function SavedViewsCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const { prefs } = usePrefs();
@@ -326,7 +326,7 @@ function SavedViewsCard() {
   );
 }
 
-function WritingStatsCard() {
+export function WritingStatsCard() {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const titles = useTitles();
@@ -344,7 +344,7 @@ function WritingStatsCard() {
   );
 }
 
-function QuickCaptureCard() {
+export function QuickCaptureCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const [busy, setBusy] = useState(false);
@@ -375,7 +375,7 @@ function QuickCaptureCard() {
   );
 }
 
-function AgentPromptCard() {
+export function AgentPromptCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   return (
@@ -388,7 +388,7 @@ function AgentPromptCard() {
   );
 }
 
-function GraphCard() {
+export function GraphCard() {
   const { t } = useTranslation();
   const ws = useWorkspace();
   const titles = useTitles();
