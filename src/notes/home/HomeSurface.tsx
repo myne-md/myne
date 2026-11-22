@@ -33,6 +33,7 @@ import {
   homeCardSpec,
   resolveHomeCards,
 } from "./homeCards";
+import { HOME_CARD_BODIES } from "./cardBodies";
 
 /** The column count the grid is laid out on. A card spans one or two of them. */
 const COLUMNS = 2;
@@ -248,12 +249,28 @@ function CardShell({ card }: { card: HomeCard }) {
         <span>{t(homeCardLabelKey(card.kind))}</span>
       </header>
       <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
-        {spec === undefined
-          ? t("notes.home.cards.unknownNote")
-          : t("notes.home.cards.pending")}
+        {spec === undefined ? (
+          t("notes.home.cards.unknownNote")
+        ) : (
+          <CardBody kind={card.kind} />
+        )}
       </div>
     </section>
   );
+}
+
+/**
+ * The card's body, or an honest note when this build has no renderer for it.
+ *
+ * The registry and the body map are two lists that can disagree, and the
+ * disagreement is silent: a kind declared but not drawn would render an empty
+ * card that looks like a broken query. This names it instead.
+ */
+function CardBody({ kind }: { kind: string }) {
+  const { t } = useTranslation();
+  const Body = HOME_CARD_BODIES[kind];
+  if (Body === undefined) return <>{t("notes.home.cards.pending")}</>;
+  return <Body />;
 }
 
 function EmptyState({ onArrange }: { onArrange: () => void }) {
