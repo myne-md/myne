@@ -350,10 +350,15 @@ describe("the approval dialog", () => {
     );
     fireEvent.click(screen.getByTestId("settings.mcp-flow-next"));
 
-    // Step 3 states what is shared, in one access list rather than a read scope and
-    // a write scope.
+    // Step 3 asks one question: the whole vault, or a list of folders. The default
+    // is the whole vault, which is the answer that needs no folder knowledge, and
+    // the list beside it then means the folders to LEAVE OUT rather than a set to
+    // opt into one at a time.
     await screen.findByTestId("settings.mcp-step-scope");
-    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("412");
+    expect(screen.getByTestId("settings.mcp-whole-vault").getAttribute("data-whole-vault")).toBe(
+      "true",
+    );
+    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("every note");
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
     // The switches are the host's catalog, and one verb this build cannot serve
     // is off with a reason rather than offered as a control that does nothing.
@@ -362,15 +367,21 @@ describe("the approval dialog", () => {
       (screen.getByTestId("settings.mcp-tool-note_set_field") as HTMLInputElement).disabled,
     ).toBe(true);
 
+    // Leave one folder out, which under this reading is the exclusion list.
+    fireEvent.click(screen.getByTestId("settings.mcp-access-picker-toggle"));
+    const leaveOut = screen
+      .getAllByTestId("settings.mcp-access-picker-option")
+      .find((node) => node.getAttribute("data-value") === "Private/");
+    fireEvent.click(leaveOut!);
     fireEvent.click(screen.getByTestId("settings.mcp-tool-note_edit"));
     fireEvent.click(screen.getByTestId("settings.mcp-approve"));
     await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
-    // One list, derived into the two fields the grant carries: the write scope is
-    // what was ticked, and everything else is left out of reads.
+    // One list, derived into the two fields the grant carries: the exclusion set is
+    // what was ticked, and the write scope is every folder it does not name.
     expect(setMcpConnectionGrant).toHaveBeenCalledWith(
       "claude-desktop",
-      ["Private/", "Projects/", "Projects/New/", "Work/"],
-      [],
+      ["Private/"],
+      ["Projects/", "Projects/New/", "Work/"],
       ["note_edit"],
     );
   });
@@ -485,6 +496,29 @@ describe("the approval dialog", () => {
     ).toBe(false);
     fireEvent.click(screen.getByTestId("settings.mcp-approve"));
     await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+  });
+
+  it("grants the whole vault by default, with an empty exclusion set", async () => {
+    // The consent screen asks one question, and its default answer is the vault:
+    // requiring the person to tick forty folders before the tool works teaches
+    // them to click through the one screen that matters. The exclusion list beside
+    // it is empty until they use it, and the grant says so rather than naming
+    // every folder (myne-md/myne#1077, task 19).
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
+    fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
+    await screen.findByTestId("settings.mcp-step-scope");
+
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    const [name, excluded, write] = setMcpConnectionGrant.mock.calls[0];
+    expect(name).toBe("claude-desktop");
+    expect(excluded).toEqual([]);
+    // Every folder the vault has, and the root sentinel is not a folder.
+    expect(write).toEqual(["Private/", "Projects/", "Projects/New/", "Work/"]);
   });
 
   it("shows the switch bank on a vault that has never approved a connection", async () => {
