@@ -40,6 +40,13 @@ export const SURFACE_ROOTS = [
   // set), which is what makes the agent UI reviewable in the catalogue rather
   // than only in the app.
   "src/notes/agent",
+  // **The home surface joined the catalogue** (myne-md/myne#1074). It is a
+  // first-class tab kind living outside every other root, so without this line
+  // the one new SCREEN of the 0.19 block would have been invisible to the
+  // coverage denominator: a tree outside it is not a gap the guard can report.
+  // Its four stories landed with the surface, so the root arrives covered rather
+  // than as debt (this guard has no debt escape by design).
+  "src/notes/home",
 ];
 
 /** The directory the coverage scan reads story surfaces from. */
