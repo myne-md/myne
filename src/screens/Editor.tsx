@@ -259,6 +259,8 @@ import { useReminderScheduler } from "../hooks/useReminderScheduler";
 import { useLiveCalendarEvents } from "../hooks/useLiveCalendarEvents";
 import { resolveCalendarDayAnchor } from "../lib/prefs";
 import { createInAppNotifier } from "../lib/reminderNotifier";
+import { createOsNotifier } from "../lib/reminderOsNotifier";
+import { reminderTier } from "../lib/reminderPlatform";
 import { useLiveVaultTasks } from "../notes/taskIndex";
 import { TASK_CHIP_INK } from "../notes/taskDisplay";
 import i18n from "../i18n";
@@ -1207,14 +1209,29 @@ function EditorChrome({
   // calendar's own range query, over the horizon rather than a month.
   const reminderEvents = useLiveCalendarEvents(barPrefs.reminder_horizon_days);
   const calendarDayAnchor = resolveCalendarDayAnchor(barPrefs.calendar_settings);
-  const reminderNotifier = useMemo(
-    () =>
-      createInAppNotifier({
-        deliver: () => setToast({ message: i18n.t("tasks.reminder.due"), variant: "info" }),
-      }),
-    [setToast],
+  // The tier decides which notifier the scheduler drives, and today it is the
+  // in-app one on every platform: the OS adapter exists and can register, and
+  // nothing claims that what it registers arrives until a notarized bundle has been
+  // measured delivering (`decisions/ai/0805`). So the branch below is the seam being
+  // honest rather than a feature flag: the day `reminderTier()` answers
+  // `pre-registered`, the OS notifier is what the same pass drives, with no change
+  // to the policy above it.
+  const osTier = reminderTier() === "pre-registered";
+  const reminderNotifier = useMemo(() => {
+    if (osTier) return createOsNotifier();
+    return createInAppNotifier({
+      deliver: () => setToast({ message: i18n.t("tasks.reminder.due"), variant: "info" }),
+    });
+  }, [osTier, setToast]);
+  useEffect(
+    () => () => {
+      // Only the in-app notifier owns timers; the OS one owns nothing this process
+      // can dispose, and calling a `dispose` it does not have would be a lie about
+      // what cancelling means on that tier.
+      if (!osTier) (reminderNotifier as ReturnType<typeof createInAppNotifier>).dispose();
+    },
+    [reminderNotifier, osTier],
   );
-  useEffect(() => () => reminderNotifier.dispose(), [reminderNotifier]);
   useReminderScheduler({
     enabled: barPrefs.reminders_enabled,
     tasks: reminderTasks,

@@ -444,6 +444,7 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::graph_layout::init())
+        .plugin(plugins::reminders::init())
         // live-collab (`collab-editor-bridge`): the live co-editing session
         // commands. The `LiveSessionRegistry` state is managed in the setup hook
         // below, beside the awareness signal.

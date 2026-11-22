@@ -14,6 +14,20 @@ fn main() {
         // live-session commands. The plugin namespace must be declared or the
         // permissions under `permissions/live/` flatten into `__app-acl__` and
         // never match `plugin:live|…`.
+        // reminders (myne-md/myne#1076): the desktop delivery seam's five commands.
+        // Declared here for the same reason as every other entry: without it the
+        // permissions under `permissions/reminders/` flatten into `__app-acl__` and
+        // never match `plugin:reminders|…`.
+        .plugin(
+            "reminders",
+            tauri_build::InlinedPlugin::new().commands(&[
+                "reminders_schedule",
+                "reminders_cancel",
+                "reminders_list_pending",
+                "reminders_permission_status",
+                "reminders_request_permission",
+            ]),
+        )
         .plugin(
             "live",
             tauri_build::InlinedPlugin::new().commands(&[
