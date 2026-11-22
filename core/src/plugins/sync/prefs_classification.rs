@@ -397,6 +397,16 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // editor_slash orders): the rail is how THIS machine's chrome is arranged,
     // so the local value always survives the merge.
     ("ribbon_items", PrefClass::DeviceLocal),
+    // The home surface's card arrangement (myne-md/myne#1074) is SHARED, unlike
+    // the rail beside it: how you like to start work is a property of you, not of
+    // this machine, so it merges. A sequence, because an order is the value.
+    (
+        "home_cards",
+        PrefClass::Shared(SharedDiscipline::SequenceLww),
+    ),
+    // Whether THIS device opens the home tab on start is DEVICE-LOCAL for the
+    // reason the rail is: a desktop and a phone reasonably start differently.
+    ("home_open_on_start", PrefClass::DeviceLocal),
     ("ribbon_visible", PrefClass::DeviceLocal),
     ("right_panel_active_tab", PrefClass::DeviceLocal),
     ("right_panel_hidden_tabs", PrefClass::DeviceLocal),
@@ -561,6 +571,8 @@ mod tests {
             folder_icons: _,
             folder_notes_enabled: _,
             hidden_bar_items: _,
+            home_cards: _,
+            home_open_on_start: _,
             icon: _,
             item_colors: _,
             item_order: _,
@@ -651,6 +663,8 @@ mod tests {
             "folder_icons",
             "folder_notes_enabled",
             "hidden_bar_items",
+            "home_cards",
+            "home_open_on_start",
             "icon",
             "item_colors",
             "item_order",

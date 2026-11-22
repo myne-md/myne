@@ -4388,6 +4388,138 @@ pub(crate) async fn set_ribbon_items_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the home surface's card arrangement
+/// (myne-md/myne#1074). **Synced**, so it merges like `favorites` rather than
+/// like the rail: the arrangement is how this person likes to start work, not a
+/// property of one machine.
+///
+/// **The write is validated, the read is not.** A client that hands over a card
+/// this codec would skip on the next load has a bug, and writing a row that
+/// silently vanishes is worse than refusing: the user arranges their home, sees
+/// it, and finds it different tomorrow. `home_cards_are_writable` is the same
+/// predicate the codec's own tests pin.
+pub async fn set_home_cards_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    cards: Vec<crate::plugins::prefs::HomeCard>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_home_cards_with_dir(&dir, state, hooks, cards, io, host).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_home_cards<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    cards: Vec<crate::plugins::prefs::HomeCard>,
+) -> Result<(), PrefsWriteError> {
+    set_home_cards_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        cards,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_home_cards`].
+pub(crate) async fn set_home_cards_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    cards: Vec<crate::plugins::prefs::HomeCard>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    if !protocol::home_layout::home_cards_are_writable(&cards) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    let count = cards.len();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.home_cards = Some(cards);
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "home_cards", count);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the home surface's open-on-start switch
+/// (myne-md/myne#1074): whether THIS DEVICE opens the home tab on start. Default
+/// `false`, so an untouched vault keeps today's behaviour. **Device-local**, so
+/// it is never clock-stamped. Non-load-bearing.
+pub async fn set_home_open_on_start_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_home_open_on_start_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_home_open_on_start<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_home_open_on_start_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_home_open_on_start`].
+pub(crate) async fn set_home_open_on_start_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.home_open_on_start = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "home_open_on_start",
+        enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `ribbon_visible` flag
 /// (myne-md/myne#699): whether THIS DEVICE shows the left ribbon. Default
 /// `true`; the codec omits the field unless it is `false`. Read-modify-write

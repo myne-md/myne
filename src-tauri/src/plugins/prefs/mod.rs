@@ -98,6 +98,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // myne-md/myne#699 left ribbon.
             commands::set_ribbon_items,
             commands::set_ribbon_visible,
+            commands::set_home_cards,
+            commands::set_home_open_on_start,
             commands::set_new_note_location,
             commands::set_startup_open,
             commands::set_editor_text_size,

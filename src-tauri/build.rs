@@ -205,6 +205,8 @@ fn main() {
                 // myne-md/myne#699 left ribbon.
                 "set_ribbon_items",
                 "set_ribbon_visible",
+                "set_home_cards",
+                "set_home_open_on_start",
                 // developer-mode (MYND-593): named here too, though not
                 // strictly required (the plugin's own InlinedPlugin
                 // declaration above is what creates the `prefs:` ACL

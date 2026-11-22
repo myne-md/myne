@@ -94,6 +94,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // resolver fails closed.
             commands::set_ribbon_items,
             commands::set_ribbon_visible,
+            commands::set_home_cards,
+            commands::set_home_open_on_start,
             commands::set_favorites,
             commands::set_editor_layout,
             commands::set_theme,

@@ -276,10 +276,10 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #3",
-        "lines": 91,
+        "lines": 93,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized at 93/72/49 by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #4",
@@ -325,10 +325,10 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #10",
-        "lines": 70,
+        "lines": 72,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized at 93/72/49 by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #11",
@@ -339,176 +339,176 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #12",
-        "lines": 47,
+        "lines": 49,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized at 93/72/49 by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #13",
-        "lines": 54,
+        "lines": 56,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #14",
-        "lines": 52,
+        "lines": 54,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #15",
-        "lines": 54,
+        "lines": 56,
         "copies": 3,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #16",
-        "lines": 54,
+        "lines": 56,
         "copies": 3,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #17",
-        "lines": 53,
+        "lines": 55,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #18",
-        "lines": 82,
+        "lines": 84,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #19",
-        "lines": 82,
+        "lines": 84,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #20",
-        "lines": 80,
+        "lines": 82,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #21",
-        "lines": 34,
-        "copies": 2,
-        "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
-      },
-      {
-        "id": "protocol/src/prefs_tests.rs #22",
         "lines": 36,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #22",
+        "lines": 38,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #23",
-        "lines": 79,
+        "lines": 36,
         "copies": 3,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #24",
-        "lines": 78,
+        "lines": 81,
         "copies": 3,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #25",
-        "lines": 75,
-        "copies": 2,
+        "lines": 80,
+        "copies": 3,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #26",
-        "lines": 76,
-        "copies": 5,
+        "lines": 77,
+        "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #27",
-        "lines": 58,
-        "copies": 2,
+        "lines": 78,
+        "copies": 5,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #28",
-        "lines": 94,
+        "lines": 60,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #29",
-        "lines": 39,
+        "lines": 96,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #30",
-        "lines": 32,
+        "lines": 39,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #31",
-        "lines": 33,
+        "lines": 32,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #32",
+        "lines": 33,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #33",
         "lines": 32,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
-        "id": "protocol/src/prefs_tests.rs #33",
+        "id": "protocol/src/prefs_tests.rs #34",
         "lines": 62,
         "copies": 2,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
-      },
-      {
-        "id": "protocol/src/prefs_tests.rs #34",
-        "lines": 38,
-        "copies": 4,
-        "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #35",
-        "lines": 35,
-        "copies": 3,
+        "lines": 38,
+        "copies": 4,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs_tests.rs #36",
-        "lines": 36,
-        "copies": 7,
+        "lines": 35,
+        "copies": 3,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
@@ -661,10 +661,10 @@
       },
       {
         "id": "core/src/plugins/prefs/commands_tests.rs + core/src/plugins/vault_unlock/commands.rs",
-        "lines": 55,
+        "lines": 57,
         "copies": 3,
         "verdict": "consolidate",
-        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent. Sized by the home-layout change (myne-md/myne#1074): every PrefsView fixture gained the two new members, so each recorded copy is two lines longer."
       },
       {
         "id": "protocol/src/prefs.rs + protocol/src/prefs_tests.rs #1",
@@ -675,7 +675,7 @@
       },
       {
         "id": "protocol/src/prefs.rs + protocol/src/prefs_tests.rs #2",
-        "lines": 35,
+        "lines": 34,
         "copies": 3,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -742,6 +742,13 @@
         "copies": 2,
         "verdict": "justified",
         "reason": "The two 40-line windows the detector pairs are not the same fragment: the AgentHubList window is the conversation-title state machine (one `case` per outcome, each setting its own notice) and the ChatHistoryModal window is the error/loading/empty trio of `<EmptyState>`s. They read as one skeleton only after the vocabulary pass because both now call the same `common.*` keys and the same `setState` shape. Extracting a component would need the title machine and three empty states under one interface, whose only shared part is i18n keys, and that hides which outcome sets which notice. myne-md/myne#1049 review pass."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #37",
+        "lines": 36,
+        "copies": 7,
+        "verdict": "justified",
+        "reason": "A normalised-skeleton false positive across seven PrefsView fixture literals: the matcher ignores field names, so it sees the same shape repeated once per test that needs a populated view. The fixtures deliberately spell out every member (no `..Default::default()`) so a new prefs member fails to compile until each test's expectation is decided, which is the compile-time drift lock the sync classification relies on. Consolidating them into one builder would restore the silent default the lock exists to prevent (myne-md/myne#1074)."
       }
     ],
     "baseline": [
