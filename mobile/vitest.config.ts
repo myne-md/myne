@@ -31,6 +31,16 @@ export default defineConfig({
       // no count. The mirror is kept complete rather than only where today's
       // specs happen to reach it.
       { find: "@myne/dialect-civil-date", replacement: sib("../dialect/src/civilDate.ts") },
+      { find: "@myne/attachment-folder-scope", replacement: sib("../src/notes/attachmentFolderScope.ts") },
+      // Three aliases the vite config has carried since their features landed
+      // and this one never did (myne-md/myne#1075). Nothing noticed until a test
+      // imported the attachments sheet, which reaches `TranscriptSheet` and so
+      // `@myne/meeting-note`: the gap was invisible because no test had ever
+      // loaded that import chain, and the suite was green over a module the
+      // build could resolve and the test could not.
+      { find: /^@myne\/meeting-note$/, replacement: sib("../src/notes/meetingNote.ts") },
+      { find: /^@myne\/view-version$/, replacement: sib("../src/notes/views/viewVersion.ts") },
+      { find: /^@myne\/board-view$/, replacement: sib("../src/notes/views/boardView.tsx") },
       { find: "@myne/vault-indices", replacement: sib("../src/notes/vaultIndices.ts") },
       // The calendar's own grid math and labels (myne-md/myne#1037). Shared with
       // the desktop pane and the agent tool's answers, so a cell and a row cannot
