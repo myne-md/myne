@@ -35,7 +35,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "AttachmentPickerDialog": { file: "src/notes/components/AttachmentPickerDialog.tsx", line: 45 },
   "AttachmentsLibrary": { file: "src/components/attachments/AttachmentsLibrary.tsx", line: 302 },
   "AttachmentSyncProgress": { file: "src/components/attachments/AttachmentSyncProgress.tsx", line: 147 },
-  "AttachmentThumbnail": { file: "src/components/attachments/AttachmentThumbnail.tsx", line: 183 },
+  "AttachmentThumbnail": { file: "src/components/attachments/AttachmentThumbnail.tsx", line: 188 },
   "AuthShell": { file: "src/screens/AuthShell.tsx", line: 123 },
   "AutomaticBackupBlock": { file: "src/components/settings/AutomaticBackupBlock.tsx", line: 127 },
   "BacklinksTab": { file: "src/notes/components/BacklinksTab.tsx", line: 32 },
