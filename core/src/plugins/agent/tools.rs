@@ -164,6 +164,134 @@ pub trait ScopeSearcher: Send + Sync {
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, AgentError>;
 }
 
+/// One attachment the run can reach, as the model reads it.
+///
+/// **A file is not a note and does not become one.** The catalog keeps the
+/// bytes and the folder; the extracted text is a cache. So a file has an id, a
+/// filename and a folder, and no title and no body of its own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileScopeEntry {
+    /// The attachment-id, lowercase hex.
+    pub attachment_id: String,
+    /// The folder the attachment is filed in, raw (what the user sees), or `None`
+    /// for the vault root. The clamp compares its canonical form.
+    pub folder: Option<String>,
+    /// The display filename.
+    pub filename: Option<String>,
+}
+
+/// The attachments a run may read. The host supplies it (myne-md/myne#1075).
+///
+/// **There is no run-scoped id list for files, and that is deliberate.** A note
+/// run is approved over a SET OF NOTES, which the user picked; an attachment is
+/// approved over the folder it is filed in, which is the same set the MCP grant
+/// and the library use. So the clamp here is the exclusion set alone, and it
+/// rides with each operation exactly as it does for notes.
+///
+/// `None` in [`LoopDeps`](super::run_loop::LoopDeps) where a client cannot
+/// answer, the same shape the calendar takes: the model is then told that files
+/// are not readable in this run rather than being handed an empty library that
+/// looks like an empty vault.
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait AttachmentScopeSource: Send + Sync {
+    /// Every attachment in the vault, with its folder. No scope check: the clamp
+    /// is this module's job, so there is one place it can be wrong.
+    async fn list(&self) -> Result<Vec<FileScopeEntry>, AgentError>;
+    /// One attachment's extracted text. `None` when nothing was extracted (a
+    /// video, an unsupported type), which the model must be able to tell apart
+    /// from an empty file.
+    async fn read_text(&self, attachment_id: &str) -> Result<Option<String>, AgentError>;
+    /// Rank attachments against a query, by their extracted text.
+    async fn search(&self, query: &str, limit: usize) -> Result<Vec<FileScopeEntry>, AgentError>;
+}
+
+/// One file scope entry as the model reads it: `<attachment_id> | <folder> | <filename>`.
+///
+/// The same `|` discipline and the same placeholders as [`render_scope_entry`],
+/// so a model that learned to read one line reads the other. The ids are
+/// distinguishable by shape as well: a note id and an attachment id are both
+/// 32 hex bytes, so the tools accept either and resolve by lookup.
+pub fn render_file_scope_entry(entry: &FileScopeEntry) -> String {
+    format!(
+        "{} | {} | {}",
+        entry.attachment_id,
+        entry.folder.as_deref().unwrap_or("(root)"),
+        entry.filename.as_deref().unwrap_or("(unnamed)")
+    )
+}
+
+/// The files a run may read, clamped by the exclusion set as it is NOW.
+///
+/// The same clamp `list_scope` applies, one population over: a folder the user
+/// excluded since the run started is a control they TIGHTENED, and a file in it
+/// must not appear even as a name.
+pub async fn list_scope_files(
+    source: &dyn AttachmentScopeSource,
+    exclusions: &dyn ExclusionSource,
+) -> Result<Vec<FileScopeEntry>, AgentError> {
+    let excluded = excluded_now(exclusions).await?;
+    Ok(source
+        .list()
+        .await?
+        .into_iter()
+        .filter(|file| !file_excluded(file, &excluded))
+        .collect())
+}
+
+/// Read one attachment's extracted text, if its folder is not excluded.
+///
+/// The clamp runs BEFORE the read, not after: a refused file must not be
+/// decrypted, and the text of an excluded one must not exist in the process
+/// even briefly.
+pub async fn read_attachment(
+    attachment_id: &str,
+    source: &dyn AttachmentScopeSource,
+    exclusions: &dyn ExclusionSource,
+) -> Result<Option<String>, AgentError> {
+    let excluded = excluded_now(exclusions).await?;
+    let entry = source
+        .list()
+        .await?
+        .into_iter()
+        .find(|file| file.attachment_id == attachment_id)
+        .ok_or_else(|| AgentError::OutOfScope {
+            note_id: attachment_id.to_string(),
+        })?;
+    if file_excluded(&entry, &excluded) {
+        return Err(AgentError::ExcludedNow);
+    }
+    source.read_text(attachment_id).await
+}
+
+/// Search the attachments' extracted text, clamped to what the run may read.
+pub async fn search_scope_files(
+    query: &str,
+    limit: usize,
+    source: &dyn AttachmentScopeSource,
+    exclusions: &dyn ExclusionSource,
+) -> Result<Vec<FileScopeEntry>, AgentError> {
+    let excluded = excluded_now(exclusions).await?;
+    let over = limit.saturating_mul(4).max(limit);
+    let mut out = Vec::new();
+    for file in source.search(query, over).await? {
+        if file_excluded(&file, &excluded) {
+            continue;
+        }
+        out.push(file);
+        if out.len() == limit {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+/// Whether a file's folder is excluded, using the same canonical key the notes use.
+fn file_excluded(file: &FileScopeEntry, excluded: &[String]) -> bool {
+    folder_matches_excluded(file.folder.as_deref().unwrap_or(""), excluded)
+}
+
 /// A [`ScopeSearcher`] that finds nothing.
 ///
 /// The seam is a required parameter of `step` because it genuinely differs per
@@ -1172,6 +1300,128 @@ mod tests {
         .unwrap();
         assert!(out.in_scope.is_empty());
         assert!(out.elsewhere.is_empty());
+    }
+    // ---- attachment scope (myne-md/myne#1075) --------------------------
+
+    struct Files {
+        rows: Vec<super::FileScopeEntry>,
+        texts: BTreeMap<String, String>,
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl super::AttachmentScopeSource for Files {
+        async fn list(&self) -> Result<Vec<super::FileScopeEntry>, AgentError> {
+            Ok(self.rows.clone())
+        }
+        async fn read_text(&self, id: &str) -> Result<Option<String>, AgentError> {
+            Ok(self.texts.get(id).cloned())
+        }
+        async fn search(
+            &self,
+            query: &str,
+            limit: usize,
+        ) -> Result<Vec<super::FileScopeEntry>, AgentError> {
+            Ok(self
+                .rows
+                .iter()
+                .filter(|r| {
+                    self.texts
+                        .get(&r.attachment_id)
+                        .is_some_and(|t| t.contains(query))
+                })
+                .take(limit)
+                .cloned()
+                .collect())
+        }
+    }
+
+    fn files() -> Files {
+        Files {
+            rows: vec![
+                super::FileScopeEntry {
+                    attachment_id: "aa".repeat(32),
+                    folder: Some("Ders Notları/".to_string()),
+                    filename: Some("hafta-1.pdf".to_string()),
+                },
+                super::FileScopeEntry {
+                    attachment_id: "bb".repeat(32),
+                    folder: Some("Private/".to_string()),
+                    filename: Some("diary.pdf".to_string()),
+                },
+                super::FileScopeEntry {
+                    attachment_id: "cc".repeat(32),
+                    folder: None,
+                    filename: Some("root.txt".to_string()),
+                },
+            ],
+            texts: BTreeMap::from([
+                ("aa".repeat(32), "kaldiraç konusu".to_string()),
+                ("bb".repeat(32), "kaldiraç gizli".to_string()),
+            ]),
+        }
+    }
+
+    #[test]
+    fn list_scope_files_drops_an_excluded_folder() {
+        block(async {
+            let source = files();
+            let exclusions = StubExclusions(vec!["Private/".to_string()]);
+            let listed = super::list_scope_files(&source, &exclusions).await.unwrap();
+            let names: Vec<_> = listed.iter().filter_map(|f| f.filename.clone()).collect();
+            assert_eq!(names, vec!["hafta-1.pdf", "root.txt"]);
+        });
+    }
+
+    #[test]
+    fn read_attachment_refuses_a_file_in_an_excluded_folder() {
+        block(async {
+            let source = files();
+            let exclusions = StubExclusions(vec!["Private/".to_string()]);
+            let refused = super::read_attachment(&"bb".repeat(32), &source, &exclusions).await;
+            assert!(matches!(refused, Err(AgentError::ExcludedNow)));
+        });
+    }
+
+    #[test]
+    fn read_attachment_returns_the_extracted_text_and_distinguishes_none() {
+        block(async {
+            let source = files();
+            let exclusions = no_exclusions();
+            let text = super::read_attachment(&"aa".repeat(32), &source, &exclusions)
+                .await
+                .unwrap();
+            assert_eq!(text.as_deref(), Some("kaldiraç konusu"));
+            // A file with no extraction is `None`, never an empty string: the
+            // model must be able to tell "nothing was extracted" from "empty".
+            let none = super::read_attachment(&"cc".repeat(32), &source, &exclusions)
+                .await
+                .unwrap();
+            assert_eq!(none, None);
+        });
+    }
+
+    #[test]
+    fn read_attachment_refuses_an_unknown_id() {
+        block(async {
+            let source = files();
+            let exclusions = no_exclusions();
+            let refused = super::read_attachment(&"dd".repeat(32), &source, &exclusions).await;
+            assert!(matches!(refused, Err(AgentError::OutOfScope { .. })));
+        });
+    }
+
+    #[test]
+    fn search_scope_files_never_returns_an_excluded_hit() {
+        block(async {
+            let source = files();
+            let exclusions = StubExclusions(vec!["Private/".to_string()]);
+            let hits = super::search_scope_files("kaldiraç", 5, &source, &exclusions)
+                .await
+                .unwrap();
+            assert_eq!(hits.len(), 1);
+            assert_eq!(hits[0].filename.as_deref(), Some("hafta-1.pdf"));
+        });
     }
 }
 
