@@ -40,6 +40,7 @@
     "i18n:extract": "i18next-cli extract",
     "i18n:status": "i18next-cli status",
     "capture:userguide": "vitest run --config .config/vitest/capture.config.ts",
+    "capture:stories": "node scripts/capture-stories.mjs",
     "coverage:rust": "cargo +nightly llvm-cov -p protocol --tests --html",
     "coverage:rust:summary": "cargo +nightly llvm-cov -p protocol --tests --summary-only",
     "coverage:rust:all": "pnpm build && cargo +nightly llvm-cov --workspace --tests --html"
