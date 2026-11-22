@@ -1092,6 +1092,13 @@ function verbLabel(
     "note_set_field",
     "note_move",
     "note_edit",
+    // The four reads that joined in myne-md/myne#1077. Each gets a label rather
+    // than its wire name, because the wire name is written for a model and the
+    // switch bank is read by a person deciding what may leave the vault.
+    "attachment_list",
+    "attachment_read",
+    "calendar_read",
+    "view_list",
   ];
   if (!known.includes(verb)) return verb;
   return t(`settings.ai.externalAccess.verb.${verb}`);

@@ -11,7 +11,7 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use serde_json::{json, Value};
 
-const EXPECTED_TOOLS: [&str; 9] = [
+const EXPECTED_TOOLS: [&str; 13] = [
     "note_search",
     "note_read",
     "vault_list",
@@ -21,6 +21,10 @@ const EXPECTED_TOOLS: [&str; 9] = [
     "note_set_field",
     "note_move",
     "note_edit",
+    "attachment_list",
+    "attachment_read",
+    "calendar_read",
+    "view_list",
 ];
 
 struct Session {
@@ -161,7 +165,7 @@ fn an_initialize_first_frame_selects_the_stateful_revision() {
     session.send(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }));
     let list = session.request(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }));
     assert_eq!(list["id"], 2);
-    assert_eq!(tool_names(&list).len(), 9);
+    assert_eq!(tool_names(&list).len(), 13);
 
     // The revision is fixed by the FIRST frame: a second handshake does not
     // re-select it.
@@ -175,7 +179,7 @@ fn a_non_initialize_first_frame_selects_the_stateless_revision() {
 
     // A request with no handshake at all: the current revision's shape.
     let list = session.request(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }));
-    assert_eq!(tool_names(&list).len(), 9);
+    assert_eq!(tool_names(&list).len(), 13);
 
     // The session's selection is observable on a later handshake, which is the
     // difference the sniff makes: the same frame sent FIRST reports the older
