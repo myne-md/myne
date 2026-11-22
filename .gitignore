@@ -152,3 +152,7 @@ web/bench/pkg/
 # published. Never committed; the provenance is the tag, not the tree.
 /dist-release/
 .e2e-tmp/
+
+# Captures from `pnpm capture:stories` (myne-md/myne#1073): evidence for a pull
+# request, never a committed artefact.
+dist-stories/
