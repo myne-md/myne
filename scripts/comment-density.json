@@ -513,7 +513,7 @@
     "src/components/ActionStatus.tsx": 113,
     "src/components/BlockingProgressStep.tsx": 46,
     "src/components/ChoiceList.tsx": 12,
-    "src/components/CommandPalette.tsx": 272,
+    "src/components/CommandPalette.tsx": 310,
     "src/components/DeleteVaultConfirmForm.tsx": 152,
     "src/components/FailClosedError.tsx": 85,
     "src/components/IdentitySetupDialog.tsx": 71,

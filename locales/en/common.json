@@ -510,7 +510,10 @@
     },
     "searchPlaceholder": "Search notes or run a command. Try tag: · path: · task:",
     "sectionCommands": "Commands",
-    "sectionNotes": "Notes"
+    "sectionNotes": "Notes",
+    "sectionFiles": "Files",
+    "fileUsedIn": "in {{title}}",
+    "fileUnused": "not used in a note"
   },
   "commands": {
     "actions": {
