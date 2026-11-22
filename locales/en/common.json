@@ -362,6 +362,13 @@
         "nameDesc": "Name Z-A"
       },
       "sortAriaLabel": "Sort attachments",
+      "folderAll": "All folders",
+      "folderScopeAriaLabel": "Show the files in one folder",
+      "selectAriaLabel": "Select {{name}}",
+      "selectedCount_one": "{{count}} selected",
+      "selectedCount_other": "{{count}} selected",
+      "moveToAriaLabel": "Move the selected files to a folder",
+      "moveFailed": "Could not move the selected files. Nothing changed; try again.",
       "supportedFilesFilter": "Supported files",
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
