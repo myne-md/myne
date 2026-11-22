@@ -68,6 +68,10 @@ export const NEW_TAB_PLACES: readonly {
   { id: "graph.show", icon: "share-2", labelKey: "notes.newTab.places.graph" },
   { id: "tasks.show", icon: "list-todo", labelKey: "notes.newTab.places.tasks" },
   { id: "calendar.show", icon: "calendar", labelKey: "notes.newTab.places.calendar" },
+  // Home last: it is the place you go when you are not going anywhere in
+  // particular, so it reads as the fallback rather than as the first choice
+  // (myne-md/myne#1074).
+  { id: "home.show", icon: "house", labelKey: "notes.newTab.places.home" },
 ];
 
 /** Commands that never belong in the recent list: the places already have a

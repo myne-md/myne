@@ -47,6 +47,7 @@ import {
   focusedLeaf,
   graphItem,
   calendarItem,
+  homeItem,
   tasksItem,
   attachmentsItem,
   templatesItem,
@@ -310,6 +311,7 @@ export type WorkspaceApi = {
   openTasks: () => void;
   /** Open (or reveal) the calendar tab (myne-md/myne#1037). */
   openCalendar: () => void;
+  openHome: () => void;
   /** Open (or reveal) the attachment-library tab (myne-md/myne#773). */
   openAttachments: () => void;
   /** Open (or reveal) the template-library tab (myne-md/myne#779). */
@@ -708,6 +710,7 @@ export function WorkspaceProvider({
     () => openSingleton(calendarItem()),
     [openSingleton],
   );
+  const openHome = useCallback(() => openSingleton(homeItem()), [openSingleton]);
   const openAttachments = useCallback(
     () => openSingleton(attachmentsItem()),
     [openSingleton],
@@ -1076,6 +1079,7 @@ export function WorkspaceProvider({
       openGraph,
       openTasks,
       openCalendar,
+      openHome,
       openAttachments,
       openTemplates,
       openAgent,
@@ -1141,6 +1145,7 @@ export function WorkspaceProvider({
       openGraph,
       openTasks,
       openCalendar,
+      openHome,
       openAttachments,
       openTemplates,
       setTaskViewState,

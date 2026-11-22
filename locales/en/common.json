@@ -816,6 +816,9 @@
       },
       "showCalendar": {
         "label": "Open the calendar"
+      },
+      "showHome": {
+        "label": "Go to Home"
       }
     },
     "hotkeys": {
@@ -2472,7 +2475,8 @@
         "graph": "Graph",
         "tasks": "Tasks",
         "today": "Today",
-        "calendar": "Calendar"
+        "calendar": "Calendar",
+        "home": "Home"
       },
       "placesLabel": "Go to",
       "recent": "Jump back in",
@@ -2484,7 +2488,8 @@
       "graphTab": "Graph",
       "tasksTab": "Tasks",
       "agentTab": "Agent",
-      "calendarTab": "Calendar"
+      "calendarTab": "Calendar",
+      "homeTab": "Home"
     },
     "relativeTime": {
       "daysAgo": "{{d}} days ago",
@@ -2811,6 +2816,10 @@
     "autoTag": {
       "applied": "Tags added: {{tags}}",
       "undo": "Undo"
+    },
+    "home": {
+      "emptyTitle": "Your home surface",
+      "emptyBody": "Cards for recent notes, today's tasks and the files you keep reaching for land here. Nothing is arranged yet."
     }
   },
   "photoNote": {

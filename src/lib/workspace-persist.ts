@@ -514,6 +514,20 @@ function parseItem(t: unknown): ParsedItem {
   // per-tab zoom. Read-when-present and degrade to the default view rather than
   // erroring: an unknown zoom from a future build must not reject the whole
   // workspace blob and lose every open tab.
+  // The home surface (myne-md/myne#1074). An older build reading a workspace
+  // that carries this kind drops the tab rather than the workspace, which is
+  // the parser's existing rule and is asserted by name in
+  // `tests/lib/workspace-persist.test.ts`.
+  if (o.kind === "home") {
+    return {
+      item: {
+        kind: "home",
+        id: canonicalTabId("home", o.id),
+        ...pinned,
+        ...viewMode,
+      },
+    };
+  }
   if (o.kind === "calendar") {
     return {
       item: {
