@@ -32,7 +32,9 @@ use crate::plugins::agent::apply::{ApplyReader, BatchWrite, BatchWriter, Restore
 use crate::plugins::agent::error::AgentError;
 use crate::plugins::agent::memory::{MemoryStore, RememberAction, RememberOutcome};
 use crate::plugins::agent::prompt::ProposedNote;
-use crate::plugins::agent::tools::{CalendarReader, CalendarRefusal, NoteReader};
+use crate::plugins::agent::tools::{
+    AttachmentScopeSource, CalendarReader, CalendarRefusal, FileScopeEntry, NoteReader,
+};
 use crate::plugins::memory::commands::{
     memory_list_from_host, memory_read_from_host, memory_write_from_host,
     personality_read_from_host, PersonalityView,
@@ -113,6 +115,62 @@ impl<R: Runtime> NoteReader for NoteReadAdapter<'_, R> {
 impl<R: Runtime> ApplyReader for NoteReadAdapter<'_, R> {
     async fn current_body(&self, note_id: &str) -> Result<String, AgentError> {
         self.read(note_id).await
+    }
+}
+
+/// The agent's reach into the attachment library (myne-md/myne#1075).
+///
+/// **A file's scope is its folder**, so this adapter answers the whole catalog
+/// and the clamp stays in `tools.rs`: an adapter that filtered would be the
+/// second place the exclusion set is applied, and the second place is the one
+/// that drifts.
+///
+/// `search` answers nothing on this client, and that is the honest shape rather
+/// than a stub. The vault's full-text index covers notes; attachment text is a
+/// separate cache (`MYE1`) that the index does not hold, so searching files here
+/// would mean decrypting every cached blob per query. A model that needs a file
+/// finds it by name through the list tool, which is what a person does too.
+pub struct HostAttachments<'a, R: Runtime> {
+    pub host: TauriHost<R>,
+    pub runtime: &'a VaultRuntimeState,
+}
+
+#[async_trait::async_trait]
+impl<R: Runtime> AttachmentScopeSource for HostAttachments<'_, R> {
+    async fn list(&self) -> Result<Vec<FileScopeEntry>, AgentError> {
+        let rows = crate::plugins::attachments::commands::catalog_list_from_host(
+            &self.host,
+            &StdVaultIo,
+            self.runtime,
+        )
+        .await
+        .map_err(|_| AgentError::ReadFailed)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| FileScopeEntry {
+                attachment_id: row.id,
+                // Empty is the vault root, and the tool's clamp reads `None` that
+                // way; carrying `Some("")` would put an empty folder in front of
+                // the model as if it were a name.
+                folder: (!row.folder.is_empty()).then_some(row.folder),
+                filename: (!row.filename.is_empty()).then_some(row.filename),
+            })
+            .collect())
+    }
+
+    async fn read_text(&self, attachment_id: &str) -> Result<Option<String>, AgentError> {
+        crate::plugins::attachments::commands::extracted_text_from_host(
+            &self.host,
+            &StdVaultIo,
+            self.runtime,
+            attachment_id,
+        )
+        .await
+        .map_err(|_| AgentError::ReadFailed)
+    }
+
+    async fn search(&self, _query: &str, _limit: usize) -> Result<Vec<FileScopeEntry>, AgentError> {
+        Ok(Vec::new())
     }
 }
 

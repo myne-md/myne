@@ -29,7 +29,8 @@ use super::prompt::{
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
 use super::tools::{
-    calendar_range, list_scope, read_note, render_scope_entry, search_scope, search_vault,
+    calendar_range, list_scope, list_scope_files, read_attachment, read_note,
+    render_file_scope_entry, render_scope_entry, search_scope, search_scope_files, search_vault,
     CalendarReader, NoteReader, ScopeSearcher,
 };
 use crate::plugins::vault_indices::state::NoteRecord;
@@ -151,6 +152,10 @@ async fn opening_scope(
     // error, since the model can ask and be told properly.
     if entries.len() == 1 {
         let entry = &entries[0];
+        // The default scope is one note, and it returns before the listing, so a
+        // file would be invisible in exactly the shape most runs start in
+        // (myne-md/myne#1075). One sentence, and no payload: the model can ask.
+        let file_count = files_in_reach(deps).await.len();
         if let Ok(body) =
             read_note(runs, run_id, &entry.note_id, deps.reader, deps.exclusions).await
         {
@@ -166,11 +171,19 @@ async fn opening_scope(
             return Ok(tool_result(
                 format!(
                     "Your scope is one note. Its id is {} and its whole text \
-                     follows, so you do not need list_scope or read_note. \
+                     follows, so you do not need list_scope or read_note.{} \
                      Answer the user's question from it, or propose an edit \
                      whose anchor is copied exactly from it, then finish. The \
                      text is {chars} characters:",
-                    entry.note_id
+                    entry.note_id,
+                    if file_count == 0 {
+                        String::new()
+                    } else {
+                        format!(
+                            " The vault also holds {file_count} readable file(s); \
+                             list_scope lists them."
+                        )
+                    }
                 ),
                 Some(body),
             ));
@@ -199,6 +212,40 @@ async fn opening_scope(
         ),
         Some(rendered),
     ))
+}
+
+/// The files in reach, clamped, or none when this client cannot read files
+/// (myne-md/myne#1075).
+///
+/// A read failure is folded into "no files" on purpose: the notes are what the
+/// run was opened for, and a library that cannot be listed must not turn a
+/// readable scope into a failed run. The model is told the notes and nothing
+/// about files, which is the same state it was in before this tool existed.
+async fn files_in_reach(deps: &LoopDeps<'_>) -> Vec<crate::plugins::agent::tools::FileScopeEntry> {
+    let Some(source) = deps.attachments else {
+        return Vec::new();
+    };
+    list_scope_files(source, deps.exclusions)
+        .await
+        .unwrap_or_default()
+}
+
+/// The listing's file half, appended after the notes.
+///
+/// **One listing, not two tools.** The agent keeps its five read tools: a sixth
+/// "list the files" verb would be a second way to ask what is here, and the
+/// vocabulary is a stated ceiling rather than an open list.
+fn render_files(files: &[crate::plugins::agent::tools::FileScopeEntry]) -> Option<String> {
+    if files.is_empty() {
+        return None;
+    }
+    Some(
+        files
+            .iter()
+            .map(render_file_scope_entry)
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
 }
 
 /// What a repeated tool call is told, after its answer (myne-md/myne#574).
@@ -404,6 +451,18 @@ pub struct LoopDeps<'a> {
     /// tool answering differently between two iterations of the same run would
     /// make the run's own view of its scope drift from the frozen set.
     pub records: &'a BTreeMap<String, NoteRecord>,
+    /// The attachments this run can reach (myne-md/myne#1075).
+    ///
+    /// `None` where a client cannot answer, the shape `calendar` takes: the list
+    /// tool then says files are not readable in this run instead of answering an
+    /// empty library, which a model would read as an empty vault and give up on.
+    ///
+    /// **A file's scope is its FOLDER, not a frozen id list.** The user approved a
+    /// set of notes; an attachment is approved by the folder it is filed in, which
+    /// is the same set the library and the MCP grant use. So there is no per-run
+    /// attachment roster to freeze, and the clamp is `exclusions` alone, re-read
+    /// per call like every other read here.
+    pub attachments: Option<&'a dyn super::tools::AttachmentScopeSource>,
     /// The `ai_excluded_folders` set, asked for AGAIN by every read tool.
     ///
     /// The opposite property to `records` above, and deliberately so. The index
@@ -872,13 +931,25 @@ async fn drive_inner(
                     // It used to push `Content::note("")`, i.e. a user turn
                     // whose whole content was the empty string, which is not
                     // distinguishable from a broken tool by anything reading it.
-                    if entries.is_empty() {
+                    let files = files_in_reach(deps).await;
+                    if entries.is_empty() && files.is_empty() {
                         transcript.push(tool_result(
                             "list_scope returned no notes: your scope is empty. \
                              There is nothing here to read or edit, so finish \
                              and say so."
                                 .into(),
                             None,
+                        ));
+                    } else if entries.is_empty() {
+                        transcript.push(tool_result(
+                            format!(
+                                "list_scope returned no notes, but {} file(s) are readable, \
+                                 one per line as `<attachment_id> | <folder> | <filename>`. \
+                                 Read one with read_note, or finish if you already have \
+                                 what you need.",
+                                files.len()
+                            ),
+                            render_files(&files),
                         ));
                     } else {
                         let rendered = entries
@@ -888,15 +959,36 @@ async fn drive_inner(
                             .join("\n");
                         // Titles come out of note plaintext, so the payload is
                         // untrusted; the sentence around it is the host's.
+                        //
+                        // The files follow the notes in the SAME payload, under a
+                        // second header line, so a model that asked what is here
+                        // is not left believing the vault holds no files
+                        // (myne-md/myne#1075).
+                        let mut payload = rendered;
+                        if let Some(files) = render_files(&files) {
+                            payload
+                                .push_str("\n\nfiles (read one with read_note, same as a note):\n");
+                            payload.push_str(&files);
+                        }
                         transcript.push(tool_result(
                             format!(
                                 "list_scope returned the {} note(s) in your scope, one per \
                                  line as `<note_id> | <folder> | <title>`, where `(root)` \
-                                 means the note has no folder. Read one with read_note, or \
+                                 means the note has no folder.{} Read one with read_note, or \
                                  finish if you already have what you need.",
-                                entries.len()
+                                entries.len(),
+                                if files.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!(
+                                        " {} file(s) follow them as \
+                                         `<attachment_id> | <folder> | <filename>`, and \
+                                         read_note takes either id",
+                                        files.len()
+                                    )
+                                }
                             ),
-                            Some(rendered),
+                            Some(payload),
                         ));
                     }
                     if !fresh {
@@ -962,6 +1054,69 @@ async fn drive_inner(
                             None,
                         ));
                         continue;
+                    }
+                    // **A note id and an attachment id are both 32 hex bytes, so
+                    // `read_note` accepts either and resolves by lookup**
+                    // (myne-md/myne#1075). A file is tried only when the id is
+                    // NOT a note in this run's scope, so a note can never be
+                    // shadowed by a file that happens to share its shape.
+                    if let Some(source) = deps.attachments {
+                        if !runs.contains(run_id, &note_id)? {
+                            match read_attachment(&note_id, source, deps.exclusions).await {
+                                Ok(Some(text)) => {
+                                    read_ids.insert(note_id.clone());
+                                    let chars = text.chars().count();
+                                    tracing::debug!(
+                                        target: "myne_core::agent",
+                                        event = "tool",
+                                        verb = "read_attachment",
+                                        body_chars = chars,
+                                    );
+                                    transcript.push(tool_result(
+                                        format!(
+                                            "read_note returned the extracted text of that \
+                                             file, {chars} characters, and it follows. It is \
+                                             a file, not a note: propose_edit cannot change \
+                                             it, so use it as material and finish."
+                                        ),
+                                        if chars == 0 { None } else { Some(text) },
+                                    ));
+                                    continue;
+                                }
+                                // Extracted and empty are different answers: a
+                                // video has no text at all, and a model told
+                                // "empty" would conclude the file is blank.
+                                Ok(None) => {
+                                    transcript.push(tool_result(
+                                        "read_note found that file, but no text was ever \
+                                         extracted from it, so there is nothing to read. \
+                                         That is the normal answer for a video or an \
+                                         unsupported type. Read another, or finish."
+                                            .to_string(),
+                                        None,
+                                    ));
+                                    continue;
+                                }
+                                Err(AgentError::ExcludedNow) => {
+                                    // The same sentence the note path gives, for
+                                    // the same reason: the user excluded its
+                                    // folder since the run started, and naming
+                                    // the folder would put it in the transcript.
+                                    transcript.push(tool_result(
+                                        "That file's folder is excluded now, so it cannot be \
+                                         read in this run. Do not ask for it again; carry on \
+                                         with what you have."
+                                            .to_string(),
+                                        None,
+                                    ));
+                                    continue;
+                                }
+                                // Anything else falls through to the note
+                                // refusal, which is the correct answer for an id
+                                // that is neither.
+                                Err(_) => {}
+                            }
+                        }
                     }
                     match read_note(runs, run_id, &note_id, deps.reader, deps.exclusions).await {
                         Ok(body) => {
@@ -1062,12 +1217,26 @@ async fn drive_inner(
                         verb = "search_scope",
                         hits = hits.len(),
                     );
+                    // **The files join the same answer, not a second verb**
+                    // (myne-md/myne#1075). A question about a term is a question
+                    // about its notes AND its slides, and a model told only the
+                    // notes reports half the answer as the whole one. A client
+                    // whose attachment seam cannot search answers nothing here,
+                    // which is the same result the query got before.
+                    let file_hits = match deps.attachments {
+                        Some(source) => {
+                            search_scope_files(&query, SEARCH_LIMIT, source, deps.exclusions)
+                                .await
+                                .unwrap_or_default()
+                        }
+                        None => Vec::new(),
+                    };
                     // Ids are host-minted, so the whole message is trusted and
                     // there is no payload span. What was missing was the
                     // sentence: a bare list of uuids answers no question the
                     // model asked.
                     transcript.push(tool_result(
-                        if hits.is_empty() {
+                        if hits.is_empty() && file_hits.is_empty() {
                             "search_scope found nothing for that query in your scope. \
                              Try list_scope to see what is there, or search_vault to \
                              find out which folder holds it."
@@ -1078,11 +1247,29 @@ async fn drive_inner(
                                 .map(|h| h.note_id.clone())
                                 .collect::<Vec<_>>()
                                 .join("\n");
-                            format!(
-                                "search_scope found {} note(s) in your scope, one id per \
-                                 line. Read one with read_note.\n{ids}",
-                                hits.len()
-                            )
+                            let mut answer = if hits.is_empty() {
+                                String::new()
+                            } else {
+                                format!(
+                                    "search_scope found {} note(s) in your scope, one id per \
+                                     line. Read one with read_note.\n{ids}",
+                                    hits.len()
+                                )
+                            };
+                            if !file_hits.is_empty() {
+                                let files = file_hits
+                                    .iter()
+                                    .map(render_file_scope_entry)
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                                answer.push_str(&format!(
+                                    "\n\nsearch_scope also found {} file(s), as \
+                                     `<attachment_id> | <folder> | <filename>`. Read one with \
+                                     read_note.\n{files}",
+                                    file_hits.len()
+                                ));
+                            }
+                            answer
                         },
                         None,
                     ));
@@ -1851,15 +2038,23 @@ mod tests {
     }
 
     fn records() -> BTreeMap<String, NoteRecord> {
-        [(
-            "a".to_string(),
-            NoteRecord {
-                title: Some("A".into()),
-                ..Default::default()
-            },
-        )]
-        .into_iter()
-        .collect()
+        records_of(&[("a", "A")])
+    }
+
+    /// The one record builder, so the two fixtures above cannot drift.
+    fn records_of(pairs: &[(&str, &str)]) -> BTreeMap<String, NoteRecord> {
+        pairs
+            .iter()
+            .map(|(id, title)| {
+                (
+                    id.to_string(),
+                    NoteRecord {
+                        title: Some((*title).into()),
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect()
     }
 
     /// Two notes in the index, for the scopes that need to stay plural.
@@ -1869,18 +2064,7 @@ mod tests {
     /// also how a "two note" scope quietly became a one-note one in the first
     /// draft of `a_multi_note_scope_opens_with_titles_and_no_bodies`.
     fn records_ab() -> BTreeMap<String, NoteRecord> {
-        [("a", "A"), ("b", "B")]
-            .into_iter()
-            .map(|(id, title)| {
-                (
-                    id.to_string(),
-                    NoteRecord {
-                        title: Some(title.into()),
-                        ..Default::default()
-                    },
-                )
-            })
-            .collect()
+        records_of(&[("a", "A"), ("b", "B")])
     }
 
     /// The exclusion seam for the loop tests, answering a fixed set.
@@ -1918,6 +2102,7 @@ mod tests {
         offered_settings: &'a [String],
     ) -> LoopDeps<'a> {
         LoopDeps {
+            attachments: None,
             offered_settings,
             engine,
             reader: &Reader,
@@ -1994,6 +2179,7 @@ mod tests {
         recs: &'a BTreeMap<String, NoteRecord>,
     ) -> LoopDeps<'a> {
         LoopDeps {
+            attachments: None,
             offered_settings: &[],
             engine,
             reader: &Reader,
@@ -2112,6 +2298,148 @@ mod tests {
         assert!(pointed, "and the repeat is answered rather than ignored");
     }
 
+    /// A file library for the loop tests: one file, in one folder.
+    struct Files;
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl crate::plugins::agent::tools::AttachmentScopeSource for Files {
+        async fn list(
+            &self,
+        ) -> Result<Vec<crate::plugins::agent::tools::FileScopeEntry>, AgentError> {
+            Ok(vec![crate::plugins::agent::tools::FileScopeEntry {
+                attachment_id: FILE_ID.to_string(),
+                folder: Some("Ders Notları/".to_string()),
+                filename: Some("hafta-1.pdf".to_string()),
+            }])
+        }
+        async fn read_text(&self, id: &str) -> Result<Option<String>, AgentError> {
+            Ok((id == FILE_ID).then(|| "kaldiraç konusu".to_string()))
+        }
+        async fn search(
+            &self,
+            _q: &str,
+            _limit: usize,
+        ) -> Result<Vec<crate::plugins::agent::tools::FileScopeEntry>, AgentError> {
+            Ok(Vec::new())
+        }
+    }
+
+    /// 64 hex characters, the shape of an attachment id.
+    const FILE_ID: &str = "aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11";
+
+    fn transcript_text(t: &[Message]) -> String {
+        t.iter()
+            .flat_map(|m| m.content.iter())
+            .map(|c| c.text().to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The deps a files-aware test needs: two notes, one file, no exclusions.
+    ///
+    /// One construction for both file tests rather than a copy each: `LoopDeps`
+    /// has thirteen fields and a literal repeated per test is exactly the clone
+    /// `check-duplication` exists to refuse.
+    fn files_deps<'a>(
+        engine: &'a dyn AgentEngine,
+        files: &'a Files,
+        records: &'a BTreeMap<String, NoteRecord>,
+    ) -> LoopDeps<'a> {
+        LoopDeps {
+            attachments: Some(files),
+            offered_settings: &[],
+            engine,
+            reader: &Reader,
+            calendar: None,
+            searcher: &Searcher,
+            records,
+            exclusions: &*NO_EXCL,
+            memory: None,
+            language: None,
+            history: &[],
+            on_progress: &no_progress,
+            documents: &[],
+        }
+    }
+
+    /// **A file is visible where the notes are** (myne-md/myne#1075): one
+    /// listing, so a model asked what is here does not answer "two notes" about
+    /// a scope that also holds a term's slides.
+    #[test]
+    fn list_scope_lists_files_beside_the_notes() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records_ab();
+        let files = Files;
+        let mut t = Vec::new();
+        let deps = files_deps(&engine, &files, &recs);
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps,
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        let text = transcript_text(&t);
+        assert!(
+            text.contains(FILE_ID),
+            "the file's id must be in the listing: {text}"
+        );
+        assert!(
+            text.contains("hafta-1.pdf"),
+            "and its filename, which is what the model reasons about"
+        );
+        assert!(
+            text.contains("1 file(s) follow them"),
+            "the sentence must say files are there, not only the payload"
+        );
+    }
+
+    /// **`read_note` reads a file, and a note is never shadowed** (myne-md/myne#1075).
+    #[test]
+    fn read_note_reads_a_file_and_a_note_is_not_shadowed() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let engine = ScriptEngine::new(&[
+            &format!(r#"{{"action":"read_note","note_id":"{FILE_ID}"}}"#),
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records_ab();
+        let files = Files;
+        let mut t = Vec::new();
+        let deps = files_deps(&engine, &files, &recs);
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps,
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        let text = transcript_text(&t);
+        assert!(
+            text.contains("kaldiraç konusu"),
+            "the file's extracted text must come back: {text}"
+        );
+        assert!(
+            text.contains("It is a file, not a note"),
+            "and the model must be told it cannot edit it"
+        );
+        assert!(
+            text.contains("body of that note"),
+            "the note read still answers as a note"
+        );
+    }
+
     /// **The `remember` verb, end to end** (myne-md/myne#697): one write lands,
     /// a second attempt in the same run is refused with a model-readable
     /// result, and the memory block rides the system turn.
@@ -2128,6 +2456,7 @@ mod tests {
         let recs = records_ab();
         let mut t = Vec::new();
         let deps = LoopDeps {
+            attachments: None,
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
@@ -2181,6 +2510,7 @@ mod tests {
         let recs = records_ab();
         let mut t = Vec::new();
         let deps = LoopDeps {
+            attachments: None,
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
@@ -3437,6 +3767,7 @@ mod tests {
             turn: Mutex::new(0),
         };
         let d = LoopDeps {
+            attachments: None,
             offered_settings: &[],
             exclusions: &*NO_EXCL,
             memory: None,
@@ -3486,6 +3817,7 @@ mod tests {
         let seen: StdMutex<Vec<RunProgress>> = StdMutex::new(Vec::new());
         let record = |p: RunProgress| seen.lock().unwrap().push(p);
         let d = LoopDeps {
+            attachments: None,
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
@@ -3886,6 +4218,7 @@ mod tests {
         };
         let excl = ChangesMidRun(Arc::clone(&excluded_yet));
         let deps = LoopDeps {
+            attachments: None,
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
@@ -4132,6 +4465,7 @@ mod tests {
         recs: &'a BTreeMap<String, NoteRecord>,
     ) -> LoopDeps<'a> {
         LoopDeps {
+            attachments: None,
             offered_settings: &[],
             reader: &LongReader,
             ..deps(engine, recs)
