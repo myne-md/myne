@@ -43,6 +43,7 @@ use super::scope::{
 use crate::folder_key::canonical_folder;
 use crate::plugins::agent::frontmatter::folder_of;
 use crate::plugins::agent::tools::SearchHit;
+use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_indices::state::NoteRecord;
 use protocol::McpConnectionGrant;
 use serde::{Deserialize, Serialize};
@@ -94,6 +95,73 @@ pub trait McpNoteSource: Send + Sync {
     /// know about connections, and teaching it would be a second place for the
     /// clamp to be wrong.
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, McpToolError>;
+    /// Every file in the vault's catalog, with the folder it is filed in.
+    /// Scope-blind for the same reason [`Self::search`] is.
+    async fn files(&self) -> Result<Vec<FileRow>, McpToolError>;
+    /// One file's extracted text. `None` when nothing was ever extracted from it,
+    /// which the caller must be able to tell apart from an empty file.
+    async fn file_text(&self, attachment_id: &str) -> Result<Option<String>, McpToolError>;
+    /// The calendar between two days, bounded by the same rule the pane and the
+    /// phone use. Unfiltered: the caller clamps it to the scope.
+    async fn calendar(&self, from: &str, to: &str) -> Result<Vec<CalendarRow>, McpToolError>;
+    /// The vault's saved views, as stored.
+    async fn views(&self) -> Result<Vec<ViewRow>, McpToolError>;
+}
+
+/// One file as `attachment_list` hands it over.
+///
+/// The id is the only handle: there is deliberately no path, because a path is
+/// the one argument shape that can name something outside the vault, and this
+/// surface has no verb that accepts one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileRow {
+    /// The attachment-id, lowercase hex, as `attachment://` spells it.
+    pub attachment_id: String,
+    /// The display filename, or `None` when the catalog has none.
+    pub filename: Option<String>,
+    /// The folder it is filed in, raw (what the user sees), or `None` for the
+    /// vault root.
+    pub folder: Option<String>,
+}
+
+/// One saved view as `view_list` hands it over.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewRow {
+    /// The view's id, opaque.
+    pub view_id: String,
+    /// Its display name.
+    pub name: String,
+    /// `table` / `cards` / `list`.
+    pub view_type: String,
+}
+
+/// `attachment_list`'s arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AttachmentListRequest {
+    /// Narrow the listing to one folder. Must be inside the resolved scope.
+    #[serde(default)]
+    pub folder: Option<String>,
+}
+
+/// `attachment_read`'s arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AttachmentReadRequest {
+    /// The id `attachment_list` returned.
+    pub attachment_id: String,
+}
+
+/// `calendar_read`'s arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CalendarReadRequest {
+    /// First day of the window, `YYYY-MM-DD`.
+    pub from: String,
+    /// Last day of the window, inclusive.
+    pub to: String,
 }
 
 /// `note_search`'s arguments.
@@ -316,6 +384,106 @@ pub async fn note_read(
 /// with either would hand the caller a handle on notes it cannot open, or their
 /// content (a title is note text). The shape of the vault is what the caller
 /// needs to choose a query, and that is what this answers.
+/// `attachment_list`: the files whose folder this connection may read.
+///
+/// **The clamp is the same one `note_search` applies, one population over.** A
+/// file's scope is the folder it is FILED IN, not the folders of the notes that
+/// embed it: the library files a file once, and a note that links it from
+/// somewhere else is a reference rather than a second home. That is why the clamp
+/// needs no note bodies and costs one catalog read.
+pub async fn attachment_list(
+    scope: &ConnectionScope,
+    request: AttachmentListRequest,
+    source: &dyn McpNoteSource,
+) -> Result<Vec<FileRow>, McpToolError> {
+    scope.require_granted()?;
+    let narrow = match request.folder.as_deref() {
+        None => None,
+        Some(folder) => {
+            let key = canonical_folder(folder);
+            if !scope.covers_key(&key) {
+                return Err(McpToolError::OutOfScopeFolder {
+                    folder: folder.to_string(),
+                });
+            }
+            Some(key)
+        }
+    };
+    Ok(source
+        .files()
+        .await?
+        .into_iter()
+        .filter(|file| {
+            let key = canonical_folder(file.folder.as_deref().unwrap_or(""));
+            scope.covers_key(&key) && narrow.as_ref().is_none_or(|want| &key == want)
+        })
+        .collect())
+}
+
+/// `attachment_read`: one file's extracted text, clamped before the read.
+///
+/// The clamp runs BEFORE `file_text`, not after: an excluded file must not be
+/// decrypted at all, and its text must not exist in this process even briefly.
+pub async fn attachment_read(
+    scope: &ConnectionScope,
+    request: AttachmentReadRequest,
+    source: &dyn McpNoteSource,
+) -> Result<Option<String>, McpToolError> {
+    scope.require_granted()?;
+    let entry = source
+        .files()
+        .await?
+        .into_iter()
+        .find(|file| file.attachment_id == request.attachment_id)
+        .ok_or_else(|| McpToolError::UnknownFile {
+            attachment_id: request.attachment_id.clone(),
+        })?;
+    let key = canonical_folder(entry.folder.as_deref().unwrap_or(""));
+    if !scope.covers_key(&key) {
+        return Err(McpToolError::OutOfScopeFile {
+            attachment_id: request.attachment_id,
+        });
+    }
+    source.file_text(&request.attachment_id).await
+}
+
+/// `calendar_read`: the rows inside the window, clamped to readable folders.
+///
+/// The window bound is the calendar's own (`MAX_WINDOW_DAYS`), not a second
+/// number here: the pane, the phone and this door all refuse the same width, and
+/// a private bound would be the second opinion that drifts.
+pub async fn calendar_read(
+    scope: &ConnectionScope,
+    request: CalendarReadRequest,
+    source: &dyn McpNoteSource,
+) -> Result<Vec<CalendarRow>, McpToolError> {
+    scope.require_granted()?;
+    let rows = source.calendar(&request.from, &request.to).await?;
+    let records = source.records().await?;
+    Ok(rows
+        .into_iter()
+        .filter(|row| {
+            records
+                .get(&row.note_id)
+                .is_some_and(|record| scope.covers_key(&folder_key_of(record)))
+        })
+        .collect())
+}
+
+/// `view_list`: the vault's saved views, as stored.
+///
+/// **No filter runs here, and that is the point.** Evaluating a view is the front
+/// end's job, and a second evaluator in Rust would be a second answer to "which
+/// notes does this view match". So this verb lists, and `view_read` is refused by
+/// name rather than approximated (`decisions/mcp/0802`).
+pub async fn view_list(
+    scope: &ConnectionScope,
+    source: &dyn McpNoteSource,
+) -> Result<Vec<ViewRow>, McpToolError> {
+    scope.require_granted()?;
+    source.views().await
+}
+
 pub async fn vault_list(
     scope: &ConnectionScope,
     source: &dyn McpNoteSource,
@@ -366,6 +534,12 @@ pub enum ToolName {
     NoteAppend,
     NoteEdit,
     NoteMove,
+    /// The four reads that joined in myne-md/myne#1077. Every one of them is a
+    /// read: the surface still has no delete, no path argument and no fetch.
+    AttachmentList,
+    AttachmentRead,
+    CalendarRead,
+    ViewList,
 }
 
 impl ToolName {
@@ -385,6 +559,10 @@ impl ToolName {
             "note_append" => Some(Self::NoteAppend),
             "note_edit" => Some(Self::NoteEdit),
             "note_move" => Some(Self::NoteMove),
+            "attachment_list" => Some(Self::AttachmentList),
+            "attachment_read" => Some(Self::AttachmentRead),
+            "calendar_read" => Some(Self::CalendarRead),
+            "view_list" => Some(Self::ViewList),
             _ => None,
         }
     }
@@ -410,7 +588,10 @@ impl ToolName {
     /// not charging the two that do return text would make the budget a count of
     /// calls wearing a count of notes as a name.
     pub fn produces_notes(self) -> bool {
-        matches!(self, Self::NoteSearch | Self::NoteRead)
+        matches!(
+            self,
+            Self::NoteSearch | Self::NoteRead | Self::AttachmentRead | Self::CalendarRead
+        )
     }
 
     /// The wire spelling of this verb.
@@ -424,6 +605,10 @@ impl ToolName {
             Self::NoteAppend => "note_append",
             Self::NoteEdit => "note_edit",
             Self::NoteMove => "note_move",
+            Self::AttachmentList => "attachment_list",
+            Self::AttachmentRead => "attachment_read",
+            Self::CalendarRead => "calendar_read",
+            Self::ViewList => "view_list",
         }
     }
 }
@@ -535,6 +720,10 @@ enum Parsed {
     Append(super::intent::NoteAppendRequest),
     Edit(super::anchor::NoteEditRequest),
     Move(super::anchor::NoteMoveRequest),
+    Files(AttachmentListRequest),
+    FileText(AttachmentReadRequest),
+    Calendar(CalendarReadRequest),
+    Views,
 }
 
 /// `vault_list` and `vault_state` take no arguments; an object with anything in
@@ -570,6 +759,18 @@ fn parse_arguments(tool: ToolName, arguments: &Value) -> Option<Parsed> {
         ToolName::NoteMove => serde_json::from_value(arguments.clone())
             .ok()
             .map(Parsed::Move),
+        ToolName::AttachmentList => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Files),
+        ToolName::AttachmentRead => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::FileText),
+        ToolName::CalendarRead => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Calendar),
+        ToolName::ViewList => serde_json::from_value::<NoArguments>(arguments.clone())
+            .ok()
+            .map(|_| Parsed::Views),
     }
 }
 
@@ -793,6 +994,22 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
                 Err(error) => Err(error),
             }
         }
+        // The four reads that joined in myne-md/myne#1077. Each charges the budget
+        // for what it actually hands over: a file's text is one note's worth, and a
+        // calendar or a view list is one row per note named, because a row names a
+        // note and a caller can walk the ids from there.
+        Parsed::Files(request) => attachment_list(&scope, request, source)
+            .await
+            .map(|rows| to_value(&rows)),
+        Parsed::FileText(request) => attachment_read(&scope, request, source).await.map(|text| {
+            notes_taken = 1;
+            to_value(&text)
+        }),
+        Parsed::Calendar(request) => calendar_read(&scope, request, source).await.map(|rows| {
+            notes_taken = rows.len() as u32;
+            to_value(&rows)
+        }),
+        Parsed::Views => view_list(&scope, source).await.map(|rows| to_value(&rows)),
     };
     // The budget is charged only for an answer that carried note text. A refusal
     // costs nothing, which is what keeps a client retrying a refused call from
@@ -958,7 +1175,7 @@ pub fn excerpt(body: &str, query: &str) -> String {
 /// a separate binary by design: this process must not link it. `scripts/check-mcp-tool-
 /// surface.mjs` holds the copy against the catalog; the test below only compares it to
 /// the DISPATCH table, so it cannot see a tenth verb arriving in the catalog.
-pub const CATALOG_VERBS: [&str; 9] = [
+pub const CATALOG_VERBS: [&str; 13] = [
     "note_search",
     "note_read",
     "vault_list",
@@ -968,14 +1185,18 @@ pub const CATALOG_VERBS: [&str; 9] = [
     "note_set_field",
     "note_move",
     "note_edit",
+    "attachment_list",
+    "attachment_read",
+    "calendar_read",
+    "view_list",
 ];
 
 #[cfg(test)]
 #[test]
 fn catalog_verbs_agree_with_the_dispatch_table() {
     // Two facts, and both matter to the switches on screen: the roster carries the
-    // nine catalog names, and exactly one of them is absent from this build, which
-    // the UI renders as a switch that says why. A tenth verb added to the catalog
+    // thirteen catalog names, and exactly one of them is absent from this build,
+    // which the UI renders as a switch that says why. A verb added to the catalog
     // without a dispatch arm would otherwise appear on the screen as an enabled
     // switch that answers version skew.
     let unimplemented: Vec<&str> = CATALOG_VERBS

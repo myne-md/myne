@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! The compiled tool surface, held to the three rules that make it safe to
-//! hand to a model: the set is exactly the nine verbs, every schema is
+//! hand to a model: the set is exactly the thirteen verbs, every schema is
 //! internally consistent, and nothing in it names a capability outside the
 //! vault.
 
@@ -8,8 +8,8 @@ use crate::tools::catalog;
 
 /// Written out here on purpose rather than derived from [`catalog`]. A roster
 /// compared against a second copy of itself cannot fail on the drift it exists
-/// for, so the expected set is a literal that a tenth verb has to edit.
-const EXPECTED_TOOLS: [&str; 9] = [
+/// for, so the expected set is a literal that a fourteenth verb has to edit.
+const EXPECTED_TOOLS: [&str; 13] = [
     "note_search",
     "note_read",
     "vault_list",
@@ -19,12 +19,16 @@ const EXPECTED_TOOLS: [&str; 9] = [
     "note_set_field",
     "note_move",
     "note_edit",
+    "attachment_list",
+    "attachment_read",
+    "calendar_read",
+    "view_list",
 ];
 
 /// Vocabulary that would mean a tool reaches outside the vault. The PRD's rule
 /// is "no outbound tool, ever", and the list is compiled in, so it is testable
 /// exactly here.
-const NON_VAULT_CAPABILITIES: [&str; 19] = [
+const NON_VAULT_CAPABILITIES: [&str; 18] = [
     "fetch",
     "http",
     "url",
@@ -32,7 +36,6 @@ const NON_VAULT_CAPABILITIES: [&str; 19] = [
     "shell",
     "process",
     "clipboard",
-    "attachment",
     "network",
     "socket",
     "download",
@@ -59,13 +62,19 @@ fn names() -> Vec<String> {
 }
 
 #[test]
-fn the_catalog_is_exactly_the_nine_verbs() {
+fn the_catalog_is_exactly_the_thirteen_verbs() {
     let mut found = names();
     found.sort();
     let mut expected = EXPECTED_TOOLS.map(str::to_string).to_vec();
     expected.sort();
     assert_eq!(found, expected);
-    assert_eq!(catalog().len(), 9, "nine is a ceiling, not a start");
+    assert_eq!(
+        catalog().len(),
+        13,
+        "thirteen is a ceiling, not a start: a verb is an injection surface and a \
+         scope-enforcement site, so widening the list edits this number and the guard's \
+         roster in the same change"
+    );
 }
 
 #[test]

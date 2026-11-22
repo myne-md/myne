@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The compiled-in tool surface: nine verbs, declared as data.
+//! The compiled-in tool surface: thirteen verbs, declared as data.
 //!
 //! **This file is the list, and it is the ONLY file a guard reads to answer
 //! "what can an MCP connection do?"** `scripts/check-mcp-tool-surface.mjs` parses
@@ -15,16 +15,21 @@
 //! `format!`, `concat!`, `include_str!` or `env!` in this file so the property is
 //! checked rather than assumed.
 //!
-//! **Nine is a ceiling, not a starting point.** Every tool is an injection
-//! surface and a scope-enforcement site, so a tenth verb is a deliberate cost
-//! rather than a convenience. Three write classes are absent by decision, not by
+//! **Thirteen is a ceiling, not a starting point.** Every tool is an injection
+//! surface and a scope-enforcement site, so a fourteenth verb is a deliberate
+//! cost rather than a convenience. Four reads joined the nine in
+//! myne-md/myne#1077, and the shape they follow is the one rule that decided
+//! them: **a verb may read a file by id, and no verb may name a path or a URL.**
+//! A by-id read stays inside the vault the grant covers; a path argument would
+//! let a caller name a file outside it, and a URL argument would make this
+//! process the fetch leg of the trifecta. Three write classes are absent by decision, not by
 //! omission: delete (a read is recoverable harm, a delete is not), rename (it
 //! rewrites the notes that link to the target, and those notes are outside any
 //! grant), and whole-body replace (two devices' splices both survive a merge and
 //! the note comes back containing itself twice).
 //!
 //! **No tool reaches outside the vault.** No fetch, no mail, no shell, no
-//! clipboard, no URL dereference, no attachment access. The moment one does,
+//! clipboard, no URL dereference, no path argument. The moment one does,
 //! Myne assembles all three legs of the lethal trifecta itself and becomes the
 //! exfiltration path rather than the data source. Two witnesses hold that:
 //! `tools_test.rs` scans the compiled list for the vocabulary, and
@@ -227,6 +232,77 @@ pub fn catalog() -> Vec<Value> {
                     }
                 },
                 "required": ["note_id", "source", "replacement"],
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "attachment_list",
+            "description": "List the files this connection may read: each file's id, its \
+                filename and the folder it is filed in. A file's scope is the folder it is \
+                filed in, so a file in a folder the user left out is not listed at all. \
+                Read-only.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "folder": {
+                        "type": "string",
+                        "description": "Restrict the listing to exactly this folder path. It \
+                            must be inside the granted read scope; its subfolders are not \
+                            included."
+                    }
+                },
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "attachment_read",
+            "description": "Read the text extracted from one file, by its id. Never the \
+                file's bytes: an image yields its OCR text, a PDF its text layer, and a format \
+                nothing was extracted from returns null rather than an empty string. A file in \
+                a folder the user left out is refused. Read-only.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "attachment_id": {
+                        "type": "string",
+                        "description": "The id of the file, as attachment_list returned it."
+                    }
+                },
+                "required": ["attachment_id"],
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "calendar_read",
+            "description": "Read the calendar between two days, inclusive, bounded to at most \
+                366 days. Each row names the note the event lives in, its start, its end and \
+                whether it repeats, and rows for notes outside the granted read scope are \
+                dropped. Read-only.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "description": "First day of the window, as YYYY-MM-DD."
+                    },
+                    "to": {
+                        "type": "string",
+                        "description": "Last day of the window, as YYYY-MM-DD. At most 366 \
+                            days after from."
+                    }
+                },
+                "required": ["from", "to"],
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "view_list",
+            "description": "List the vault's saved views: each view's id, its name and the \
+                kind of view it is. Listing does not run the view, so this returns no note \
+                ids and reads no note. Read-only.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {},
                 "additionalProperties": false
             }
         }),

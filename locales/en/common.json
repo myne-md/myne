@@ -3849,7 +3849,11 @@
           "note_append": "Append to a note",
           "note_set_field": "Set a note field",
           "note_move": "Move a note",
-          "note_edit": "Edit a note"
+          "note_edit": "Edit a note",
+          "attachment_list": "List files",
+          "attachment_read": "Read a file's text",
+          "calendar_read": "Read the calendar",
+          "view_list": "List saved views"
         },
         "emptyBody": "Approving one is what lets a tool you installed read this vault, minus the folders you leave out.",
         "trademarks": "Myne is not affiliated with, endorsed by or sponsored by any of these tools. Names and logos belong to their respective owners.",

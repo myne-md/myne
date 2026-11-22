@@ -56,6 +56,25 @@ pub enum McpToolError {
     /// The note exists but sits in a folder the user left out.
     #[serde(rename = "out_of_scope")]
     OutOfScopeNote { note_id: String },
+    /// The id is not in the attachments catalog at all.
+    ///
+    /// A separate reason from `unknown_note` because the caller's next action is
+    /// different: a note id is found with `note_search`, and a file id is found
+    /// with `attachment_list`. Collapsing them would send a model looking for a
+    /// file in the note search and concluding the file does not exist.
+    #[serde(rename = "unknown_file")]
+    UnknownFile { attachment_id: String },
+    /// The file exists but is filed in a folder the user left out.
+    #[serde(rename = "out_of_scope_file")]
+    OutOfScopeFile { attachment_id: String },
+    /// A calendar window wider than the bound this surface accepts.
+    ///
+    /// The same 366-day bound `vault_indices::calendar` enforces, reported with the
+    /// number so a caller can narrow rather than guess. Asking unbounded would put
+    /// the whole calendar inside one call, which is the shape the bound exists to
+    /// make unexpressible.
+    #[serde(rename = "calendar_window_too_wide")]
+    CalendarWindowTooWide { max_days: u32 },
     /// A write named a title that is empty once trimmed. Refused rather than
     /// written, because a note with no title has no name in the sidebar and the
     /// caller cannot find it again to fix it.
@@ -175,6 +194,9 @@ impl McpToolError {
             McpToolError::EmptyQuery => "empty_query",
             McpToolError::UnknownNote { .. } => "unknown_note",
             McpToolError::OutOfScopeNote { .. } => "out_of_scope",
+            McpToolError::UnknownFile { .. } => "unknown_file",
+            McpToolError::OutOfScopeFile { .. } => "out_of_scope_file",
+            McpToolError::CalendarWindowTooWide { .. } => "calendar_window_too_wide",
             McpToolError::EmptyTitle => "empty_title",
             McpToolError::EmptyAppend => "empty_append",
             McpToolError::AnchorNotFound => "anchor_not_found",
@@ -225,6 +247,19 @@ impl McpToolError {
             McpToolError::OutOfScopeNote { .. } => {
                 "That note is in a folder the user left out of this connection's approval: ask \
                  the user to stop leaving that folder out, under Settings, AI, in the Myne app."
+            }
+            McpToolError::UnknownFile { .. } => {
+                "No file with that id exists in this vault: call attachment_list to find the \
+                 file's id, then read that id."
+            }
+            McpToolError::OutOfScopeFile { .. } => {
+                "That file is in a folder the user left out of this connection's approval: ask \
+                 the user to stop leaving that folder out, under Settings, Connections, in the \
+                 Myne app."
+            }
+            McpToolError::CalendarWindowTooWide { .. } => {
+                "That date range is wider than this surface reads in one call: ask for a shorter \
+                 range, at most a year at a time."
             }
             McpToolError::OutOfScopeFolder { .. } => {
                 "That folder is one the user left out of this connection's approval: ask the user \
