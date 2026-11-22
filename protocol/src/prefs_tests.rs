@@ -103,6 +103,8 @@ fn canonical_json_encodes_true_to_expected_bytes() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
@@ -193,6 +195,8 @@ fn canonical_json_encodes_false_to_expected_bytes() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -676,6 +680,8 @@ fn canonical_json_decodes_true() {
             opaque_saved_views: Vec::new(),
             view_approvals: Default::default(),
             view_order: Vec::new(),
+            home_cards: None,
+            home_open_on_start: false,
         }
     );
 }
@@ -768,6 +774,8 @@ fn canonical_json_decodes_false() {
             opaque_saved_views: Vec::new(),
             view_approvals: Default::default(),
             view_order: Vec::new(),
+            home_cards: None,
+            home_open_on_start: false,
         }
     );
 }
@@ -2681,6 +2689,8 @@ fn encode_emits_theme_after_all_other_fields() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -3281,6 +3291,8 @@ fn encode_emits_sorted_keys_with_nonempty_folders() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -3378,6 +3390,8 @@ fn encode_sorts_and_dedupes_folder_elements() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -3473,6 +3487,8 @@ fn encode_escapes_quote_in_folder_name() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -3567,6 +3583,8 @@ fn encode_nfc_normalizes_folder_elements() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -3722,6 +3740,8 @@ fn full_blob_round_trip_with_deliberate_folders() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let blob =
         encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce()).unwrap();
@@ -3846,6 +3866,8 @@ fn encode_emits_favorites_and_item_order_in_canonical_key_position() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -3950,6 +3972,8 @@ fn encode_preserves_order_does_not_sort_or_dedupe() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -4128,6 +4152,8 @@ fn full_blob_round_trip_with_all_fields() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let blob =
         encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce()).unwrap();
@@ -4239,6 +4265,8 @@ fn encode_places_hidden_bar_items_between_folder_icons_and_item_colors() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -4590,6 +4618,8 @@ fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -4684,6 +4714,8 @@ fn encode_emits_all_three_fields_in_canonical_order() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -4780,6 +4812,8 @@ fn encode_auto_lock_seconds_zero_has_no_leading_zeros() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -4941,6 +4975,8 @@ fn full_blob_round_trip_with_auto_lock_seconds() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let blob =
         encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce()).unwrap();
@@ -5080,6 +5116,8 @@ fn encode_emits_editor_layout_in_canonical_key_position() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let encoded = canonical_json_encode(&prefs);
     assert_eq!(
@@ -5408,6 +5446,8 @@ fn round_trip_toggled_off() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let blob =
         encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce()).unwrap();
@@ -5505,6 +5545,8 @@ fn round_trip_via_getrandom_convenience() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
     let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
@@ -5664,6 +5706,72 @@ fn decode_rejects_with_tampered_ctx_tag_as_cannot_decrypt() {
 
     let err = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap_err();
     assert_eq!(err, PrefsBlobError::CannotDecrypt);
+}
+
+// ---- home layout members (myne-md/myne#1074) ----------------------
+
+#[test]
+fn home_members_are_omitted_until_they_are_set() {
+    // A vault that never arranged its home must stay byte-identical to a
+    // pre-#1074 `vault.prefs`: `None` for the card list, `false` for the switch.
+    let encoded = canonical_json_encode(&PrefsView::default());
+    let text = alloc::string::String::from_utf8_lossy(&encoded);
+    assert!(!text.contains("home_cards"), "{text}");
+    assert!(!text.contains("home_open_on_start"), "{text}");
+}
+
+#[test]
+fn home_cards_round_trip_and_keep_an_unknown_id() {
+    let prefs = PrefsView {
+        home_cards: Some(alloc::vec![
+            crate::home_layout::HomeCard {
+                id: alloc::string::String::from("recent-notes"),
+                kind: alloc::string::String::from("recent-notes"),
+                span: 1,
+            },
+            // A card id this build has never heard of: a NEWER client wrote it, and
+            // dropping it here would lose a row from the arrangement on every save
+            // this older build makes.
+            crate::home_layout::HomeCard {
+                id: alloc::string::String::from("card-from-the-future"),
+                kind: alloc::string::String::from("future-kind"),
+                span: 2,
+            },
+        ]),
+        home_open_on_start: true,
+        ..PrefsView::default()
+    };
+    let encoded = canonical_json_encode(&prefs);
+    let text = alloc::string::String::from_utf8_lossy(&encoded);
+    assert!(
+        text.contains(r#""home_cards":[{"id":"recent-notes","kind":"recent-notes"}"#),
+        "{text}"
+    );
+    assert!(
+        text.contains(r#"{"id":"card-from-the-future","kind":"future-kind","span":2}"#),
+        "{text}"
+    );
+    assert!(text.contains(r#""home_open_on_start":true"#), "{text}");
+
+    let decoded = canonical_json_decode(&encoded).expect("round-trips");
+    assert_eq!(decoded.home_cards, prefs.home_cards);
+    assert!(decoded.home_open_on_start);
+}
+
+#[test]
+fn an_emptied_home_stays_emptied() {
+    // `Some([])` is a home the user emptied on purpose; `None` is one they never
+    // arranged. The two must not collapse into each other, or the client re-seeds
+    // its defaults over an empty home every load.
+    let prefs = PrefsView {
+        home_cards: Some(alloc::vec![]),
+        ..PrefsView::default()
+    };
+    let encoded = canonical_json_encode(&prefs);
+    let text = alloc::string::String::from_utf8_lossy(&encoded);
+    assert!(text.contains(r#""home_cards":[]"#), "{text}");
+    let decoded = canonical_json_decode(&encoded).expect("round-trips");
+    assert_eq!(decoded.home_cards, Some(alloc::vec![]));
 }
 
 // ---- PrefsView default semantic (spec § 9.5.5) --------------------
@@ -5864,6 +5972,8 @@ fn emit_prefs_vectors_for_paste() {
             opaque_saved_views: Vec::new(),
             view_approvals: Default::default(),
             view_order: Vec::new(),
+            home_cards: None,
+            home_open_on_start: false,
         },
         &nonce_default,
     )
@@ -5955,6 +6065,8 @@ fn emit_prefs_vectors_for_paste() {
             opaque_saved_views: Vec::new(),
             view_approvals: Default::default(),
             view_order: Vec::new(),
+            home_cards: None,
+            home_open_on_start: false,
         },
         &nonce_toggled,
     )
@@ -6140,6 +6252,8 @@ fn emit_prefs_vectors_for_paste() {
         opaque_saved_views: Vec::new(),
         view_approvals: Default::default(),
         view_order: Vec::new(),
+        home_cards: None,
+        home_open_on_start: false,
     };
     let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
     let canonical_populated = canonical_json_encode(&prefs_populated);

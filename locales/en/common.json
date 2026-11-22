@@ -2819,7 +2819,32 @@
     },
     "home": {
       "emptyTitle": "Your home surface",
-      "emptyBody": "Cards for recent notes, today's tasks and the files you keep reaching for land here. Nothing is arranged yet."
+      "emptyBody": "Cards for recent notes, today's tasks and the files you keep reaching for land here. Nothing is arranged yet.",
+      "title": "Home",
+      "arrange": "Arrange",
+      "arrangeTitle": "Arrange your home",
+      "addCard": "Add a card",
+      "removeCard": "Remove {{name}}",
+      "spanWide": "Wide",
+      "spanNarrow": "Narrow",
+      "onStart": "When the app opens",
+      "onStartHint": "Open this home surface on start, on this device only.",
+      "cards": {
+        "recentNotes": "Recent notes",
+        "quickCapture": "Quick capture",
+        "todaysTasks": "Today's tasks",
+        "calendarAgenda": "Coming up",
+        "favorites": "Favourites",
+        "referenceSets": "Reference sets",
+        "savedViews": "Saved views",
+        "recentFiles": "Recent files",
+        "writingStats": "Writing",
+        "agentPrompt": "Ask the agent",
+        "graph": "Your vault",
+        "unknown": "Unavailable card",
+        "unknownNote": "This card was added by a newer version of Myne, so this one cannot draw it. It is kept in place.",
+        "pending": "This card is being built."
+      }
     }
   },
   "photoNote": {

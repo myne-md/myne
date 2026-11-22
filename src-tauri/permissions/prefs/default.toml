@@ -35,6 +35,8 @@ permissions = [
   "allow-set-calendar-setting",
   "allow-set-ribbon-items",
   "allow-set-ribbon-visible",
+  "allow-set-home-cards",
+  "allow-set-home-open-on-start",
   "allow-set-new-note-location",
   "allow-set-startup-open",
   "allow-set-editor-text-size",
@@ -761,3 +763,13 @@ commands.allow = ["dismiss_mcp_write_request"]
 identifier = "allow-set-calendar-setting"
 description = "Allow invoking prefs:set_calendar_setting (Slot::Unlocked-gated setter for one calendar_settings entry: the all-day reminder anchor day_reminder_anchor, or a colours.<name> design-token name for a calendar; Some sets it and None removes the key, which the Phase 2 merge represents as a stamped absence; read-modify-write under the write mutex, disk-first, no native side-effect; the three host-side refusals are a key nothing reads, an anchor that is not HH:MM wall clock, and a colour that is not a token name, so a hex literal is refused rather than stored and ignored; the calendar name is user text and is never logged; class Shared with a per-key map merge per sync-protocol.md §10.2, sealed inside the vault.prefs blob, so the server reads ciphertext only and every device of the account converges on one value)."
 commands.allow = ["set_calendar_setting"]
+
+[[permission]]
+identifier = "allow-set-home-cards"
+description = "Allow invoking prefs:set_home_cards (Slot::Unlocked-gated setter for the home surface's card arrangement: the ordered card list, synced so it merges like favorites; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_home_cards"]
+
+[[permission]]
+identifier = "allow-set-home-open-on-start"
+description = "Allow invoking prefs:set_home_open_on_start (Slot::Unlocked-gated setter for whether THIS DEVICE opens the home tab on start; default false, device-local so it never merges; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_home_open_on_start"]
