@@ -36,7 +36,10 @@ const PANEL_IDS = [
   "sync",
   "ai",
   "network",
-  "cli",
+  // Connections replaced the separate `cli` and `extensions` panels
+  // (myne-md/myne#1077): the CLI, the browser clipper and an external MCP client
+  // are three sections of one panel.
+  "connections",
   "editor",
   "files",
   "transcription",
@@ -44,11 +47,6 @@ const PANEL_IDS = [
   "appearance",
   "storage",
   "about",
-  // Split out of Account on myne-md/myne#960, when the browser clipper got its
-  // own panel. The registry moved its entry to `panelId: "extensions"` and this
-  // independent mirror did not move with it, so the assertion above and the
-  // coverage one below both failed on the merged tree.
-  "extensions",
   // Split out of About on 2026-10-25; it must carry ≥1 entry or the coverage
   // assertion below fails, which is why the list is independent of the registry.
   "diagnostics",
@@ -225,7 +223,7 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     // Both members of the rail's Developer group (SettingsModal's PANELS_BASE).
     // An untagged entry would let search navigate into a panel the rail itself
     // refuses to show while Developer mode is off.
-    const DEVELOPER_PANELS = ["ai", "network", "cli"];
+    const DEVELOPER_PANELS = ["ai", "network"];
     for (const e of SETTINGS_SEARCH_INDEX) {
       if (DEVELOPER_PANELS.includes(e.panelId)) {
         expect(e.developerGated, `entry ${e.id}`).toBe(true);
@@ -260,13 +258,15 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
   // the tag one level up: `searchSettings` reads this index, not the rail, so
   // without it a mode-off search offers three results in a panel the rail is
   // not showing.
+  // The CLI trio is no longer developer-gated: Connections is a CORE panel
+  // (myne-md/myne#1077), so those rows are gated by their capability alone.
   const SETTING_LEVEL_GATED_IDS = ["editor.vim-mode"];
   const CLI_PANEL_GATED_IDS = [
     "cli.access",
     "cli.excluded-folders",
     "cli.rate-limit",
   ];
-  const DEVELOPER_GATED_IDS = [...SETTING_LEVEL_GATED_IDS, ...CLI_PANEL_GATED_IDS];
+  const DEVELOPER_GATED_IDS = [...SETTING_LEVEL_GATED_IDS];
 
   it("tags the vim entry as developer-gated inside the core panel it renders in", () => {
     for (const id of SETTING_LEVEL_GATED_IDS) {
@@ -280,7 +280,7 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     }
   });
 
-  it("keeps the CLI trio's capability tag alongside the developer gate", () => {
+  it("keeps the CLI trio's capability tag, without a developer gate", () => {
     // Two independent axes (`settingsSearchIndex.ts` docstring): a static
     // per-build capability descriptor and a runtime user toggle. Dropping the
     // capability half would make the entries searchable on web, where the
@@ -289,12 +289,15 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     for (const id of CLI_PANEL_GATED_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
       expect(entry.capability, `entry ${id}`).toBe("cliAccess");
-      expect(entry.developerGated, `entry ${id}`).toBe(true);
-      expect(entry.panelId, `entry ${id}`).toBe("cli");
+      // Connections is core (myne-md/myne#1077): the capability is the only gate
+      // these three need now, and the panel renders for any client that can host
+      // one of its three sections.
+      expect(entry.developerGated, `entry ${id}`).toBe(false);
+      expect(entry.panelId, `entry ${id}`).toBe("connections");
     }
   });
 
-  it("mode off: the CLI and vim entries are absent from every search, even by exact title", () => {
+  it("mode off: the vim entry is absent from every search, even by exact title", () => {
     for (const id of DEVELOPER_GATED_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
       const found = searchSettings(entry.titleKey, t, false).map((r) => r.id);
