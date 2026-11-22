@@ -362,7 +362,6 @@
         "nameDesc": "Name Z-A"
       },
       "sortAriaLabel": "Sort attachments",
-      "folderAll": "All folders",
       "folderScopeAriaLabel": "Show the files in one folder",
       "selectAriaLabel": "Select {{name}}",
       "selectedCount_one": "{{count}} selected",
@@ -376,6 +375,7 @@
       "importFolderCancelled_one": "Stopped after {{count}} file. What was imported is in the library.",
       "importFolderCancelled_other": "Stopped after {{count}} files. What was imported is in the library.",
       "importFolderFailed": "Could not read that folder. Nothing was imported.",
+      "folderAll": "All folders",
       "supportedFilesFilter": "Supported files",
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
@@ -433,7 +433,12 @@
     "emptyState": "No attachments yet. Tap Upload to add an image or PDF.",
     "insert": "Insert",
     "pauseLabel": "Pause {{filename}}",
-    "playLabel": "Play {{filename}}"
+    "playLabel": "Play {{filename}}",
+    "move": "Move",
+    "folderAll": "All folders",
+    "folderRoot": "No folder",
+    "folderPickerAria": "Folder for {{name}}",
+    "folderMoveFailed": "Could not move that file. Nothing changed; try again."
   },
   "backup": {
     "errors": {

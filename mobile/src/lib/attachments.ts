@@ -19,6 +19,10 @@ export interface CatalogEntry {
   created_at: number;
   /** Display filename. */
   filename: string;
+  /** The vault folder this attachment is filed in, canonical with a trailing
+   *  `/`, or empty for the vault root (myne-md/myne#1075). Absent in a catalog
+   *  written before the field existed, which reads as the root. */
+  folder?: string;
   /** File size in bytes. */
   size: number;
 }
@@ -100,6 +104,28 @@ export async function importFile(file: File): Promise<ImportedAttachment> {
 /** Delete one attachment (unlink blob + catalog entry). Idempotent. */
 export function attachmentDelete(id: string): Promise<void> {
   return invoke("plugin:attachments|attachment_delete", { id });
+}
+
+/** One row of a folder move: the attachment and where it goes. */
+export interface AttachmentFolderAssignment {
+  /** Attachment-id, 64-char lowercase hex. */
+  id: string;
+  /** Canonical folder path with a trailing `/`, or `""` for the vault root. */
+  folder: string;
+}
+
+/**
+ * File attachments into folders (myne-md/myne#1075).
+ *
+ * A batch, because the acts that need it are batches: a multi-select move is one
+ * write, and re-rooting a renamed folder is one write for every file under it. An
+ * empty list is not a call, since the command refuses one.
+ */
+export async function attachmentSetFolders(
+  assignments: readonly AttachmentFolderAssignment[],
+): Promise<void> {
+  if (assignments.length === 0) return;
+  await invoke<void>("plugin:attachments|attachment_set_folders", { assignments });
 }
 
 /** Rename one attachment's catalog display filename (cosmetic; id unchanged). */

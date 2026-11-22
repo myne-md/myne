@@ -25,6 +25,7 @@
       "@myne/dialect": ["../dialect/src/index.ts"],
       "@myne/dialect/*": ["../dialect/src/*"],
       "@myne/dialect-civil-date": ["../dialect/src/civilDate.ts"],
+      "@myne/attachment-folder-scope": ["../src/notes/attachmentFolderScope.ts"],
       "@myne/vault-indices": ["../src/notes/vaultIndices.ts"],
       "@myne/calendar-grid": ["../src/notes/calendar/grid.ts"],
       "@myne/calendar-layout": ["../src/notes/calendar/layout.ts"],
