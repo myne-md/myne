@@ -4101,7 +4101,8 @@
         "storage": "Storage",
         "sync": "Sync",
         "vault": "Vault",
-        "extensions": "Browser extensions"
+        "extensions": "Browser extensions",
+        "connections": "Connections"
       },
       "passwordUpdatedToast": "Password updated",
       "title": "Settings"
@@ -4338,6 +4339,9 @@
       "newNamePlaceholder": "Work",
       "addColour": "Add",
       "saveFailed": "Could not save that setting. Your vault has not changed."
+    },
+    "connections": {
+      "mcp": "External MCP clients"
     }
   },
   "storageLost": {

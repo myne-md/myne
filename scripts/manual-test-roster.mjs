@@ -1432,6 +1432,9 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/cli_bridge/mod.rs",
       "src-tauri/src/cli_bridge/path_shim.rs",
       "src/components/settings/CliPanel.tsx",
+      // The panel that hosts it, since myne-md/myne#1077: the door is now one
+      // section of Connections rather than a rail entry of its own.
+      "src/components/settings/ConnectionsPanel.tsx",
       "src/components/settings/CliAccessSettings.tsx",
       "src/lib/cli-access.ts",
       "cli/src/status.rs",

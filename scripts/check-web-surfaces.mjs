@@ -119,6 +119,10 @@ const V = {
     "adapted",
     "Never rendered: the panel is a `developer`-group rail entry carrying `capability: \"cliAccess\"`, which is absent on web, so the rail drops it and nothing here ever mounts. It ships in the bundle (it is the composition root for the CLI block, one small file inside the settings chunk that does ship) and the block it renders carries the same capability gate. Moved out of PrivacyPanel by `decisions/ui/0678`; the web verdict is unchanged by the move, since the capability gate was already what kept the terminal surface off this client.",
   ],
+  "src/components/settings/ConnectionsPanel.tsx": [
+    "adapted",
+    "Never rendered: the panel is a core rail entry whose three sections are each gated on a capability web does not have (`cliAccess`, `clipper`, `externalMcp`), so the rail drops the panel entirely. It ships in the bundle as a composition root — it holds no host call of its own and only stacks three components that already carry their own gates, so a hand-reached render would draw an empty column.",
+  ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
   "src/components/settings/mcp-client-marks.tsx": [
     "adapted",

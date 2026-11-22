@@ -242,7 +242,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "extensions.install",
     agentWritability: WRITABILITY_NONE,
     capability: "clipper",
-    panelId: "extensions",
+    panelId: "connections",
     testid: "settings.clipper-install",
     titleKey: "settings.clipperInstall.label",
     descriptionKey: "settings.clipperInstall.helper",
@@ -396,8 +396,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "cli.access",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
-    developerGated: true,
-    panelId: "cli",
+    // Connections is a CORE panel (myne-md/myne#1077): the CLI is a normal
+    // feature with a real gate, and the Developer group is for the panels that
+    // leave the path Myne vouches for.
+    developerGated: false,
+    panelId: "connections",
     titleKey: "settings.cliAccess.label",
     descriptionKey: "settings.cliAccess.helperOff",
     keywordsKey: "settings.search.keywords.cliAccess",
@@ -406,8 +409,8 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "cli.excluded-folders",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
-    developerGated: true,
-    panelId: "cli",
+    developerGated: false,
+    panelId: "connections",
     titleKey: "settings.cliAccess.excludedLabel",
     descriptionKey: "settings.cliAccess.excludedHelper",
     keywordsKey: "settings.search.keywords.cliExcludedFolders",
@@ -416,8 +419,8 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "cli.rate-limit",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
-    developerGated: true,
-    panelId: "cli",
+    developerGated: false,
+    panelId: "connections",
     titleKey: "settings.cliAccess.rateLimitLabel",
     descriptionKey: "settings.cliAccess.rateLimitHelper",
     keywordsKey: "settings.search.keywords.cliRateLimit",
@@ -1223,17 +1226,12 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "ai.external-access",
     agentWritability: WRITABILITY_CONTROL,
-    // `localAi`, not `externalMcp`: the row lives in the AI panel, so a client
-    // without the AI capability has no panel to show it in. The section it points
-    // at needs `externalMcp` as well, and that is the component's gate rather than
-    // the search row's — a row keyed to a narrower capability would be offered on a
-    // build where the panel itself is absent.
-    capability: "localAi",
-    developerGated: true,
-    panelId: "ai",
-    // Its own topic since the rework (myne-md/myne#1052): the entry lands on the
-    // tab that holds the switch rather than on Limits, which no longer carries it.
-    topic: "externalAccess",
+    // `externalMcp`: the switch moved to the Connections panel with its section
+    // (myne-md/myne#1077), so the row is gated on the capability that renders it
+    // rather than on the AI panel it used to live in.
+    capability: "externalMcp",
+    developerGated: false,
+    panelId: "connections",
     testid: "settings.mcp-enable",
     titleKey: "settings.ai.externalAccess.label",
     descriptionKey: "settings.ai.externalAccess.helperOff",
