@@ -45,6 +45,7 @@ import {
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { listFolderPaths, type FolderPathOption } from "../../notes/listFolderPaths";
 import { folderMatchesScope } from "../../notes/attachmentFolderScope";
+import { importFolderTree } from "../../notes/attachments/folderImport";
 import { useWarmAttachmentRefs } from "./useWarmAttachmentRefs";
 import {
   startTranscription,
@@ -336,6 +337,13 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
   // One move in flight at a time: a second one would race the catalog write
   // and the refresh, and the bar already reports the first.
   const movingRef = useRef(false);
+  // A directory import, with the two things a long one needs: a count and a way
+  // out (myne-md/myne#1075).
+  const [folderImport, setFolderImport] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const folderImportCancel = useRef(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   // Fix (MYND-164 dogfooding): the focus ring belongs on the WHOLE search bar,
@@ -510,6 +518,52 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
     },
     [refresh],
   );
+
+  /**
+   * Import a directory tree, keeping its shape (myne-md/myne#1075).
+   *
+   * The picked folder's own name becomes the top folder in the library, so
+   * picking `Ders Notları` with `Hafta 1/slides.pdf` inside files the slide under
+   * `Ders Notları/Hafta 1/`. Without that the import flattens a term into one
+   * place, which is the state the folder field exists to avoid.
+   */
+  const handleImportFolder = useCallback(async () => {
+    const picked = await openFileDialog({ directory: true, multiple: false });
+    if (typeof picked !== "string" || picked === "") return;
+    const top = picked.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+    folderImportCancel.current = false;
+    setFolderImport({ done: 0, total: 0 });
+    try {
+      const summary = await importFolderTree(picked, {
+        onProgress: (done, total) => setFolderImport({ done, total }),
+        shouldCancel: () => folderImportCancel.current,
+        folderFor: (rel) => {
+          const slash = rel.lastIndexOf("/");
+          return slash === -1 ? `${top}/` : `${top}/${rel.slice(0, slash)}/`;
+        },
+      });
+      await refresh();
+      if (summary.cancelled) {
+        showAttachmentToast(
+          t("attachments.library.importFolderCancelled", {
+            count: summary.imported,
+          }),
+        );
+      } else {
+        showAttachmentToast(
+          t("attachments.library.importFolderDone", {
+            imported: summary.imported,
+            skipped: Object.values(summary.skipped).reduce((a, b) => a + b, 0),
+          }),
+          "success",
+        );
+      }
+    } catch {
+      showAttachmentToast(t("attachments.library.importFolderFailed"), "error");
+    } finally {
+      setFolderImport(null);
+    }
+  }, [refresh, t]);
 
   /** File every selected row into one folder (myne-md/myne#1075). */
   const handleMoveSelected = useCallback(
@@ -968,6 +1022,25 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
             disabled={importing}
             hoverColor="var(--accent)"
             spinning={importing}
+          />
+          <ToolbarActionButton
+            icon="folder-plus"
+            label={
+              folderImport === null
+                ? t("attachments.library.importFolder")
+                : t("attachments.library.importFolderProgress", {
+                    done: folderImport.done,
+                    total: folderImport.total,
+                  })
+            }
+            onClick={() => {
+              if (folderImport === null) void handleImportFolder();
+              else folderImportCancel.current = true;
+            }}
+            disabled={importing}
+            hoverColor="var(--accent)"
+            spinning={folderImport !== null}
+            testId="attachments.import-folder"
           />
         </div>
       </div>
