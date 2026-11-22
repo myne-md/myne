@@ -60,7 +60,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "CliPanel": { file: "src/components/settings/CliPanel.tsx", line: 56 },
   "ColorGroupEditor": { file: "src/notes/components/ColorGroupEditor.tsx", line: 163 },
   "ColorSwatchPicker": { file: "src/components/primitives/ColorSwatchPicker.tsx", line: 75 },
-  "CommandPalette": { file: "src/components/CommandPalette.tsx", line: 325 },
+  "CommandPalette": { file: "src/components/CommandPalette.tsx", line: 353 },
   "ConfirmStep": { file: "src/screens/vault-creation/ConfirmStep.tsx", line: 58 },
   "ConflictsView": { file: "src/notes/components/ConflictsView.tsx", line: 310 },
   "ConnectedExtensions": { file: "src/components/settings/ConnectedExtensions.tsx", line: 116 },
