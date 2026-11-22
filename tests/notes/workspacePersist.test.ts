@@ -16,6 +16,7 @@ import {
   emptyNamedWorkspaces,
   emptyWorkspace,
   graphItem,
+  homeItem,
   noteItem,
   openInNewTab,
   openToSide,
@@ -178,6 +179,45 @@ describe("workspace descriptor (de)serialization", () => {
     } else {
       throw new Error("expected a leaf root");
     }
+  });
+
+  it("round-trips a home tab, and an older build drops it rather than the workspace", () => {
+    // myne-md/myne#1074: the forward-compatibility contract, asserted by NAME
+    // for the kind this change adds. The generic case above covers the rule;
+    // this one covers the rule applying to `home`, which is the thing a reader
+    // of the diff wants to know and the generic case cannot say.
+    const stored = JSON.stringify({
+      root: {
+        kind: "leaf",
+        id: "p",
+        tabs: [{ kind: "note", id: "a" }, { kind: "home", id: "home" }],
+        activeTab: { kind: "home", id: "home" },
+      },
+      focusedPaneId: "p",
+    });
+    const restored = deserializeWorkspace(stored);
+    expect(restored).not.toBeNull();
+    if (restored!.root.kind !== "leaf") throw new Error("expected a leaf root");
+    expect(restored!.root.tabs).toEqual([noteItem("a"), homeItem()]);
+
+    // The older-build direction: `home` is unknown to a client that predates it,
+    // so it is dropped and the note beside it survives. This is the same parser
+    // rule as `kanban` above, and it is why adding a kind is not a breaking
+    // change to a synced workspace.
+    const older = deserializeWorkspace(
+      JSON.stringify({
+        root: {
+          kind: "leaf",
+          id: "p",
+          tabs: [{ kind: "note", id: "a" }, { kind: "home", id: "home" }],
+          activeTab: { kind: "note", id: "a" },
+        },
+        focusedPaneId: "p",
+      }),
+    );
+    expect(older).not.toBeNull();
+    if (older!.root.kind !== "leaf") throw new Error("expected a leaf root");
+    expect(older!.root.tabs).toContainEqual(noteItem("a"));
   });
 
   it("falls back to the first tab when the active tab was a dropped unknown kind", () => {
