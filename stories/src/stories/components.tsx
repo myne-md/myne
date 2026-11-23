@@ -108,6 +108,7 @@ import { SettingsModal } from "@app/components/SettingsModal";
 import { SkipToContent } from "@app/components/SkipToContent";
 import { SuspicionBanner } from "@app/components/SuspicionBanner";
 import { SyncBanners } from "@app/components/sync/SyncBanners";
+import { NoticeCard, NoticeStack } from "@app/components/notices/NoticeStack";
 import { SyncStatusIndicator } from "@app/components/sync/SyncStatusIndicator";
 import { SyncUsageBlock } from "@app/components/sync/SyncUsageBlock";
 import { TemplatesManager } from "@app/components/TemplatesManager";
@@ -1430,12 +1431,67 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <RepairResidueBanner />,
   },
   {
+    id: "components/noticestack/warning",
+    group: "components",
+    surface: "NoticeStack",
+    state: "warning",
+    description:
+      "The bottom-centre notice column with the two warnings a session can raise: the sync-integrity alert and the stale-sync warning, each a card rather than a band, with severity carried by the warning token. Look for the column floating over the surface instead of pushing it down, and for the dismiss controls staying inside the cards.",
+    tags: ["components", "notices", "warning", "sync", "integrity", "stale", "bottom-centre"],
+    fixture: "unlocked",
+    render: () => (
+      <NoticeStack>
+        <NoticeCard
+          severity="warning"
+          role="alert"
+          testId="story.notice-integrity"
+          onDismiss={action("onDismiss")}
+          dismissLabel="Dismiss"
+        >
+          Possible sync integrity problem: the server may have sent out-of-date or
+          altered sync data, which Myne did not accept. Your local notes are safe.
+        </NoticeCard>
+        <NoticeCard
+          severity="warning"
+          role="alert"
+          testId="story.notice-stale"
+          onDismiss={action("onDismiss")}
+          dismissLabel="Dismiss"
+        >
+          Sync has been failing on this device for a while. Your notes are still
+          saving here, and nothing has left the device.
+        </NoticeCard>
+      </NoticeStack>
+    ),
+  },
+  {
+    id: "components/noticestack/info",
+    group: "components",
+    surface: "NoticeStack",
+    state: "info",
+    description:
+      "The same column carrying the two notices that are information rather than a problem: the vault was rekeyed on another device, and a first sync is counting its notes. The severity border is the only difference, which is the point — one surface, three weights.",
+    tags: ["components", "notices", "info", "rekeyed", "materialising", "bottom-centre"],
+    fixture: "unlocked",
+    render: () => (
+      <NoticeStack>
+        <NoticeCard severity="info" testId="story.notice-rekeyed">
+          This vault was upgraded on another device, so this session is on the
+          previous keys. Unlock again to use the new ones.
+        </NoticeCard>
+        <NoticeCard severity="info" testId="story.notice-materialising">
+          Bringing 128 of 542 notes into the index…
+        </NoticeCard>
+      </NoticeStack>
+    ),
+  },
+  {
     id: "components/syncbanners/default",
     group: "components",
     surface: "SyncBanners",
     state: "default",
     description:
-      "The sync status banners, driven by live sync state the fake host does not emit, so the stage shows that reason. In the app it is the top-of-window strip carrying the paused, error and progress states.",
+      "The sync status notices, driven by live sync state the fake host does not emit, so the stage shows that reason. In the app they render into the bottom-centre column (components/noticestack/warning shows that shape).",
     unreachable: {
       what: "the sync status banners",
       why: "they are driven by live sync state the fake host does not emit",
