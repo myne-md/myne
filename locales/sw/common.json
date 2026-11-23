@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne haikuweza kubadilisha mpangilio huo.",
       "diagnosticLogReadError": "Myne haikuweza kusoma mpangilio wa kumbukumbu za uchunguzi, hivyo unaonyeshwa kama umezimwa.",
       "diagnosticBlockLabel": "Maelezo ya ripoti",
-      "diagnosticBlockHelper": "Hasa kile ambacho Nakili huweka kwenye ubao wako wa kunakili. Hakuna kinachotumwa popote; wewe unaamua cha kushiriki.",
       "diagnosticCopy": "Nakili taarifa za uchunguzi",
       "diagnosticCopyDone": "Taarifa za uchunguzi zimenakiliwa",
       "diagnosticCopyFailed": "Haikuweza kunakili. Chagua maandishi yaliyo juu kisha uyanakili kwa mkono.",

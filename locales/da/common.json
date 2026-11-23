@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne kunne ikke ændre den indstilling.",
       "diagnosticLogReadError": "Myne kunne ikke læse indstillingen for diagnostiklog, så den vises som slået fra.",
       "diagnosticBlockLabel": "Rapportdetaljer",
-      "diagnosticBlockHelper": "Præcis hvad Kopiér lægger i din udklipsholder. Intet sendes nogen steder hen; du bestemmer, hvad du deler.",
       "diagnosticCopy": "Kopiér diagnostik",
       "diagnosticCopyDone": "Diagnostik kopieret",
       "diagnosticCopyFailed": "Kunne ikke kopiere. Markér teksten ovenfor, og kopiér den manuelt.",

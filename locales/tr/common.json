@@ -3106,7 +3106,6 @@
       "diagnosticLogError": "Myne o ayarı değiştiremedi.",
       "diagnosticLogReadError": "Myne tanılama günlüğü ayarını okuyamadı, bu yüzden kapalı olarak gösteriliyor.",
       "diagnosticBlockLabel": "Rapor ayrıntıları",
-      "diagnosticBlockHelper": "Kopyala’nın panonuza koyduğu şeyin tam olarak kendisi. Hiçbir yere hiçbir şey gönderilmez; neyi paylaşacağınıza siz karar verirsiniz.",
       "diagnosticCopy": "Tanılamayı kopyala",
       "diagnosticCopyDone": "Tanılama kopyalandı",
       "diagnosticCopyFailed": "Kopyalanamadı. Yukarıdaki metni seçip elle kopyalayın.",

@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne kon die instelling niet wijzigen.",
       "diagnosticLogReadError": "Myne kon de instelling voor diagnostische logboekregistratie niet lezen, dus die wordt als uit getoond.",
       "diagnosticBlockLabel": "Rapportdetails",
-      "diagnosticBlockHelper": "Precies wat Kopiëren op je klembord zet. Er wordt niets verzonden; jij bepaalt wat je deelt.",
       "diagnosticCopy": "Diagnostiek kopiëren",
       "diagnosticCopyDone": "Diagnostiek gekopieerd",
       "diagnosticCopyFailed": "Kon niet kopiëren. Selecteer de tekst hierboven en kopieer die handmatig.",

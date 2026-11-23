@@ -3376,7 +3376,6 @@
       "diagnosticLogError": "Myne nu a putut modifica acea setare.",
       "diagnosticLogReadError": "Myne nu a putut citi setarea jurnalului de diagnostic, așa că este afișată ca dezactivată.",
       "diagnosticBlockLabel": "Detalii raport",
-      "diagnosticBlockHelper": "Exact ce pune Copiază în clipboard. Nimic nu este trimis nicăieri; tu decizi ce partajezi.",
       "diagnosticCopy": "Copiază diagnosticul",
       "diagnosticCopyDone": "Diagnostic copiat",
       "diagnosticCopyFailed": "Copierea nu a reușit. Selectează textul de mai sus și copiază-l manual.",

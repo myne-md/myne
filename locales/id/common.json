@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne tidak dapat mengubah pengaturan itu.",
       "diagnosticLogReadError": "Myne tidak dapat membaca pengaturan pencatatan diagnostik, jadi ditampilkan sebagai mati.",
       "diagnosticBlockLabel": "Detail laporan",
-      "diagnosticBlockHelper": "Persis apa yang diletakkan tombol Salin ke papan klip Anda. Tidak ada yang dikirim ke mana pun; Anda yang menentukan apa yang dibagikan.",
       "diagnosticCopy": "Salin diagnostik",
       "diagnosticCopyDone": "Diagnostik disalin",
       "diagnosticCopyFailed": "Tidak dapat menyalin. Pilih teks di atas lalu salin secara manual.",
