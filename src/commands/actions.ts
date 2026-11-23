@@ -1435,6 +1435,25 @@ const showCalendarAction: CommandAction = {
   },
 };
 
+const showHomeAction: CommandAction = {
+  // The identifier is FROZEN here for the reason `tasks.show` records: command
+  // ids carry migration weight the moment a user rebinds one.
+  id: "home.show",
+  ribbon: { icon: "house" },
+  get label() {
+    return i18n.t("commands.actions.showHome.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  kbd: "⌘⇧H",
+  defaultBinding: "Mod-Shift-h",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowHome();
+  },
+};
+
 const showTasksAction: CommandAction = {
   // The identifier is FROZEN here. Command ids carry migration weight the
   // moment a user rebinds one — a rename silently drops their keybinding — so
@@ -1780,6 +1799,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNoteTxtAction,
   showGraphAction,
   showIsolatedGraphAction,
+  showHomeAction,
   showTasksAction,
   showCalendarAction,
   showTagsAction,

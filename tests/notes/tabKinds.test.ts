@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  HOME_TAB_ID,
   TAB_KINDS,
   TAB_KIND_TAGS,
   canonicalTabId,
@@ -28,6 +29,22 @@ import {
 } from "../../src/notes/workspaceState";
 
 describe("the registry covers the union", () => {
+  it("home is one registry entry: sentinel, icon, label and singleton behaviour", () => {
+    // myne-md/myne#1074's first acceptance criterion, and the reason the registry
+    // exists: one entry has to produce all four, or a new kind costs seven edits
+    // again and one of them gets forgotten.
+    const spec = tabKindSpec("home");
+    expect(spec.singletonId).toBe(HOME_TAB_ID);
+    expect(spec.icon).toBe("house");
+    expect(spec.labelKey).toBe("notes.pane.homeTab");
+    expect(spec.showsFocusedNote).toBe(false);
+    // Derived, not listed: a kind is a singleton because it declared an id.
+    expect(isSingletonTabKind("home")).toBe(true);
+    // Whatever id a stored descriptor claimed, the singleton resolves to its one
+    // sentinel, which is what makes "open home" a reveal rather than a second tab.
+    expect(canonicalTabId("home", "junk")).toBe(HOME_TAB_ID);
+  });
+
   it("registers every kind the union declares", () => {
     // Hand-listed on purpose: this array IS the assertion. Widening the union
     // without registering the kind must fail HERE, and a derived list would
@@ -43,6 +60,9 @@ describe("the registry covers the union", () => {
       // myne-md/myne#1037: an event is a note and a vault has one schedule, so
       // the calendar is a singleton tab beside the graph and the task list.
       "calendar",
+      // myne-md/myne#1074: home is one per workspace, so a second open reveals
+      // the first rather than splitting the same cards across two panes.
+      "home",
     ];
     expect([...TAB_KIND_TAGS].sort()).toEqual([...unionKinds].sort());
     for (const kind of unionKinds) {

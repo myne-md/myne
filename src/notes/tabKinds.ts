@@ -89,6 +89,11 @@ export const AGENT_TAB_ID = "agent";
  *  month across two panes. */
 export const CALENDAR_TAB_ID = "calendar";
 
+/** The home surface (myne-md/myne#1074). One per workspace: it is the place you
+ *  start from, and a second copy of it in the same pane tree would be two
+ *  answers to "where am I" rather than a second view of anything. */
+export const HOME_TAB_ID = "home";
+
 export type TabKind = WorkspaceItem["kind"];
 
 export interface TabKindSpec {
@@ -194,6 +199,17 @@ export const TAB_KINDS: readonly TabKindSpec[] = [
     // A month grid reads neither sidebar.
     ownsWholeSurface: true,
     openCommandId: "calendar.show",
+  },
+  {
+    kind: "home",
+    singletonId: HOME_TAB_ID,
+    icon: "house",
+    labelKey: "notes.pane.homeTab",
+    // The cards act on the vault, not on one note, so the note floats stay off
+    // it. It does NOT own the whole surface: home beside a note is the shape it
+    // is for, which is why it is not declared `ownsWholeSurface`.
+    showsFocusedNote: false,
+    openCommandId: "home.show",
   },
   {
     kind: "agent",
