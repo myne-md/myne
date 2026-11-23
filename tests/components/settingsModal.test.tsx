@@ -93,8 +93,8 @@ vi.mock("../../src/components/settings/AiPanel", () => ({
 vi.mock("../../src/components/settings/NetworkPanel", () => ({
   NetworkPanel: () => <div data-testid="panel.network">network</div>,
 }));
-vi.mock("../../src/components/settings/CliPanel", () => ({
-  CliPanel: () => <div data-testid="panel.cli">cli</div>,
+vi.mock("../../src/components/settings/ConnectionsPanel", () => ({
+  ConnectionsPanel: () => <div data-testid="panel.connections">connections</div>,
 }));
 
 import { SettingsModal } from "../../src/components/SettingsModal";
@@ -195,7 +195,10 @@ describe("SettingsModal — Developer group gating (MYND-593)", () => {
     expect(screen.queryByTestId("settings.tab-cli")).toBeNull();
   });
 
-  it("mode on: Developer group and all three of its tabs appear, and are reachable", () => {
+  it("mode on: the Developer group and its two remaining tabs appear, and are reachable", () => {
+    // **Two, not three**: the CLI panel left the Developer group for Connections
+    // (myne-md/myne#1077), which is a core panel — terminal access is a normal
+    // feature with a real capability gate, not a path Myne stops vouching for.
     developerMode = true;
     renderModal();
     expect(screen.getByTestId("settings.developer-group")).toBeTruthy();
@@ -203,8 +206,6 @@ describe("SettingsModal — Developer group gating (MYND-593)", () => {
     expect(screen.getByTestId("panel.ai")).toBeTruthy();
     fireEvent.click(screen.getByTestId("settings.tab-network"));
     expect(screen.getByTestId("panel.network")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("settings.tab-cli"));
-    expect(screen.getByTestId("panel.cli")).toBeTruthy();
   });
 
   it("the group divider renders exactly once, at the core→developer boundary", () => {
@@ -220,9 +221,12 @@ describe("SettingsModal — Developer group gating (MYND-593)", () => {
     developerMode = true;
     renderModal();
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    expect(screen.getByTestId("panel.cli")).toBeTruthy();
+    // The LAST panel in the rail is Network now that the CLI moved to Connections
+    // (myne-md/myne#1077), and the wrap still lands on the last member rather than
+    // on a panel that is no longer in the Developer group.
+    expect(screen.getByTestId("panel.network")).toBeTruthy();
     expect(
-      screen.getByTestId("settings.tab-cli").getAttribute("aria-selected"),
+      screen.getByTestId("settings.tab-network").getAttribute("aria-selected"),
     ).toBe("true");
   });
 });

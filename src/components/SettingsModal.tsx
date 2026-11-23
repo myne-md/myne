@@ -71,12 +71,11 @@ import { livePanelTopics } from "./settings/settingsTopics";
 import { AboutPanel } from "./settings/AboutPanel";
 import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { AccountPanel } from "./settings/AccountPanel";
-import { BrowserExtensionsPanel } from "./settings/BrowserExtensionsPanel";
 import { VaultPanel } from "./settings/VaultPanel";
 import * as capabilities from "../platform/capabilities";
 import { AiPanel } from "./settings/AiPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
-import { CliPanel } from "./settings/CliPanel";
+import { ConnectionsPanel } from "./settings/ConnectionsPanel";
 import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
 import { TranscriptionPanel } from "./settings/TranscriptionPanel";
@@ -103,10 +102,13 @@ export type PanelId =
   | "privacy"
   | "sync"
   // The browser clipper's own surface, split out of Account on myne-md/myne#960.
-  | "extensions"
   | "ai"
   | "network"
-  | "cli"
+  // Connections (myne-md/myne#1077): the three doors into the vault — the CLI,
+  // the browser clipper and an external MCP client — in one panel, because a
+  // person asking "what can read my notes" should not have to know which feature
+  // owns each answer. Replaces the separate `cli` and `extensions` panels.
+  | "connections"
   | "editor"
   | "files"
   | "transcription"
@@ -140,6 +142,15 @@ interface PanelMeta {
    *  absent capability filters the panel OUT of the rail rather than greying
    *  it: a greyed panel is an offer the platform cannot honour. */
   capability?: capabilities.Capability;
+  /**
+   * The capabilities ANY ONE of which keeps this panel in the rail.
+   *
+   * The single `capability` above is the common case; Connections is the one
+   * panel whose body is three separately gated sections, so a client that can
+   * host any one of them still has something to show. A panel with neither field
+   * is unconditional.
+   */
+  anyOf?: readonly capabilities.Capability[];
 }
 
 // The `developer` group sits LAST: Developer mode is where the user leaves the
@@ -184,15 +195,15 @@ const PANELS_BASE: readonly PanelMeta[] = [
   { id: "vault", labelKey: "settings.shell.panels.vault", icon: "key-round" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy", icon: "lock" },
   { id: "sync", labelKey: "settings.shell.panels.sync", icon: "refresh-cw" },
-  // The browser clipper, split out of Account (myne-md/myne#960). A capability
-  // gate, not a developer gate: clipping pages is a normal user's feature, and
-  // the web client cannot host a native-messaging endpoint at all, so the rail
+  // Connections (myne-md/myne#1077): the CLI, the browser clipper and an external
+  // MCP client in one panel. A capability gate, not a developer gate: all three
+  // are normal features, and a client that can host none of them (the web build)
   // omits the door rather than greying it (`decisions.md` 2026-07-26).
   {
-    id: "extensions",
-    labelKey: "settings.shell.panels.extensions",
+    id: "connections",
+    labelKey: "settings.shell.panels.connections",
     icon: "link",
-    capability: "clipper",
+    anyOf: ["cliAccess", "clipper", "externalMcp"],
   },
   { id: "editor", labelKey: "settings.shell.panels.editor", icon: "pencil" },
   { id: "files", labelKey: "settings.shell.panels.files", icon: "folder" },
@@ -226,13 +237,6 @@ const PANELS_BASE: readonly PanelMeta[] = [
     icon: "globe",
     group: "developer",
     capability: "torRouting",
-  },
-  {
-    id: "cli",
-    labelKey: "settings.shell.panels.cli",
-    icon: "code",
-    group: "developer",
-    capability: "cliAccess",
   },
 ] as const satisfies readonly PanelMeta[];
 
@@ -554,6 +558,7 @@ export function SettingsModal({
       PANELS_BASE.filter(
         (p) =>
           (p.capability === undefined || capabilities.has(p.capability)) &&
+          (p.anyOf === undefined || p.anyOf.some((c) => capabilities.has(c))) &&
           (p.group !== "developer" || prefs.developer_mode),
       ),
     [prefs.developer_mode],
@@ -659,10 +664,9 @@ export function SettingsModal({
     vault: null,
     privacy: null,
     sync: null,
-    extensions: null,
+    connections: null,
     ai: null,
     network: null,
-    cli: null,
     editor: null,
     files: null,
     transcription: null,
@@ -856,7 +860,6 @@ export function SettingsModal({
       />
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
-    extensions: <BrowserExtensionsPanel />,
     sync: (
       <SyncPanel
         vaultId={vaultId}
@@ -865,7 +868,12 @@ export function SettingsModal({
     ),
     ai: <AiPanel onShowToast={onShowToast} onDialogOpenChange={setChildDialogOpen} />,
     network: <NetworkPanel />,
-    cli: <CliPanel onShowToast={onShowToast} />,
+    connections: (
+      <ConnectionsPanel
+        onShowToast={onShowToast}
+        onDialogOpenChange={setChildDialogOpen}
+      />
+    ),
     editor: <EditorPanel onShowToast={onShowToast} focusAnchorId={pendingScroll?.id} />,
     files: <FilesPanel />,
     transcription: <TranscriptionPanel />,
