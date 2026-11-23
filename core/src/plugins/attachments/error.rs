@@ -519,6 +519,77 @@ impl From<std::io::Error> for AttachmentRenameError {
     }
 }
 
+/// Failure surface for `attachment_set_folders` (myne-md/myne#1075): the one
+/// write that files attachments into the vault's note folders.
+///
+/// The variants mirror [`AttachmentRenameError`] because the operation is the
+/// same shape (read the catalog under the write guard, change one field, bump the
+/// causal version, write once), plus `InvalidFolder`: a folder string that is not
+/// a canonical path. That one is a real rejection rather than a bug-canary,
+/// because the folder travels from a picker the user drives and a pasted path is
+/// ordinary input.
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum AttachmentPlacementError {
+    /// Slot was not `Slot::Unlocked`.
+    #[error("vault is not unlocked")]
+    Locked,
+
+    /// The supplied id string is not a valid 64-char lowercase-hex
+    /// attachment-id. Bug-canary: the UI only hands back catalog ids.
+    #[error("invalid attachment id")]
+    InvalidId,
+
+    /// The folder is not a canonical path: a `..` or `.` segment, a backslash, a
+    /// NUL, or a path that is empty after trimming. Empty is the vault root and
+    /// is expressed as an EMPTY STRING, never as `/`.
+    #[error("not a canonical folder path")]
+    InvalidFolder,
+
+    /// No live catalog entry with the supplied id exists. Bug-canary, with one
+    /// ordinary exception: a row deleted on another device between the read that
+    /// listed it and the move that files it.
+    #[error("attachment not found")]
+    AttachmentNotFound,
+
+    /// Filesystem error reading `vault.meta` / the catalog, or rewriting the
+    /// catalog.
+    #[error("filesystem error during attachment placement")]
+    Io {
+        /// Closed-enum mapping of `std::io::Error::kind()`.
+        io_error_kind: IoFailureKind,
+    },
+
+    /// `vault.meta` parse failed.
+    #[error("vault.meta parse failed")]
+    InvalidVaultMeta,
+
+    /// `protocol::encode_attachments_catalog` returned an error on the catalog
+    /// rewrite — practically unreachable in v0.1.
+    #[error("catalog encode failed")]
+    EncodeFailed,
+
+    /// `vault.attachments` EXISTS and no copy of it decoded (myne#308). Refusing
+    /// is the point: a rewrite from the empty base would destroy every other
+    /// attachment's metadata. See [`AttachmentRenameError::CatalogUndecodable`].
+    #[error("the attachments catalog exists but could not be decoded")]
+    CatalogUndecodable,
+}
+
+impl From<IoFailureKind> for AttachmentPlacementError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentPlacementError::Io { io_error_kind }
+    }
+}
+
+impl From<std::io::Error> for AttachmentPlacementError {
+    fn from(e: std::io::Error) -> Self {
+        AttachmentPlacementError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        }
+    }
+}
+
 /// Failure surface for the `attachments` reconcile commands
 /// (`attachment_refs_apply` / `attachment_refs_remove` /
 /// `attachment_refs_referencing`, MYND-169 SYNC-6).

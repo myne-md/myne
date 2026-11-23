@@ -29,6 +29,7 @@ permissions = [
   "allow-catalog-list",
   "allow-attachment-delete",
   "allow-attachment-rename",
+  "allow-attachment-set-folder",
   "allow-attachment-export",
   "allow-attachment-read-text",
   "allow-attachment-read-structured",
@@ -156,3 +157,8 @@ commands.allow = ["attachment_unused_list"]
 identifier = "allow-attachment-clean-unused"
 description = "Allow invoking attachments:attachment_clean_unused (Slot::Unlocked-gated batched cryptographic erase of confirmed unused attachments — re-verifies each id is still referenced by zero notes via the authoritative fail-closed scan, drops survivors from the MYC1 catalog in one atomic rewrite catalog-first, then unlinks their MYA1 blobs; a re-referenced or already-gone id is skipped; returns deleted/skipped/bytes-reclaimed counts; MYND-171)."
 commands.allow = ["attachment_clean_unused"]
+
+[[permission]]
+identifier = "allow-attachment-set-folder"
+description = "Allow invoking attachments:attachment_set_folders (Slot::Unlocked-gated batch placement of attachments into the vault's own note folders, myne-md/myne#1075). One command serves the library's multi-select move and the folder-rename re-root, because they are the same write; validation is all-or-nothing and an assignment that changes nothing is skipped rather than bumping a version."
+commands.allow = ["attachment_set_folders"]

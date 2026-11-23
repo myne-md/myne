@@ -908,6 +908,9 @@ export function ChatComposer({
           content_type: att.content_type,
           created_at: att.created_at,
           filename: att.filename,
+          // A file pasted into a conversation is imported at the vault root;
+          // it is filed afterwards like any other attachment.
+          folder: "",
           size: att.size,
         });
       }
