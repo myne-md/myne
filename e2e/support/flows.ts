@@ -483,7 +483,6 @@ export type SettingsTab =
   | "vault"
   | "privacy"
   | "sync"
-  | "extensions"
   | "editor"
   | "files"
   | "hotkeys"
@@ -491,7 +490,7 @@ export type SettingsTab =
   | "storage"
   | "ai"
   | "network"
-  | "cli"
+  | "connections"
   | "transcription"
   | "diagnostics"
   | "about";

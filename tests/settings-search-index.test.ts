@@ -280,19 +280,22 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     }
   });
 
-  it("keeps the CLI trio's capability tag, without a developer gate", () => {
+  it("keeps the CLI trio's capability tag AND its developer gate", () => {
     // Two independent axes (`settingsSearchIndex.ts` docstring): a static
     // per-build capability descriptor and a runtime user toggle. Dropping the
     // capability half would make the entries searchable on web, where the
-    // panel is absent by platform fact rather than by preference; dropping the
-    // developer half would make them searchable while the rail group is gone.
+    // section is absent by platform fact rather than by preference; dropping the
+    // developer half would offer a result that scrolls into a section the
+    // developer gate is not rendering.
     for (const id of CLI_PANEL_GATED_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
       expect(entry.capability, `entry ${id}`).toBe("cliAccess");
-      // Connections is core (myne-md/myne#1077): the capability is the only gate
-      // these three need now, and the panel renders for any client that can host
-      // one of its three sections.
-      expect(entry.developerGated, `entry ${id}`).toBe(false);
+      // myne-md/myne#1077 moved the three doors into one Connections panel and
+      // dropped this flag, on the reading that one panel makes the CLI a normal
+      // feature. `decisions/ui/0793` keeps `0678`: the panel is a capability
+      // gate, the CLI section inside it is still a developer tool, so both axes
+      // stay.
+      expect(entry.developerGated, `entry ${id}`).toBe(true);
       expect(entry.panelId, `entry ${id}`).toBe("connections");
     }
   });

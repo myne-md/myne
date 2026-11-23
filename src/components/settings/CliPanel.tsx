@@ -15,15 +15,19 @@
 // reasoning, and the panel a user hunts for a terminal setting in is not the
 // panel that answers "what can somebody looking at this machine see".
 //
-// # The gates are the same two, moved from the block to the rail
+// # The gates are the same two, and they have moved twice without changing
 //
-// `PANELS_BASE` carries `group: "developer"` and `capability: "cliAccess"`, so
-// the rail drops the whole entry on a client with no command socket (web) and
-// drops the whole developer group while `developer_mode` is off. That is
-// exactly the pair the block carried inline, which is why nothing about who
-// can reach these settings changed: they were invisible without Developer mode
-// before, and they are invisible without it now. The move is a taxonomy change,
-// not a visibility one.
+// `decisions/ui/0678` moved the pair from the block to the rail: a
+// `capability: "cliAccess"` entry in the `developer` group, so a client with no
+// command socket (web) dropped it and the whole developer group dropped while
+// `developer_mode` was off. `decisions/ui/0778`'s sibling reasoning then put
+// three doors — the CLI, the browser clipper, an external MCP client — into one
+// Connections panel (myne-md/myne#1077), and THAT panel is a capability gate.
+// The pair did not travel with it: this component still renders only when
+// `capabilities.has("cliAccess") && prefs.developer_mode`, which is the same two
+// conditions 0678 recorded, now checked one level down instead of by the rail.
+// A placement change is a taxonomy change, and who can reach the command socket
+// is not part of a taxonomy.
 //
 // What deliberately does NOT change: the disclosure copy stays in the row it
 // belongs to (`CliAccessSettings`), always visible and never behind a

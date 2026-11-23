@@ -194,14 +194,15 @@ function refusalReason(answer: RpcAnswer, label: string): string {
   return reason;
 }
 
-/** Open Settings → AI → Limits and wait for the External access section. The AI
- *  tab lives behind Developer mode (`developer-mode.e2e.ts:137`), so the caller
- *  enables that first; `enableDeveloperMode` leaves Settings OPEN on About by
- *  design, hence the tab click rather than a second `openSettings`. */
+/** Open Settings → Connections and wait for the External access section. The
+ *  grant left the AI panel's Limits topic for the Connections panel in
+ *  myne-md/myne#1077, where the CLI and the clipper already live.
+ *  `enableDeveloperMode` (the caller's first move, for the CLI switch this door
+ *  shares) leaves Settings OPEN on About by design, hence the tab click rather
+ *  than a second `openSettings`. */
 async function openExternalAccess(session: Session): Promise<void> {
-  await (await session.byTestId("settings.tab-ai")).click();
-  await session.byTestId("settings.ai-panel", { timeoutMs: UI_TIMEOUT_MS });
-  await selectSettingsTopic(session, "ai", "limits");
+  await (await session.byTestId("settings.tab-connections")).click();
+  await session.byTestId("settings.connections", { timeoutMs: UI_TIMEOUT_MS });
   await session.byTestId("settings.mcp-external-access", { timeoutMs: UI_TIMEOUT_MS });
 }
 
