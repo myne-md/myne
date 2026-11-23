@@ -34,6 +34,7 @@ export default defineConfig(async () => ({
       // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
       // tree rather than a top-level workspace package.
       { find: "@myne/dialect-civil-date", replacement: sib("../dialect/src/civilDate.ts") },
+      { find: "@myne/attachment-folder-scope", replacement: sib("../src/notes/attachmentFolderScope.ts") },
       { find: "@myne/vault-indices", replacement: sib("../src/notes/vaultIndices.ts") },
       // The calendar's own grid math and labels (myne-md/myne#1037). Shared with
       // the desktop pane and the agent tool's answers, so a cell and a row cannot
