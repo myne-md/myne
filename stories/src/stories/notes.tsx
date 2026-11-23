@@ -1710,6 +1710,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
             content_type: "application/pdf",
             created_at: 1700000000,
             filename: "lecture-04.pdf",
+            folder: "",
             size: 482_304,
           },
           {
@@ -1717,6 +1718,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
             content_type: "text/markdown",
             created_at: 1700000100,
             filename: "reading-list.md",
+            folder: "",
             size: 3_200,
           },
         ]}

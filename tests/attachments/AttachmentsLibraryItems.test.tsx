@@ -94,6 +94,7 @@ const LIVE_TITLE_CACHE = new Map<NoteId, TitleRecord>([
 const ENTRY_A: CatalogEntry = {
   id: "a".repeat(64),
   content_type: "image/png",
+  folder: "",
   created_at: 1_700_000_000,
   filename: "alpha.png",
   size: 2048,
@@ -101,6 +102,7 @@ const ENTRY_A: CatalogEntry = {
 const ENTRY_B: CatalogEntry = {
   id: "b".repeat(64),
   content_type: "image/png",
+  folder: "",
   created_at: 1_700_000_500,
   filename: "bravo.png",
   size: 4096,
@@ -241,6 +243,7 @@ describe("AttachmentsLibrary PDF tile preview → scrollable reader (MYND-164)",
   const PDF_ENTRY: CatalogEntry = {
     id: "f".repeat(64),
     content_type: "application/pdf",
+    folder: "",
     created_at: 1_700_000_900,
     filename: "report.pdf",
     size: 8192,
@@ -280,6 +283,7 @@ describe("AttachmentsLibrary PDF tile preview → scrollable reader (MYND-164)",
     const generic: CatalogEntry = {
       id: "c".repeat(64),
       content_type: "application/octet-stream",
+      folder: "",
       filename: "notes.docx",
       size: 4096,
       created_at: 1_700_000_000,

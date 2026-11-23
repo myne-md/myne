@@ -162,6 +162,9 @@ const ATTACHMENT = {
   content_type: "image/png",
   created_at: 1_700_000_000,
   filename: "diagram.png",
+  // The vault root: `folder` is required on the mirror and `""` means root,
+  // because the codec omits the key rather than emitting an empty one.
+  folder: "",
   size: 204_800,
 };
 

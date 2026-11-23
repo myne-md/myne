@@ -24,6 +24,7 @@
 // `mobile/`-only id would be a false hint on the desktop lane, and the address of
 // the hint ("nowhere under src/") is what makes it a hint rather than a verdict.
 
+import type { Dirent } from "node:fs";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -43,7 +44,7 @@ function sharedTreeText(): string {
   if (census !== null) return census;
   const chunks: string[] = [];
   const walk = (dir: string): void => {
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: Dirent<string>[];
     try {
       entries = readdirSync(dir, { withFileTypes: true });
     } catch {
