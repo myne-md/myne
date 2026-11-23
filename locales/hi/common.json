@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne वह सेटिंग बदल नहीं सका।",
       "diagnosticLogReadError": "Myne डायग्नोस्टिक लॉगिंग की सेटिंग पढ़ नहीं सका, इसलिए यह बंद दिखाई जा रही है।",
       "diagnosticBlockLabel": "रिपोर्ट का ब्योरा",
-      "diagnosticBlockHelper": "कॉपी करने पर आपके क्लिपबोर्ड पर ठीक यही जाता है। कहीं कुछ भी नहीं भेजा जाता; क्या साझा करना है, यह आप तय करते हैं।",
       "diagnosticCopy": "डायग्नोस्टिक्स कॉपी करें",
       "diagnosticCopyDone": "डायग्नोस्टिक्स कॉपी हो गए",
       "diagnosticCopyFailed": "कॉपी नहीं हो सका। ऊपर का टेक्स्ट चुनें और हाथ से कॉपी करें।",
@@ -3888,8 +3887,7 @@
         "preferences": "पसंद",
         "memory": "मेमोरी",
         "excluded": "AI क्या पढ़ सकता है",
-        "history": "चैट इतिहास",
-        "externalAccess": "बाहरी पहुँच"
+        "history": "चैट इतिहास"
       },
       "externalAccess": {
         "label": "बाहरी पहुँच",

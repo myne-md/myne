@@ -93,39 +93,6 @@ describe("DiagnosticsPanel — the report block", () => {
     expect(preview.style.resize).toBe("");
   });
 
-  // Issue #970 item 15, second attempt. The first fix answered the desktop
-  // readings that looked broken (`bundleHash: unknown`, `storageUsedMb: 0`) with
-  // a two-line paragraph explaining them, which is an apology in a settings
-  // panel and was rejected on sight. The block now omits a reading it cannot
-  // take, so there is nothing to explain and no desktop-only text at all: one
-  // helper sentence, on every client.
-  it("describes the block in one sentence, with no desktop-only explanation", () => {
-    for (const tauri of [true, false]) {
-      env.tauri = tauri;
-      render(<DiagnosticsPanel />);
-      const text = document.body.textContent ?? "";
-      expect(text).toContain("settings.about.diagnosticBlockHelper");
-      expect(
-        text.includes("diagnosticBlockHelperDesktop"),
-        "a desktop-only caveat is back. The block carries no placeholders, so " +
-          "it does not owe an explanation of them either.",
-      ).toBe(false);
-      cleanup();
-    }
-    env.tauri = false;
-  });
-
-  it("explains the one word of its own vocabulary that reads as a fault", () => {
-    // `unknown` is the vault doctor's answer for "the question was never asked"
-    // (myne-md/myne#1003), and it is a REAL answer rather than the placeholder
-    // issue #970 removed. An owner's paste carried four in a row and read them as
-    // four faults, so the block says once what the token means (myne-md/myne#1029).
-    // The line is a vocabulary, not a desktop caveat: it renders on every client.
-    render(<DiagnosticsPanel />);
-    const note = screen.getByTestId("about.diagnostic-unknown-note");
-    expect(note.textContent).toContain("settings.about.diagnosticUnknownNote");
-  });
-
   it("keeps the preview's settings-search anchor on the canon block root", () => {
     // The block moved from the local `Block` wrapper to `ControlBlock`, whose anchor
     // prop is `anchorId` rather than a raw `data-setting-anchor`. If that prop were

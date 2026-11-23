@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne وہ ترتیب تبدیل نہیں کر سکا۔",
       "diagnosticLogReadError": "Myne ڈایاگنوسٹک لاگنگ کی ترتیب پڑھ نہیں سکا، اس لیے یہ بند دکھائی جا رہی ہے۔",
       "diagnosticBlockLabel": "رپورٹ کی تفصیلات",
-      "diagnosticBlockHelper": "بالکل وہی جو کاپی آپ کے کلپ بورڈ پر رکھتی ہے۔ کچھ بھی کہیں نہیں بھیجا جاتا؛ آپ طے کرتے ہیں کہ کیا شیئر کرنا ہے۔",
       "diagnosticCopy": "ڈایاگنوسٹکس کاپی کریں",
       "diagnosticCopyDone": "ڈایاگنوسٹکس کاپی ہو گئے",
       "diagnosticCopyFailed": "کاپی نہیں ہو سکا۔ اوپر کا متن منتخب کر کے اسے ہاتھ سے کاپی کریں۔",
@@ -3888,8 +3887,7 @@
         "preferences": "ترجیحات",
         "memory": "یادداشت",
         "excluded": "AI کیا پڑھ سکتا ہے",
-        "history": "چیٹ کی تاریخ",
-        "externalAccess": "بیرونی رسائی"
+        "history": "چیٹ کی تاریخ"
       },
       "externalAccess": {
         "label": "بیرونی رسائی",

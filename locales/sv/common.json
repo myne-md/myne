@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne kunde inte ändra den inställningen.",
       "diagnosticLogReadError": "Myne kunde inte läsa inställningen för diagnostikloggning, så den visas som avstängd.",
       "diagnosticBlockLabel": "Rapportdetaljer",
-      "diagnosticBlockHelper": "Exakt vad Kopiera lägger i urklipp. Ingenting skickas någonstans; du bestämmer vad du delar.",
       "diagnosticCopy": "Kopiera diagnostik",
       "diagnosticCopyDone": "Diagnostiken kopierad",
       "diagnosticCopyFailed": "Kunde inte kopiera. Markera texten ovan och kopiera den manuellt.",
@@ -3888,8 +3887,7 @@
         "preferences": "Preferenser",
         "memory": "Minne",
         "excluded": "Vad AI kan läsa",
-        "history": "Chatthistorik",
-        "externalAccess": "Extern åtkomst"
+        "history": "Chatthistorik"
       },
       "externalAccess": {
         "label": "Extern åtkomst",

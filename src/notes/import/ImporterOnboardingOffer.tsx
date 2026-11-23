@@ -139,6 +139,10 @@ export function ImporterOnboardingOffer({
           {t("notes.import.offer.body")}
         </p>
 
+        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
+          {t("notes.import.offer.laterHint")}
+        </p>
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
           <Button variant="ghost" onClick={onDismiss} data-testid="importer.offer-dismiss">
             {t("common.notnow")}
@@ -147,10 +151,6 @@ export function ImporterOnboardingOffer({
             {t("common.choosefolder")}
           </Button>
         </div>
-
-        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
-          {t("notes.import.offer.laterHint")}
-        </p>
       </div>
     </div>
   );

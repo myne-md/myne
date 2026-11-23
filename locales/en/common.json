@@ -2085,6 +2085,7 @@
         "body": "Myne writes plain Markdown and shows the result as you type.\n\n## The basics\nMake a word **bold** or *italic*, or drop in `inline code`.\n\n## A list\n- One item\n- Another item\n  - A nested one\n\n## A quote\n> Small notes, kept for years, beat big notes you never write.\n\n## A table\n| Shortcut | What it does |\n| --- | --- |\n| Cmd/Ctrl + B | Bold |\n| Cmd/Ctrl + K | Add a link |\n\n## Some code\n```\nconsole.log(\"hello from Myne\")\n```\n\nWhen you are ready, head back to [[{{index}}]].\n"
       },
       "tasks": {
+        "title": "Tasks",
         "body": "Any line that starts with `- [ ]` is a task. Myne collects every open task from across your notes into one Tasks view, so nothing gets lost between notes.\n\n- [ ] Read [[{{markdown}}]]\n- [ ] Add a task of your own\n- [ ] Try one with a due date 📅 2030-12-31\n- [x] Create your vault\n\nCheck a box here, then open the Tasks view in the sidebar to watch the list update.\n\nBack to [[{{index}}]].\n"
       },
       "links": {
@@ -2311,7 +2312,7 @@
         "reasonUnknown": "Myne couldn't say why."
       },
       "offer": {
-        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported. Nothing leaves this device, and your original files stay exactly where they are.",
+        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported, and your original files stay exactly where they are.",
         "laterHint": "You can always import later from Settings → Storage.",
         "title": "Import your notes?"
       },
@@ -3146,12 +3147,10 @@
       "diagnosticLogError": "Myne could not change that setting.",
       "diagnosticLogReadError": "Myne could not read the diagnostic logging setting, so it is shown as off.",
       "diagnosticBlockLabel": "Report details",
-      "diagnosticBlockHelper": "Exactly what Copy puts on your clipboard. Nothing is sent anywhere; you decide what to share.",
       "diagnosticsIntro": "What Myne knows about this device right now. Nothing is sent anywhere; you decide what to share.",
       "diagnosticsReading": "Reading…",
       "diagnosticCopied": "Copied",
       "diagnosticsLogNote": "There is no log file on this device for this block to hand over: the saved diagnostic log is a desktop feature.",
-      "diagnosticUnknownNote": "unknown is an answer, not a fault. That reading stopped before it asked its question, so it reports nothing either way.",
       "diagnosticCopy": "Copy diagnostics",
       "diagnosticCopyDone": "Diagnostics copied",
       "diagnosticCopyFailed": "Could not copy. Select the text above and copy it by hand.",
@@ -3841,8 +3840,7 @@
         "preferences": "Preferences",
         "memory": "Memory",
         "excluded": "What AI can read",
-        "history": "Chat history",
-        "externalAccess": "External access"
+        "history": "Chat history"
       },
       "externalAccess": {
         "label": "External access",

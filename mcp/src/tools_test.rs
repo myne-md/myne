@@ -175,3 +175,57 @@ fn no_tool_is_declared_twice() {
         seen.push(name);
     }
 }
+
+/// The verbs whose answer is a list rather than an object. Written out, like
+/// [`EXPECTED_TOOLS`]: a roster derived from the thing it checks cannot fail.
+const LIST_SHAPED_TOOLS: [&str; 5] = [
+    "note_search",
+    "vault_list",
+    "attachment_list",
+    "calendar_read",
+    "view_list",
+];
+
+/// A list answer is nested under `items`, because `structuredContent` must be an
+/// object (myne-md/myne#1106), so the schema has to say where the list is.
+#[test]
+fn a_list_shaped_answer_declares_an_object_schema_with_items() {
+    for name in LIST_SHAPED_TOOLS {
+        let tool = catalog()
+            .into_iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap_or_else(|| panic!("{name} is not in the catalog"));
+        let schema = &tool["outputSchema"];
+        assert_eq!(
+            schema["type"], "object",
+            "{name} must declare an object schema: structuredContent is not a list"
+        );
+        assert_eq!(
+            schema["properties"]["items"]["type"], "array",
+            "{name} answers with a list, so its schema has to say where the list is"
+        );
+    }
+}
+
+/// And nothing may declare a non-object `outputSchema`: a client validates against
+/// it, so a list-typed one would licence the payload that breaks the call.
+#[test]
+fn no_output_schema_is_anything_but_an_object() {
+    for tool in catalog() {
+        let name = tool["name"].as_str().unwrap();
+        let Some(schema) = tool.get("outputSchema") else {
+            continue;
+        };
+        assert_eq!(
+            schema["type"], "object",
+            "{name} declares a non-object outputSchema"
+        );
+        // Not style: a closed schema this file got wrong fails EVERY call in a
+        // validating client.
+        assert!(
+            schema.get("additionalProperties").is_none(),
+            "{name} must not close its outputSchema: a forgotten field would then \
+             reject a valid answer"
+        );
+    }
+}

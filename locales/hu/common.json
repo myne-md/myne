@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "A Myne nem tudta módosítani azt a beállítást.",
       "diagnosticLogReadError": "A Myne nem tudta beolvasni a diagnosztikai naplózás beállítását, ezért kikapcsoltként jelenik meg.",
       "diagnosticBlockLabel": "Jelentés részletei",
-      "diagnosticBlockHelper": "Pontosan az, amit a Másolás a vágólapodra tesz. Semmi nem megy el sehová; te döntöd el, mit osztasz meg.",
       "diagnosticCopy": "Diagnosztika másolása",
       "diagnosticCopyDone": "Diagnosztika másolva",
       "diagnosticCopyFailed": "Nem sikerült a másolás. Jelöld ki a fenti szöveget, és másold ki kézzel.",
@@ -3888,8 +3887,7 @@
         "preferences": "Preferenciák",
         "memory": "Emlékezet",
         "excluded": "Mit olvashat az AI",
-        "history": "Csevegési előzmények",
-        "externalAccess": "Külső hozzáférés"
+        "history": "Csevegési előzmények"
       },
       "externalAccess": {
         "label": "Külső hozzáférés",

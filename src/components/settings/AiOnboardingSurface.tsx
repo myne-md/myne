@@ -69,6 +69,17 @@ const CARD_FOOTER_STYLE: CSSProperties = {
   flexWrap: "wrap",
 };
 
+
+/* Space ABOVE only: the modal body already insets its children, so a footer
+   carrying its own inset too sat twice as far in as the content above it. */
+const FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-4)",
+  flexShrink: 0,
+};
+
 /** One downloadable feature card (auto-tag). */
 function DownloadCard(props: {
   title: string;
@@ -215,7 +226,8 @@ export function AiOnboardingSurface({
         {AI_TRUST_INVARIANT}
       </p>
 
-      {/* The opt-in: nothing is downloaded unless it is on. */}
+      {/* The opt-in, as a `Switch`: a setting's control is this one, and a native
+          checkbox does not follow the theme on every platform. */}
       <div style={OPT_IN_ROW_STYLE}>
         <span style={CARD_BODY_STYLE}>{t("aiOnboarding.enableLabel")}</span>
         <Switch
@@ -255,17 +267,7 @@ export function AiOnboardingSurface({
 
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: "var(--space-2)",
-          // The footer is a SIBLING of the scrolling body, so the body's own
-          // padding does not reach it and the buttons would sit on the card's
-          // bottom edge.
-          padding: "0 var(--space-5) var(--space-5)",
-        }}
-      >
+      <div style={FOOTER_STYLE}>
         <Button
           variant="ghost"
           onClick={onClose}
