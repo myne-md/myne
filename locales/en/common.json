@@ -2121,7 +2121,8 @@
       "folderListFull": "Myne can remember a limited number of folders, and that list is full. This folder still works, but it will disappear when its last note leaves it. Deleting a folder you no longer need makes room.",
       "folderNotRemembered": "The folder was created, but Myne couldn't record it. It will disappear when its last note leaves it, and it is gone at the next unlock if it is still empty. Creating it again is safe.",
       "deliberateWriteFailed": "The folder was renamed, but one of its settings could not be saved. An empty folder will reappear under the old name each time you unlock; deleting it is safe and changes nothing else. Renaming the folder again will not clear it.",
-      "mcpScopeRewriteFailed": "The folder was renamed, but the folders an external AI connection is kept out of could not be updated. If you had left this folder out of a connection's approval, it may now be readable by that connection. Open Settings, AI, External access and check the folders left out for each connection."
+      "mcpScopeRewriteFailed": "The folder was renamed, but the folders an external AI connection is kept out of could not be updated. If you had left this folder out of a connection's approval, it may now be readable by that connection. Open Settings, AI, External access and check the folders left out for each connection.",
+      "attachmentFolderRewriteFailed": "The folder was renamed, but the files filed under it could not be moved with it. They still name the old folder, so they are missing from the library tree and from an agent given this folder. Move them again by hand from Attachments, or rename the folder back and forward once."
     },
     "folderNote": {
       "defaultTitle": "Index"

@@ -30,6 +30,7 @@ permissions = [
   "allow-catalog-list",
   "allow-attachment-delete",
   "allow-attachment-rename",
+  "allow-attachment-set-folder",
   "allow-attachment-export",
   "allow-attachment-unused-list",
   "allow-attachment-clean-unused",
@@ -93,3 +94,8 @@ commands.allow = ["attachment_refs_referencing"]
 identifier = "allow-attachment-read-extracted-text"
 description = "Allow invoking attachments:attachment_read_extracted_text (Slot::Unlocked-gated read-back of one attachment's cached MYE1 extracted text, which on mobile is the image OCR the import wrote (protocol.md § 9.15); decrypts the device-local cache blob in Rust and crosses IPC as plaintext of note-body class, rendered as inert editable text in the photo-to-note draft sheet, returning null when no usable cache entry exists. No engine and no pref gate: reading needs neither. myne-md/myne#926)."
 commands.allow = ["attachment_read_extracted_text"]
+
+[[permission]]
+identifier = "allow-attachment-set-folder"
+description = "Allow invoking attachments:attachment_set_folders (Slot::Unlocked-gated batch placement of attachments into the vault's own note folders, myne-md/myne#1075). One command serves the library's multi-select move and the folder-rename re-root, because they are the same write; validation is all-or-nothing and an assignment that changes nothing is skipped rather than bumping a version."
+commands.allow = ["attachment_set_folders"]
