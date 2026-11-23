@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (transcript)",
       "transcriptSave": "Opslaan als notitie",
       "transcriptSaved": "Transcript opgeslagen als notitie.",
-      "transcriptSaveFailed": "Kon het transcript niet als notitie opslaan."
+      "transcriptSaveFailed": "Kon het transcript niet als notitie opslaan.",
+      "folderScopeAriaLabel": "De bestanden in één map tonen",
+      "selectAriaLabel": "{{name}} selecteren",
+      "selectedCount_one": "{{count}} geselecteerd",
+      "selectedCount_other": "{{count}} geselecteerd",
+      "moveToAriaLabel": "De geselecteerde bestanden naar een map verplaatsen",
+      "moveFailed": "De geselecteerde bestanden konden niet worden verplaatst. Er is niets veranderd; probeer het opnieuw.",
+      "importFolder": "Een map importeren",
+      "importFolderProgress": "{{done}} van {{total}} worden geïmporteerd",
+      "importFolderDone_one": "{{imported}} bestand geïmporteerd, {{skipped}} overgeslagen.",
+      "importFolderDone_other": "{{imported}} bestanden geïmporteerd, {{skipped}} overgeslagen.",
+      "importFolderCancelled_one": "Gestopt na {{count}} bestand. Wat is geïmporteerd staat in de bibliotheek.",
+      "importFolderCancelled_other": "Gestopt na {{count}} bestanden. Wat is geïmporteerd staat in de bibliotheek.",
+      "importFolderFailed": "Die map kon niet worden gelezen. Er is niets geïmporteerd.",
+      "folderAll": "Alle mappen"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Nog geen bijlagen. Tik op Uploaden om een afbeelding of PDF toe te voegen.",
     "insert": "Invoegen",
     "pauseLabel": "{{filename}} pauzeren",
-    "playLabel": "{{filename}} afspelen"
+    "playLabel": "{{filename}} afspelen",
+    "move": "Verplaatsen",
+    "folderAll": "Alle mappen",
+    "folderRoot": "Geen map",
+    "folderPickerAria": "Map voor {{name}}",
+    "folderMoveFailed": "Dat bestand kon niet worden verplaatst. Er is niets veranderd; probeer het opnieuw."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Opdrachten en notities",
     "pin": "Vastmaken aan linker lint",
     "unpin": "Losmaken van linker lint",
-    "pinError": "De opdracht kon niet worden vastgemaakt."
+    "pinError": "De opdracht kon niet worden vastgemaakt.",
+    "sectionFiles": "Bestanden",
+    "fileUsedIn": "in {{title}}",
+    "fileUnused": "in geen enkele notitie gebruikt"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Geïmporteerde bijlagen omzetten…"
+      },
+      "showHome": {
+        "label": "Naar Home"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Kon de map niet hernoemen, dus die is ongewijzigd gebleven.",
       "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Elke keer dat je ontgrendelt, verschijnt er weer een lege map onder de oude naam; die verwijderen is veilig en verandert verder niets. De map opnieuw hernoemen ruimt hem niet op.",
       "folderListFull": "Myne kan een beperkt aantal mappen onthouden, en die lijst is vol. Deze map werkt gewoon, maar hij verdwijnt zodra de laatste notitie eruit gaat. Een map verwijderen die je niet meer nodig hebt, maakt weer ruimte.",
-      "folderNotRemembered": "De map is aangemaakt, maar Myne kon hem niet vastleggen. Hij verdwijnt zodra de laatste notitie eruit gaat, en bij de volgende ontgrendeling is hij weg als hij dan nog leeg is. Hem opnieuw aanmaken is veilig."
+      "folderNotRemembered": "De map is aangemaakt, maar Myne kon hem niet vastleggen. Hij verdwijnt zodra de laatste notitie eruit gaat, en bij de volgende ontgrendeling is hij weg als hij dan nog leeg is. Hem opnieuw aanmaken is veilig.",
+      "attachmentFolderRewriteFailed": "De map is hernoemd, maar de bestanden die erin stonden zijn niet mee verhuisd. Ze noemen nog de oude map, dus ze ontbreken in de bibliotheekboom en bij een agent die deze map krijgt. Verplaats ze opnieuw met de hand vanuit Bijlagen, of hernoem de map terug en daarna nog eens."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2543,7 +2569,8 @@
         "attachments": "Bijlagen",
         "graph": "Grafiek",
         "tasks": "Taken",
-        "today": "Vandaag"
+        "today": "Vandaag",
+        "home": "Home"
       },
       "placesLabel": "Ga naar",
       "results": "Resultaten"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Taken",
       "loading": "Laden…",
       "untitledView": "Naamloze weergave",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Home"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dagen geleden",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Exporteren…",
       "txt": "Platte tekst"
+    },
+    "home": {
+      "emptyTitle": "Je home-oppervlak",
+      "emptyBody": "Hier komen kaarten voor recente notities, de taken van vandaag en de bestanden die je vaak opent. Er is nog niets ingericht.",
+      "title": "Home",
+      "arrange": "Inrichten",
+      "arrangeTitle": "Je home inrichten",
+      "addCard": "Een kaart toevoegen",
+      "removeCard": "{{name}} verwijderen",
+      "spanWide": "Breed",
+      "spanNarrow": "Smal",
+      "onStart": "Wanneer de app opent",
+      "onStartHint": "Dit home-oppervlak bij het starten openen, alleen op dit apparaat.",
+      "cards": {
+        "recentNotes": "Recente notities",
+        "quickCapture": "Snel vastleggen",
+        "todaysTasks": "Taken van vandaag",
+        "calendarAgenda": "Binnenkort",
+        "favorites": "Favorieten",
+        "referenceSets": "Referentiesets",
+        "savedViews": "Opgeslagen weergaven",
+        "recentFiles": "Recente bestanden",
+        "writingStats": "Schrijven",
+        "agentPrompt": "Vraag het de agent",
+        "graph": "Je kluis",
+        "unknown": "Kaart niet beschikbaar",
+        "unknownNote": "Deze kaart is toegevoegd door een nieuwere versie van Myne, dus deze kan hem niet tekenen. Hij blijft staan waar hij staat.",
+        "pending": "Deze kaart wordt gebouwd.",
+        "loading": "Kluis wordt gelezen…",
+        "recentNotesEmpty": "Op dit apparaat is nog geen notitie geopend. Wat je opent verschijnt hier.",
+        "favoritesEmpty": "Er is nog niets met een ster. Geef een notitie een ster en hij komt hier.",
+        "todaysTasksEmpty": "Vandaag is er niets aan de beurt.",
+        "calendarAgendaEmpty": "Voor volgende week staat er niets gepland.",
+        "recentFilesEmpty": "Nog geen bestanden. Importeer er een uit de bestandsbibliotheek.",
+        "referenceSetsEmpty": "Geen enkele map bevat bestanden. Zet een bestand in een map en het verschijnt hier.",
+        "savedViewsEmpty": "Nog geen opgeslagen weergaven.",
+        "writingStatsHint": "Woordaantallen verschijnen hier terwijl de kluis groeit.",
+        "quickCaptureHint": "Begin een notitie zonder je home te verlaten.",
+        "agentPromptHint": "Vraag de agent naar alles in je kluis.",
+        "agentPromptAction": "De agent openen",
+        "graphCount": "{{count}} notities in de graaf",
+        "openTasks": "De takenlijst openen",
+        "openCalendar": "De agenda openen",
+        "openFiles": "De bestandsbibliotheek openen",
+        "openGraph": "De graaf openen",
+        "fileCount_one": "{{count}} bestand",
+        "fileCount_other": "{{count}} bestanden",
+        "statNotes": "{{count}} notities",
+        "statFavorites": "{{count}} met ster"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnostiek"
       },
       "diagnosticFilesHelper_one": "Eén bestand zou dit blok bevatten plus {{count}} logbestand, {{size}} in totaal. Er wordt niets verzonden; jij bepaalt waar het terechtkomt.",
-      "diagnosticFilesHelper_other": "Eén bestand zou dit blok bevatten plus {{count}} logbestanden, {{size}} in totaal. Er wordt niets verzonden; jij bepaalt waar het terechtkomt."
+      "diagnosticFilesHelper_other": "Eén bestand zou dit blok bevatten plus {{count}} logbestanden, {{size}} in totaal. Er wordt niets verzonden; jij bepaalt waar het terechtkomt.",
+      "updateBlocked": "Myne kon de update vanaf hier niet starten, dus er is niets geïnstalleerd. Probeer het zo opnieuw."
     },
     "vault": {
       "changePasswordButton": "Wachtwoord wijzigen",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "Een map die je weglaat, wordt niet gedeeld, en alles erin ook niet. Je kiest uit alle mappen in deze kluis, dus dit is de enige plek waar de hele kluis op tafel ligt.",
         "approve": "Goedkeuren",
         "grantRefused": "Deze toekenning paste niet in het instellingenbudget van de kluis. Er is niets veranderd. Herroep een verbinding die je niet meer gebruikt en probeer opnieuw.",
-        "grantFailed": "Kon de goedkeuring niet opslaan. Er is niets veranderd."
+        "grantFailed": "Kon de goedkeuring niet opslaan. Er is niets veranderd.",
+        "verb": {
+          "attachment_list": "Bestanden opvragen",
+          "attachment_read": "De tekst van een bestand lezen",
+          "calendar_read": "De agenda lezen",
+          "view_list": "Opgeslagen weergaven opvragen"
+        },
+        "wholeVaultLabel": "De hele kluis lezen en schrijven",
+        "wholeVaultHelper": "Elke map, ook de mappen die je later aanmaakt. Laat je hieronder een map buiten, dan blijft die buiten voor lezen én schrijven.",
+        "excludeNothing": "Niets buiten gelaten",
+        "scopeLineAll": "Bereikt elke notitie in de kluis, ook in mappen die je later aanmaakt, en kan ze allemaal wijzigen.",
+        "scopeLine": "Bereikt {{count}} notities in {{folders}} mappen, en kan alles daarin wijzigen.",
+        "toolsNote": "Lezen is begroot: tot {{count}} notities per {{minutes}} minuten.",
+        "needsReapproval": "Goedgekeurd door een oudere versie, onder de omgekeerde regel. Deze build leest er niets voor tot je opnieuw goedkeurt.",
+        "scopeLineWords": "Bereikt de mappen die je noemt, en kan alles daarin wijzigen."
       },
       "autoApplyLabel": "Voorgestelde tags automatisch toepassen",
       "autoApplyHelper": "Schrijft de tags in de notitie zonder te vragen, eenmaal per notitie per sessie, alleen nadat je hem bewerkt hebt. Alleen op dit apparaat. Ongedaan maken zit onder de notitie nadat hij geschreven is."
@@ -4009,7 +4102,8 @@
         "vault": "Kluis",
         "data": "Gegevens",
         "diagnostics": "Diagnostiek",
-        "extensions": "Browserextensies"
+        "extensions": "Browserextensies",
+        "connections": "Verbindingen"
       },
       "passwordUpdatedToast": "Wachtwoord bijgewerkt",
       "title": "Instellingen"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Gebruik minstens {{count}} tekens/cijfers.",
       "errorGeneric": "Kon het aanmeldgegeven niet instellen. Probeer het opnieuw."
     },
-    "helperDisclosureLabel": "Meer over deze instelling"
+    "helperDisclosureLabel": "Meer over deze instelling",
+    "connections": {
+      "mcp": "Externe MCP-clients"
+    }
   },
   "storageLost": {
     "allSynced": "Er is niets verloren gegaan: elke notitie hier had de server al bereikt.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} draait nog en je notities zijn ongemoeid.",
       "hint": "Opnieuw proberen begint de download vanaf het begin.",
       "retry": "Opnieuw proberen",
-      "back": "Terug naar ontgrendelen"
+      "back": "Terug naar ontgrendelen",
+      "manual": "Als het blijft gebeuren, download de nieuwe versie dan van myne.md en installeer haar met de hand. De app die je nu hebt blijft onaangeroerd."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Deze code verwijst naar een kluis die niet bij je uitnodigingen op dit apparaat staat. Vraag de kluiseigenaar de uitnodiging opnieuw naar deze identiteit te sturen."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Geef een agenda een naam, bijvoorbeeld Persoonlijk",
+      "calendarRequired": "Geef de gebeurtenis een agenda. Die bepaalt de kleur van de gebeurtenis en dat is wat deze weergave kan uitzetten."
+    },
+    "calendarsToggleFailed": "Die agenda is niet omgezet. Hij is gebleven zoals hij was."
   }
 }
