@@ -40,18 +40,7 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TorPosture } from "../../lib/tor-routing";
-
-const BANNER_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  padding: "var(--space-3) var(--space-4)",
-  borderRadius: "var(--radius-2)",
-  background: "var(--bg-2)",
-  color: "var(--fg-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-};
+import { NoticeCard } from "../notices/NoticeStack";
 
 const DOT_STYLE: CSSProperties = {
   width: "8px",
@@ -77,27 +66,28 @@ export function TorStatusBanner({ posture }: TorStatusBannerProps) {
 
   const unavailable = posture === "unavailable";
   return (
-    <div
-      // `alert` for the fail-closed state (a screen reader should not have to
-      // wait for a pause in the user's typing to learn sync stopped) and
-      // `status` for the transient one.
+    // `alert` for the fail-closed state (a screen reader should not have to wait
+    // for a pause in the user's typing to learn sync stopped) and `status` for
+    // the transient one.
+    <NoticeCard
+      severity={unavailable ? "danger" : "info"}
       role={unavailable ? "alert" : "status"}
-      data-testid="sync.tor-banner"
-      data-posture={posture}
-      style={{
-        ...BANNER_STYLE,
-        border: `1px solid ${unavailable ? "var(--danger)" : "var(--line-1)"}`,
-      }}
+      testId="sync.tor-banner"
+      data={{ posture }}
     >
       <span
-        aria-hidden="true"
-        style={{
-          ...DOT_STYLE,
-          background: unavailable ? "var(--danger)" : "var(--accent)",
-        }}
-      />
-      <span>{unavailable ? t("sync.tor.unavailable") : t("sync.tor.connecting")}</span>
-      {unavailable && <span style={HINT_STYLE}>{t("sync.tor.settingsHint")}</span>}
-    </div>
+        style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            ...DOT_STYLE,
+            background: unavailable ? "var(--danger)" : "var(--accent)",
+          }}
+        />
+        <span>{unavailable ? t("sync.tor.unavailable") : t("sync.tor.connecting")}</span>
+        {unavailable && <span style={HINT_STYLE}>{t("sync.tor.settingsHint")}</span>}
+      </span>
+    </NoticeCard>
   );
 }
