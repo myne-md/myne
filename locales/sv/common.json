@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (transkription)",
       "transcriptSave": "Spara som anteckning",
       "transcriptSaved": "Transkriptionen sparades som en anteckning.",
-      "transcriptSaveFailed": "Kunde inte spara transkriptionen som en anteckning."
+      "transcriptSaveFailed": "Kunde inte spara transkriptionen som en anteckning.",
+      "folderScopeAriaLabel": "Visa filerna i en mapp",
+      "selectAriaLabel": "Välj {{name}}",
+      "selectedCount_one": "{{count}} vald",
+      "selectedCount_other": "{{count}} valda",
+      "moveToAriaLabel": "Flytta de valda filerna till en mapp",
+      "moveFailed": "Det gick inte att flytta de valda filerna. Inget ändrades; försök igen.",
+      "importFolder": "Importera en mapp",
+      "importFolderProgress": "Importerar {{done}} av {{total}}",
+      "importFolderDone_one": "{{imported}} fil importerad, {{skipped}} överhoppad.",
+      "importFolderDone_other": "{{imported}} filer importerade, {{skipped}} överhoppade.",
+      "importFolderCancelled_one": "Stoppade efter {{count}} fil. Det som importerades finns i biblioteket.",
+      "importFolderCancelled_other": "Stoppade efter {{count}} filer. Det som importerades finns i biblioteket.",
+      "importFolderFailed": "Det gick inte att läsa mappen. Inget importerades.",
+      "folderAll": "Alla mappar"
     },
     "thumbnail": {
       "audioLabel": "Ljud: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Inga bilagor ännu. Tryck på Ladda upp för att lägga till en bild eller PDF.",
     "insert": "Infoga",
     "pauseLabel": "Pausa {{filename}}",
-    "playLabel": "Spela upp {{filename}}"
+    "playLabel": "Spela upp {{filename}}",
+    "move": "Flytta",
+    "folderAll": "Alla mappar",
+    "folderRoot": "Ingen mapp",
+    "folderPickerAria": "Mapp för {{name}}",
+    "folderMoveFailed": "Det gick inte att flytta filen. Inget ändrades; försök igen."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Kommandon och anteckningar",
     "pin": "Fäst till vänster list",
     "unpin": "Lossa från vänster list",
-    "pinError": "Kommandot kunde inte fästas."
+    "pinError": "Kommandot kunde inte fästas.",
+    "sectionFiles": "Filer",
+    "fileUsedIn": "i {{title}}",
+    "fileUnused": "används inte i någon anteckning"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Konvertera importerade bilagor…"
+      },
+      "showHome": {
+        "label": "Gå till Hem"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Kunde inte byta namn på mappen, så den är oförändrad.",
       "deliberateWriteFailed": "Mappen fick ett nytt namn, men en av dess inställningar kunde inte sparas. En tom mapp dyker upp igen under det gamla namnet varje gång du låser upp; det är säkert att ta bort den, och inget annat påverkas. Att byta namn på mappen igen tar inte bort den.",
       "folderListFull": "Myne kan komma ihåg ett begränsat antal mappar, och den listan är full. Den här mappen fungerar fortfarande, men den försvinner när dess sista anteckning lämnar den. Att ta bort en mapp du inte längre behöver ger plats.",
-      "folderNotRemembered": "Mappen skapades, men Myne kunde inte registrera den. Den försvinner när dess sista anteckning lämnar den, och den är borta vid nästa upplåsning om den fortfarande är tom. Det är säkert att skapa den igen."
+      "folderNotRemembered": "Mappen skapades, men Myne kunde inte registrera den. Den försvinner när dess sista anteckning lämnar den, och den är borta vid nästa upplåsning om den fortfarande är tom. Det är säkert att skapa den igen.",
+      "attachmentFolderRewriteFailed": "Mappen bytte namn, men filerna som låg i den flyttades inte med. De anger fortfarande den gamla mappen, så de saknas i biblioteksträdet och hos en agent som fått mappen. Flytta dem igen för hand från Bilagor, eller byt namn på mappen tillbaka och sedan igen."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2543,7 +2569,8 @@
         "attachments": "Bilagor",
         "graph": "Graf",
         "tasks": "Uppgifter",
-        "today": "I dag"
+        "today": "I dag",
+        "home": "Hem"
       },
       "placesLabel": "Gå till",
       "results": "Resultat"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Uppgifter",
       "loading": "Läser in…",
       "untitledView": "Namnlös vy",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Hem"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dagar sedan",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Exportera…",
       "txt": "Oformaterad text"
+    },
+    "home": {
+      "emptyTitle": "Din hemyta",
+      "emptyBody": "Här dyker kort upp för senaste anteckningar, dagens uppgifter och de filer du ofta öppnar. Inget är ordnat än.",
+      "title": "Hem",
+      "arrange": "Ordna",
+      "arrangeTitle": "Ordna din hemyta",
+      "addCard": "Lägg till ett kort",
+      "removeCard": "Ta bort {{name}}",
+      "spanWide": "Bred",
+      "spanNarrow": "Smal",
+      "onStart": "När appen öppnas",
+      "onStartHint": "Öppna den här hemytan vid start, bara på den här enheten.",
+      "cards": {
+        "recentNotes": "Senaste anteckningar",
+        "quickCapture": "Snabbregistrering",
+        "todaysTasks": "Dagens uppgifter",
+        "calendarAgenda": "På gång",
+        "favorites": "Favoriter",
+        "referenceSets": "Referensuppsättningar",
+        "savedViews": "Sparade vyer",
+        "recentFiles": "Senaste filer",
+        "writingStats": "Skrivande",
+        "agentPrompt": "Fråga agenten",
+        "graph": "Ditt valv",
+        "unknown": "Kortet är inte tillgängligt",
+        "unknownNote": "Det här kortet lades till av en nyare version av Myne, så den här kan inte rita det. Det ligger kvar på sin plats.",
+        "pending": "Det här kortet byggs.",
+        "loading": "Läser valvet…",
+        "recentNotesEmpty": "Ingen anteckning har öppnats på den här enheten än. De du öppnar visas här.",
+        "favoritesEmpty": "Inget är stjärnmärkt än. Stjärnmärk en anteckning så hamnar den här.",
+        "todaysTasksEmpty": "Inget förfaller i dag.",
+        "calendarAgendaEmpty": "Inget är planerat den närmaste veckan.",
+        "recentFilesEmpty": "Inga filer än. Importera en från filbiblioteket.",
+        "referenceSetsEmpty": "Ingen mapp innehåller filer. Lägg en fil i en mapp så visas den här.",
+        "savedViewsEmpty": "Inga sparade vyer än.",
+        "writingStatsHint": "Ordantal visas här när valvet växer.",
+        "quickCaptureHint": "Börja en anteckning utan att lämna Hem.",
+        "agentPromptHint": "Fråga agenten om vad som helst i ditt valv.",
+        "agentPromptAction": "Öppna agenten",
+        "graphCount": "{{count}} anteckningar i grafen",
+        "openTasks": "Öppna uppgiftslistan",
+        "openCalendar": "Öppna kalendern",
+        "openFiles": "Öppna filbiblioteket",
+        "openGraph": "Öppna grafen",
+        "fileCount_one": "{{count}} fil",
+        "fileCount_other": "{{count}} filer",
+        "statNotes": "{{count}} anteckningar",
+        "statFavorites": "{{count}} stjärnmärkta"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnostik"
       },
       "diagnosticFilesHelper_one": "En fil skulle innehålla det här blocket plus {{count}} loggfil, {{size}} totalt. Ingenting skickas någonstans; du väljer var den hamnar.",
-      "diagnosticFilesHelper_other": "En fil skulle innehålla det här blocket plus {{count}} loggfiler, {{size}} totalt. Ingenting skickas någonstans; du väljer var den hamnar."
+      "diagnosticFilesHelper_other": "En fil skulle innehålla det här blocket plus {{count}} loggfiler, {{size}} totalt. Ingenting skickas någonstans; du väljer var den hamnar.",
+      "updateBlocked": "Myne kunde inte starta uppdateringen härifrån, så inget installerades. Försök igen om en stund."
     },
     "vault": {
       "changePasswordButton": "Byt lösenord",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "En mapp du lämnar utanför delas inte, och inte heller något inuti den. Du väljer bland alla mappar i det här valvet, så det här är det enda stället där hela valvet ligger på bordet.",
         "approve": "Godkänn",
         "grantRefused": "Den här beviljningen ryms inte i valvets inställningsbudget. Inget ändrades. Återkalla en anslutning du inte längre använder och försök sedan igen.",
-        "grantFailed": "Kunde inte spara godkännandet. Inget ändrades."
+        "grantFailed": "Kunde inte spara godkännandet. Inget ändrades.",
+        "verb": {
+          "attachment_list": "Lista filer",
+          "attachment_read": "Läs en fils text",
+          "calendar_read": "Läs kalendern",
+          "view_list": "Lista sparade vyer"
+        },
+        "wholeVaultLabel": "Läs och skriv hela valvet",
+        "wholeVaultHelper": "Varje mapp, även de du skapar senare. Om du lämnar en mapp utanför nedan är den utanför både för läsning och skrivning.",
+        "excludeNothing": "Inget utanför",
+        "scopeLineAll": "Når varje anteckning i valvet, även i mappar du skapar senare, och kan ändra vilken som helst av dem.",
+        "scopeLine": "Når {{count}} anteckningar i {{folders}} mappar och kan ändra allt i dem.",
+        "toolsNote": "Läsningar har en budget: upp till {{count}} anteckningar per {{minutes}} minuter.",
+        "needsReapproval": "Godkänd av en äldre version, under den motsatta regeln. Den här bygget läser inget för den förrän du godkänner igen.",
+        "scopeLineWords": "Når mapparna du anger och kan ändra allt i dem."
       },
       "autoApplyLabel": "Tillämpa föreslagna taggar automatiskt",
       "autoApplyHelper": "Skriver taggarna i anteckningen utan att fråga, en gång per anteckning och session, bara efter att du har redigerat den. Endast på den här enheten. Ångra finns under anteckningen efter att den skrivit."
@@ -4009,7 +4102,8 @@
         "vault": "Valv",
         "data": "Data",
         "diagnostics": "Diagnostik",
-        "extensions": "Webbläsartillägg"
+        "extensions": "Webbläsartillägg",
+        "connections": "Anslutningar"
       },
       "passwordUpdatedToast": "Lösenord uppdaterat",
       "title": "Inställningar"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Använd minst {{count}} tecken/siffror.",
       "errorGeneric": "Det gick inte att ange inloggningsuppgiften. Försök igen."
     },
-    "helperDisclosureLabel": "Mer om den här inställningen"
+    "helperDisclosureLabel": "Mer om den här inställningen",
+    "connections": {
+      "mcp": "Externa MCP-klienter"
+    }
   },
   "storageLost": {
     "allSynced": "Ingenting gick förlorat: varje anteckning här hade redan nått servern.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} kör fortfarande och dina anteckningar är orörda.",
       "hint": "Att försöka igen börjar om nedladdningen från början.",
       "retry": "Försök igen",
-      "back": "Tillbaka till upplåsningen"
+      "back": "Tillbaka till upplåsningen",
+      "manual": "Om det fortsätter, ladda ner den nya versionen från myne.md och installera den för hand. Appen du har nu rörs inte."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Den här koden anger ett valv som inte finns bland dina inbjudningar på den här enheten. Be valvets ägare att skicka inbjudan till den här identiteten igen."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Namnge en kalender, till exempel Privat",
+      "calendarRequired": "Ge händelsen en kalender. Den ger händelsen färg och det är den här vyn kan stänga av."
+    },
+    "calendarsToggleFailed": "Kalendern ändrades inte. Den är som den var."
   }
 }

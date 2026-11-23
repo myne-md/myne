@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (transskription)",
       "transcriptSave": "Gem som note",
       "transcriptSaved": "Transskriptionen er gemt som en note.",
-      "transcriptSaveFailed": "Kunne ikke gemme transskriptionen som en note."
+      "transcriptSaveFailed": "Kunne ikke gemme transskriptionen som en note.",
+      "folderScopeAriaLabel": "Vis filerne i én mappe",
+      "selectAriaLabel": "Vælg {{name}}",
+      "selectedCount_one": "{{count}} valgt",
+      "selectedCount_other": "{{count}} valgt",
+      "moveToAriaLabel": "Flyt de valgte filer til en mappe",
+      "moveFailed": "De valgte filer kunne ikke flyttes. Intet er ændret; prøv igen.",
+      "importFolder": "Importér en mappe",
+      "importFolderProgress": "Importerer {{done}} af {{total}}",
+      "importFolderDone_one": "{{imported}} fil importeret, {{skipped}} sprunget over.",
+      "importFolderDone_other": "{{imported}} filer importeret, {{skipped}} sprunget over.",
+      "importFolderCancelled_one": "Stoppet efter {{count}} fil. Det importerede ligger i biblioteket.",
+      "importFolderCancelled_other": "Stoppet efter {{count}} filer. Det importerede ligger i biblioteket.",
+      "importFolderFailed": "Mappen kunne ikke læses. Intet blev importeret.",
+      "folderAll": "Alle mapper"
     },
     "thumbnail": {
       "audioLabel": "Lyd: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Ingen vedhæftninger endnu. Tryk på Upload for at tilføje et billede eller en PDF.",
     "insert": "Indsæt",
     "pauseLabel": "Sæt {{filename}} på pause",
-    "playLabel": "Afspil {{filename}}"
+    "playLabel": "Afspil {{filename}}",
+    "move": "Flyt",
+    "folderAll": "Alle mapper",
+    "folderRoot": "Ingen mappe",
+    "folderPickerAria": "Mappe til {{name}}",
+    "folderMoveFailed": "Filen kunne ikke flyttes. Intet er ændret; prøv igen."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Kommandoer og noter",
     "pin": "Fastgør til venstre bånd",
     "unpin": "Frigør fra venstre bånd",
-    "pinError": "Kommandoen kunne ikke fastgøres."
+    "pinError": "Kommandoen kunne ikke fastgøres.",
+    "sectionFiles": "Filer",
+    "fileUsedIn": "i {{title}}",
+    "fileUnused": "bruges ikke i nogen note"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Konvertér importerede vedhæftede filer…"
+      },
+      "showHome": {
+        "label": "Gå til Hjem"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Kunne ikke omdøbe mappen, så den er uændret.",
       "deliberateWriteFailed": "Mappen blev omdøbt, men en af dens indstillinger kunne ikke gemmes. Der dukker en tom mappe op med det gamle navn, hver gang du låser op; den kan trygt slettes, og intet andet ændres. Omdøber du mappen igen, forsvinder den ikke.",
       "folderListFull": "Myne kan huske et begrænset antal mapper, og den liste er fuld. Denne mappe virker stadig, men den forsvinder, når dens sidste note forlader den. Sletter du en mappe, du ikke længere har brug for, bliver der plads.",
-      "folderNotRemembered": "Mappen blev oprettet, men Myne kunne ikke registrere den. Den forsvinder, når dens sidste note forlader den, og den er væk ved næste oplåsning, hvis den stadig er tom. Du kan trygt oprette den igen."
+      "folderNotRemembered": "Mappen blev oprettet, men Myne kunne ikke registrere den. Den forsvinder, når dens sidste note forlader den, og den er væk ved næste oplåsning, hvis den stadig er tom. Du kan trygt oprette den igen.",
+      "attachmentFolderRewriteFailed": "Mappen blev omdøbt, men filerne i den flyttede ikke med. De henviser stadig til den gamle mappe, så de mangler i bibliotekstræet og hos en agent, der har fået mappen. Flyt dem igen manuelt fra Vedhæftninger, eller omdøb mappen tilbage og derefter igen."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2543,7 +2569,8 @@
         "attachments": "Vedhæftede filer",
         "graph": "Graf",
         "tasks": "Opgaver",
-        "today": "I dag"
+        "today": "I dag",
+        "home": "Hjem"
       },
       "placesLabel": "Gå til",
       "results": "Resultater"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Opgaver",
       "loading": "Indlæser…",
       "untitledView": "Visning uden titel",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Hjem"
     },
     "relativeTime": {
       "daysAgo": "for {{d}} dage siden",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Eksportér…",
       "txt": "Almindelig tekst"
+    },
+    "home": {
+      "emptyTitle": "Din hjemflade",
+      "emptyBody": "Her dukker kort op til seneste noter, dagens opgaver og de filer, du ofte åbner. Der er endnu ikke ordnet noget.",
+      "title": "Hjem",
+      "arrange": "Arrangér",
+      "arrangeTitle": "Arrangér din hjemflade",
+      "addCard": "Tilføj et kort",
+      "removeCard": "Fjern {{name}}",
+      "spanWide": "Bred",
+      "spanNarrow": "Smal",
+      "onStart": "Når appen åbner",
+      "onStartHint": "Åbn denne hjemflade ved start, kun på denne enhed.",
+      "cards": {
+        "recentNotes": "Seneste noter",
+        "quickCapture": "Hurtig optagelse",
+        "todaysTasks": "Dagens opgaver",
+        "calendarAgenda": "På vej",
+        "favorites": "Favoritter",
+        "referenceSets": "Referencesæt",
+        "savedViews": "Gemte visninger",
+        "recentFiles": "Seneste filer",
+        "writingStats": "Skrivning",
+        "agentPrompt": "Spørg agenten",
+        "graph": "Din boks",
+        "unknown": "Kortet er ikke tilgængeligt",
+        "unknownNote": "Dette kort blev tilføjet af en nyere version af Myne, så denne kan ikke tegne det. Det bliver på sin plads.",
+        "pending": "Dette kort bygges.",
+        "loading": "Læser boksen…",
+        "recentNotesEmpty": "Der er ikke åbnet nogen note på denne enhed endnu. Dem, du åbner, vises her.",
+        "favoritesEmpty": "Intet er stjernemarket endnu. Stjernemarkér en note, så lander den her.",
+        "todaysTasksEmpty": "Intet forfalder i dag.",
+        "calendarAgendaEmpty": "Intet er planlagt i den kommende uge.",
+        "recentFilesEmpty": "Ingen filer endnu. Importér en fra filbiblioteket.",
+        "referenceSetsEmpty": "Ingen mappe indeholder filer. Læg en fil i en mappe, så vises den her.",
+        "savedViewsEmpty": "Ingen gemte visninger endnu.",
+        "writingStatsHint": "Ordtal vises her, efterhånden som boksen vokser.",
+        "quickCaptureHint": "Begynd en note uden at forlade Hjem.",
+        "agentPromptHint": "Spørg agenten om hvad som helst i din boks.",
+        "agentPromptAction": "Åbn agenten",
+        "graphCount": "{{count}} noter i grafen",
+        "openTasks": "Åbn opgavelisten",
+        "openCalendar": "Åbn kalenderen",
+        "openFiles": "Åbn filbiblioteket",
+        "openGraph": "Åbn grafen",
+        "fileCount_one": "{{count}} fil",
+        "fileCount_other": "{{count}} filer",
+        "statNotes": "{{count}} noter",
+        "statFavorites": "{{count}} stjernemarkede"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnostik"
       },
       "diagnosticFilesHelper_one": "Én fil ville indeholde denne blok plus {{count}} logfil, i alt {{size}}. Intet sendes nogen steder hen; du vælger, hvor den skal hen.",
-      "diagnosticFilesHelper_other": "Én fil ville indeholde denne blok plus {{count}} logfiler, i alt {{size}}. Intet sendes nogen steder hen; du vælger, hvor den skal hen."
+      "diagnosticFilesHelper_other": "Én fil ville indeholde denne blok plus {{count}} logfiler, i alt {{size}}. Intet sendes nogen steder hen; du vælger, hvor den skal hen.",
+      "updateBlocked": "Myne kunne ikke starte opdateringen herfra, så intet blev installeret. Prøv igen om lidt."
     },
     "vault": {
       "changePasswordButton": "Skift adgangskode",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "En mappe, du udelader, deles ikke, og heller ikke noget indeni den. Du vælger fra alle mapper i denne boks, så dette er det eneste sted, hvor hele boksen er på bordet.",
         "approve": "Godkend",
         "grantRefused": "Denne godkendelse ville ikke passe i boksens indstillingsbudget. Intet blev ændret. Tilbagekald en forbindelse, du ikke længere bruger, og prøv igen.",
-        "grantFailed": "Kunne ikke gemme godkendelsen. Intet blev ændret."
+        "grantFailed": "Kunne ikke gemme godkendelsen. Intet blev ændret.",
+        "verb": {
+          "attachment_list": "Vis filer",
+          "attachment_read": "Læs en fils tekst",
+          "calendar_read": "Læs kalenderen",
+          "view_list": "Vis gemte visninger"
+        },
+        "wholeVaultLabel": "Læs og skriv hele boksen",
+        "wholeVaultHelper": "Hver mappe, også dem du opretter senere. Holder du en mappe ude nedenfor, er den ude for både læsning og skrivning.",
+        "excludeNothing": "Intet holdt udenfor",
+        "scopeLineAll": "Når hver note i boksen, også i mapper du opretter senere, og kan ændre enhver af dem.",
+        "scopeLine": "Når {{count}} noter i {{folders}} mapper og kan ændre alt i dem.",
+        "toolsNote": "Læsning har et budget: op til {{count}} noter pr. {{minutes}} minutter.",
+        "needsReapproval": "Godkendt af en ældre version, under den modsatte regel. Denne build læser intet for den, før du godkender igen.",
+        "scopeLineWords": "Når de mapper, du angiver, og kan ændre alt i dem."
       },
       "autoApplyLabel": "Anvend foreslåede tags automatisk",
       "autoApplyHelper": "Skriver tags ind i noten uden at spørge, én gang per note per session, kun efter du har redigeret den. Kun på denne enhed. Fortryd ligger under noten, efter den skriver."
@@ -4009,7 +4102,8 @@
         "vault": "Boks",
         "data": "Data",
         "diagnostics": "Diagnostik",
-        "extensions": "Browserudvidelser"
+        "extensions": "Browserudvidelser",
+        "connections": "Forbindelser"
       },
       "passwordUpdatedToast": "Adgangskode opdateret",
       "title": "Indstillinger"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Brug mindst {{count}} tegn/cifre.",
       "errorGeneric": "Kunne ikke angive legitimationsoplysningen. Prøv igen."
     },
-    "helperDisclosureLabel": "Mere om denne indstilling"
+    "helperDisclosureLabel": "Mere om denne indstilling",
+    "connections": {
+      "mcp": "Eksterne MCP-klienter"
+    }
   },
   "storageLost": {
     "allSynced": "Intet gik tabt: hver note her var allerede nået frem til serveren.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} kører stadig, og dine noter er urørte.",
       "hint": "Et nyt forsøg starter downloadet forfra.",
       "retry": "Prøv igen",
-      "back": "Tilbage til oplåsning"
+      "back": "Tilbage til oplåsning",
+      "manual": "Hvis det bliver ved, så hent den nye version fra myne.md og installér den manuelt. Den app, du har nu, er urørt."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Denne kode henviser til en boks, der ikke findes i dine invitationer på denne enhed. Bed boksens ejer om at sende invitationen til denne identitet igen."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Giv en kalender et navn, for eksempel Privat",
+      "calendarRequired": "Giv begivenheden en kalender. Det er den, der farver begivenheden, og det er den, denne visning kan slå fra."
+    },
+    "calendarsToggleFailed": "Den kalender blev ikke skiftet. Den er som den var."
   }
 }

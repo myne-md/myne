@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (litteraatti)",
       "transcriptSave": "Tallenna muistiinpanona",
       "transcriptSaved": "Litteraatti tallennettiin muistiinpanona.",
-      "transcriptSaveFailed": "Litteraattia ei voitu tallentaa muistiinpanona."
+      "transcriptSaveFailed": "Litteraattia ei voitu tallentaa muistiinpanona.",
+      "folderScopeAriaLabel": "Näytä yhden kansion tiedostot",
+      "selectAriaLabel": "Valitse {{name}}",
+      "selectedCount_one": "{{count}} valittu",
+      "selectedCount_other": "{{count}} valittu",
+      "moveToAriaLabel": "Siirrä valitut tiedostot kansioon",
+      "moveFailed": "Valittuja tiedostoja ei voitu siirtää. Mikään ei muuttunut; yritä uudelleen.",
+      "importFolder": "Tuo kansio",
+      "importFolderProgress": "Tuodaan {{done}} / {{total}}",
+      "importFolderDone_one": "{{imported}} tiedosto tuotu, {{skipped}} ohitettu.",
+      "importFolderDone_other": "{{imported}} tiedostoa tuotu, {{skipped}} ohitettu.",
+      "importFolderCancelled_one": "Pysäytetty {{count}} tiedoston jälkeen. Tuodut ovat kirjastossa.",
+      "importFolderCancelled_other": "Pysäytetty {{count}} tiedoston jälkeen. Tuodut ovat kirjastossa.",
+      "importFolderFailed": "Kansiota ei voitu lukea. Mitään ei tuotu.",
+      "folderAll": "Kaikki kansiot"
     },
     "thumbnail": {
       "audioLabel": "Ääni: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Ei vielä liitteitä. Lisää kuva tai PDF napauttamalla Lataa.",
     "insert": "Lisää",
     "pauseLabel": "Keskeytä {{filename}}",
-    "playLabel": "Toista {{filename}}"
+    "playLabel": "Toista {{filename}}",
+    "move": "Siirrä",
+    "folderAll": "Kaikki kansiot",
+    "folderRoot": "Ei kansiota",
+    "folderPickerAria": "Kansio kohteelle {{name}}",
+    "folderMoveFailed": "Tiedostoa ei voitu siirtää. Mikään ei muuttunut; yritä uudelleen."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Komennot ja muistiinpanot",
     "pin": "Kiinnitä vasempaan nauhaan",
     "unpin": "Poista vasemmasta nauhasta",
-    "pinError": "Komentoa ei voitu kiinnittää."
+    "pinError": "Komentoa ei voitu kiinnittää.",
+    "sectionFiles": "Tiedostot",
+    "fileUsedIn": "kohteessa {{title}}",
+    "fileUnused": "ei käytössä missään muistiinpanossa"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Muunna tuodut liitteet…"
+      },
+      "showHome": {
+        "label": "Siirry Kotiin"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Kansion nimeäminen uudelleen ei onnistunut, joten se on ennallaan.",
       "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Tyhjä kansio ilmestyy vanhalla nimellä uudelleen aina, kun avaat holvin; sen voi poistaa turvallisesti, eikä poistaminen muuta mitään muuta. Kansion uudelleennimeäminen ei poista sitä.",
       "folderListFull": "Myne voi muistaa vain rajallisen määrän kansioita, ja tuo luettelo on täynnä. Tämä kansio toimii silti, mutta se katoaa, kun siitä poistuu viimeinen muistiinpano. Tilaa vapautuu, kun poistat kansion, jota et enää tarvitse.",
-      "folderNotRemembered": "Kansio luotiin, mutta Myne ei saanut sitä muistiin. Se katoaa, kun siitä poistuu viimeinen muistiinpano, ja se on poissa, kun avaat holvin seuraavan kerran, jos se on silloin yhä tyhjä. Sen voi turvallisesti luoda uudelleen."
+      "folderNotRemembered": "Kansio luotiin, mutta Myne ei saanut sitä muistiin. Se katoaa, kun siitä poistuu viimeinen muistiinpano, ja se on poissa, kun avaat holvin seuraavan kerran, jos se on silloin yhä tyhjä. Sen voi turvallisesti luoda uudelleen.",
+      "attachmentFolderRewriteFailed": "Kansion nimi vaihdettiin, mutta siinä olleet tiedostot eivät siirtyneet mukana. Ne viittaavat yhä vanhaan kansioon, joten ne puuttuvat kirjastopuusta ja agentilta, jolle tämä kansio annettiin. Siirrä ne uudelleen käsin Liitteistä tai vaihda kansion nimi takaisin ja sitten uudelleen."
     },
     "folderNote": {
       "defaultTitle": "Hakemisto"
@@ -2543,7 +2569,8 @@
         "attachments": "Liitteet",
         "graph": "Kaavio",
         "tasks": "Tehtävät",
-        "today": "Tänään"
+        "today": "Tänään",
+        "home": "Koti"
       },
       "placesLabel": "Siirry kohteeseen",
       "results": "Tulokset"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Tehtävät",
       "loading": "Ladataan…",
       "untitledView": "Nimetön näkymä",
-      "agentTab": "Agentti"
+      "agentTab": "Agentti",
+      "homeTab": "Koti"
     },
     "relativeTime": {
       "daysAgo": "{{d}} päivää sitten",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Vie…",
       "txt": "Pelkkä teksti"
+    },
+    "home": {
+      "emptyTitle": "Kotipintasi",
+      "emptyBody": "Tänne ilmestyvät kortit viimeisimmistä muistiinpanoista, tämän päivän tehtävistä ja tiedostoista, joita avaat usein. Mitään ei ole vielä järjestetty.",
+      "title": "Koti",
+      "arrange": "Järjestä",
+      "arrangeTitle": "Järjestä kotipintasi",
+      "addCard": "Lisää kortti",
+      "removeCard": "Poista {{name}}",
+      "spanWide": "Leveä",
+      "spanNarrow": "Kapea",
+      "onStart": "Kun sovellus avautuu",
+      "onStartHint": "Avaa tämä kotipinta käynnistyksessä, vain tällä laitteella.",
+      "cards": {
+        "recentNotes": "Viimeisimmät muistiinpanot",
+        "quickCapture": "Pikakaappaus",
+        "todaysTasks": "Tämän päivän tehtävät",
+        "calendarAgenda": "Tulossa",
+        "favorites": "Suosikit",
+        "referenceSets": "Viitesarjat",
+        "savedViews": "Tallennetut näkymät",
+        "recentFiles": "Viimeisimmät tiedostot",
+        "writingStats": "Kirjoittaminen",
+        "agentPrompt": "Kysy agentilta",
+        "graph": "Holvisi",
+        "unknown": "Kortti ei ole käytettävissä",
+        "unknownNote": "Tämän kortin on lisännyt uudempi Myne-versio, joten tämä ei voi piirtää sitä. Se pysyy paikallaan.",
+        "pending": "Tätä korttia rakennetaan.",
+        "loading": "Luetaan holvia…",
+        "recentNotesEmpty": "Tällä laitteella ei ole vielä avattu yhtään muistiinpanoa. Avaamasi ilmestyvät tänne.",
+        "favoritesEmpty": "Mitään ei ole vielä merkitty tähdellä. Merkitse muistiinpano tähdellä, niin se päätyy tänne.",
+        "todaysTasksEmpty": "Tänään ei eräänny mitään.",
+        "calendarAgendaEmpty": "Ensi viikolle ei ole suunniteltu mitään.",
+        "recentFilesEmpty": "Ei vielä tiedostoja. Tuo yksi tiedostokirjastosta.",
+        "referenceSetsEmpty": "Missään kansiossa ei ole tiedostoja. Laita tiedosto kansioon, niin se ilmestyy tänne.",
+        "savedViewsEmpty": "Ei vielä tallennettuja näkymiä.",
+        "writingStatsHint": "Sanamäärät ilmestyvät tänne holvin kasvaessa.",
+        "quickCaptureHint": "Aloita muistiinpano poistumatta Koti-näkymästä.",
+        "agentPromptHint": "Kysy agentilta mitä tahansa holvistasi.",
+        "agentPromptAction": "Avaa agentti",
+        "graphCount": "{{count}} muistiinpanoa kaaviossa",
+        "openTasks": "Avaa tehtävälista",
+        "openCalendar": "Avaa kalenteri",
+        "openFiles": "Avaa tiedostokirjasto",
+        "openGraph": "Avaa kaavio",
+        "fileCount_one": "{{count}} tiedosto",
+        "fileCount_other": "{{count}} tiedostoa",
+        "statNotes": "{{count}} muistiinpanoa",
+        "statFavorites": "{{count}} tähdellä merkittyä"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnostiikka"
       },
       "diagnosticFilesHelper_one": "Yksi tiedosto sisältäisi tämän lohkon ja lisäksi {{count}} lokitiedoston, yhteensä {{size}}. Mitään ei lähetetä minnekään; sinä valitset, minne se menee.",
-      "diagnosticFilesHelper_other": "Yksi tiedosto sisältäisi tämän lohkon ja lisäksi {{count}} lokitiedostoa, yhteensä {{size}}. Mitään ei lähetetä minnekään; sinä valitset, minne se menee."
+      "diagnosticFilesHelper_other": "Yksi tiedosto sisältäisi tämän lohkon ja lisäksi {{count}} lokitiedostoa, yhteensä {{size}}. Mitään ei lähetetä minnekään; sinä valitset, minne se menee.",
+      "updateBlocked": "Myne ei voinut aloittaa päivitystä täältä, joten mitään ei asennettu. Yritä hetken kuluttua uudelleen."
     },
     "vault": {
       "changePasswordButton": "Vaihda salasana",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "Jättämäsi kansio ei jaeta, eikä mikään sen sisällä. Valitset kaikista tämän holvin kansioista, joten tämä on se paikka, jossa koko holvi on pöydällä.",
         "approve": "Hyväksy",
         "grantRefused": "Tämä hyväksyntä ei mahtuisi holvin asetusbudjettiin. Mitään ei muuttunut. Peruuta yhteys, jota et enää käytä, ja yritä uudelleen.",
-        "grantFailed": "Hyväksyntää ei voitu tallentaa. Mitään ei muuttunut."
+        "grantFailed": "Hyväksyntää ei voitu tallentaa. Mitään ei muuttunut.",
+        "verb": {
+          "attachment_list": "Listaa tiedostot",
+          "attachment_read": "Lue tiedoston teksti",
+          "calendar_read": "Lue kalenteri",
+          "view_list": "Listaa tallennetut näkymät"
+        },
+        "wholeVaultLabel": "Lue ja kirjoita koko holvi",
+        "wholeVaultHelper": "Jokainen kansio, myös ne jotka luot myöhemmin. Jos jätät kansion pois alta, se on pois sekä lukemisesta että kirjoittamisesta.",
+        "excludeNothing": "Ei mitään pois jätetty",
+        "scopeLineAll": "Tavoittaa jokaisen holvin muistiinpanon, myös myöhemmin luoduissa kansioissa, ja voi muuttaa mitä tahansa niistä.",
+        "scopeLine": "Tavoittaa {{count}} muistiinpanoa {{folders}} kansiossa ja voi muuttaa niissä kaikkea.",
+        "toolsNote": "Lukemisilla on kiintiö: enintään {{count}} muistiinpanoa {{minutes}} minuutissa.",
+        "needsReapproval": "Vanhempi versio hyväksyi sen päinvastaisella säännöllä. Tämä kooste ei lue sille mitään ennen kuin hyväksyt uudelleen.",
+        "scopeLineWords": "Tavoittaa nimeämäsi kansiot ja voi muuttaa niissä kaikkea."
       },
       "autoApplyLabel": "Ota ehdotetut tunnisteet käyttöön automaattisesti",
       "autoApplyHelper": "Kirjoittaa tunnisteet muistiinpanoon kysymättä, kerran muistiinpanoa kohti istuntoa, vain sen jälkeen kun muokkaat sitä. Vain tällä laitteella. Kumoa on muistiinpanon alla kirjoituksen jälkeen."
@@ -4009,7 +4102,8 @@
         "vault": "Holvi",
         "data": "Tiedot",
         "diagnostics": "Diagnostiikka",
-        "extensions": "Selainlaajennukset"
+        "extensions": "Selainlaajennukset",
+        "connections": "Yhteydet"
       },
       "passwordUpdatedToast": "Salasana päivitetty",
       "title": "Asetukset"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Käytä vähintään {{count}} merkkiä/numeroa.",
       "errorGeneric": "Tunnistetta ei voitu asettaa. Yritä uudelleen."
     },
-    "helperDisclosureLabel": "Lisätietoja tästä asetuksesta"
+    "helperDisclosureLabel": "Lisätietoja tästä asetuksesta",
+    "connections": {
+      "mcp": "Ulkoiset MCP-asiakkaat"
+    }
   },
   "storageLost": {
     "allSynced": "Mitään ei menetetty: jokainen täällä ollut muistiinpano oli jo ehtinyt palvelimelle.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} on yhä käynnissä, eikä muistiinpanoihisi ole koskettu.",
       "hint": "Uudelleen yrittäminen aloittaa latauksen alusta.",
       "retry": "Yritä uudelleen",
-      "back": "Takaisin avaamiseen"
+      "back": "Takaisin avaamiseen",
+      "manual": "Jos ongelma jatkuu, lataa uusi versio osoitteesta myne.md ja asenna se käsin. Nykyinen sovellus pysyy koskemattomana."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Tämä koodi nimeää holvin, jota ei ole kutsuissasi tällä laitteella. Pyydä holvin omistajaa lähettämään kutsu tälle identiteetille uudelleen."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Nimeä kalenteri, esimerkiksi Henkilökohtainen",
+      "calendarRequired": "Anna tapahtumalle kalenteri. Se värjää tapahtuman, ja juuri sen tämä näkymä voi kytkeä pois."
+    },
+    "calendarsToggleFailed": "Kalenteri ei vaihtunut. Se on kuten oli."
   }
 }
