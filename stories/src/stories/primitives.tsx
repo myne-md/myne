@@ -13,6 +13,7 @@ import { Input } from "@app/components/primitives/Input";
 import { Textarea } from "@app/components/primitives/Textarea";
 import { Segmented } from "@app/components/primitives/Segmented";
 import { Select } from "@app/components/primitives/Select";
+import { Checkbox } from "@app/components/primitives/Checkbox";
 import { Switch } from "@app/components/primitives/Switch";
 import { Tooltip } from "@app/components/primitives/Tooltip";
 import { Spinner } from "@app/components/Spinner";
@@ -317,6 +318,25 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
         <Switch checked ariaLabel="On" onChange={action("onChange")} />
         <Switch checked={false} ariaLabel="Off" onChange={action("onChange")} />
         <Switch checked={false} ariaLabel="Disabled placeholder" />
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/checkbox/box-and-labelled-row",
+    group: "primitives",
+    surface: "Checkbox",
+    state: "box-and-labelled-row",
+    description:
+      "The tree's checkbox in both shapes: the bare box a tile or a list row puts in a corner, and the labelled row a consent or acknowledgement uses, where the whole row is the control. It is a button carrying `role=\"checkbox\"` and `aria-checked`, so the painted tick and the announced state come from one attribute, and the box is 16px inside at least a `--target-min` target rather than a native input sized to the target. Look for `aria-checked` to match the tick.",
+    tags: ["primitives", "checkbox", "tick", "selected", "disabled", "aria-checked"],
+    render: () => (
+      <Row>
+        <Checkbox checked onChange={action("onChange")} ariaLabel="Selected" />
+        <Checkbox checked={false} onChange={action("onChange")} ariaLabel="Not selected" />
+        <Checkbox checked={false} ariaLabel="Disabled placeholder" />
+        <Checkbox checked onChange={action("onChange")}>
+          Keep my original files where they are
+        </Checkbox>
       </Row>
     ),
   },

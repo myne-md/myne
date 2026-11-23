@@ -511,6 +511,80 @@
 
 
 /* =========================================================================
+   Checkbox
+   ========================================================================= */
+
+/* The button IS the hit area, the span is the box. That split is the canon rule
+   (`docs/design/README.md`, "Interactive surfaces"): a control whose box is what
+   is drawn keeps its painted size and gets a transparent hit box around it — so
+   16px of paint inside at least `--target-min` of target, never a 24px-tall tick
+   (myne-md/myne#1099). */
+.myne-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: var(--target-min);
+  min-height: var(--target-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+/* A labelled row is as wide as its text, and its text may wrap. */
+.myne-checkbox--labelled {
+  justify-content: flex-start;
+  width: 100%;
+  padding: var(--space-1) 0;
+  line-height: var(--leading-relaxed);
+}
+
+.myne-checkbox__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line-3);
+  border-radius: var(--radius-1);
+  background: var(--bg-1);
+  color: var(--accent-on);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+/* Checked is a FILL, and the tick on it is `--accent-on`: the pair the tasks
+   panel already uses for a completed box, so a checked checkbox reads the same
+   in the editor and in a settings row. */
+.myne-checkbox[aria-checked="true"] .myne-checkbox__box {
+  background: var(--accent);
+  border-color: var(--accent-press);
+}
+
+.myne-checkbox[aria-disabled="false"]:hover .myne-checkbox__box { border-color: var(--fg-3); }
+.myne-checkbox[aria-checked="true"][aria-disabled="false"]:hover .myne-checkbox__box {
+  border-color: var(--accent);
+}
+
+.myne-checkbox[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* `:focus-visible` on the row draws the ring around the BOX rather than around a
+   full-width row, where it would look like a selected table row. */
+.myne-checkbox:focus-visible .myne-checkbox__box { box-shadow: var(--ring); }
+.myne-checkbox:focus-visible { border-radius: var(--radius-1); }
+
+
+/* =========================================================================
    Input
    ========================================================================= */
 

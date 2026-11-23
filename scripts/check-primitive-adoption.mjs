@@ -68,9 +68,15 @@ const PRIMITIVE_DIRS = [
   "mobile/src/components/",
 ];
 
-/** `<input type="...">` values no primitive covers. */
+/** `<input type="...">` values no primitive covers.
+ *
+ * `checkbox` is NOT here any more: `<Checkbox>` exists (`src/components/
+ * primitives/Checkbox.tsx`, myne-md/myne#1099) and every one of the ten raw
+ * checkboxes was adopted onto it, so a raw one is owed work the ratchet counts
+ * like any other raw control. Removing a type from this set is the point at
+ * which the primitive became real. */
 const UNCOVERED_INPUT_TYPES = new Set([
-  "checkbox", "radio", "range", "color", "file", "hidden",
+  "radio", "range", "color", "file", "hidden",
 ]);
 
 const SCAN_EXT = new Set([".tsx"]);
@@ -209,7 +215,8 @@ if (grew.length > 0) {
   for (const g of grew) console.error(`    ${g}`);
   console.error(
     "\n  Use the primitive (`<Button>`, `<IconButton>`, `<Select>`, `<Switch>`,\n" +
-      "  `<Input>`, `<Segmented>`) instead of re-deriving padding, radius, hover,\n" +
+      "  `<Checkbox>`, `<Input>`, `<Segmented>`) instead of re-deriving padding,\n" +
+      "  radius, hover,\n" +
       "  press and focus by hand. Every hand-rolled control is one more button\n" +
       "  design in an app that is supposed to have one.\n\n" +
       "  If the element genuinely is not a primitive — an editor DOM widget, an\n" +

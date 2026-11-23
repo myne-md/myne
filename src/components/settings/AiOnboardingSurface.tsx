@@ -29,6 +29,14 @@ import {
 import { AI_TRUST_INVARIANT } from "../../lib/load-bearing-copy";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
+import { Switch } from "../primitives/Switch";
+
+const OPT_IN_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+};
 
 const CARD_STYLE: CSSProperties = {
   display: "flex",
@@ -207,19 +215,16 @@ export function AiOnboardingSurface({
         {AI_TRUST_INVARIANT}
       </p>
 
-      {/* The opt-in. Turning it on is what makes the cards meaningful; a user
-          who skips leaves it off and nothing is downloaded. */}
-      <label
-        style={{ ...CARD_BODY_STYLE, display: "flex", gap: "var(--space-2)", alignItems: "center" }}
-      >
-        <input
-          type="checkbox"
-          data-testid="aiOnboarding.enable"
+      {/* The opt-in: nothing is downloaded unless it is on. */}
+      <div style={OPT_IN_ROW_STYLE}>
+        <span style={CARD_BODY_STYLE}>{t("aiOnboarding.enableLabel")}</span>
+        <Switch
           checked={aiEnabled}
-          onChange={(e) => void setAiEnabled(e.target.checked)}
+          onChange={(next) => void setAiEnabled(next)}
+          ariaLabel={t("aiOnboarding.enableLabel")}
+          testId="aiOnboarding.enable"
         />
-        {t("aiOnboarding.enableLabel")}
-      </label>
+      </div>
 
       {downloads && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>

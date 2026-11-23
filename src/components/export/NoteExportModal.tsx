@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { Button } from "../primitives/Button";
+import { Checkbox } from "../primitives/Checkbox";
 import { IconButton } from "../primitives/IconButton";
 import {
   EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL,
@@ -189,20 +190,17 @@ export function NoteExportModal({
         </h2>
         <p style={SENTENCE_STYLE}>{EXPORT_PLAIN_MARKDOWN_SENTENCE}</p>
         <div style={SUB_PANEL_STYLE}>
-          <label style={TOGGLE_ROW_STYLE}>
-            <input
-              type="checkbox"
+          <div style={TOGGLE_ROW_STYLE}>
+            <Checkbox
               checked={include}
-              onChange={(e) => setInclude(e.target.checked)}
-              style={{ margin: 0, accentColor: "var(--accent)" }}
-              data-testid="export.include-attachments-toggle"
-            />
-            <span>
+              onChange={setInclude}
+              testId="export.include-attachments-toggle"
+            >
               {t("export.note.modal.includeAttachments", {
                 count: attachmentCount,
               })}
-            </span>
-          </label>
+            </Checkbox>
+          </div>
           <p style={SUB_LABEL_STYLE}>{EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL}</p>
         </div>
         <div style={FOOTER_STYLE}>

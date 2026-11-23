@@ -137,11 +137,14 @@ describe("ToolbarCustomizeSettings adopts the shared customize row", () => {
     const rows = await renderToolbar({ hidden: allShown.slice(1) });
     const visibleId = allShown[0]!;
     const visibleRow = rows.find((r) => r.getAttribute("data-item-id") === visibleId)!;
-    const toggle = visibleRow.querySelector<HTMLInputElement>(
+    const toggle = visibleRow.querySelector<HTMLButtonElement>(
       '[data-testid="settings.toolbar-customize.toggle"]',
     )!;
-    expect(toggle.checked).toBe(true);
-    expect(toggle.disabled).toBe(true);
+    // `<Checkbox>` is a `button role="checkbox"`: the painted tick and the
+    // announced state come from `aria-checked`, and the inert one says
+    // `aria-disabled` (`myne-md/myne#1099`).
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(toggle.getAttribute("aria-disabled")).toBe("true");
     expect(visibleRow.textContent ?? "").toContain("Keep at least one");
     act(() => {
       fireEvent.click(toggle);
@@ -188,10 +191,10 @@ describe("ToolbarCustomizeSettings adopts the shared customize row", () => {
     const hiddenId = allShown[0]!;
     const rows = await renderToolbar({ hidden: [hiddenId] });
     const hiddenRow = rows.find((r) => r.getAttribute("data-item-id") === hiddenId)!;
-    const toggle = hiddenRow.querySelector<HTMLInputElement>(
+    const toggle = hiddenRow.querySelector<HTMLButtonElement>(
       '[data-testid="settings.toolbar-customize.toggle"]',
     )!;
-    expect(toggle.checked).toBe(false);
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
     expect(hiddenRow.textContent ?? "").toContain("Keep at least one hidden");
     act(() => {
       fireEvent.click(toggle);
@@ -255,25 +258,29 @@ describe("ToolbarCustomizeSettings adopts the shared customize row", () => {
     setEditorToolbarHidden.mockRejectedValueOnce(new Error("locked"));
     const rows = await renderToolbar();
     const liveRow = rows.find((r) => {
-      const toggle = r.querySelector<HTMLInputElement>(
+      const toggle = r.querySelector<HTMLButtonElement>(
         '[data-testid="settings.toolbar-customize.toggle"]',
       );
-      return toggle !== null && toggle.checked && !toggle.disabled;
+      return (
+        toggle !== null &&
+        toggle.getAttribute("aria-checked") === "true" &&
+        toggle.getAttribute("aria-disabled") === "false"
+      );
     })!;
-    const toggle = liveRow.querySelector<HTMLInputElement>(
+    const toggle = liveRow.querySelector<HTMLButtonElement>(
       '[data-testid="settings.toolbar-customize.toggle"]',
     )!;
-    expect(toggle.checked).toBe(true);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
     act(() => {
       fireEvent.click(toggle);
     });
     await waitFor(() => expect(setEditorToolbarHidden).toHaveBeenCalled());
     await waitFor(() =>
       expect(
-        liveRow.querySelector<HTMLInputElement>(
-          '[data-testid="settings.toolbar-customize.toggle"]',
-        )!.checked,
-      ).toBe(true),
+        liveRow
+          .querySelector<HTMLButtonElement>('[data-testid="settings.toolbar-customize.toggle"]')!
+          .getAttribute("aria-checked"),
+      ).toBe("true"),
     );
     // The failure is stated, not swallowed: the paragraph the sibling panels render.
     await waitFor(() => expect(document.querySelector("p")).not.toBeNull());

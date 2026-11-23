@@ -24,12 +24,12 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../primitives/Button";
+import { Checkbox } from "../primitives/Checkbox";
 import { ModalShell } from "../primitives/ModalShell";
 import { useSelectedNoteOptional } from "../../notes/sidebarState";
 import { usePrefs } from "../../hooks/usePrefs";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { Textarea } from "../primitives/Textarea";
-import { MIN_TARGET } from "../primitives/targetSize";
 import { toast } from "../toast/toastStore";
 import {
   isSeedStale,
@@ -141,23 +141,12 @@ const FACT_CHIP: CSSProperties = {
 
 /** The candidate's header row: the label for its own checkbox, sized so the
  *  whole line is clickable. */
+/** The head row: the primitive's own target floor is the hit area, so this only
+ *  spaces the box from the character count beside it. */
 const CANDIDATE_HEAD: CSSProperties = {
   display: "flex",
   gap: "var(--space-2)",
   alignItems: "center",
-  cursor: "pointer",
-};
-
-/** The selection box itself, at the WCAG pointer floor rather than the browser's
- *  13px default. `accent-color` keeps it the accent rather than the platform's
- *  blue, which is what it was in the report. */
-const SELECT_BOX: CSSProperties = {
-  ...MIN_TARGET,
-  width: "var(--target-min)",
-  height: "var(--target-min)",
-  margin: 0,
-  accentColor: "var(--accent)",
-  cursor: "pointer",
 };
 
 /** An unselected entry stays readable but stops competing for attention: its
@@ -518,23 +507,18 @@ export function SeedMemoryWizard(props: {
                 </pre>
               ) : null}
               {status.remote ? (
-                <label
-                  data-testid="settings.memory.seed.consent-row"
-                  style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-start" }}
-                >
-                  <input
-                    type="checkbox"
-                    data-testid="settings.memory.seed.consent"
+                <div data-testid="settings.memory.seed.consent-row">
+                  <Checkbox
+                    testId="settings.memory.seed.consent"
                     checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                  />
-                  <span>
+                    onChange={setConsent}
+                  >
                     {t("settings.memory.seed.consentLabel", {
                       provider: providerName,
                       chars: payload.chars,
                     })}
-                  </span>
-                </label>
+                  </Checkbox>
+                </div>
               ) : (
                 <p style={HELPER}>{t("settings.memory.seed.localNote")}</p>
               )}
@@ -626,26 +610,27 @@ export function SeedMemoryWizard(props: {
                         (clicking the words toggles the entry), the box is
                         `--target-min` square, and the count follows it as the
                         secondary fact it is. */}
-                    <label style={CANDIDATE_HEAD}>
-                      <input
-                        type="checkbox"
-                        style={SELECT_BOX}
-                        data-testid={`settings.memory.seed.candidate-select-${index}`}
+                    <div style={CANDIDATE_HEAD}>
+                      <Checkbox
+                        testId={`settings.memory.seed.candidate-select-${index}`}
                         checked={candidate.selected}
-                        onChange={(e) =>
+                        onChange={(next) =>
                           setCandidates((prev) =>
                             prev.map((c, i) =>
-                              i === index ? { ...c, selected: e.target.checked } : c,
+                              i === index ? { ...c, selected: next } : c,
                             ),
                           )
                         }
+                        ariaLabel={t("settings.memory.seed.charCount", {
+                          count: candidate.text.length,
+                        })}
                       />
-                      <span style={{ ...HELPER, cursor: "pointer" }}>
+                      <span style={HELPER}>
                         {t("settings.memory.seed.charCount", {
                           count: candidate.text.length,
                         })}
                       </span>
-                    </label>
+                    </div>
                     {/* The textarea grows with its own content, because a fixed
                         `rows={3}` cut the entry off mid-sentence: the first
                         candidate in the report ended on "Subfolders split by

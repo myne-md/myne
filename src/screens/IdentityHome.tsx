@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
+import { Checkbox } from "../components/primitives/Checkbox";
 import { IconButton } from "../components/primitives/IconButton";
 import { Input } from "../components/primitives/Input";
 import { ModalShell } from "../components/primitives/ModalShell";
@@ -169,13 +170,6 @@ const CHECKBOX_LABEL_STYLE: CSSProperties = {
   cursor: "pointer",
   fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
-};
-
-const CHECKBOX_STYLE: CSSProperties = {
-  width: 16,
-  height: 16,
-  accentColor: "var(--accent)",
-  flexShrink: 0,
 };
 
 const FORGET_ERROR_STYLE: CSSProperties = {
@@ -815,17 +809,16 @@ function ForgetIdentityDialog({
         <p data-testid="identity-home.forget-warning" style={BODY_SMALL_STYLE}>
           {`${t("identityForget.body")} ${t("identityForget.savedPhraseTail")}`}
         </p>
-        <label style={CHECKBOX_LABEL_STYLE}>
-          <input
-            type="checkbox"
-            data-testid="identity-home.forget-ack"
+        <div style={CHECKBOX_LABEL_STYLE}>
+          <Checkbox
+            testId="identity-home.forget-ack"
             checked={ack}
             disabled={busy}
-            onChange={(e) => setAck(e.target.checked)}
-            style={CHECKBOX_STYLE}
-          />
-          {t("identityHome.forgetCheckbox")}
-        </label>
+            onChange={setAck}
+          >
+            {t("identityHome.forgetCheckbox")}
+          </Checkbox>
+        </div>
         {error ? (
           <p data-testid="identity-home.forget-error" role="alert" style={FORGET_ERROR_STYLE}>
             {t("identityHome.forgetError")}
