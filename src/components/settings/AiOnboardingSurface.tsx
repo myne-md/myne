@@ -29,6 +29,7 @@ import {
 import { AI_TRUST_INVARIANT } from "../../lib/load-bearing-copy";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
+import { Switch } from "../primitives/Switch";
 
 const CARD_STYLE: CSSProperties = {
   display: "flex",
@@ -59,6 +60,23 @@ const CARD_FOOTER_STYLE: CSSProperties = {
   alignItems: "center",
   gap: "var(--space-2)",
   flexWrap: "wrap",
+};
+
+const OPT_IN_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+};
+
+/* Space ABOVE only: the modal body already insets its children, so a footer
+   carrying its own inset too sat twice as far in as the content above it. */
+const FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-4)",
+  flexShrink: 0,
 };
 
 /** One downloadable feature card (auto-tag). */
@@ -207,19 +225,18 @@ export function AiOnboardingSurface({
         {AI_TRUST_INVARIANT}
       </p>
 
-      {/* The opt-in. Turning it on is what makes the cards meaningful; a user
-          who skips leaves it off and nothing is downloaded. */}
-      <label
-        style={{ ...CARD_BODY_STYLE, display: "flex", gap: "var(--space-2)", alignItems: "center" }}
-      >
-        <input
-          type="checkbox"
-          data-testid="aiOnboarding.enable"
+      {/* The opt-in, as a `Switch`: this row is a setting, and the control the
+          tree has for a setting is this one. A native checkbox does not follow the
+          theme on every platform. */}
+      <div style={OPT_IN_ROW_STYLE}>
+        <span style={CARD_BODY_STYLE}>{t("aiOnboarding.enableLabel")}</span>
+        <Switch
           checked={aiEnabled}
-          onChange={(e) => void setAiEnabled(e.target.checked)}
+          onChange={(next) => void setAiEnabled(next)}
+          ariaLabel={t("aiOnboarding.enableLabel")}
+          testId="aiOnboarding.enable"
         />
-        {t("aiOnboarding.enableLabel")}
-      </label>
+      </div>
 
       {downloads && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -250,17 +267,7 @@ export function AiOnboardingSurface({
 
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: "var(--space-2)",
-          // The footer is a SIBLING of the scrolling body, so the body's own
-          // padding does not reach it and the buttons would sit on the card's
-          // bottom edge.
-          padding: "0 var(--space-5) var(--space-5)",
-        }}
-      >
+      <div style={FOOTER_STYLE}>
         <Button
           variant="ghost"
           onClick={onClose}
