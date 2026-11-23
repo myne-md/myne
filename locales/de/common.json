@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne konnte diese Einstellung nicht ändern.",
       "diagnosticLogReadError": "Myne konnte die Einstellung für die Diagnoseprotokollierung nicht lesen, sie wird daher als aus angezeigt.",
       "diagnosticBlockLabel": "Berichtsdetails",
-      "diagnosticBlockHelper": "Genau das, was Kopieren in Ihre Zwischenablage legt. Es wird nichts irgendwohin gesendet; Sie entscheiden, was Sie teilen.",
       "diagnosticCopy": "Diagnose kopieren",
       "diagnosticCopyDone": "Diagnose kopiert",
       "diagnosticCopyFailed": "Kopieren nicht möglich. Wählen Sie den Text oben aus und kopieren Sie ihn von Hand.",

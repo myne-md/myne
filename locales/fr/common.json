@@ -3376,7 +3376,6 @@
       "diagnosticLogError": "Myne n'a pas pu modifier ce réglage.",
       "diagnosticLogReadError": "Myne n'a pas pu lire le réglage du journal de diagnostic, il est donc affiché comme désactivé.",
       "diagnosticBlockLabel": "Détails du rapport",
-      "diagnosticBlockHelper": "Exactement ce que Copier place dans votre presse-papiers. Rien n'est envoyé nulle part ; vous décidez ce que vous partagez.",
       "diagnosticCopy": "Copier les diagnostics",
       "diagnosticCopyDone": "Diagnostics copiés",
       "diagnosticCopyFailed": "Impossible de copier. Sélectionnez le texte ci-dessus et copiez-le à la main.",

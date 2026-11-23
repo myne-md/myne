@@ -3497,7 +3497,6 @@
       "diagnosticLogError": "Myne toto nastavení nedokázalo změnit.",
       "diagnosticLogReadError": "Myne nedokázalo přečíst nastavení diagnostického protokolování, takže se zobrazuje jako vypnuté.",
       "diagnosticBlockLabel": "Podrobnosti hlášení",
-      "diagnosticBlockHelper": "Přesně to, co Kopírovat vloží do schránky. Nikam se nic neodesílá; o tom, co sdílet, rozhodujete vy.",
       "diagnosticCopy": "Kopírovat diagnostiku",
       "diagnosticCopyDone": "Diagnostika zkopírována",
       "diagnosticCopyFailed": "Kopírování se nepodařilo. Vyberte text výše a zkopírujte ho ručně.",
