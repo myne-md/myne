@@ -105,7 +105,9 @@ describe("pickAndInsert (/attach picker)", () => {
     const view = mount("");
     await pickAndInsert(view);
     expect(view.state.doc.toString()).toBe(
-      `![[att:${ID}|one.png]]\n![[att:${ID}|two.png]]`,
+      // Trailing newline: the picker inserted at the end of an empty note, and a
+      // block with nothing after it strands the caret above it (myne-md/myne#1063).
+      `![[att:${ID}|one.png]]\n![[att:${ID}|two.png]]\n`,
     );
     view.destroy();
   });
@@ -146,7 +148,7 @@ describe("pickAndInsert (/attach picker)", () => {
     );
     const view = mount("");
     await pickAndInsert(view);
-    expect(view.state.doc.toString()).toBe(`![[att:${ID}|ok.png]]`);
+    expect(view.state.doc.toString()).toBe(`![[att:${ID}|ok.png]]\n`);
     view.destroy();
   });
 });
