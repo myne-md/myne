@@ -167,6 +167,10 @@ export const DEFAULT_PREFS: PrefsView = {
   // renders its curated default set client-side.
   ribbon_items: null,
   ribbon_visible: true,
+  // Never arranged, and closed-on-start: the two defaults that keep a vault
+  // which never touched the home surface byte-identical (myne-md/myne#1074).
+  home_cards: null,
+  home_open_on_start: false,
 };
 
 interface UsePrefsResult {

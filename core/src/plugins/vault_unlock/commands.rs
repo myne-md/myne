@@ -4272,6 +4272,8 @@ mod tests {
                     opaque_saved_views: Vec::new(),
                     view_approvals: Default::default(),
                     view_order: Vec::new(),
+                    home_cards: None,
+                    home_open_on_start: false,
                 },
             )
             .expect("encode prefs blob");
@@ -4456,6 +4458,8 @@ mod tests {
                 opaque_saved_views: Vec::new(),
                 view_approvals: Default::default(),
                 view_order: Vec::new(),
+                home_cards: None,
+                home_open_on_start: false,
             },
         )
         .expect("encode");

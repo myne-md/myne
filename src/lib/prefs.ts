@@ -209,6 +209,19 @@ export interface PrefsView {
    * `true`; persisted only when `false`. Device-local.
    */
   ribbon_visible: boolean;
+  /**
+   * The home surface's ordered card list (myne-md/myne#1074). `null` means never
+   * arranged, so the client renders its default layout and writes nothing; `[]`
+   * is a home the user emptied on purpose and stays empty. **Synced**, so it
+   * merges like `favorites` rather than like the rail.
+   */
+  home_cards: HomeCard[] | null;
+  /**
+   * Whether THIS DEVICE opens the home tab on start (myne-md/myne#1074).
+   * Defaults `false`, so an untouched vault keeps today's behaviour.
+   * Device-local: never merged, never sent.
+   */
+  home_open_on_start: boolean;
   show_task_marker: boolean;
   /**
    * Whether speech-to-text may run on this vault's audio attachments
@@ -1520,6 +1533,22 @@ export async function setDailyTemplate(templateId: string | null): Promise<void>
  * native side-effect. Bumps the prefs nonce on success so the open rail (which
  * reads prefs through its OWN `usePrefs`) re-renders without a reload.
  */
+/**
+ * One card in the home surface's arrangement (myne-md/myne#1074).
+ *
+ * **`id` and `kind` are both carried, and they are not redundant.** `id` is the
+ * card's identity in the arrangement; `kind` is what to draw. Two cards of one
+ * kind are a legitimate arrangement, and a kind alone could not tell them apart.
+ */
+export interface HomeCard {
+  /** The card's identity in the arrangement. */
+  id: string;
+  /** What to draw. A kind this build does not know renders as an inert row. */
+  kind: string;
+  /** How many columns the card occupies, 1..=4. */
+  span: number;
+}
+
 export async function setRibbonItems(items: string[]): Promise<void> {
   await writePref("plugin:prefs|set_ribbon_items", { items });
 }
@@ -1530,6 +1559,25 @@ export async function setRibbonItems(items: string[]): Promise<void> {
  */
 export async function setRibbonVisible(visible: boolean): Promise<void> {
   await writePref("plugin:prefs|set_ribbon_visible", { visible });
+}
+
+/**
+ * Store the home surface's card arrangement (myne-md/myne#1074). Synced, so the
+ * order reaches the person's other devices; the host validates it and refuses a
+ * card this build would skip on the next load rather than writing a row that
+ * silently vanishes. Bumps the prefs nonce on success, so an open home re-renders
+ * without a reload.
+ */
+export async function setHomeCards(cards: readonly HomeCard[]): Promise<void> {
+  await writePref("plugin:prefs|set_home_cards", { cards });
+}
+
+/**
+ * Whether THIS DEVICE opens the home tab on start (myne-md/myne#1074).
+ * Device-local; disk-first, no native side-effect.
+ */
+export async function setHomeOpenOnStart(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_home_open_on_start", { enabled });
 }
 
 /**

@@ -23,3 +23,7 @@ pub mod set_mutation;
 // `apply_persisted_prefs` post-pipeline hook).
 pub use error::PrefsReadError;
 pub use protocol::PrefsView;
+// The home surface's card shape, re-exported so the command signatures and the
+// Tauri IPC surface name one type rather than reaching into `protocol` twice
+// (myne-md/myne#1074).
+pub use protocol::home_layout::HomeCard;

@@ -10,6 +10,8 @@ import { SCREEN_STORIES } from "./stories/screens";
 import { SETTINGS_STORIES } from "./stories/settings";
 import { COMPONENT_STORIES } from "./stories/components";
 import { AI_STORIES } from "./stories/ai-panels";
+import { HOME_CARD_STORIES } from "./stories/home-cards";
+import { HOME_STORIES } from "./stories/home";
 import { NOTES_STORIES } from "./stories/notes";
 import { GRAPH_STORIES } from "./stories/graph";
 import { WELCOME_STORIES } from "./stories/welcome";
@@ -25,6 +27,8 @@ export const STORIES: readonly StoryDescriptor[] = [
   ...COMPONENT_STORIES,
   ...AI_STORIES,
   ...NOTES_STORIES,
+  ...HOME_STORIES,
+  ...HOME_CARD_STORIES,
   ...GRAPH_STORIES,
   ...SCREEN_STORIES,
   ...SETTINGS_STORIES,
