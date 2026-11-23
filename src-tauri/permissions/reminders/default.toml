@@ -1,0 +1,50 @@
+# Permissions for the in-app `reminders` Tauri plugin (myne-md/myne#1076).
+# Picked up under the `reminders:` ACL namespace because `build.rs` declares this
+# as an `InlinedPlugin`. Capability files reference these as `reminders:default`
+# or one identifier at a time.
+#
+# **These five commands are the only place a task reminder leaves the vault, and
+# what leaves is `{ id, at }`.** The notification's title and body are constants
+# owned by the Rust side (`plugins/reminders/mod.rs`), so no note text can reach
+# the platform's plaintext store through this seam at all — see
+# `threat-model.md` §7 and `decisions/ai/0805`.
+#
+# Main-window-only, like the other vault-adjacent plugins: the scheduler runs in
+# the main window's React tree, and a detached note window has no reminder pass.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the reminders plugin — register, withdraw and list task reminders, and read or request the platform's notification permission."
+permissions = [
+  "allow-reminders-schedule",
+  "allow-reminders-cancel",
+  "allow-reminders-list-pending",
+  "allow-reminders-permission-status",
+  "allow-reminders-request-permission",
+]
+
+[[permission]]
+identifier = "allow-reminders-schedule"
+description = "Allow invoking reminders:reminders_schedule (register one reminder at one local wall-clock instant; the payload is an id and an instant, never task text)."
+commands.allow = ["reminders_schedule"]
+
+[[permission]]
+identifier = "allow-reminders-cancel"
+description = "Allow invoking reminders:reminders_cancel (withdraw one registration by id)."
+commands.allow = ["reminders_cancel"]
+
+[[permission]]
+identifier = "allow-reminders-list-pending"
+description = "Allow invoking reminders:reminders_list_pending (what the platform reports as still registered, so the reconciliation diff has something to compare against)."
+commands.allow = ["reminders_list_pending"]
+
+[[permission]]
+identifier = "allow-reminders-permission-status"
+description = "Allow invoking reminders:reminders_permission_status (the platform's current notification authorization)."
+commands.allow = ["reminders_permission_status"]
+
+[[permission]]
+identifier = "allow-reminders-request-permission"
+description = "Allow invoking reminders:reminders_request_permission (show the platform's permission dialog, once)."
+commands.allow = ["reminders_request_permission"]

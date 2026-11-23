@@ -46,6 +46,7 @@ pub mod device_binding;
 pub mod export;
 pub mod graph_layout;
 pub mod importer;
+pub mod reminders;
 // live-collab (`collab-editor-bridge`): the collaborative-editor live-session
 // commands. Core in `myne-core::plugins::live`; this shim registers them.
 pub mod live;
