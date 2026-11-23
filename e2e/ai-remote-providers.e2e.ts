@@ -264,8 +264,9 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           // ── the model chooser cannot ask before a key exists ──
           const load = await s.byTestId("ai.provider-model-load");
           expect(await load.attribute("disabled")).not.toBeNull();
-          const modelState = await s.byTestId("ai.provider-model-state");
-          expect(await modelState.textContent()).toContain("Load the list");
+          // And the row claims nothing it has not asked: before a key exists no
+          // list request has been made, so there is no state line to report.
+          expect((await s.byTestIdAll("ai.provider-model-state")).length).toBe(0);
 
           // ── paste a key: the panel flips to the stored state and never
           //    renders the value back ──
