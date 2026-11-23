@@ -1427,6 +1427,8 @@ fn prefs_read_returns_default_when_vault_prefs_tampered() {
                 opaque_saved_views: Vec::new(),
                 view_approvals: Default::default(),
                 view_order: Vec::new(),
+                home_cards: None,
+                home_open_on_start: false,
             },
             &[0x77; AEAD_NONCE_LEN],
         )
@@ -2950,6 +2952,95 @@ fn set_ribbon_items_writes_some_so_emptied_stays_emptied() {
             .await
             .expect("read");
         assert_eq!(cleared.ribbon_items, Some(Vec::new()));
+    });
+}
+
+#[test]
+fn set_home_cards_writes_the_order_and_refuses_what_the_reader_would_skip() {
+    rt().block_on(async {
+        let (tmp, state) = make_temp_vault_with_unlocked_state(0x5c).await;
+        let cards = vec![
+            protocol::home_layout::HomeCard {
+                id: "recent-notes".into(),
+                kind: "recent-notes".into(),
+                span: 1,
+            },
+            protocol::home_layout::HomeCard {
+                id: "card-from-the-future".into(),
+                kind: "future-kind".into(),
+                span: 2,
+            },
+        ];
+        set_home_cards_with_dir(
+            tmp.path(),
+            &state,
+            &noop_hooks(),
+            cards.clone(),
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("set cards");
+        let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+            .await
+            .expect("read");
+        // Order is the payload and an unknown id survives the round trip: a card
+        // a NEWER build wrote must not be dropped by an older one's save.
+        assert_eq!(view.home_cards, Some(cards));
+
+        // A span the codec would skip on the next load is REFUSED here rather
+        // than written: a row that silently vanishes is worse than a refusal.
+        let bad = vec![protocol::home_layout::HomeCard {
+            id: "x".into(),
+            kind: "k".into(),
+            span: 9,
+        }];
+        let refused = set_home_cards_with_dir(
+            tmp.path(),
+            &state,
+            &noop_hooks(),
+            bad,
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await;
+        assert!(matches!(refused, Err(PrefsWriteError::InvalidValue)));
+    });
+}
+
+#[test]
+fn home_open_on_start_is_device_local_and_off_by_default() {
+    rt().block_on(async {
+        let (tmp, state) = make_temp_vault_with_unlocked_state(0x5d).await;
+        let before = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+            .await
+            .expect("read");
+        assert!(!before.home_open_on_start, "off until someone asks for it");
+        assert_eq!(before.home_cards, None, "never arranged");
+
+        set_home_open_on_start_with_dir(
+            tmp.path(),
+            &state,
+            &noop_hooks(),
+            true,
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("set switch");
+        let after = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+            .await
+            .expect("read");
+        assert!(after.home_open_on_start);
+
+        // Device-local: a remote prefs blob carrying the OTHER value must not win.
+        let mut remote = after.clone();
+        remote.home_open_on_start = false;
+        let merged = crate::plugins::sync::prefs_merge::merge_prefs(&after, &remote);
+        assert!(
+            merged.home_open_on_start,
+            "this device's start behaviour never follows the person"
+        );
     });
 }
 

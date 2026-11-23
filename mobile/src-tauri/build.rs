@@ -153,6 +153,8 @@ fn main() {
                     // invoke_handler).
                     "set_ribbon_items",
                     "set_ribbon_visible",
+                    "set_home_cards",
+                    "set_home_open_on_start",
                 ]),
             )
             .plugin(

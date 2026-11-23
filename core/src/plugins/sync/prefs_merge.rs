@@ -802,6 +802,13 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // ---- shared: sequence-LWW-on-whole -------------------------------
         favorites: lww!("favorites", favorites),
         view_order: lww!("view_order", view_order),
+        // The home surface's card arrangement (myne-md/myne#1074). A SEQUENCE, so
+        // it merges like `view_order`: the whole ordered list is one LWW value and
+        // the remote order replaces the local one outright. A per-card merge was
+        // considered and rejected — two devices each adding a card would produce
+        // an order neither of them arranged, and "the last arrangement wins" is
+        // what a person expects of a layout.
+        home_cards: lww!("home_cards", home_cards),
         // view_approvals (view-manifests): **device-local**, and the local side
         // winning outright is the feature rather than a merge detail. An approval
         // is a decision a person made AT a device, so a remote map may never
@@ -866,6 +873,11 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // bar_items_order above, so the local value always survives the merge.
         ribbon_items: local.ribbon_items.clone(),
         ribbon_visible: local.ribbon_visible,
+        // Whether THIS DEVICE opens the home tab on start (myne-md/myne#1074). A
+        // desktop that starts on its home surface and a phone that starts on the
+        // note you were reading are both reasonable, so the value never follows
+        // the person between them: the local side wins outright.
+        home_open_on_start: local.home_open_on_start,
         // myne-cli epic (MYND-490): a per-machine door + performance knob — the
         // local value always survives the merge, same discipline as ai_enabled.
         cli_enabled: local.cli_enabled,

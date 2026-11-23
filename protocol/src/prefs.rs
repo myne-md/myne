@@ -1192,6 +1192,39 @@ pub struct PrefsView {
     #[serde(default)]
     pub hidden_bar_items: Vec<String>,
 
+    /// The home surface's ordered card list (myne-md/myne#1074).
+    ///
+    /// **`Option` for the reason `ribbon_items` is.** `None` means the user has
+    /// never arranged their home, so the client renders its default layout and
+    /// writes nothing; `Some([])` is a deliberately emptied home and stays empty.
+    /// A plain `Vec` could not tell those apart under the codec's
+    /// omit-when-empty discipline, which would re-seed the defaults over a home
+    /// the user had emptied.
+    ///
+    /// **Synced, not device-local.** The arrangement is how this person likes to
+    /// start work, not a property of one machine, so it merges like
+    /// `favorites` rather than like `ribbon_items`. **Non-load-bearing** (a
+    /// tampered value can at worst rearrange cards), so there is no
+    /// protective-envelope clamp. The shape lives in
+    /// [`crate::home_layout`]; this member is only where it sits. Canonical key
+    /// `home_cards` — sorts after `hidden_bar_items` (`hid` < `hom`), before
+    /// `home_open_on_start` (`home_c` < `home_o`).
+    #[serde(default)]
+    pub home_cards: Option<Vec<crate::home_layout::HomeCard>>,
+
+    /// Whether THIS DEVICE opens the home tab on start (myne-md/myne#1074).
+    /// Default `false`, so an untouched vault keeps today's behaviour: the app
+    /// opens on the workspace it was left on.
+    ///
+    /// **Device-local**, by the rule the other device-local switches follow: a
+    /// desktop that opens on its home surface and a phone that opens on the note
+    /// you were reading are both reasonable, so the value must not follow the
+    /// person between them. Omit-when-default, so a vault that never set it stays
+    /// byte-identical to a pre-#1074 `vault.prefs`. Canonical key
+    /// `home_open_on_start` — after `home_cards`, before `icon`.
+    #[serde(default)]
+    pub home_open_on_start: bool,
+
     /// User-chosen bottom-bar item display order (MYND bottom-bar customization, drag-to-reorder
     /// twin of [`PrefsView::hidden_bar_items`]). A `sequence`-semantics array of right-cluster
     /// `BottomBar` element ids (e.g. `view-mode`, `tags`, `graph`) in the order the user arranged
@@ -1769,6 +1802,8 @@ impl Default for PrefsView {
             folder_icons: Default::default(),
             folder_notes_enabled: false,
             hidden_bar_items: Vec::new(),
+            home_cards: None,
+            home_open_on_start: false,
             icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
@@ -2433,6 +2468,23 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, id);
         }
         out.extend_from_slice(b"],");
+    }
+
+    // home_cards + home_open_on_start (canonical keys 'hom' — after
+    // 'hidden_bar_items' ['hid' < 'hom'], before 'icon' ['hom' < 'ico'],
+    // myne-md/myne#1074). `home_cards` is an `Option` so `Some([])` (a home the
+    // user emptied) is EMITTED as `[]` while `None` (never arranged) is omitted,
+    // which is what lets the client seed its default layout only when the key is
+    // absent. The card shape and its byte contract live in `crate::home_layout`.
+    if let Some(ref cards) = prefs.home_cards {
+        out.extend_from_slice(b"\"home_cards\":");
+        crate::home_layout::push_home_cards(&mut out, cards);
+        out.push(b',');
+    }
+    // `home_open_on_start` is omit-when-default, so only `true` is written and an
+    // untouched vault stays byte-identical.
+    if prefs.home_open_on_start {
+        out.extend_from_slice(b"\"home_open_on_start\":true,");
     }
 
     // icon (canonical key 'icon' — after 'hidden_bar_items' [h < i], before 'item_colors' ['ico' <
@@ -3589,6 +3641,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // (`h` < `s`, so the cursor-based helper — not the post-SCP `_marker`
     // variant — is correct here).
     let hidden_bar_items = parse_optional_array_field(rest, &mut cursor, b"\"hidden_bar_items\":")?;
+    // home_cards + home_open_on_start (keys 'hom' — after hidden_bar_items
+    // ['hid' < 'hom'], before icon ['hom' < 'ico'], myne-md/myne#1074).
+    // `home_cards` uses the Option-returning parse so ABSENT (never arranged)
+    // stays distinguishable from PRESENT-but-EMPTY (deliberately emptied);
+    // `home_open_on_start` is omit-when-default, absent → `false`.
+    let home_cards = parse_optional_home_cards_field(rest, &mut cursor, b"\"home_cards\":")?;
+    let home_open_on_start =
+        parse_optional_bool_field(rest, &mut cursor, b"\"home_open_on_start\":")?.unwrap_or(false);
     // icon (key 'icon') sits between hidden_bar_items (h) and item_colors (i)
     // ['ico' < 'ite'] in canonical order. The per-vault switcher glyph name
     // (vault-icons), parsed from the same monotonic cursor so a later field's key
@@ -3810,6 +3870,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_icons,
         folder_notes_enabled,
         hidden_bar_items,
+        home_cards,
+        home_open_on_start,
         bar_items_order,
         calendar_settings,
         chat_history_budget,
@@ -3915,6 +3977,33 @@ fn parse_optional_saved_views_field(
             Ok((views, opaque))
         }
         None => Ok((Vec::new(), Vec::new())),
+    }
+}
+
+/// Parse the OPTIONAL `home_cards` nested-array-of-objects field
+/// (myne-md/myne#1074), searching `rest` from `*cursor` onward. On a hit,
+/// decodes the canonical [`crate::home_layout::HomeCard`] array and advances
+/// `*cursor` past the closing `]`; on a miss returns `None` and leaves `*cursor`
+/// unchanged, which is what keeps "never arranged" distinguishable from
+/// "deliberately emptied".
+///
+/// A malformed array collapses to `PlaintextParseFailed` for the same reason
+/// every other member does: a blob whose bytes do not parse is not a blob whose
+/// OTHER preferences should be trusted.
+fn parse_optional_home_cards_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<Vec<crate::home_layout::HomeCard>>, PrefsBlobError> {
+    match find_top_level_marker(rest, *cursor, marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (cards, consumed) = crate::home_layout::parse_home_cards_array(&rest[val_start..])
+                .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = val_start + consumed;
+            Ok(Some(cards))
+        }
+        None => Ok(None),
     }
 }
 
