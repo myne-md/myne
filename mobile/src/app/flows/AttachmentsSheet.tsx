@@ -7,8 +7,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sheet, Banner, Spinner } from "../../components";
-import { catalogList, attachmentDelete, attachmentRename, attachmentUnusedList, attachmentCleanUnused, importFile, ATTACHMENT_ACCEPT, type CatalogEntry } from "../../lib/attachments";
+import { Sheet, Banner, Spinner, Segmented } from "../../components";
+import { catalogList, attachmentDelete, attachmentRename, attachmentSetFolders, attachmentUnusedList, attachmentCleanUnused, importFile, ATTACHMENT_ACCEPT, type CatalogEntry } from "../../lib/attachments";
 import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
@@ -17,6 +17,7 @@ import { TranscriptSheet } from "./TranscriptSheet";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { renderPdfFirstPage } from "@myne/editor/attachments/pdf-render";
 import { tappable } from "../a11y/tappable";
+import { folderMatchesScope } from "@myne/attachment-folder-scope";
 
 const isImage = (t: string) => t.startsWith("image/");
 /** PDFs render a first-page thumbnail (MYND-477) — parity with the desktop
@@ -71,6 +72,14 @@ export function AttachmentsSheet({
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  // The folder scope, `null` for every folder (myne-md/myne#1075). A SUBTREE:
+  // a term folder holds week folders under it, and scoping to the term means
+  // the term.
+  const [scope, setScope] = useState<string | null>(null);
+  // The row whose folder picker is open, or null. The same shape `renaming`
+  // takes, so a row shows one inline editor at a time and nothing new has to be
+  // invented for a phone.
+  const [moving, setMoving] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
   // Clean-unused review: the unused entries being confirmed for erase, or null.
   const [cleanup, setCleanup] = useState<CatalogEntry[] | null>(null);
@@ -174,6 +183,19 @@ export function AttachmentsSheet({
     }
   }
 
+  async function moveTo(id: string, folder: string) {
+    setMoving(null);
+    try {
+      if (HAS_TAURI) await attachmentSetFolders([{ id, folder }]);
+      setEntries((es) => (es ?? []).map((e) => (e.id === id ? { ...e, folder } : e)));
+    } catch {
+      setError(t("attachments.folderMoveFailed"));
+    }
+  }
+
+  /** Every folder the catalog already uses, sorted, so the picker names real ones. */
+  const folders = [...new Set((entries ?? []).map((e) => e.folder ?? "").filter((f) => f !== ""))].sort();
+
   const totalUnusedBytes = (cleanup ?? []).reduce((s, e) => s + e.size, 0);
 
   // Shared bits between the modal (sheet) and the full-page (Files tab) render.
@@ -250,8 +272,30 @@ export function AttachmentsSheet({
     </div>
   );
 
+  // The folder scope, as the segmented primitive. Only when the catalog actually
+  // holds folders: a library where every file sits at the root has nothing to
+  // scope by, and a control of one option would be chrome that never changes
+  // anything. The value is the folder path itself (`""` for every folder), so a
+  // scope and a move name the same thing.
+  const scopeChips = !cleanup && folders.length > 0 && (
+    <div data-testid="files.folder-scope" style={{ flex: "none", paddingTop: "var(--space-2)" }}>
+      <Segmented
+        options={[t("attachments.folderAll"), ...folders.map((f) => f.replace(/\/$/, ""))]}
+        optionValues={["", ...folders]}
+        active={scope === null ? 0 : folders.indexOf(scope) + 1}
+        // The primitive reports the INDEX, and `optionValues` is what makes that
+        // index addressable in a test; the mapping back to a folder path stays
+        // here, where the scope lives.
+        onChange={(index) => setScope(index === 0 ? null : (folders[index - 1] ?? null))}
+        ariaLabel={t("attachments.folderAll")}
+        testIdPrefix="files.folder-scope"
+      />
+    </div>
+  );
+
   const listInner = (
     <>
+        {scopeChips}
         {cleanup ? (
           cleanup.map((e) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px", borderTop: "1px solid var(--line-1)" }}>
@@ -279,7 +323,9 @@ export function AttachmentsSheet({
             {t("attachments.emptyState")}
           </div>
         ) : (
-          entries.map((e) => {
+          entries
+            .filter((e) => scope === null || folderMatchesScope(e.folder ?? "", scope))
+            .map((e) => {
             // The row's activation depends on what the file IS: an image/PDF
             // opens the shared lightbox, an audio attachment opens its transcript
             // sheet (myne-md/myne#886: the row is the entry point, replacing the
@@ -361,9 +407,29 @@ export function AttachmentsSheet({
                   </div>
                 )}
               </div>
-              {renaming !== e.id && (
-                <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+              {moving === e.id && (
+                <div data-testid="files.row-folder" style={{ flexShrink: 0, maxWidth: "50%" }}>
+                  <Segmented
+                    options={[t("attachments.folderRoot"), ...folders.map((f) => f.replace(/\/$/, ""))]}
+                    optionValues={["", ...folders]}
+                    active={folders.indexOf(e.folder ?? "") + 1}
+                    onChange={(index) => void moveTo(e.id, index === 0 ? "" : (folders[index - 1] ?? ""))}
+                    ariaLabel={t("attachments.folderPickerAria", { name: e.filename })}
+                    testIdPrefix={`files.row-folder.${e.id}`}
+                  />
+                </div>
+              )}
+              {renaming !== e.id && moving !== e.id && (
+                <div
+                  data-testid={`files.row-actions.${e.id}`}
+                  style={{ display: "flex", gap: 2, flexShrink: 0 }}
+                >
                   {onInsert && <button onClick={() => onInsert(e.id, e.filename)} style={actionBtn("var(--accent)")}>{t("attachments.insert")}</button>}
+                  {/* A raw button, like the three beside it: the row's actions are
+                      ONE visual set rendered through `actionBtn`, and converting
+                      only the new one would make the row inconsistent. Converting
+                      all four to the primitive is its own change (myne-md/myne#1075). */}
+                  <button onClick={() => setMoving(e.id)} style={actionBtn("var(--fg-2)")}>{t("attachments.move")}</button>
                   <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>{t("common.rename")}</button>
                   <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
                 </div>
