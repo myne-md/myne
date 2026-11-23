@@ -32,7 +32,7 @@ import { join } from "node:path";
  * reference material the user went looking for, not help with using the page.
  */
 const OUTBOUND: Record<string, { help: boolean; what: string }> = {
-  "https://myne.md/download": { help: false, what: "the download page, offered when a client is out of date" },
+  "https://myne.md/download/": { help: false, what: "the download page, offered when a client is out of date; the trailing slash is the form the site answers 200 on, and the slashless one 301s to it" },
   "https://myne.md/impressum/": { help: false, what: "a legal document (German imprint requirement)" },
   "https://myne.md/themes/": { help: false, what: "the theme gallery, a content source" },
   "https://myne.md/threat-model": { help: false, what: "the published threat model, reference material" },

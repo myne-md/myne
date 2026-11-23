@@ -405,12 +405,16 @@ describe("check-prefs-parity, the denominator floor", () => {
 describe("check-prefs-parity, the tree as it stands", () => {
   it("passes, with the measured roster and tally", () => {
     // The tally tracks the tree: it moves as rows converge, which is the record
-    // doing its job. 51 `both` / 29 `desktop-only` is the state after
-    // external-mcp-connection's queue and rename commands landed as reasoned
-    // desktop-only rows: `accept_mcp_write_request` and `dismiss_mcp_write_request`
-    // decide a proposal an external client produced by calling a desktop sidecar,
-    // and `rewrite_mcp_folder_paths` re-roots a grant a phone never holds, so a
-    // phone has nothing to call any of them from. (51 / 26 was the
+    // doing its job. 51 `both` / 33 `desktop-only` is the state after the
+    // home-layout batch added `set_home_cards` and `set_home_open_on_start` as
+    // reasoned desktop-only rows: desktop calls both from the home surface's
+    // arrange mode (myne-md/myne#1074), the card list because a phone's start
+    // screen is its own design question and the open-on-start switch because it
+    // is DEVICE-LOCAL, so a phone's answer is its own. (51 / 31 was
+    // external-mcp-connection's queue and rename commands, `accept_mcp_write_request`
+    // and `dismiss_mcp_write_request` deciding a proposal an external client
+    // produced by calling a desktop sidecar, and `rewrite_mcp_folder_paths`
+    // re-rooting a grant a phone never holds. 51 / 26 was the
     // deny-list shape, 51 / 24 after view-manifests' `set_view_approval`, 51 / 23
     // was myne-md/myne#880's phase 3 shape, and 42 / 32 when the projection was
     // first seeded.) The assertion is deliberately exact rather
@@ -421,7 +425,7 @@ describe("check-prefs-parity, the tree as it stands", () => {
     const out = run();
     expect(out.code).toBe(0);
     expect(out.out).toContain(
-      "prefs-parity: ok (84 command(s): 51 both, 31 desktop-only, 0 mobile-only, 2 no-ui",
+      "prefs-parity: ok (86 command(s): 51 both, 33 desktop-only, 0 mobile-only, 2 no-ui",
     );
     // A real guard run over the whole tree: ~3.5 s alone, past the 5 s default
     // under a full `pnpm test`, so it carries the same budget as the three

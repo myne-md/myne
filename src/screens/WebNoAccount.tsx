@@ -23,8 +23,13 @@ import { useTranslation } from "react-i18next";
 import { CenteredCard } from "../components/primitives/CenteredCard";
 import { openUrl } from "../platform/opener";
 
-/** Where the native clients live. One constant, so the two states cannot drift. */
-export const NATIVE_DOWNLOAD_URL = "https://myne.md/download";
+/**
+ * Where the native clients live. One constant, so the two states cannot drift.
+ *
+ * Trailing slash on purpose: the site answers 200 on it and 301s the slashless
+ * form, so this is the one that costs the reader no round trip.
+ */
+export const NATIVE_DOWNLOAD_URL = "https://myne.md/download/";
 
 const BODY: CSSProperties = {
   color: "var(--fg-2)",
