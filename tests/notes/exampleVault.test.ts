@@ -27,6 +27,21 @@ describe("example vault copy (#393)", () => {
     expect(notes.filter((n) => n.index)).toHaveLength(1);
   });
 
+  // A title key that is absent from the catalog resolves to the KEY ITSELF, so
+  // a note is seeded named `notes.example.tasks.title` and nothing anywhere
+  // fails: the seeder writes it, the sidebar renders it, and the only way to
+  // notice is to read the vault. That is what shipped on 0.18.0, in the two
+  // catalogs nobody would have guessed were the broken ones (English and
+  // Turkish). Titles and folder are what a user reads first, so the invariant
+  // is that neither is ever key-shaped.
+  it("resolves every seeded title and the folder to copy, never to a key", () => {
+    for (const n of notes) {
+      expect(n.title, `note ${n.role}`).not.toMatch(/^[\w.]+\.[\w.]+$/);
+      expect(n.folder, `folder of ${n.role}`).not.toMatch(/^[\w.]+\.[\w.]+$/);
+      expect(n.title.trim(), `note ${n.role}`).not.toBe("");
+    }
+  });
+
   it("leaves no unfilled interpolation placeholder", () => {
     for (const n of notes) {
       expect(n.markdown, `note ${n.role}`).not.toMatch(/\{\{|\}\}/);

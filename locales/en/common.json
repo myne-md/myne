@@ -2085,6 +2085,7 @@
         "body": "Myne writes plain Markdown and shows the result as you type.\n\n## The basics\nMake a word **bold** or *italic*, or drop in `inline code`.\n\n## A list\n- One item\n- Another item\n  - A nested one\n\n## A quote\n> Small notes, kept for years, beat big notes you never write.\n\n## A table\n| Shortcut | What it does |\n| --- | --- |\n| Cmd/Ctrl + B | Bold |\n| Cmd/Ctrl + K | Add a link |\n\n## Some code\n```\nconsole.log(\"hello from Myne\")\n```\n\nWhen you are ready, head back to [[{{index}}]].\n"
       },
       "tasks": {
+        "title": "Tasks",
         "body": "Any line that starts with `- [ ]` is a task. Myne collects every open task from across your notes into one Tasks view, so nothing gets lost between notes.\n\n- [ ] Read [[{{markdown}}]]\n- [ ] Add a task of your own\n- [ ] Try one with a due date 📅 2030-12-31\n- [x] Create your vault\n\nCheck a box here, then open the Tasks view in the sidebar to watch the list update.\n\nBack to [[{{index}}]].\n"
       },
       "links": {
