@@ -583,9 +583,9 @@ fn a_real_client_searches_inside_the_grant_and_never_outside_it() {
     let reply = session.call(1, "note_search", json!({ "query": "alpha" }));
     let result = &reply["result"];
     assert_eq!(result["isError"], false, "reply: {reply}");
-    let rows = result["structuredContent"]
+    let rows = result["structuredContent"]["items"]
         .as_array()
-        .expect("the search's structuredContent is a row array");
+        .expect("the search's structuredContent.items is the row array");
     assert_eq!(rows.len(), 1, "expected one in-scope row: {rows:?}");
     assert_eq!(rows[0]["noteId"], fixture.in_scope.as_str());
     assert_eq!(rows[0]["folder"], format!("{IN_SCOPE_FOLDER}/"));
@@ -605,7 +605,7 @@ fn a_real_client_searches_inside_the_grant_and_never_outside_it() {
     let reply = session.call(2, "note_search", json!({ "query": "secret" }));
     assert_eq!(
         reply["result"]["structuredContent"],
-        json!([]),
+        json!({ "items": [] }),
         "an out-of-scope hit must not come back: {reply}"
     );
 
@@ -722,7 +722,7 @@ fn a_call_made_while_the_vault_is_locked_answers_vault_locked_and_an_unlock_resu
     let reply = session.call(3, "note_search", json!({ "query": "alpha" }));
     assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
     assert_eq!(
-        reply["result"]["structuredContent"][0]["noteId"],
+        reply["result"]["structuredContent"]["items"][0]["noteId"],
         fixture.in_scope.as_str()
     );
 }

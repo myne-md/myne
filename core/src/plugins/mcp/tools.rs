@@ -1095,7 +1095,18 @@ fn call_tool_result(tool: ToolName, structured: Value) -> Value {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
+        // A file's extracted text: the answer IS the text.
+        ToolName::AttachmentRead => structured.as_str().unwrap_or_default().to_string(),
         _ => serde_json::to_string_pretty(&structured).unwrap_or_default(),
+    };
+    // `structuredContent` is a JSON OBJECT on the MCP wire, and the client SDKs
+    // enforce it by refusing the call before reading it (myne-md/myne#1106). Two
+    // verbs answer with a list and one with a bare string, so both shapes are given
+    // a home HERE, in the one place a tool result is assembled.
+    let structured = match structured {
+        Value::Object(_) => structured,
+        Value::Array(_) => json!({ "items": structured }),
+        scalar => json!({ "text": scalar }),
     };
     json!({
         "content": [{ "type": "text", "text": text }],
