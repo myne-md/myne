@@ -22,8 +22,8 @@ import {
   type DecorationSet,
   EditorView,
   ViewPlugin,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import {
   editorFocusChanged,
   editorFocusField,
@@ -162,7 +162,7 @@ export function mermaidLabel(code: string): string {
     : i18n.t("editor.a11y.diagramNamed", { kind });
 }
 
-class MermaidWidget extends WidgetType {
+class MermaidWidget extends LineHeightWidget {
   constructor(
     private readonly code: string,
     private readonly renderer: MermaidRenderer,
