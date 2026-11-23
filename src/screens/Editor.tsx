@@ -3085,6 +3085,9 @@ function EditorChrome({
         onShowCalendar={() => {
           ws.openCalendar();
         }}
+        onShowHome={() => {
+          ws.openHome();
+        }}
         onShowTasks={() => {
           setPaletteOpen(false);
           ws.openTasks();
@@ -3478,6 +3481,7 @@ type CommandPaletteHostProps = {
   onImportObsidian: () => void;
   onShowTasks: () => void;
   onShowCalendar: () => void;
+  onShowHome: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
   onRestoreBackup: () => void;
@@ -3531,6 +3535,7 @@ function CommandPaletteHost({
   onImportObsidian,
   onShowTasks,
   onShowCalendar,
+  onShowHome,
   onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
@@ -4077,6 +4082,7 @@ function CommandPaletteHost({
       onImportObsidian,
       onShowTasks,
   onShowCalendar,
+  onShowHome,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -4134,6 +4140,8 @@ function CommandPaletteHost({
       onImportObsidian,
       onShowTasks,
       onShowCalendar,
+      onShowHome,
+  onShowHome,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,

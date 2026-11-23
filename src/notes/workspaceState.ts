@@ -47,6 +47,7 @@ import {
   ATTACHMENTS_TAB_ID,
   GRAPH_TAB_ID,
   CALENDAR_TAB_ID,
+  HOME_TAB_ID,
   TASKS_TAB_ID,
   TEMPLATES_TAB_ID,
   TAB_KIND_TAGS,
@@ -160,6 +161,17 @@ export type WorkspaceItem =
       pinned?: boolean;
       viewMode?: ViewMode;
       calendarView?: PersistedCalendarView;
+    }
+  /**
+   * The home surface (myne-md/myne#1074). A singleton, and it carries nothing:
+   * the card list is a synced preference rather than per-tab state, because the
+   * arrangement is the same wherever home is opened.
+   */
+  | {
+      kind: "home";
+      id: typeof HOME_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
     }
   /**
    * The agent (myne-md/myne#771). A singleton like the graph and the task list.
@@ -282,6 +294,11 @@ export function calendarItem(view?: CalendarView): CalendarWorkspaceItem {
   return persisted === undefined
     ? { kind: "calendar", id: CALENDAR_TAB_ID }
     : { kind: "calendar", id: CALENDAR_TAB_ID, calendarView: persisted };
+}
+
+/** The home tab item (singleton - see [`HOME_TAB_ID`]). */
+export function homeItem(): WorkspaceItem {
+  return { kind: "home", id: HOME_TAB_ID };
 }
 
 /** The attachment-library tab item (singleton - see [`ATTACHMENTS_TAB_ID`]). */

@@ -119,6 +119,7 @@ import { ViewRenderHost } from "../views/viewRenderHost";
 import type { BoardCardActions } from "../views/boardView";
 import { Button } from "../../components/primitives/Button";
 import { CalendarPane } from "./CalendarPane";
+import { HomeSurface } from "../home/HomeSurface";
 import { TasksPane } from "./TasksPane";
 import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
@@ -395,6 +396,10 @@ export function PaneView({
   // task list is: it is a surface you keep open beside a note, not a modal.
   const isCalendar = leaf.activeTab?.kind === "calendar";
   const isAttachments = leaf.activeTab?.kind === "attachments";
+  // The home surface (myne-md/myne#1074), the same first-class-tab pattern. It
+  // keeps its gutters: home is a column of cards, and a card grid against the
+  // pane edge is the compact this product says it is not.
+  const isHome = leaf.activeTab?.kind === "home";
   const isTemplates = leaf.activeTab?.kind === "templates";
   // An agent-kind active tab renders the agent hub (myne-md/myne#771) in place of
   // the note editor - the same first-class-tab pattern the graph and tasks tabs
@@ -2243,6 +2248,13 @@ export function PaneView({
     // The template library (myne-md/myne#779). Gutters STAY: unlike the graph
     // and the attachment grid, this is a text list, and a text list 8px from
     // the edge of a full-width pane is the compact this product says it is not.
+    if (isHome) {
+      return {
+        fill: true,
+        gutters: true,
+        el: <HomeSurface />,
+      };
+    }
     if (isTemplates) {
       return {
         fill: true,

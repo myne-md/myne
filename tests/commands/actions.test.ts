@@ -139,6 +139,9 @@ describe("Command palette action registry", () => {
       "folder.new",
       "graph.show",
       "graph.show-isolated",
+      // myne-md/myne#1074: home is a place you go, so it is a command like the
+      // graph, the task list and the calendar.
+      "home.show",
       "meeting.summarize",
       "nav.back",
       "nav.forward",
