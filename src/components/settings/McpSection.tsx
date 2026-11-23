@@ -172,13 +172,14 @@ const TOOL_ROW_STYLE: CSSProperties = {
   padding: "var(--space-1) 0",
 };
 
-/** The four paragraphs behind the row's question mark: the longer account the
- *  surface's own copy left out on purpose (`myne-md/myne#1052`). */
+/** The paragraphs behind the row's question mark: the longer account the surface's
+ *  own copy left out on purpose (`myne-md/myne#1052`). A fact stated on the surface
+ *  does not get a fourth paragraph here as well, which is why the client-side tool
+ *  filter is absent: step 2 says it once. */
 const EXPLANATION_KEYS = [
   "settings.ai.externalAccess.outsideMyne",
   "settings.ai.externalAccess.infoOneDoor",
   "settings.ai.externalAccess.infoNotACredential",
-  "settings.ai.externalAccess.infoClientTools",
   "settings.ai.externalAccess.infoBudget",
 ] as const;
 
@@ -307,9 +308,22 @@ interface FlowState {
   /** A connection being re-approved, whose name may not be edited. */
   editing: string | null;
   name: string;
-  /** The single access list: every folder the connection may touch, read and
-   *  write alike. The grant's two fields are derived from it (`derivedGrant`). */
+  /**
+   * The one list, and what it MEANS is decided by `wholeVault` beside it:
+   *
+   * - whole vault (the default): this list is the folders to LEAVE OUT, and
+   *   everything else is readable and writable.
+   * - not the whole vault: this list is the folders to let in, and everything
+   *   else is out.
+   *
+   * One array, two readings, because a person answers one question at a time and
+   * the grant underneath still has exactly two fields (`derivedGrant`).
+   */
   access: string[];
+  /** Read and write the whole vault, minus `access`. On by default: the common
+   *  answer is "yes, my vault", and a consent screen that makes the user opt in
+   *  to forty folders before the tool works teaches them to click through. */
+  wholeVault: boolean;
   disabled: string[];
 }
 
@@ -377,6 +391,15 @@ export function McpSection({
     // CURRENT exclusion set leaves readable, so deriving from it would be circular.
     const known = view?.folders ?? [];
     const chosen = new Set(flow.access);
+    if (flow.wholeVault) {
+      // The list is the exclusions, and every folder it does not name is granted.
+      return {
+        excluded: flow.access,
+        // The root sentinel (`""`) is not a folder a write scope names; it is what
+        // the picker shows for "the vault root", and the grant derives it.
+        write: known.filter((folder) => folder !== "" && !chosen.has(folder)),
+      };
+    }
     return {
       excluded: known.filter((folder) => !chosen.has(folder) && folder !== ""),
       write: flow.access,
@@ -407,6 +430,7 @@ export function McpSection({
       editing: null,
       name: "",
       access: [],
+      wholeVault: true,
       disabled: [],
     });
 
@@ -436,7 +460,12 @@ export function McpSection({
       presetId: null,
       editing: row.name,
       name: row.name,
-      access: readable,
+      // Editing keeps whichever model the stored grant already expresses. A
+      // non-legacy grant with an empty exclusion set IS the whole vault. A legacy
+      // grant has an empty exclusion set too and is nothing of the sort: its
+      // allow list is the whole truth about it, so it opens as a folder list.
+      wholeVault: !row.legacy && row.excludedFolders.length === 0,
+      access: !row.legacy && row.excludedFolders.length === 0 ? [] : readable,
       disabled,
     });
   };
@@ -523,6 +552,7 @@ export function McpSection({
     : presetById(flow.presetId);
 
   const scopeLine = useMemo(() => {
+    if (flow?.wholeVault) return t("settings.ai.externalAccess.scopeLineAll");
     if (preview !== null) {
       return t("settings.ai.externalAccess.scopeLine", {
         count: preview.noteCount,
@@ -532,7 +562,7 @@ export function McpSection({
     // The claim without the number: it is true whether or not the host answered,
     // and it is the sentence the consent rests on.
     return t("settings.ai.externalAccess.scopeLineWords");
-  }, [preview, t]);
+  }, [flow?.wholeVault, preview, t]);
 
   return (
     <SettingsSection
@@ -831,9 +861,41 @@ export function McpSection({
 
           {flow.step === 3 && (
             <div data-testid="settings.mcp-step-scope">
+              <SettingRow
+                testId="settings.mcp-whole-vault"
+                stateAttrs={{ "data-whole-vault": String(flow.wholeVault) }}
+                label={t("settings.ai.externalAccess.wholeVaultLabel")}
+                helper={t("settings.ai.externalAccess.wholeVaultHelper")}
+                control={(helperId) => (
+                  <Switch
+                    checked={flow.wholeVault}
+                    onChange={(next) =>
+                      setFlow((current) =>
+                        current === null
+                          ? current
+                          : {
+                              ...current,
+                              wholeVault: next,
+                              // The list means the opposite thing under the other
+                              // reading, so it starts empty rather than inverting
+                              // itself into a set nobody chose.
+                              access: [],
+                            },
+                      )
+                    }
+                    testId="settings.mcp-whole-vault-toggle"
+                    ariaLabel={t("settings.ai.externalAccess.wholeVaultLabel")}
+                    ariaDescribedBy={helperId}
+                  />
+                )}
+              />
+
               <p style={HELPER_STYLE} data-testid="settings.mcp-scope-line">
                 {scopeLine}
               </p>
+              {/* A guarantee rather than a restatement of a control, so it stays:
+                  a write is recoverable, and that is the fact that decides whether
+                  the person switches a write verb on at all. */}
               <p style={HELPER_STYLE} data-testid="settings.mcp-write-restore">
                 {t("settings.ai.externalAccess.writeRestore")}
               </p>
@@ -845,8 +907,16 @@ export function McpSection({
                 onChange={(next) =>
                   setFlow((current) => (current === null ? current : { ...current, access: next }))
                 }
-                label={t("settings.ai.externalAccess.accessLabel")}
-                emptySummary={t("settings.ai.externalAccess.accessNothing")}
+                label={
+                  flow.wholeVault
+                    ? t("settings.ai.externalAccess.excludeLabel")
+                    : t("settings.ai.externalAccess.accessLabel")
+                }
+                emptySummary={
+                  flow.wholeVault
+                    ? t("settings.ai.externalAccess.excludeNothing")
+                    : t("settings.ai.externalAccess.accessNothing")
+                }
                 searchPlaceholder={t("settings.ai.externalAccess.findFolder")}
                 emptyText={t("settings.ai.externalAccess.noFolderMatches")}
                 maxListHeight={240}

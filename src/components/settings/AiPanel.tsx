@@ -68,7 +68,6 @@ import type {
   ProviderModel,
 } from "../../lib/ai-model-store";
 import { usePrefs } from "../../hooks/usePrefs";
-import { has } from "../../platform/capabilities";
 import {
   endpointRejectionOf,
   listProviderModels,
@@ -116,7 +115,6 @@ import { SettingRow } from "./SettingRow";
 import { SettingsTopicPanel } from "./SettingsTabs";
 import { SettingsSection } from "./SettingsSection";
 import { MemorySection } from "./MemorySection";
-import { McpSection } from "./McpSection";
 import {
   AiModelCatalogue,
   ACTION_CELL_STYLE as TABLE_ACTION_CELL_STYLE,
@@ -488,10 +486,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     setAutoTagEnabled,
     setChatHistoryBudget,
     setMeetingAiPrompt,
-    // `cli_enabled` is the master switch for external access, and the section
-    // that renders it lives in this panel (Limits) while the CLI panel renders the
-    // other door. One field, two surfaces; the copy says so.
-    setCliEnabled,
   } = usePrefs(onShowToast);
   // Local draft for the meeting-AI prompt textarea: it writes on blur rather
   // than on every keystroke, and resyncs when the stored value changes (a sync
@@ -598,9 +592,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // consent is not already recorded routes HERE first; nothing is stored until
   // the dialog is accepted.
   const [pendingProvider, setPendingProvider] = useState<string | null>(null);
-  // The external-access setup runs in its own modal, so it owes the shell the
-  // same Esc gate the provider consent does.
-  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   // Tell the Settings shell a modal of ours is up (see `onDialogOpenChange`).
   // The cleanup is load-bearing: the shell's flag outlives this panel, so
   // unmounting with the dialog open — Settings closed by its own × — would
@@ -609,13 +600,12 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // **Only the provider consent is a dialog now** (myne-md/myne#885): the model
   // catalogue left its `ModalShell` for an inline table, so there is no second
   // dialog to gate the shell's Esc on.
-  // The external-access approval dialog is a second modal of ours, so the gate is
-  // the OR of the two. Its own effect reports into the same state, and both reset
-  // on unmount because the shell's flag outlives this panel.
+  // One modal now: the external-access dialog moved to the Connections panel
+  // with its section (myne-md/myne#1077), and that panel reports its own.
   useEffect(() => {
-    onDialogOpenChange?.(pendingProvider !== null || mcpDialogOpen);
+    onDialogOpenChange?.(pendingProvider !== null);
     return () => onDialogOpenChange?.(false);
-  }, [pendingProvider, mcpDialogOpen, onDialogOpenChange]);
+  }, [pendingProvider, onDialogOpenChange]);
   // The provider's own catalogue, and the three states it can be in. `null` is
   // "not asked yet" and is NOT the same as `[]` ("asked, and the provider
   // published none") — collapsing them would tell the user a provider has no
@@ -1948,25 +1938,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
 
       </SettingsTopicPanel>
 
-      {/* **External access** has its own topic rather than living inside Limits
-          (mcp external access rework, myne-md/myne#1052). It is the one answer in
-          this panel that is about a program other than Myne, and burying it two
-          levels down was the complaint. Absent rather than disabled where
-          `externalMcp` is missing (`decisions.md` 2026-07-26): no client but
-          desktop can host the sidecar it configures, and a greyed tab would be an
-          offer the platform cannot honour. */}
-      <SettingsTopicPanel panelId="ai" topicId="externalAccess">
-        {has("externalMcp") && (
-          <McpSection
-            onDialogOpenChange={setMcpDialogOpen}
-            enabled={prefs.cli_enabled}
-            onSetEnabled={(next) => {
-              void setCliEnabled(next);
-            }}
-            onShowToast={onShowToast}
-          />
-        )}
-      </SettingsTopicPanel>
 
       {/* **Advanced**: the knobs a user reaches for once the rest works: the
           meeting summary prompt and the memory surface, neither of which is a

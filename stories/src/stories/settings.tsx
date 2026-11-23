@@ -37,6 +37,7 @@ import { AttachmentOcrSettings } from "@app/components/settings/AttachmentOcrSet
 import { AutomaticBackupBlock } from "@app/components/settings/AutomaticBackupBlock";
 import { CliAccessSettings } from "@app/components/settings/CliAccessSettings";
 import { CliPanel } from "@app/components/settings/CliPanel";
+import { ConnectionsPanel } from "@app/components/settings/ConnectionsPanel";
 import { ConnectedExtensions } from "@app/components/settings/ConnectedExtensions";
 import { ControlBlock } from "@app/components/settings/ControlBlock";
 import { CustomThemesSection } from "@app/components/settings/CustomThemesSection";
@@ -852,6 +853,25 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           <ClientMark name="Hermes" />
           <ClientMark name="Some MCP client" />
         </div>
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/connectionspanel/default",
+    group: "settings",
+    surface: "ConnectionsPanel",
+    state: "default",
+    description:
+      "Settings → Connections: the CLI, the browser clipper and an external MCP client in one panel, because they are three doors into the same vault. Each section is absent rather than disabled where its capability is missing, and the panel itself leaves the rail when a client has none of the three.",
+    tags: ["settings", "connections", "cli", "clipper", "mcp", "panel"],
+    // The clipper section inherits the gap `settings/connectedextensions/default`
+    // records: this fixture does not answer the command that drives its install
+    // switch, so `aria-checked` is unresolved here too. Same cause, same record.
+    a11y: "todo",
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <ConnectionsPanel />
       </Frame>
     ),
   },

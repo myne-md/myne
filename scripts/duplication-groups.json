@@ -1,14 +1,21 @@
 {
   "clones": {
     "verdicts": [
-{
+      {
+        "id": "src/components/settings/search/settingsSearchIndex.ts",
+        "lines": 31,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Two SETS OF SEARCH ENTRIES in one table, matched on shape alone: the matcher ignores field names, so it sees `panelId`/`topic`/`titleKey`/`descriptionKey`/`keywordsKey` repeated once per setting, which is what a data table is. Consolidating them would mean a builder function that takes seven positional arguments per row, and the whole point of this file is that a row is readable beside the setting it describes (myne-md/myne#1077)."
+      },
+      {
         "id": "core/src/plugins/agent/run_loop.rs #5",
         "lines": 21,
         "copies": 3,
         "verdict": "justified",
         "reason": "A normalised-skeleton false positive, and the three anchors show it: they land at 2041, 2063 and 2365, which is a record builder, its wrapper and the opening of a test, so the match spans function boundaries rather than describing one body. What the skeleton sees is the order of a few `let`s, a call and a `collect` in short test-support functions that are a fixture, the fixture's caller and a test. Merging any two of them would be wrong: one builds data, one names the shape a test needs, and the third asserts. Recorded so the ratchet keeps its baseline without licensing a copy that exists."
       },
-{
+      {
         "id": "core/src/plugins/mcp/tools_test.rs",
         "lines": 35,
         "copies": 2,
@@ -1056,8 +1063,6 @@
       "src/components/primitives/Segmented.tsx + src/notes/agent/reviewCardLayout.ts",
       "src/components/settings/AiPanel.tsx",
       "src/components/settings/TypographySettings.tsx",
-      "src/components/settings/search/settingsSearchIndex.ts #1",
-      "src/components/settings/search/settingsSearchIndex.ts #2",
       "src/dialect/clip.ts + src/dialect/html/emitNoteHtml.ts",
       "src/dialect/clip.ts + src/dialect/text/emitNoteText.ts",
       "src/dialect/clip/math.ts + src/dialect/html/emitNoteHtml.ts",
