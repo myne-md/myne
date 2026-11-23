@@ -1928,8 +1928,8 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 : `${helperId} ${explanationId}`
             }
             data-testid="ai.history-budget-input"
-            // Wide enough for the longest value the ceiling allows (12 000) plus
-            // the stepper: at 8ch the spinner overlapped the last digit.
+            // Wide enough for the longest value the ceiling allows (12 000); the
+            // stepper that used to need two more characters is gone.
             style={{ width: "10ch" }}
           />
         )}
