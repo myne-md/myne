@@ -90,16 +90,28 @@ pub enum ReminderError {
     /// silently corrected instant fires at a moment the user did not choose.
     InvalidInstant { at: String },
     /// The platform refused the request, with its own words stripped to a code.
+    ///
+    /// Constructed by the macOS arm alone today, and it stays in the enum on the
+    /// other targets for the same reason `Unsupported` does: the variant is part of
+    /// the CLOSED wire set the WebView switches on.
+    #[allow(dead_code)]
     Refused { reason: String },
     /// The platform did not answer in time. Distinct from `Refused` because the
     /// registration may exist: the caller re-reads the pending set rather than
     /// assuming either outcome.
+    ///
+    /// macOS-only constructor today, kept here on every target for the reason above.
+    #[allow(dead_code)]
     TimedOut,
 }
 
 /// The notification's title, owned here rather than sent from the WebView.
+///
+/// Read by the macOS arm, which is the only arm that draws a notification today.
+#[allow(dead_code)]
 pub const NOTIFICATION_TITLE: &str = "Myne";
 /// The notification's body. Content-free by construction: it names no task.
+#[allow(dead_code)]
 pub const NOTIFICATION_BODY: &str = "A reminder is due.";
 
 /// A `YYYY-MM-DDTHH:MM` instant, split into the components a calendar trigger
