@@ -335,3 +335,26 @@ describe("SettingsModal — child-dialog gating", () => {
     ).toBe(false);
   });
 });
+
+describe("SettingsModal: the rail scrolls instead of crushing its rows (myne-md/myne#1061)", () => {
+  // The reported symptom was in a real window: turning Developer mode on or off
+  // changes how many rows the rail has, and a rail with more rows than height
+  // squeezed every one of them — padding gone, icons touching, the last rows cut
+  // off — because a flex column shrinks its items to fit before anything
+  // overflows. jsdom computes no layout, so the assertion is on the three
+  // declarations that decide it: the scroll box, and the row height and padding
+  // that must not be negotiated.
+  it("gives the tab list the scroll and the rows a fixed height", () => {
+    render(<SettingsModal vaultId="v1" open onClose={vi.fn()} />);
+    const nav = screen.getByRole("tablist");
+    expect(nav.style.overflowY).toBe("auto");
+    // `min-height: 0` is what lets the box be SHORTER than its content in a flex
+    // column at all; without it the scroll never gets a box to scroll in.
+    expect(nav.style.minHeight).toBe("0px");
+
+    const tab = screen.getByTestId("settings.tab-account");
+    expect(tab.style.flexShrink).toBe("0");
+    expect(tab.style.height).toBe("40px");
+    expect(tab.style.boxSizing).toBe("border-box");
+  });
+});

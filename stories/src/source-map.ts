@@ -199,7 +199,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "Select": { file: "src/components/primitives/Select.tsx", line: 89 },
   "SessionLostStep": { file: "src/screens/vault-creation/SessionLostStep.tsx", line: 25 },
   "SettingRow": { file: "src/components/settings/SettingRow.tsx", line: 96 },
-  "SettingsModal": { file: "src/components/SettingsModal.tsx", line: 492 },
+  "SettingsModal": { file: "src/components/SettingsModal.tsx", line: 506 },
   "SettingsSearch": { file: "src/components/settings/search/SettingsSearch.tsx", line: 84 },
   "SettingsSearchResults": { file: "src/components/settings/search/SettingsSearchResults.tsx", line: 62 },
   "SettingsSection": { file: "src/components/settings/SettingsSection.tsx", line: 155 },
