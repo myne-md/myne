@@ -31,6 +31,13 @@ import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { Switch } from "../primitives/Switch";
 
+const OPT_IN_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+};
+
 const CARD_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -62,12 +69,6 @@ const CARD_FOOTER_STYLE: CSSProperties = {
   flexWrap: "wrap",
 };
 
-const OPT_IN_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
-};
 
 /* Space ABOVE only: the modal body already insets its children, so a footer
    carrying its own inset too sat twice as far in as the content above it. */
@@ -225,9 +226,8 @@ export function AiOnboardingSurface({
         {AI_TRUST_INVARIANT}
       </p>
 
-      {/* The opt-in, as a `Switch`: this row is a setting, and the control the
-          tree has for a setting is this one. A native checkbox does not follow the
-          theme on every platform. */}
+      {/* The opt-in, as a `Switch`: a setting's control is this one, and a native
+          checkbox does not follow the theme on every platform. */}
       <div style={OPT_IN_ROW_STYLE}>
         <span style={CARD_BODY_STYLE}>{t("aiOnboarding.enableLabel")}</span>
         <Switch

@@ -23,6 +23,7 @@ import { useLayoutEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
+import { Checkbox } from "../../components/primitives/Checkbox";
 import { Icon } from "../../components/primitives/Icon";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
 import { StepCard, StepEyebrow, StepHeading, StepLayout } from "./step-shell";
@@ -204,17 +205,16 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                   color: acked[s.id] ? "var(--fg-1)" : "var(--fg-2)",
                 }}
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!!acked[s.id]}
-                  onChange={(e) =>
-                    setAcked((prev) => ({ ...prev, [s.id]: e.target.checked }))
+                  onChange={(next) =>
+                    setAcked((prev) => ({ ...prev, [s.id]: next }))
                   }
-                  style={{ margin: 0, accentColor: "var(--accent)" }}
-                  data-testid="create.briefing-ack"
+                  testId="create.briefing-ack"
                   data-ack-id={s.id}
-                />
-                {s.ackLabel}
+                >
+                  {s.ackLabel}
+                </Checkbox>
               </label>
             </div>
           );

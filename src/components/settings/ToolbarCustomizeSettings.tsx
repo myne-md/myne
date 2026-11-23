@@ -39,7 +39,7 @@ import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { ERROR_STYLE } from "./panel-styles";
 import { CustomizeRow, CUSTOMIZE_LIST_STYLE, useDragReorder } from "./CustomizeList";
-import { Icon } from "../primitives/Icon";
+import { Checkbox } from "../primitives/Checkbox";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
@@ -54,39 +54,6 @@ import {
 // control inside a settings block, so it keeps the width it shipped with.
 const LIST_STYLE: CSSProperties = { ...CUSTOMIZE_LIST_STYLE, minWidth: 240 };
 
-// The native checkbox is kept for behaviour + a11y + the E2E testid, but visually
-// hidden (absolute, opacity 0) over a custom box so the CHECK MARK colour is
-// ours: `--accent` fill + an `--accent-on` tick. `--accent-on` is black on a
-// light accent and white on a dark one, so the tick stays readable at any accent
-// (the OS checkbox drew a fixed near-white tick that vanished on a light accent).
-const HIDDEN_INPUT_STYLE: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  width: "100%",
-  height: "100%",
-  margin: 0,
-  opacity: 0,
-  cursor: "pointer",
-};
-
-function checkboxBoxStyle(checked: boolean, disabled: boolean): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 16,
-    height: 16,
-    flexShrink: 0,
-    boxSizing: "border-box",
-    borderRadius: "var(--radius-1)",
-    border: `1px solid ${checked ? "var(--accent)" : "var(--line-2)"}`,
-    background: checked ? "var(--accent)" : "transparent",
-    color: "var(--accent-on)",
-    opacity: disabled ? 0.5 : 1,
-    transition:
-      "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
-  };
-}
 // The hint on the row that may not be switched off (issue #970): dimmed like a
 // disabled control, because that is what its checkbox is.
 const LAST_SHOWN_HINT_STYLE: CSSProperties = {
@@ -256,32 +223,18 @@ export function ToolbarCustomizeSettings() {
                   }
                   trailing={
                     <>
-                      <span
-                        style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!hiddenSet.has(id)}
-                          onChange={() => toggleShown(id)}
-                          disabled={isLastShown || !loaded}
-                          // `role="list"` above and this name are the two things
-                          // axe reported as critical on this story: a
-                          // `role="listitem"` whose parent is a plain div, and a
-                          // form element with no accessible name. The sibling
-                          // lists had both; this one adopted the shared row
-                          // without them.
-                          aria-label={label}
-                          style={HIDDEN_INPUT_STYLE}
-                          data-testid="settings.toolbar-customize.toggle"
-                          data-item-id={id}
-                        />
-                        <span
-                          aria-hidden="true"
-                          style={checkboxBoxStyle(!hiddenSet.has(id), isLastShown)}
-                        >
-                          {!hiddenSet.has(id) && <Icon name="check" size={12} strokeWidth={3} />}
-                        </span>
-                      </span>
+                      {/* `role="list"` above and this name are the two things axe
+                          reported as critical on this story: a `role="listitem"`
+                          whose parent is a plain div, and a form element with no
+                          accessible name. */}
+                      <Checkbox
+                        checked={!hiddenSet.has(id)}
+                        onChange={() => toggleShown(id)}
+                        disabled={isLastShown || !loaded}
+                        ariaLabel={label}
+                        testId="settings.toolbar-customize.toggle"
+                        data-item-id={id}
+                      />
                       <span style={ARROWS_STYLE}>
                         <button
                           type="button"
