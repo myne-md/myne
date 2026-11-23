@@ -173,23 +173,28 @@ const SEARCH_WRAP_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-// Left control cluster (search + type filter + sort + view toggle). The search
-// field is the flexible member, so the cluster grows to fill the row and the
-// whole cluster wraps as a unit when the pane narrows.
+// Each cluster wraps INTERNALLY: the toolbar above wraps, but a cluster is ONE
+// flex item, so without this the row's wrap never reached its children and at a
+// narrow pane the pickers painted over each other (myne-md/myne#1102). `minWidth:
+// 0` lets the search field shrink to its floor; a picker narrower than its own
+// label is unreadable, so the rest keep their intrinsic widths.
 const LEFT_CLUSTER_STYLE: CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "center",
   gap: "var(--space-2)",
+  rowGap: "var(--space-2)",
   flex: "1 1 320px",
   minWidth: 0,
 };
 
-// Right control cluster (clean unused + import). It does NOT shrink and wraps to
-// the next line as a unit when the row runs out of width.
 const RIGHT_CLUSTER_STYLE: CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
   alignItems: "center",
   gap: "var(--space-2)",
+  rowGap: "var(--space-2)",
   flexShrink: 0,
 };
 
