@@ -32,11 +32,13 @@
  *  user's); it does not soften "leaves the vault"; it does not alarm — it
  *  states the fact and stops.
  *
- *  NOT RENDERED YET: it describes a cost the `pre-registered` tier imposes,
- *  and no platform ships that tier (no OS-registration adapter, nothing stored
- *  outside the vault). Showing it today would disclose a leak that does not
- *  exist. `ReminderSettings` gates it on the tier, so it appears with the
- *  change that makes it true. */
+ *  NOT RENDERED YET: it describes a cost the `pre-registered` tier imposes, and
+ *  no platform ships that tier. The OS adapter exists as of myne-md/myne#1076 but
+ *  the tier is still `in-app-only`, because the delivery measurement is blocked on
+ *  a notarized bundle rather than answered (`decisions/ai/0805`). Nothing is stored
+ *  outside the vault today, so showing this would disclose a leak that does not
+ *  exist. `ReminderSettings` gates it on the tier, so it appears with the change
+ *  that makes it true. */
 export const REMINDER_OS_DISCLOSURE_SENTENCE =
   "To remind you while Myne is closed, your device stores the reminder times — not your task text — outside the encrypted vault.";
 
@@ -52,8 +54,10 @@ export const REMINDER_SHOW_TEXT_SENTENCE =
   "Turning this on puts your task's text in the notification, where your device — and anyone who can see its screen — can read it.";
 
 /** What the user is told while reminders are in-app only — every platform in
- *  this build, because the OS-registration adapter is gated behind a delivery
- *  measurement that has never run (`reminderPlatform.ts`).
+ *  this build. The adapter now exists, and this sentence is unchanged on purpose:
+ *  an adapter that can register is not a promise that what it registers arrives,
+ *  and the delivery measurement is still blocked (`reminderPlatform.ts`,
+ *  `decisions/ai/0805`).
  *
  *  Deliberately platform-neutral: the Linux-specific sentence below says "On
  *  Linux", right when Linux was the exception; saying it on a Mac would be

@@ -38,6 +38,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import type { SyntaxNode } from "@lezer/common";
 import { parseAttachmentTarget } from "@myne/editor/host/notes/attachmentRef";
 import { parseEmbedAlias } from "@myne/dialect/embedLayout";
@@ -223,7 +224,7 @@ function resolveEmbedNode(
  * second copy of the 13px in TypeScript where the stylesheet already owns it, and
  * the estimate exists only until the first measure corrects it.
  */
-class BlockEmbedFrame extends WidgetType {
+class BlockEmbedFrame extends LineHeightWidget {
   constructor(private readonly inner: WidgetType) {
     super();
   }

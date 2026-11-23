@@ -54,20 +54,25 @@ export function reminderTier(_platform: ReminderPlatform = detectReminderPlatfor
   // EVERY platform reports `in-app-only`, and that is a statement about what
   // this build can deliver rather than about what macOS and Windows can do.
   //
-  // The `pre-registered` tier needs an OS-registration adapter, and there is
-  // none: writing one is gated behind the delivery measurement in
-  // `features/task-notifications-desktop/tasks.md` — whether a Developer-ID-
-  // signed, non-App-Store bundle actually fires a scheduled local notification
-  // while not running — which is marked 🔴 with a live `[NEEDS DECISION]` and
-  // has never been run for our artifacts.
+  // The `pre-registered` tier needs two things and this build has one of them.
+  // The adapter exists (`src-tauri/src/plugins/reminders/`, and the notifier over
+  // it in `src/lib/reminderOsNotifier.ts`), and it can register. What is still
+  // missing is the DELIVERY MEASUREMENT: whether a Developer-ID-signed, notarized
+  // bundle actually fires a scheduled local notification while not running. That
+  // was re-run on 2026-11-22 and is BLOCKED rather than negative — macOS refused
+  // authorization for a locally signed probe with `notDetermined` left untouched,
+  // and the machine holds no Developer ID identity to build the artifact the test
+  // needs (`decisions/ai/0805`, `features/task-notifications-desktop/progress.md`).
   //
   // Reporting `pre-registered` here would put "arrives even when Myne is
   // closed" in the settings copy on the strength of an assumption. The whole
   // point of this module is to not do that: "a platform that holds no
   // registration leaks nothing", and a client that promises no delivery it
   // cannot perform is the same discipline pointed at the user instead of the
-  // adversary. When the adapter lands, this returns `pre-registered` for the
-  // platforms it covers and the copy follows automatically.
+  // adversary. When a measurement says delivery works for our artifacts, this
+  // returns `pre-registered` for the platforms it covers and the copy follows
+  // automatically — and not before, because the adapter's existence is a fact about
+  // our code while delivery is a fact about somebody else's platform.
   return "in-app-only";
 }
 

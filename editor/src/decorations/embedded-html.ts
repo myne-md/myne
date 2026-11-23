@@ -25,8 +25,8 @@ import {
   EditorView,
   ViewPlugin,
   type ViewUpdate,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import {
   editorFocusChanged,
   editorFocusField,
@@ -79,7 +79,7 @@ const purifierLoaderPlugin = ViewPlugin.fromClass(
 // whole `<tag …>…</tag>` spans; the `\1` backref keeps open/close in sync.
 const INLINE_HTML_RE = /<(kbd|mark|sub|sup|abbr)\b[^>]*>[\s\S]*?<\/\1>/gi;
 
-class InlineHtmlWidget extends WidgetType {
+class InlineHtmlWidget extends LineHeightWidget {
   constructor(
     private readonly safeHtml: string,
     private readonly key: string,
@@ -256,7 +256,7 @@ function setDetailsOpenState(key: string, open: boolean): void {
   }
 }
 
-class BlockHtmlWidget extends WidgetType {
+class BlockHtmlWidget extends LineHeightWidget {
   constructor(
     private readonly safeHtml: string,
     private readonly key: string,

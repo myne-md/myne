@@ -569,11 +569,18 @@ export function ownLineInsertion(
   doc: Text,
   at: number,
   text: string,
+  block: boolean,
 ): { readonly insert: string; readonly anchor: number } {
   const line = doc.lineAt(at);
   const before = doc.sliceString(line.from, at);
   const after = doc.sliceString(at, line.to);
   const prefix = before.trim() === "" ? "" : "\n";
-  const suffix = after.trim() === "" ? "" : "\n";
+  // A BLOCK embed needs a position AFTER it as well as before it (myne-md/myne#1063).
+  // A block owns its whole line, so with nothing after it a click below it, or a
+  // paste there, resolves to the nearest position that DOES exist — above the
+  // image — and the text lands on the wrong side of it. Measured: a note ending
+  // `Paragraph one.\n![[photo]]` put a paste at the start of the PARAGRAPH.
+  const atDocEnd = after.trim() === "" && line.to === doc.length;
+  const suffix = after.trim() === "" ? (block && atDocEnd ? "\n" : "") : "\n";
   return { insert: `${prefix}${text}${suffix}`, anchor: at + prefix.length + text.length };
 }

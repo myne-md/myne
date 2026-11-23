@@ -39,8 +39,8 @@ import {
   type DecorationSet,
   EditorView,
   type KeyBinding,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import type { SyntaxNode } from "@lezer/common";
 import { revealActive, selectionTouchesLines } from "./cursor-aware";
 import { makeCursorAwareStateField } from "./plugin-factory";
@@ -188,7 +188,7 @@ export function gridFromModel(model: TableModel): TableGrid {
   return { align: model.align, rows: model.rows.map((r) => r.cells) };
 }
 
-class TableWidget extends WidgetType {
+class TableWidget extends LineHeightWidget {
   constructor(private readonly model: TableModel) {
     super();
   }

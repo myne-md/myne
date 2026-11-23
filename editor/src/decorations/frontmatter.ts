@@ -43,8 +43,8 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import { formatYamlScalar, TASK_KIND_VALUE } from "@myne/dialect";
 import { load as loadYaml } from "js-yaml";
 // The SINGLE type authority (markdown-dialect.md 3.6.4). Consumed, never
@@ -302,7 +302,7 @@ function hasTaskClassMarker(rows: readonly PropertyRow[]): boolean {
   return readKindFromFmBody(`kind: ${first.value}\n`) === TASK_KIND_VALUE;
 }
 
-class PropertiesWidget extends WidgetType {
+class PropertiesWidget extends LineHeightWidget {
   constructor(
     private readonly properties: readonly PropertyRow[],
     /** Whether the cover banner above this widget is showing the note's cover.

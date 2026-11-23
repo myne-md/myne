@@ -148,28 +148,32 @@ export const myneThemeSpec = {
   // could only ever paint ON TOP of the drawn band — two washes over the same
   // text, in two tones. That is the double highlight.
   //
-  // It is not needed for anything: the one place the drawn layer genuinely
-  // cannot be seen is a fenced code card, whose opaque body paints over it, and
-  // that case has its own deliberate carve-out below at a specificity chosen to
-  // out-rank the upstream zeroing. Outside the editor, `tokens.css`'s global
-  // `::selection` still styles ordinary UI text.
-  ".cm-selectionBackground": {
-    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
+  // Since myne-md/myne#1062 the band itself no longer comes from this layer: it
+  // is a `Decoration.mark` (`selection-band.ts`), because the layer's rectangles
+  // stretch each row to the content column's right edge and collapse the rows in
+  // between into one slab. The layer keeps the CARET and the iOS drag handles,
+  // so it is the rectangles that are retired here, not the layer.
+  ".cm-selectionLayer .cm-selectionBackground": {
+    display: "none !important",
   },
-  "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
+  // The band, on the selected characters themselves.
+  ".cm-selband": {
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24))",
   },
-  // Selection inside a fenced code-block card: the card paints an OPAQUE
-  // `--paper-2` background on each body line (content layer), which sits ABOVE
-  // CM's drawn selection layer and hides it — so a selection over code showed
-  // nothing. Re-enable the NATIVE `::selection` for code-card lines (it paints on
-  // the text, over the card bg). `drawSelection` zeroes native `::selection` with
-  // a `Prec.highest` rule `.cm-line ::selection { transparent !important }`
-  // (specificity 0,2,1 with the theme class); the COMPOUND `.cm-line.cm-code-card-body`
-  // here is 0,3,1, so it out-specifies that important rule regardless of order.
-  ".cm-line.cm-code-card-body::selection, .cm-line.cm-code-card-body ::selection": {
-    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
+  // A block widget the selection covers (myne-md/myne#1063, first half). It has
+  // no characters to mark, so it says "I travel with the cut" with a ring in the
+  // selection colour and a wash behind its frame.
+  ".cm-widget-selected": {
+    borderRadius: "var(--radius-2)",
+    outline: "2px solid var(--selection-bg, rgba(44, 74, 122, 0.24))",
+    outlineOffset: "2px",
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24))",
   },
+  // The fenced-code-card carve-out that used to be here (re-enabling the
+  // NATIVE `::selection` because the card's opaque body painted over the layer)
+  // is gone with the layer rectangles: a mark paints inside the line, above the
+  // card's own background, so it needs no second mechanism — and keeping the
+  // carve-out would paint both.
 
   // Headings — apply via `Decoration.line` from heading.ts.
   ".cm-h1": {

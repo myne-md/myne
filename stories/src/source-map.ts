@@ -11,7 +11,7 @@ export interface SourceReference {
 }
 
 export const SOURCE_MAP: Record<string, SourceReference> = {
-  "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 175 },
+  "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 181 },
   "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 212 },
   "ActionStatus": { file: "src/components/ActionStatus.tsx", line: 153 },
   "AgentConversationView": { file: "src/notes/agent/AgentConversationView.tsx", line: 66 },
@@ -85,7 +85,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "DeviceRevoked": { file: "src/screens/DeviceRevoked.tsx", line: 67 },
   "DiagnosticsPanel": { file: "src/components/settings/DiagnosticsPanel.tsx", line: 125 },
   "DiffView": { file: "src/notes/components/DiffView.tsx", line: 91 },
-  "Editor": { file: "src/screens/Editor.tsx", line: 543 },
+  "Editor": { file: "src/screens/Editor.tsx", line: 545 },
   "EditorPanel": { file: "src/components/settings/EditorPanel.tsx", line: 659 },
   "EmptyState": { file: "src/components/primitives/EmptyState.tsx", line: 52 },
   "EncryptingStep": { file: "src/screens/vault-creation/EncryptingStep.tsx", line: 21 },
@@ -241,7 +241,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "UnlinkedMentionsSection": { file: "src/notes/components/UnlinkedMentionsSection.tsx", line: 192 },
   "Unlock": { file: "src/screens/Unlock.tsx", line: 462 },
   "UpdateNotice": { file: "src/components/update/UpdateNotice.tsx", line: 148 },
-  "UpdatingScreen": { file: "src/screens/UpdatingScreen.tsx", line: 260 },
+  "UpdatingScreen": { file: "src/screens/UpdatingScreen.tsx", line: 264 },
   "UsedInNotesPopover": { file: "src/components/attachments/UsedInNotesPopover.tsx", line: 69 },
   "VaultExportModal": { file: "src/components/export/VaultExportModal.tsx", line: 200 },
   "VaultPanel": { file: "src/components/settings/VaultPanel.tsx", line: 367 },
