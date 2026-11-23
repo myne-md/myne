@@ -278,7 +278,7 @@ const errorIndicatorStyle: CSSProperties = {
   width: 6,
   height: 6,
   borderRadius: "50%",
-  background: "var(--warning)",
+  background: "var(--danger)",  // a failure, not a warning (myne-md/myne#1100)
   marginInlineEnd: 6,
   verticalAlign: "middle",
 };

@@ -8,8 +8,8 @@
 // `decisions.md` 2026-05-07 "Note delete cryptographic erase" (hard-
 // delete; no soft-trash until MYND-133 / v0.2).
 //
-// PRD stories 35-38: title, body and warning copy, and the two-button row with
-// the destructive `var(--warning)` fill.
+// PRD stories 35-38: title, body and warning copy, and the two-button row whose
+// confirm is a filled DANGER button (myne-md/myne#1100, canon 0794).
 //
 // The KEYBOARD contract those stories originally specified was reversed by
 // myne-md/myne#628; `design-notes/ui/0564` is the record and the effect below
@@ -101,9 +101,9 @@ const CANCEL_BUTTON_STYLE: CSSProperties = {
 
 const DELETE_BUTTON_STYLE: CSSProperties = {
   ...BUTTON_BASE_STYLE,
-  background: "var(--warning)",
-  color: "var(--accent-on)",
-  border: "1px solid var(--warning)",
+  background: "var(--danger-solid)",
+  color: "var(--danger-on)",
+  border: "1px solid var(--danger-solid)",
 };
 
 export type DeleteConfirmModalProps = {
