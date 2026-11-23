@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne ei voinut muuttaa tuota asetusta.",
       "diagnosticLogReadError": "Myne ei voinut lukea diagnostiikkalokin asetusta, joten se näytetään pois päältä.",
       "diagnosticBlockLabel": "Raportin tiedot",
-      "diagnosticBlockHelper": "Täsmälleen se, mitä Kopioi laittaa leikepöydällesi. Mitään ei lähetetä minnekään; sinä päätät, mitä jaat.",
       "diagnosticCopy": "Kopioi diagnostiikkatiedot",
       "diagnosticCopyDone": "Diagnostiikkatiedot kopioitu",
       "diagnosticCopyFailed": "Kopiointi ei onnistunut. Valitse yllä oleva teksti ja kopioi se käsin.",

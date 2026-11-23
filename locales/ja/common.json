@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myneはその設定を変更できませんでした。",
       "diagnosticLogReadError": "Myneは診断ログの設定を読み取れなかったため、オフとして表示しています。",
       "diagnosticBlockLabel": "レポートの詳細",
-      "diagnosticBlockHelper": "「コピー」でクリップボードに入る内容そのものです。どこにも送信されません。共有するかどうかはあなたが決めます。",
       "diagnosticCopy": "診断情報をコピー",
       "diagnosticCopyDone": "診断情報をコピーしました",
       "diagnosticCopyFailed": "コピーできませんでした。上のテキストを選択して、手動でコピーしてください。",

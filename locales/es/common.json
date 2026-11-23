@@ -3376,7 +3376,6 @@
       "diagnosticLogError": "Myne no pudo cambiar ese ajuste.",
       "diagnosticLogReadError": "Myne no pudo leer el ajuste del registro de diagnóstico, así que se muestra como desactivado.",
       "diagnosticBlockLabel": "Detalles del informe",
-      "diagnosticBlockHelper": "Exactamente lo que Copiar pone en tu portapapeles. No se envía nada a ninguna parte; tú decides qué compartir.",
       "diagnosticCopy": "Copiar diagnóstico",
       "diagnosticCopyDone": "Diagnóstico copiado",
       "diagnosticCopyFailed": "No se pudo copiar. Selecciona el texto de arriba y cópialo a mano.",

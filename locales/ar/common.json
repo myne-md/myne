@@ -3739,7 +3739,6 @@
       "diagnosticLogError": "تعذّر على Myne تغيير ذلك الإعداد.",
       "diagnosticLogReadError": "تعذّر على Myne قراءة إعداد تسجيل التشخيص، لذا يظهر مُعطَّلًا.",
       "diagnosticBlockLabel": "تفاصيل التقرير",
-      "diagnosticBlockHelper": "بالضبط ما يضعه زر النسخ في حافظتك. ولا يُرسل شيء إلى أي مكان؛ وأنت تقرّر ما تشاركه.",
       "diagnosticCopy": "نسخ معلومات التشخيص",
       "diagnosticCopyDone": "تم نسخ التشخيص",
       "diagnosticCopyFailed": "تعذّر النسخ. حدّد النص أعلاه وانسخه يدويًا.",

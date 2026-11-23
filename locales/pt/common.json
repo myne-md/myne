@@ -3376,7 +3376,6 @@
       "diagnosticLogError": "O Myne não conseguiu alterar essa definição.",
       "diagnosticLogReadError": "O Myne não conseguiu ler a definição do registo de diagnóstico, por isso é mostrada como desligada.",
       "diagnosticBlockLabel": "Detalhes do relatório",
-      "diagnosticBlockHelper": "Exatamente o que o botão Copiar coloca na sua área de transferência. Nada é enviado para lado nenhum; é você que decide o que partilhar.",
       "diagnosticCopy": "Copiar diagnósticos",
       "diagnosticCopyDone": "Diagnósticos copiados",
       "diagnosticCopyFailed": "Não foi possível copiar. Selecione o texto acima e copie-o manualmente.",
