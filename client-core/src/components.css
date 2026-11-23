@@ -557,6 +557,23 @@
   opacity: 0.6;
 }
 
+/* A number field wears this skin and none of the platform's. The spinner is
+   drawn by the WebView -- white-on-grey in WebKitGTK, a different arrow pair
+   elsewhere -- and it was the only control in the settings tree wearing a
+   foreign widget (myne-md/myne#1098). Nothing here counts a value up either:
+   every number in Myne is typed, so the stepper was an affordance with no job.
+   `appearance: textfield` is the standard spelling; the two pseudo-elements are
+   how WebKit and Blink honour it. */
+.myne-input[type="number"] {
+  appearance: textfield;
+}
+
+.myne-input[type="number"]::-webkit-outer-spin-button,
+.myne-input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 
 /* =========================================================================
    Select / SearchableSelect — trigger, menu, option
