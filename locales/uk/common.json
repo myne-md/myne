@@ -4152,8 +4152,7 @@
         "preferences": "Параметри",
         "memory": "Пам’ять",
         "excluded": "Що може читати ШІ",
-        "history": "Історія чату",
-        "externalAccess": "Зовнішній доступ"
+        "history": "Історія чату"
       },
       "externalAccess": {
         "label": "Зовнішній доступ",

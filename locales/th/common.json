@@ -3888,8 +3888,7 @@
         "preferences": "ค่ากำหนด",
         "memory": "ความจำ",
         "excluded": "สิ่งที่ AI อ่านได้",
-        "history": "ประวัติแชต",
-        "externalAccess": "การเข้าถึงภายนอก"
+        "history": "ประวัติแชต"
       },
       "externalAccess": {
         "label": "การเข้าถึงภายนอก",

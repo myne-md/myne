@@ -3888,8 +3888,7 @@
         "preferences": "Preferenciák",
         "memory": "Emlékezet",
         "excluded": "Mit olvashat az AI",
-        "history": "Csevegési előzmények",
-        "externalAccess": "Külső hozzáférés"
+        "history": "Csevegési előzmények"
       },
       "externalAccess": {
         "label": "Külső hozzáférés",

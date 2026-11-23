@@ -3888,8 +3888,7 @@
         "preferences": "Preferanser",
         "memory": "Hukommelse",
         "excluded": "Hva AI kan lese",
-        "history": "Chathistorikk",
-        "externalAccess": "Ekstern tilgang"
+        "history": "Chathistorikk"
       },
       "externalAccess": {
         "label": "Ekstern tilgang",

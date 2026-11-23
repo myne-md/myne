@@ -3888,8 +3888,7 @@
         "preferences": "ترجیحات",
         "memory": "حافظه",
         "excluded": "AI چه چیزی را می‌تواند بخواند",
-        "history": "تاریخچهٔ گفتگو",
-        "externalAccess": "دسترسی بیرونی"
+        "history": "تاریخچهٔ گفتگو"
       },
       "externalAccess": {
         "label": "دسترسی بیرونی",

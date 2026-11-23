@@ -3888,8 +3888,7 @@
         "preferences": "Mieltymykset",
         "memory": "Muisti",
         "excluded": "Mitä tekoäly voi lukea",
-        "history": "Keskusteluhistoria",
-        "externalAccess": "Ulkoinen pääsy"
+        "history": "Keskusteluhistoria"
       },
       "externalAccess": {
         "label": "Ulkoinen pääsy",
