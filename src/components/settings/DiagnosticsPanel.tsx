@@ -63,14 +63,6 @@ const PREVIEW_STYLE: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
-/** The one line under the block that explains its own vocabulary. */
-const NOTE_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontSize: "var(--text-sm)",
-  lineHeight: 1.5,
-  color: "var(--fg-3)",
-};
-
 function Block({
   children,
   ...rest
@@ -236,27 +228,12 @@ export function DiagnosticsPanel() {
       <SettingsSection title={t("settings.about.sections.diagnostics")}>
         <ControlBlock
           label={t("settings.about.diagnosticBlockLabel")}
-          /* No desktop caveat, because there is nothing left to explain: a
-             reading the build cannot take is absent from the block rather than
-             printed as `unknown` (issue #970, item 15). The paragraph that used
-             to sit here described the app's own output back to the user, which
-             is the shape of an apology rather than a measurement. */
-          helper={t("settings.about.diagnosticBlockHelper")}
           anchorId="about.diagnostic-report"
           control={
             <>
               <pre style={PREVIEW_STYLE} data-testid="about.diagnostic-block-preview">
                 {diagnosticBlock ?? ""}
               </pre>
-              {/* The vault's five facts are the ONE place this block can carry the
-                  word `unknown`, and it is a real answer there rather than a
-                  placeholder: the doctor says so when the question was never asked
-                  (myne-md/myne#1003). Measured on an owner's paste, four of them in
-                  a row read as four faults, so the token is explained once here
-                  instead of hoping a reader knows (myne-md/myne#1029). */}
-              <div style={NOTE_STYLE} data-testid="about.diagnostic-unknown-note">
-                {t("settings.about.diagnosticUnknownNote")}
-              </div>
               <div>
                 <Button
                   variant="secondary"

@@ -3376,7 +3376,6 @@
       "diagnosticLogError": "Myne non ha potuto modificare quell'impostazione.",
       "diagnosticLogReadError": "Myne non ha potuto leggere l'impostazione del registro diagnostico, quindi è mostrata come disattivata.",
       "diagnosticBlockLabel": "Dettagli del report",
-      "diagnosticBlockHelper": "Esattamente ciò che Copia mette negli appunti. Nulla viene inviato da nessuna parte; decidi tu cosa condividere.",
       "diagnosticCopy": "Copia diagnostica",
       "diagnosticCopyDone": "Diagnostica copiata",
       "diagnosticCopyFailed": "Impossibile copiare. Seleziona il testo qui sopra e copialo a mano.",
@@ -4020,8 +4019,7 @@
         "preferences": "Preferenze",
         "memory": "Memoria",
         "excluded": "Cosa può leggere l'AI",
-        "history": "Cronologia chat",
-        "externalAccess": "Accesso esterno"
+        "history": "Cronologia chat"
       },
       "externalAccess": {
         "label": "Accesso esterno",

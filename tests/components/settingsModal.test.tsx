@@ -208,6 +208,23 @@ describe("SettingsModal — Developer group gating (MYND-593)", () => {
     expect(screen.getByTestId("panel.network")).toBeTruthy();
   });
 
+  // myne-md/myne#1097. The AI onboarding's "Set up a provider" opens Settings with
+  // `initialPanel: "ai"`, and while the mode is off that panel is not in the rail,
+  // so the shell used to fall back to Account — whose body says the vault is not
+  // grouped under an account on this device. A caller that NAMES a panel is not
+  // stumbling on it, and `decisions/ui/0402` calls the flag a discovery gate.
+  it("mode off: a panel the caller explicitly asked for still renders, without a rail tab", () => {
+    renderModal({ initialPanel: "ai" });
+    expect(screen.getByTestId("panel.ai")).toBeTruthy();
+    expect(screen.queryByTestId("settings.tab-ai")).toBeNull();
+  });
+
+  it("mode off: a panel nobody asked for still falls back to Account", () => {
+    renderModal();
+    expect(screen.getByTestId("panel.account")).toBeTruthy();
+    expect(screen.queryByTestId("panel.ai")).toBeNull();
+  });
+
   it("the group divider renders exactly once, at the core→developer boundary", () => {
     // With three members (MYND-650, and the CLI panel of `decisions/ui/0678`)
     // "once" is an assertion rather than a tautology: `opensDeveloper` must fire

@@ -3255,7 +3255,6 @@
       "diagnosticLogError": "Myne không thể thay đổi cài đặt đó.",
       "diagnosticLogReadError": "Myne không đọc được cài đặt ghi nhật ký chẩn đoán, nên nó hiển thị là tắt.",
       "diagnosticBlockLabel": "Chi tiết báo cáo",
-      "diagnosticBlockHelper": "Đúng những gì nút Sao chép đưa vào bảng nhớ tạm của bạn. Không có gì được gửi đi đâu cả; bạn quyết định chia sẻ gì.",
       "diagnosticCopy": "Sao chép thông tin chẩn đoán",
       "diagnosticCopyDone": "Đã sao chép thông tin chẩn đoán",
       "diagnosticCopyFailed": "Không thể sao chép. Hãy chọn đoạn văn bản ở trên và tự sao chép.",
@@ -3888,8 +3887,7 @@
         "preferences": "Tùy chọn",
         "memory": "Bộ nhớ",
         "excluded": "AI có thể đọc gì",
-        "history": "Lịch sử trò chuyện",
-        "externalAccess": "Truy cập ngoài"
+        "history": "Lịch sử trò chuyện"
       },
       "externalAccess": {
         "label": "Truy cập ngoài",

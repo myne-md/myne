@@ -1016,6 +1016,27 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           ...visibleModels.map((m) => ({ value: m.id, label: m.id })),
         ];
 
+  // `null` is the opening state: nothing has been asked for and nothing failed,
+  // which the row already shows, so the state line says nothing at all.
+  const modelStateCopy =
+    modelsError !== null
+      ? t(providerErrorKey(modelsError))
+      : models === null || visibleModels === null
+        ? null
+        : models.length === 0
+          ? t("settings.ai.providerModelEmpty")
+          : visibleModels.length === 0
+            ? t("settings.ai.providerModelNoTextModels")
+            : `${t("settings.ai.providerModelCount", {
+                count: visibleModels.length,
+              })}${
+                hiddenCount > 0 && !showAllModels
+                  ? ` ${t("settings.ai.providerModelHidden", {
+                      count: hiddenCount,
+                    })}`
+                  : ""
+              }`;
+
   // Built once: the Advanced topic places it in the Preferences section in
   // both branches (with AI on, beside the voice preferences; with AI off, alone).
   // Meeting AI prompt (meeting-ai): the user's replacement for the meeting AI
@@ -1462,7 +1483,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 scenario can tell apart. */}
             <SettingRow
               label={t("settings.ai.providerModelLabel")}
-              helper={t("settings.ai.providerModelHelper")}
               testId="ai.provider-model-row"
               control={
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
@@ -1527,32 +1547,16 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 </div>
               }
             >
-            {/* Four states, four sentences. `models === null` with no error is
-                "nobody has asked yet"; an empty array is "we asked and the
-                provider published none"; a non-empty array with nothing
-                text-capable is a DIFFERENT fact — the provider does publish
-                models, they are just not the kind Myne asks for, and saying
-                "published no models" there would be false; an error names the
+            {/* Three states, three sentences. An empty array is "we asked and
+                the provider published none"; a non-empty array with nothing
+                text-capable is a DIFFERENT fact (the provider does publish
+                models, just not the kind Myne asks for); an error names the
                 refusal from the shared taxonomy. */}
-            <p data-testid="ai.provider-model-state" style={HELPER_STYLE}>
-              {modelsError !== null
-                ? t(providerErrorKey(modelsError))
-                : models === null || visibleModels === null
-                  ? t("settings.ai.providerModelUnfetched")
-                  : models.length === 0
-                    ? t("settings.ai.providerModelEmpty")
-                    : visibleModels.length === 0
-                      ? t("settings.ai.providerModelNoTextModels")
-                      : `${t("settings.ai.providerModelCount", {
-                          count: visibleModels.length,
-                        })}${
-                          hiddenCount > 0 && !showAllModels
-                            ? ` ${t("settings.ai.providerModelHidden", {
-                                count: hiddenCount,
-                              })}`
-                            : ""
-                        }`}
-            </p>
+            {modelStateCopy !== null && (
+              <p data-testid="ai.provider-model-state" style={HELPER_STYLE}>
+                {modelStateCopy}
+              </p>
+            )}
             {/* Only offered when the filter is actually withholding
                 something: a link that always says "show all" while there is
                 nothing more to show implies a list is being kept from the
@@ -1928,8 +1932,8 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 : `${helperId} ${explanationId}`
             }
             data-testid="ai.history-budget-input"
-            // Wide enough for the longest value the ceiling allows (12 000) plus
-            // the stepper: at 8ch the spinner overlapped the last digit.
+            // Wide enough for the longest value the ceiling allows (12 000); the
+            // stepper that used to need two more characters is gone.
             style={{ width: "10ch" }}
           />
         )}

@@ -611,10 +611,11 @@ describe("AiPanel — the provider model chooser", () => {
 
   it("starts unfetched, and does not ask the provider merely because the panel opened", async () => {
     render(<AiPanel />);
+    // Nothing has been asked for, so the row says nothing beyond itself: the
+    // chooser names the stored model and the load button sits beside it. It used
+    // to print "Load the list to choose a model." here, which is the button.
     await waitFor(() =>
-      expect(screen.getByTestId("ai.provider-model-state").textContent).toBe(
-        "settings.ai.providerModelUnfetched",
-      ),
+      expect(screen.queryByTestId("ai.provider-model-state")).toBeNull(),
     );
     // The call is an egress. Opening a settings panel is not a user asking to
     // reach a provider, and a panel that fetched on mount would be sending on
@@ -719,11 +720,10 @@ describe("AiPanel — only text models are offered", () => {
     fireEvent.click(screen.getByTestId("ai.provider-model-load"));
     // Wait on the state line rather than on the chooser: when the filter leaves
     // nothing to choose from there IS no chooser, and that is one of the cases
-    // below — a helper that waited for it would make that test unwritable.
+    // below — a helper that waited for it would make that test unwritable. The
+    // line exists only once a list came back, so its presence IS the signal.
     await waitFor(() =>
-      expect(screen.getByTestId("ai.provider-model-state").textContent).not.toBe(
-        "settings.ai.providerModelUnfetched",
-      ),
+      expect(screen.getByTestId("ai.provider-model-state")).not.toBeNull(),
     );
   };
 

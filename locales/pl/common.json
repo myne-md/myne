@@ -3497,7 +3497,6 @@
       "diagnosticLogError": "Myne nie mogło zmienić tego ustawienia.",
       "diagnosticLogReadError": "Myne nie mogło odczytać ustawienia dziennika diagnostycznego, więc jest pokazywane jako wyłączone.",
       "diagnosticBlockLabel": "Szczegóły raportu",
-      "diagnosticBlockHelper": "Dokładnie to, co Kopiuj umieszcza w schowku. Nic nie jest nigdzie wysyłane; to Ty decydujesz, co udostępnić.",
       "diagnosticCopy": "Kopiuj diagnostykę",
       "diagnosticCopyDone": "Skopiowano diagnostykę",
       "diagnosticCopyFailed": "Nie udało się skopiować. Zaznacz powyższy tekst i skopiuj go ręcznie.",
@@ -4152,8 +4151,7 @@
         "preferences": "Preferencje",
         "memory": "Pamięć",
         "excluded": "Co AI może czytać",
-        "history": "Historia czatu",
-        "externalAccess": "Dostęp zewnętrzny"
+        "history": "Historia czatu"
       },
       "externalAccess": {
         "label": "Dostęp zewnętrzny",
