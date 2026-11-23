@@ -180,7 +180,9 @@ fn merge_attachment_entry(a: &AttachmentMeta, b: &AttachmentMeta) -> AttachmentM
 /// differing only in placement compared `Equal`, so the join kept whichever
 /// argument arrived first and the merge stopped being commutative. `Chat` sorts
 /// above `Library` (`AttachmentScope`'s `Ord`), so a disagreement settles on the
-/// conversation's claim rather than on arrival order.
+/// conversation's claim rather than on arrival order. `folder` joined the tuple
+/// for exactly the same reason when it landed (myne-md/myne#1075): two rows
+/// equal in every other field and differing only in placement must still order.
 fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
     match (a.is_tombstone(), b.is_tombstone()) {
         (true, false) => Ordering::Greater, // remove-wins
@@ -190,6 +192,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
             a.created_at,
             a.updated_at,
             &a.filename,
+            &a.folder,
             &a.content_type,
             a.size,
             a.scope,
@@ -199,6 +202,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
                 b.created_at,
                 b.updated_at,
                 &b.filename,
+                &b.folder,
                 &b.content_type,
                 b.size,
                 b.scope,
@@ -209,6 +213,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
             (
                 ts_a,
                 &a.filename,
+                a.folder.as_str(),
                 a.created_at,
                 a.updated_at,
                 &a.content_type,
@@ -218,6 +223,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
                 .cmp(&(
                     ts_b,
                     &b.filename,
+                    b.folder.as_str(),
                     b.created_at,
                     b.updated_at,
                     &b.content_type,
@@ -959,6 +965,37 @@ mod tests {
         let a = catalog(vec![("aa", tomb)]);
         let b = catalog(vec![("aa", readd.clone())]);
         assert_eq!(merge_attachments_catalog(&a, &b).entries["aa"], readd);
+    }
+
+    #[test]
+    fn catalog_merge_keeps_a_folder_across_a_reconcile() {
+        // The case the additive field exists for: one side knows the folder and
+        // the other predates it. The version winner keeps the folder, and the
+        // merge stays commutative when the version ties.
+        let mut placed = live(10, "notes.pdf");
+        placed.folder = "Ders Notları/".to_string();
+        placed.version = 1;
+        let stale = live(10, "notes.pdf");
+        let a = catalog(vec![("aa", placed.clone())]);
+        let b = catalog(vec![("aa", stale)]);
+        assert_eq!(merge_attachments_catalog(&a, &b).entries["aa"], placed);
+        assert_eq!(merge_attachments_catalog(&b, &a).entries["aa"], placed);
+    }
+
+    #[test]
+    fn catalog_merge_folder_tie_break_is_commutative() {
+        // Same version, same everything, different placement: the total order is
+        // what keeps the join commutative instead of arrival-ordered.
+        let mut one = live(10, "notes.pdf");
+        one.folder = "A/".to_string();
+        let mut two = live(10, "notes.pdf");
+        two.folder = "B/".to_string();
+        let a = catalog(vec![("aa", one)]);
+        let b = catalog(vec![("aa", two)]);
+        assert_eq!(
+            merge_attachments_catalog(&a, &b).entries["aa"],
+            merge_attachments_catalog(&b, &a).entries["aa"],
+        );
     }
 
     #[test]
