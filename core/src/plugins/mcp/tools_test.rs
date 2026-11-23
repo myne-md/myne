@@ -9,11 +9,13 @@
 use super::error::McpToolError;
 use super::scope::{resolve_scope, ConnectionScope};
 use super::tools::{
-    call_tool, excerpt, note_read, note_search, vault_list, vault_state, CallInputs,
-    McpCallOutcome, McpNoteSource, NoteReadRequest, NoteSearchRequest, WireCall, MAX_EXCERPT_BYTES,
-    MAX_SEARCH_LIMIT,
+    attachment_list, attachment_read, calendar_read, call_tool, excerpt, note_read, note_search,
+    vault_list, vault_state, view_list, AttachmentListRequest, AttachmentReadRequest,
+    CalendarReadRequest, CallInputs, FileRow, McpCallOutcome, McpNoteSource, NoteReadRequest,
+    NoteSearchRequest, ViewRow, WireCall, MAX_EXCERPT_BYTES, MAX_SEARCH_LIMIT,
 };
 use crate::plugins::agent::tools::SearchHit;
+use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_indices::state::NoteRecord;
 use crate::test_support::block_on;
 use protocol::{McpConnectionGrant, McpScopeModel};
@@ -88,6 +90,17 @@ struct Source {
     /// Ranked hits whose records are all in the map, in rank order.
     ranked: Vec<String>,
     limits: Mutex<Vec<usize>>,
+    /// The attachments catalog, as `catalog_list` answers it.
+    files: Vec<FileRow>,
+    /// Extracted text by attachment id. A missing id is a file nothing was
+    /// extracted from, which is `None` rather than an error.
+    file_texts: BTreeMap<String, String>,
+    /// The calendar the fake answers with, whatever window it is asked for.
+    calendar_rows: Vec<CalendarRow>,
+    /// Every window the fake was asked for, so a test can assert the bound.
+    calendar_calls: Mutex<Vec<(String, String)>>,
+    /// The stored views.
+    views: Vec<ViewRow>,
 }
 
 impl Source {
@@ -106,6 +119,11 @@ impl Source {
             bodies,
             ranked: pairs.iter().map(|(id, _, _)| (*id).to_string()).collect(),
             limits: Mutex::new(Vec::new()),
+            files: Vec::new(),
+            file_texts: BTreeMap::new(),
+            calendar_rows: Vec::new(),
+            calendar_calls: Mutex::new(Vec::new()),
+            views: Vec::new(),
         }
     }
 
@@ -141,6 +159,26 @@ impl McpNoteSource for Source {
                 score: 1.0,
             })
             .collect())
+    }
+
+    async fn files(&self) -> Result<Vec<FileRow>, McpToolError> {
+        Ok(self.files.clone())
+    }
+
+    async fn file_text(&self, attachment_id: &str) -> Result<Option<String>, McpToolError> {
+        Ok(self.file_texts.get(attachment_id).cloned())
+    }
+
+    async fn calendar(&self, from: &str, to: &str) -> Result<Vec<CalendarRow>, McpToolError> {
+        self.calendar_calls
+            .lock()
+            .expect("calendar lock")
+            .push((from.to_string(), to.to_string()));
+        Ok(self.calendar_rows.clone())
+    }
+
+    async fn views(&self) -> Result<Vec<ViewRow>, McpToolError> {
+        Ok(self.views.clone())
     }
 }
 
@@ -633,6 +671,19 @@ fn a_connection_with_no_grant_is_refused_before_the_vault_is_read() {
         ) -> Result<Vec<SearchHit>, McpToolError> {
             panic!("a connection with no grant must not search");
         }
+
+        async fn files(&self) -> Result<Vec<FileRow>, McpToolError> {
+            panic!("a connection with no grant must not read the attachments catalog");
+        }
+        async fn file_text(&self, _attachment_id: &str) -> Result<Option<String>, McpToolError> {
+            panic!("a connection with no grant must not read a file");
+        }
+        async fn calendar(&self, _from: &str, _to: &str) -> Result<Vec<CalendarRow>, McpToolError> {
+            panic!("a connection with no grant must not read the calendar");
+        }
+        async fn views(&self) -> Result<Vec<ViewRow>, McpToolError> {
+            panic!("a connection with no grant must not read the views");
+        }
     }
 
     let map = grants(&[("claude-desktop", &["Projects"])]);
@@ -705,6 +756,19 @@ fn malformed_arguments_are_refused_before_the_vault_is_read() {
             _limit: usize,
         ) -> Result<Vec<SearchHit>, McpToolError> {
             panic!("malformed arguments must not search");
+        }
+
+        async fn files(&self) -> Result<Vec<FileRow>, McpToolError> {
+            panic!("a connection with no grant must not read the attachments catalog");
+        }
+        async fn file_text(&self, _attachment_id: &str) -> Result<Option<String>, McpToolError> {
+            panic!("a connection with no grant must not read a file");
+        }
+        async fn calendar(&self, _from: &str, _to: &str) -> Result<Vec<CalendarRow>, McpToolError> {
+            panic!("a connection with no grant must not read the calendar");
+        }
+        async fn views(&self) -> Result<Vec<ViewRow>, McpToolError> {
+            panic!("a connection with no grant must not read the views");
         }
     }
 
@@ -1038,4 +1102,248 @@ fn a_served_note_is_charged_to_the_budget_and_a_refusal_is_not() {
         ledger.lock().unwrap().remaining("claude-desktop", 0),
         crate::plugins::mcp::budget::NOTES_PER_WINDOW - 1
     );
+}
+
+// ── the four reads that joined in myne-md/myne#1077 ─────────────────────────
+
+fn file(id: &str, folder: Option<&str>, name: &str) -> FileRow {
+    FileRow {
+        attachment_id: id.to_string(),
+        filename: Some(name.to_string()),
+        folder: folder.map(str::to_string),
+    }
+}
+
+#[test]
+fn file_list_drops_a_file_in_an_excluded_folder() {
+    // The clamp is the file's OWN folder, not the folder of any note that embeds
+    // it: the library files a file once, and a note that links it is a reference.
+    let mut source = Source::new(&[]);
+    source.files = vec![
+        file("aa", Some("Private"), "taxes.pdf"),
+        file("bb", Some("Projects"), "plan.pdf"),
+        file("cc", None, "root.pdf"),
+    ];
+    let rows = block_on(attachment_list(
+        &scope(),
+        AttachmentListRequest { folder: None },
+        &source,
+    ))
+    .unwrap();
+    let ids: Vec<&str> = rows.iter().map(|row| row.attachment_id.as_str()).collect();
+    assert_eq!(ids, vec!["bb", "cc"]);
+}
+
+#[test]
+fn file_list_narrows_to_a_folder_and_refuses_one_left_out() {
+    let mut source = Source::new(&[]);
+    source.files = vec![
+        file("aa", Some("Private"), "taxes.pdf"),
+        file("bb", Some("Projects"), "plan.pdf"),
+        file("dd", Some("Projects/Sub"), "deep.pdf"),
+    ];
+    let rows = block_on(attachment_list(
+        &scope(),
+        AttachmentListRequest {
+            folder: Some("Projects".into()),
+        },
+        &source,
+    ))
+    .unwrap();
+    // The folder argument names ONE folder, which is the rule `note_search`
+    // already follows (`&key != narrow`): a caller that wants a subtree asks for
+    // each folder, because "Projects" silently meaning "and everything under it"
+    // is a widening nobody typed.
+    let ids: Vec<&str> = rows.iter().map(|row| row.attachment_id.as_str()).collect();
+    assert_eq!(ids, vec!["bb"]);
+
+    let error = block_on(attachment_list(
+        &scope(),
+        AttachmentListRequest {
+            folder: Some("Private".into()),
+        },
+        &source,
+    ))
+    .unwrap_err();
+    assert_eq!(
+        error,
+        McpToolError::OutOfScopeFolder {
+            folder: "Private".into()
+        }
+    );
+}
+
+#[test]
+fn file_read_names_an_unknown_id_and_a_left_out_file_differently() {
+    // Two refusals with two different next actions: an unknown id sends the caller
+    // to `attachment_list`, and a left-out file sends the user to the leave-out
+    // list. Collapsing them would send a model to the wrong place.
+    let mut source = Source::new(&[]);
+    source.files = vec![file("aa", Some("Private"), "taxes.pdf")];
+    source.file_texts.insert("aa".into(), "redacted".into());
+
+    let unknown = block_on(attachment_read(
+        &scope(),
+        AttachmentReadRequest {
+            attachment_id: "zz".into(),
+        },
+        &source,
+    ))
+    .unwrap_err();
+    assert_eq!(
+        unknown,
+        McpToolError::UnknownFile {
+            attachment_id: "zz".into()
+        }
+    );
+
+    let excluded = block_on(attachment_read(
+        &scope(),
+        AttachmentReadRequest {
+            attachment_id: "aa".into(),
+        },
+        &source,
+    ))
+    .unwrap_err();
+    assert_eq!(
+        excluded,
+        McpToolError::OutOfScopeFile {
+            attachment_id: "aa".into()
+        }
+    );
+}
+
+#[test]
+fn file_read_answers_none_for_a_file_nothing_was_extracted_from() {
+    // A video is not an empty file, and a caller told "empty" would stop looking.
+    let mut source = Source::new(&[]);
+    source.files = vec![file("aa", Some("Projects"), "clip.mp4")];
+    let text = block_on(attachment_read(
+        &scope(),
+        AttachmentReadRequest {
+            attachment_id: "aa".into(),
+        },
+        &source,
+    ))
+    .unwrap();
+    assert_eq!(text, None);
+}
+
+fn calendar_row(note_id: &str, folder: Option<&str>, start: &str) -> CalendarRow {
+    CalendarRow {
+        note_id: note_id.to_string(),
+        title: Some(format!("title of {note_id}")),
+        folder: folder.map(str::to_string),
+        calendar: None,
+        start: start.to_string(),
+        end: None,
+        all_day: true,
+        occurrence_of: None,
+        occurrence_date: None,
+        conflicts: false,
+        repeat: None,
+        remind: None,
+        repeat_unrecognized: false,
+        uid: None,
+        skip: Vec::new(),
+    }
+}
+
+#[test]
+fn calendar_read_keeps_only_the_events_of_notes_in_scope() {
+    let source = Source::new(&[
+        ("secret", Some("Private"), "a private day"),
+        ("visible", Some("Projects"), "a visible day"),
+    ]);
+    let mut source = source;
+    source.calendar_rows = vec![
+        calendar_row("secret", Some("Private"), "2026-11-20"),
+        calendar_row("visible", Some("Projects"), "2026-11-20"),
+    ];
+    let rows = block_on(calendar_read(
+        &scope(),
+        CalendarReadRequest {
+            from: "2026-11-01".into(),
+            to: "2026-11-30".into(),
+        },
+        &source,
+    ))
+    .unwrap();
+    let ids: Vec<&str> = rows.iter().map(|row| row.note_id.as_str()).collect();
+    assert_eq!(ids, vec!["visible"]);
+    // The window the caller named is the window the calendar was asked for: a
+    // widened one here would read days the caller never asked about.
+    let calls = source.calendar_calls.lock().expect("calendar lock").clone();
+    assert_eq!(
+        calls,
+        vec![("2026-11-01".to_string(), "2026-11-30".to_string())]
+    );
+}
+
+#[test]
+fn calendar_read_drops_a_row_whose_note_left_the_index() {
+    // A row for a note the index no longer has cannot be clamped, so it is not
+    // served: the safe answer is the one that reveals nothing.
+    let mut source = Source::new(&[("visible", Some("Projects"), "a visible day")]);
+    source.calendar_rows = vec![
+        calendar_row("gone", None, "2026-11-20"),
+        calendar_row("visible", Some("Projects"), "2026-11-20"),
+    ];
+    let rows = block_on(calendar_read(
+        &scope(),
+        CalendarReadRequest {
+            from: "2026-11-01".into(),
+            to: "2026-11-30".into(),
+        },
+        &source,
+    ))
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].note_id, "visible");
+}
+
+#[test]
+fn view_list_answers_the_stored_rows_and_runs_no_filter() {
+    // Listing is not evaluating: the filter AST is the front end's to run, and a
+    // second evaluator here would be a second answer to "which notes does this
+    // view match".
+    let mut source = Source::new(&[]);
+    source.views = vec![ViewRow {
+        view_id: "v1".into(),
+        name: "Reading".into(),
+        view_type: "table".into(),
+    }];
+    let rows = block_on(view_list(&scope(), &source)).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].name, "Reading");
+    assert_eq!(rows[0].view_type, "table");
+}
+
+#[test]
+fn every_new_read_refuses_a_connection_with_no_grant() {
+    // The same ordering claim the older verbs carry, one population over: a
+    // connection nobody approved learns nothing, not even whether the vault has
+    // files, a calendar or a view.
+    let map: BTreeMap<String, McpConnectionGrant> = BTreeMap::new();
+    let cases = [
+        ("attachment_list", json!({})),
+        ("attachment_read", json!({ "attachment_id": "aa" })),
+        (
+            "calendar_read",
+            json!({ "from": "2026-11-01", "to": "2026-11-30" }),
+        ),
+        ("view_list", json!({})),
+    ];
+    let source = Source::new(&[]);
+    for (tool, arguments) in cases {
+        let outcome = block_on(call_tool(
+            inputs(&map, "claude-desktop", tool, &arguments),
+            &source,
+        ));
+        assert_eq!(
+            outcome,
+            McpCallOutcome::Refused(McpToolError::NoGrant),
+            "{tool} answered a connection with no grant"
+        );
+    }
 }

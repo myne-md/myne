@@ -4,7 +4,7 @@
 //
 // The rule this enforces is the load-bearing one in the feature's PRD: **no
 // outbound tool, ever.** No fetch, no HTTP, no URL dereference, no mail, no
-// shell, no process, no clipboard read, no attachment verb. The moment Myne
+// shell, no process, no clipboard read. The moment Myne
 // ships a tool that reaches outside the vault, Myne assembles all three legs of
 // the lethal trifecta itself (private data, untrusted content, an outbound path)
 // and becomes the exfiltration path rather than the data source.
@@ -73,7 +73,39 @@ const EXPECTED_TOOLS = [
   "note_set_field",
   "note_move",
   "note_edit",
+  // Four reads joined in myne-md/myne#1077: a file's extracted text, the calendar,
+  // and the saved views. None of them fetches, and none of them takes a path; the
+  // id-only rule below checks the second half structurally.
+  "attachment_list",
+  "attachment_read",
+  "calendar_read",
+  "view_list",
 ];
+
+/**
+ * The nouns this surface is allowed to point at, each one owned by the vault: a
+ * note, the vault itself, an attached file, the calendar derived from note
+ * frontmatter, a saved view. A new noun is a decision rather than a naming
+ * preference, because the namespace is what a reader trusts when they read a tool
+ * name in a model's transcript.
+ */
+const VAULT_NAMESPACES = ["note", "vault", "attachment", "calendar", "view"];
+
+/**
+ * The argument names that would mean a filesystem path or a network address, and
+ * there is deliberately **no allowlist beside them**.
+ *
+ * Every verb here takes ids and vault folder names. An id was resolved inside the
+ * grant by the host; a folder name is a vault noun the grant clamps. A `path`, a
+ * `file`, a `url` is neither: it is whatever the caller typed, which is how a tool
+ * reads something the user never approved. So the rule is absolute, and a verb that
+ * genuinely needs one is a decision that adds a rule here rather than an entry.
+ *
+ * (`folder` is NOT in this list on purpose. It looks like a path and is not one:
+ * the host canonicalises it and refuses it unless the grant covers it, which is
+ * what makes `note_search`'s and `note_move`'s folder arguments safe.)
+ */
+const PATH_SHAPED = ["path", "file", "file_path", "filepath", "url", "uri", "href", "src"];
 
 /// Constructs that would make the list something other than a constant
 /// expression. Each one is a way for text this guard never sees to reach a tool
@@ -212,6 +244,83 @@ for (const { pattern, what } of FORBIDDEN_CONSTRUCTION) {
   }
 }
 
+// ── the arguments ───────────────────────────────────────────────────────────
+//
+// A path argument is the outbound primitive in disguise: an id was resolved inside
+// the grant, and a path is whatever the caller typed. So every tool's schema is
+// read here and every property name is checked against the one allowlist above,
+// rather than trusting the descriptions to have been written carefully.
+
+/** The `inputSchema` object of each tool, by tool name, brace-matched. */
+function schemasByName(source) {
+  const out = new Map();
+  const marker = /"name"\s*:\s*"([^"]*)"/g;
+  let match;
+  while ((match = marker.exec(source)) !== null) {
+    const name = match[1];
+    const from = source.indexOf('"inputSchema"', match.index);
+    if (from < 0) continue;
+    const open = source.indexOf("{", from);
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < source.length; i += 1) {
+      if (source[i] === "{") depth += 1;
+      else if (source[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    out.set(name, source.slice(open, end + 1));
+  }
+  return out;
+}
+
+/** The property names a schema declares, at the top level of `properties`. */
+function propertyNames(schema) {
+  const at = schema.indexOf('"properties"');
+  if (at < 0) return [];
+  const open = schema.indexOf("{", at);
+  let depth = 0;
+  let end = open;
+  for (let i = open; i < schema.length; i += 1) {
+    if (schema[i] === "{") depth += 1;
+    else if (schema[i] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  const body = schema.slice(open + 1, end);
+  // Only the names at depth 1 of the properties object: a nested object's own keys
+  // are not arguments of the tool.
+  const names = [];
+  let nested = 0;
+  const tokens = /"([a-zA-Z_][a-zA-Z0-9_]*)"\s*:|[{}]/g;
+  let token;
+  while ((token = tokens.exec(body)) !== null) {
+    if (token[0] === "{") nested += 1;
+    else if (token[0] === "}") nested -= 1;
+    else if (nested === 0 && token[1]) names.push(token[1]);
+  }
+  return names;
+}
+
+for (const [name, schema] of schemasByName(toolList)) {
+  for (const property of propertyNames(schema)) {
+    if (!PATH_SHAPED.includes(property)) continue;
+    fail(
+      `${TOOL_LIST_FILE}: \`${name}\` declares a \`${property}\` argument, which is the one ` +
+        `argument shape that can name something outside the vault. A verb reads a file by id; ` +
+        `a verb that needs a path is a decision that adds a rule here, not an exception.`,
+    );
+  }
+}
+
 // ── the names ───────────────────────────────────────────────────────────────
 
 const names = [...toolList.matchAll(/"name"\s*:\s*"([^"]*)"/g)].map((m) => m[1]);
@@ -236,10 +345,11 @@ for (const name of uniqueNames) {
         `verb, add it to EXPECTED_TOOLS here AND in ${TOOLS_TEST_FILE}.`,
     );
   }
-  if (!/^(?:note|vault)_[a-z][a-z_]*$/.test(name)) {
+  const namespace = name.split("_")[0];
+  if (!VAULT_NAMESPACES.includes(namespace) || !/^[a-z][a-z_]*$/.test(name)) {
     fail(
-      `${TOOL_LIST_FILE}: \`${name}\` is outside the note_/vault_ namespace, which is the one ` +
-        `place this surface is allowed to point.`,
+      `${TOOL_LIST_FILE}: \`${name}\` is outside the vault's own nouns ` +
+        `(${VAULT_NAMESPACES.join("/")}), which is the only place this surface may point.`,
     );
   }
 }

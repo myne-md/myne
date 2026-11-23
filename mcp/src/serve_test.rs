@@ -38,7 +38,7 @@ fn two_requests_get_two_replies_and_eof_ends_the_loop() {
     assert_eq!(replies.len(), 2);
     assert_eq!(replies[0]["id"], 1);
     assert_eq!(replies[1]["id"], 2);
-    assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 9);
+    assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 13);
 }
 
 #[test]

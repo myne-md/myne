@@ -97,6 +97,12 @@ function connection(overrides: Record<string, unknown> = {}) {
       { verb: "note_set_field", enabled: false, availableInBuild: false, isWrite: false },
       { verb: "note_move", enabled: true, availableInBuild: true, isWrite: true },
       { verb: "note_edit", enabled: true, availableInBuild: true, isWrite: true },
+      // The four reads that joined in myne-md/myne#1077, in the host catalog's own
+      // order, so the switch bank's fixture tracks what the door actually offers.
+      { verb: "attachment_list", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "attachment_read", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "calendar_read", enabled: true, availableInBuild: true, isWrite: false },
+      { verb: "view_list", enabled: true, availableInBuild: true, isWrite: false },
     ],
     ...overrides,
   };
@@ -357,7 +363,7 @@ describe("the approval dialog", () => {
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
     // The switches are the host's catalog, and one verb this build cannot serve
     // is off with a reason rather than offered as a control that does nothing.
-    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(9);
+    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(13);
     expect(
       (screen.getByTestId("settings.mcp-tool-note_set_field") as HTMLInputElement).disabled,
     ).toBe(true);
@@ -497,7 +503,7 @@ describe("the approval dialog", () => {
     fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
     fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
     await screen.findByTestId("settings.mcp-step-scope");
-    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(9);
+    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(13);
   });
 
   it("offers the raw command behind the other-clients disclosure", async () => {
