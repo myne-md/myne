@@ -8,12 +8,15 @@
 // asking "what can read my notes" had to know which feature owned the answer.
 // One panel, three sections, one place to look.
 //
-// ── Per-client, not per-taste ───────────────────────────────────────────────
-// Each section is absent rather than disabled where its capability is missing,
-// which is the roster's existing rule: a greyed section is an offer the platform
-// cannot honour. The panel itself is dropped from the rail when a client has none
-// of the three, because a panel with an empty body is a tab with nothing behind
-// it.
+// ── Two gates, not one, and the difference is deliberate ──────────────────
+// The panel is a CAPABILITY gate (`anyOf` on the rail entry): a client that can
+// host none of the three doors omits the whole tab rather than greying it. What
+// the sections add on top is their own history. The clipper is a normal feature
+// and sits behind its capability alone (`decisions/ui/0778`). The CLI keeps the
+// `developer_mode` gate `decisions/ui/0678` gave it, because the section it
+// holds opens a command socket on the machine: merging the three doors into one
+// panel was a taxonomy change, and 0678's point was that a taxonomy change does
+// not move who can reach the door.
 //
 // ── What it does NOT do ─────────────────────────────────────────────────────
 // It owns no state and no copy of its own beyond its three headings. Each section
@@ -42,7 +45,9 @@ export function ConnectionsPanel({ onShowToast, onDialogOpenChange }: Connection
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.connections">
       <SettingsSectionCounter>
-        {capabilities.has("cliAccess") && <CliPanel onShowToast={onShowToast} />}
+        {capabilities.has("cliAccess") && prefs.developer_mode && (
+          <CliPanel onShowToast={onShowToast} />
+        )}
         {capabilities.has("clipper") && <BrowserExtensionsPanel />}
         {capabilities.has("externalMcp") && (
           <SettingsSection title={t("settings.connections.mcp")}>

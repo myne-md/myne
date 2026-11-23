@@ -384,22 +384,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.memberPassword",
   },
   // CLI terminal access (MYND-490), in the CLI panel since
-  // `decisions/ui/0678`. All three carry `cliAccess`: the panel is absent
-  // where the capability is, so an ungated entry would navigate to an anchor
-  // that was never rendered. All three ALSO carry `developerGated` (#181) —
-  // the rail drops the whole developer group while the mode is off, and the
-  // search index has no view of the rail's groups, so dropping the flag here
-  // would offer a result that scrolls into a panel the rail is not showing.
-  // (The flag no longer means "hidden inside a core panel"; the vim toggle is
-  // the last entry of that shape.)
+  // `decisions/ui/0678`, inside the Connections panel since myne-md/myne#1077.
+  // All three carry `cliAccess`: the section is absent where the capability is,
+  // so an ungated entry would navigate to an anchor that was never rendered.
+  // All three ALSO carry `developerGated`, and that flag is the reason this
+  // comment exists: #1077 dropped it, on the reading that one panel makes the
+  // CLI a normal feature. It does not — the section opens a command socket, and
+  // 0678 recorded that a placement change does not move who can reach it. The
+  // flag is what keeps a search result from scrolling into a section the
+  // developer gate is not rendering.
   {
     id: "cli.access",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
-    // Connections is a CORE panel (myne-md/myne#1077): the CLI is a normal
-    // feature with a real gate, and the Developer group is for the panels that
-    // leave the path Myne vouches for.
-    developerGated: false,
+    // 0678's gate, kept through #1077's merge: see the block comment above.
+    developerGated: true,
     panelId: "connections",
     titleKey: "settings.cliAccess.label",
     descriptionKey: "settings.cliAccess.helperOff",
@@ -409,7 +408,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "cli.excluded-folders",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
-    developerGated: false,
+    developerGated: true,
     panelId: "connections",
     titleKey: "settings.cliAccess.excludedLabel",
     descriptionKey: "settings.cliAccess.excludedHelper",
@@ -419,7 +418,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "cli.rate-limit",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
-    developerGated: false,
+    developerGated: true,
     panelId: "connections",
     titleKey: "settings.cliAccess.rateLimitLabel",
     descriptionKey: "settings.cliAccess.rateLimitHelper",

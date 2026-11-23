@@ -229,9 +229,13 @@ describeE2E("dm2 setting-level developer gating: vim toggle + the CLI panel (#18
         // The CLI rows are NOT here any more: they moved into a panel of their
         // own, so their absence from Privacy is structural rather than gated.
         expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
-        // And that panel is not in the rail while the mode is off — the CLI's
-        // gate is the rail filter now, which is dm1's shape rather than dm2's.
-        expect((await s.byTestIdAll("settings.tab-cli")).length).toBe(0);
+        // The door's own panel is a CAPABILITY gate since myne-md/myne#1077 (it
+        // also hosts the browser clipper), so the tab is there either way; what
+        // the developer gate removes is the CLI body inside it, asserted above
+        // and again here after opening the panel.
+        await (await s.byTestId("settings.tab-connections")).click();
+        await s.byTestId("settings.connections");
+        expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
 
         await (await s.byTestId("settings.tab-editor")).click();
         await selectSettingsTopic(s, "editor", "editing");
@@ -259,8 +263,8 @@ describeE2E("dm2 setting-level developer gating: vim toggle + the CLI panel (#18
         // ── Mode ON ──
         await enableDeveloperMode(s);
 
-        // The whole CLI panel comes back, with its block inside it.
-        await (await s.byTestId("settings.tab-cli")).click();
+        // The CLI section comes back, inside the Connections panel.
+        await (await s.byTestId("settings.tab-connections")).click();
         await s.byTestId("settings.cli-access");
         await s.byTestId("settings.cli-exclusions");
         await s.byTestId("settings.cli-rate-limit");

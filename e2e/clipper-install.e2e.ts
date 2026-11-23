@@ -73,9 +73,10 @@ describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)",
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        // Settings → Browser extensions hosts the toggle since myne-md/myne#960,
-        // where the clipper left the Account panel.
-        await openSettings(s, "extensions");
+        // Settings → Connections hosts the toggle: the clipper left the Account
+        // panel in myne-md/myne#960 and joined the CLI and the MCP grant in one
+        // panel in myne-md/myne#1077.
+        await openSettings(s, "connections");
         await s.byTestId("settings.clipper-install");
 
         // Default: absent flag ⇒ NOT registered ⇒ toggle OFF (MYND-549).

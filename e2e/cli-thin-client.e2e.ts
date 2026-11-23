@@ -254,15 +254,17 @@ async function waitToggleReflects(session: Session, expected: "true" | "false"):
  *  reflected attribute is optimistic (see `CliAccessSettings.tsx`), so it
  *  proves the click landed, never that `vault.prefs` was written.
  *
- *  Developer mode first (#181): the CLI panel is a `developer`-group rail
- *  entry, dropped by the rail filter while the mode is off, so the door is not
- *  merely unclicked here — its panel is not in the rail and its block is not in
- *  the DOM (`decisions/ui/0678`; it was a block inside Privacy before that).
+ *  Developer mode first (#181): the CLI section renders only when
+ *  `developer_mode` is on, which is the pair `decisions/ui/0678` recorded. Since
+ *  myne-md/myne#1077 the section lives inside the Connections panel rather than
+ *  in a rail entry of its own, so the tab to open is `connections` — and that
+ *  panel is a CAPABILITY gate, which is why the mode still has to be on before
+ *  its CLI body exists at all.
  *  `enableDeveloperMode` leaves Settings open on About, hence the rail click
  *  rather than a second `openSettings`. */
 async function enableCliAccess(session: Session): Promise<void> {
   await enableDeveloperMode(session);
-  await (await session.byTestId("settings.tab-cli")).click();
+  await (await session.byTestId("settings.tab-connections")).click();
   await session.byTestId("settings.cli-access");
   await (await session.byTestId("settings.cli-access-toggle")).click();
   await waitToggleReflects(session, "true");
@@ -509,7 +511,7 @@ describeE2E("cli5 an excluded folder is absent from every CLI answer (MYND-490)"
 
         // Exclude the folder through the real textarea. It commits on blur, so
         // Tab out of the field rather than reaching for the DOM.
-        await openSettings(s, "cli");
+        await openSettings(s, "connections");
         const textarea = await s.byTestId("settings.cli-excluded-folders");
         await textarea.replaceText(EXCLUDED_FOLDER);
         await pressKey(s, KEY.TAB);
@@ -600,7 +602,10 @@ describeE2E("cli6 hiding the CLI panel does not close the door (#181)", () => {
         // to name that topic first.
         await selectSettingsTopic(s, "privacy", "locking");
         await s.byTestId("settings.auto-lock-select");
-        expect((await s.byTestIdAll("settings.tab-cli")).length).toBe(0);
+        // The Connections panel is a capability gate, so the TAB stays: what the
+        // developer gate removes is its CLI body, and that is the assertion.
+        await (await s.byTestId("settings.tab-connections")).click();
+        await s.byTestId("settings.connections");
         expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
         await closeSettings(s);
 
