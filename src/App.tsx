@@ -42,6 +42,7 @@ import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { SkipToContent } from "./components/SkipToContent";
 import { Toaster } from "./components/toast/Toaster";
 import { UpdateNotice } from "./components/update/UpdateNotice";
+import { UpdateFlowProvider } from "./hooks/updateFlow";
 import { UpdatingScreen } from "./screens/UpdatingScreen";
 import { InvitesDialog } from "./components/sync/InvitesDialog";
 import { unclaimedInvites } from "./hooks/usePendingInvites";
@@ -1022,6 +1023,11 @@ function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* The update flow, provided to the tree rather than to one consumer
+          (myne-md/myne#1059). The notice still gets it as props because App
+          renders the notice; the About row is inside the Settings modal and can
+          only reach it this way. Two install doors, one flow, one guard. */}
+      <UpdateFlowProvider value={update}>
       {/* The escape hatch from screen-capture protection (myne-md/myne#482).
           FIRST in DOM order, deliberately: it is a skip link, off-screen until
           focused, so being first is what puts it one Tab from a cold launch and
@@ -1164,6 +1170,7 @@ function App() {
           land when the vault is unlocked (the Rust relay short-circuits a locked
           vault before emitting), i.e. exactly when the Editor is mounted, so the
           listener never needs to exist pre-unlock. */}
+      </UpdateFlowProvider>
     </div>
   );
 }

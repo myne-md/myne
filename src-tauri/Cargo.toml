@@ -413,7 +413,27 @@ objc2-foundation = { version = "0.3", default-features = false, features = [
     "NSDictionary",
     "NSString",
     "NSURL",
+    # The reminder seam's calendar trigger takes `NSDateComponents`, which lives
+    # under `NSCalendar` in this crate's feature map (plugins/reminders/macos.rs).
+    "NSCalendar",
+    "NSDate",
 ] }
+# The desktop reminder seam (myne-md/myne#1076): `UNUserNotificationCenter` for a
+# reminder that arrives while Myne is closed. Transitive→direct promotion of
+# `objc2-user-notifications 0.3.2`, already locked via tauri/wry on macOS, so this
+# adds no crate to the tree; the features are what the three calls in
+# `plugins/reminders/macos.rs` reach for and nothing more.
+objc2-user-notifications = { version = "0.3", default-features = false, features = [
+    "std",
+    "block2",
+    "UNUserNotificationCenter",
+    "UNNotificationRequest",
+    "UNNotificationContent",
+    "UNNotificationTrigger",
+    "UNNotificationSettings",
+    "NSString_UserNotifications",
+] }
+block2 = "0.6"
 objc2-web-kit = { version = "0.3", default-features = false, features = [
     "std",
     "WKWebView",

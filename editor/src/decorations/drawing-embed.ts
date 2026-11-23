@@ -37,8 +37,8 @@ import {
   EditorView,
   ViewPlugin,
   type ViewUpdate,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import type { SyntaxNode } from "@lezer/common";
 import { createElement } from "react";
 import type { Root } from "react-dom/client";
@@ -145,7 +145,7 @@ function canvasBackdrop(): string {
   return isDarkApp() ? "#121212" : "#ffffff";
 }
 
-class DrawingEmbedWidget extends WidgetType {
+class DrawingEmbedWidget extends LineHeightWidget {
   constructor(
     private readonly noteId: string,
     private readonly display: string,

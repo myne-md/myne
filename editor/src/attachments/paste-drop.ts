@@ -182,7 +182,7 @@ export function insertEmbedsForOutcomes(
   // Each embed on a line of its own (myne-md/myne#604), which is the form the
   // renderer draws as a block: see `ownLineInsertion` for why the placement
   // belongs to the insert path rather than to the decoration.
-  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embeds.join("\n"));
+  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embeds.join("\n"), true);
   view.dispatch({
     changes: { from: at, insert },
     selection: { anchor },

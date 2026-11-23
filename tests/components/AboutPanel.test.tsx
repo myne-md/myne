@@ -80,6 +80,8 @@ vi.mock("../../src/notes/renameFlushHook", () => ({
 }));
 
 import { AboutPanel } from "../../src/components/settings/AboutPanel";
+import { UpdateFlowProvider } from "../../src/hooks/updateFlow";
+import type { UpdateAvailableHook } from "../../src/hooks/useUpdateAvailable";
 
 beforeEach(() => {
   localAiCapable = true;
@@ -283,49 +285,63 @@ describe("AboutPanel: the update row is one button (myne-md/myne#1020)", () => {
     expect(screen.queryByTestId("about.update-install")).toBeNull();
   });
 
-  it("flushes the open panes before installing", async () => {
-    render(<AboutPanel />);
-    fireEvent.click(screen.getByTestId("about.update-check"));
-    fireEvent.click(await screen.findByTestId("about.update-install"));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(updateSeam.flushOpenPanes).toHaveBeenCalledTimes(1);
-    expect(updateSeam.updateInstall).toHaveBeenCalledTimes(1);
+  // The row used to be a SECOND install door: it flushed and called the install
+  // command itself, with no lock and no updating stage (myne-md/myne#1059). These
+  // three cases held that shape. What the row owes now is a hand-off — it asks the
+  // one flow, which flushes, locks, enters the updating screen and installs in that
+  // order — and the assertions below are the difference: the flow is pressed, and
+  // the command is NOT reached from here.
+
+  const stubFlow = (over: Partial<UpdateAvailableHook> = {}): UpdateAvailableHook => ({
+    view: "pill",
+    phase: "idle",
+    progress: { phase: "starting", downloaded: 0, total: null },
+    working: false,
+    blocked: null,
+    version: "0.13.0",
+    notes: null,
+    request: vi.fn(),
+    confirm: vi.fn(),
+    cancel: vi.fn(),
+    later: vi.fn(),
+    reopen: vi.fn(),
+    retry: vi.fn(),
+    ...over,
   });
 
-  it("does not exit into an install when a pane refuses to save, and says so on the row", async () => {
-    updateSeam.flushShouldReject = true;
-    render(<AboutPanel />);
+  const renderWithFlow = (flow: UpdateAvailableHook) =>
+    render(
+      <UpdateFlowProvider value={flow}>
+        <AboutPanel />
+      </UpdateFlowProvider>,
+    );
+
+  it("hands the press to the one update flow instead of installing by itself", async () => {
+    const flow = stubFlow();
+    renderWithFlow(flow);
     fireEvent.click(screen.getByTestId("about.update-check"));
     fireEvent.click(await screen.findByTestId("about.update-install"));
     await act(async () => {
       await Promise.resolve();
     });
-    // The install exits the process. Refused flush, refused exit: the edits are
-    // still only in memory and a restart would take them with it.
+    expect(flow.confirm).toHaveBeenCalledTimes(1);
+    // The second door is what let two installs run at once. This asserts it is
+    // shut, not merely unused by the components that happen to exist today.
     expect(updateSeam.updateInstall).not.toHaveBeenCalled();
-    expect(screen.getByTestId("about.update-blocked")).toBeTruthy();
-    // The button stays pressable, so the retry after saving is the same button.
-    expect(screen.getByTestId("about.update-install")).toBeTruthy();
+    expect(updateSeam.flushOpenPanes).not.toHaveBeenCalled();
   });
 
-  it("clears the refusal once a press gets through", async () => {
-    updateSeam.flushShouldReject = true;
-    render(<AboutPanel />);
-    fireEvent.click(screen.getByTestId("about.update-check"));
-    fireEvent.click(await screen.findByTestId("about.update-install"));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(screen.getByTestId("about.update-blocked")).toBeTruthy();
+  it("says which step refused, on the row, using the flow's own answer", async () => {
+    renderWithFlow(stubFlow({ blocked: "flush" }));
+    expect(screen.getByTestId("about.update-blocked").textContent).toBe(
+      "settings.about.updateFlushFailed",
+    );
+  });
 
-    updateSeam.flushShouldReject = false;
-    fireEvent.click(screen.getByTestId("about.update-install"));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(screen.queryByTestId("about.update-blocked")).toBeNull();
-    expect(updateSeam.updateInstall).toHaveBeenCalledTimes(1);
+  it("reports a lock refusal in the row's own words", () => {
+    renderWithFlow(stubFlow({ blocked: "lock" }));
+    expect(screen.getByTestId("about.update-blocked").textContent).toBe(
+      "settings.about.updateBlocked",
+    );
   });
 });

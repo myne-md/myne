@@ -28,6 +28,7 @@ import {
   sessionGeneration,
 } from "./session-caches";
 import { type EditorView, WidgetType } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import i18n from "@myne/editor/i18n";
 import { getHost } from "../host";
 import { attachmentUrl } from "@myne/editor/host/notes/attachmentRef";
@@ -241,7 +242,7 @@ export type TombstoneKind = "deleted" | "broken";
  * file states the measurement.
  */
 
-export class AttachmentImageWidget extends WidgetType {
+export class AttachmentImageWidget extends LineHeightWidget {
   /** The object URL resolved at BUILD time. `eq()` is keyed on it so that when
    *  the host warms this id on web (pending placeholder → real blob URL, #211)
    *  the rebuilt widget is NOT eq() to the old one and CM re-renders the `<img>`
@@ -666,7 +667,7 @@ function buildEmbedOverflowMenu(
 
 // --- resolved PDF (pdf.js first page, icon fallback) -----------------------
 
-export class AttachmentPdfWidget extends WidgetType {
+export class AttachmentPdfWidget extends LineHeightWidget {
   /** Build-time object URL — see AttachmentImageWidget.url (#211): keys eq() so a
    *  post-warm rebuild re-renders against the resolved URL on web; no-op on
    *  desktop. */
@@ -915,7 +916,7 @@ export class UrlImageChipWidget extends WidgetType {
  * is self-contained: CM6 hands it the `EditorView` in `toDOM`, so its menu
  * actions resolve the live document position themselves.
  */
-export class AttachmentFileCardWidget extends WidgetType {
+export class AttachmentFileCardWidget extends LineHeightWidget {
   /** Tear-down for the body-mounted overflow menu, so `destroy()` can close it
    *  (and remove its document listener) if CM6 discards the widget while it's
    *  open. */
@@ -1023,7 +1024,7 @@ export class AttachmentFileCardWidget extends WidgetType {
  * element fed from `attachment://<id>` (decrypted in-memory + re-sniffed +
  * allowlisted Rust-side). All visible text is set via `textContent` per TB2.
  */
-export class AttachmentAudioWidget extends WidgetType {
+export class AttachmentAudioWidget extends LineHeightWidget {
   private teardown: (() => void) | null = null;
   /** Build-time object URL — see AttachmentImageWidget.url (#211): keys eq() so a
    *  post-warm rebuild re-renders against the resolved URL on web; no-op on
@@ -1361,7 +1362,7 @@ function stripFileExtension(filename: string): string {
  * shared "⋯" overflow menu (Export / Rename / Remove / Reveal) and a teardown
  * that releases the media buffer if CM6 discards the DOM.
  */
-export class AttachmentVideoWidget extends WidgetType {
+export class AttachmentVideoWidget extends LineHeightWidget {
   private teardown: (() => void) | null = null;
   /** Build-time object URL — see AttachmentImageWidget.url (#211): keys eq() so a
    *  post-warm rebuild re-renders against the resolved URL on web; no-op on
@@ -1701,7 +1702,7 @@ const PREVIEW_EST_CARD_PX = 368;
  * the file-card chrome (icon + name + Export/Rename/Remove/Reveal menu) while
  * loading, on read failure, or when the host omits the seam.
  */
-export class AttachmentTextPreviewWidget extends WidgetType {
+export class AttachmentTextPreviewWidget extends LineHeightWidget {
   private menuTeardown: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
