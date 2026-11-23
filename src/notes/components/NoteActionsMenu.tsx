@@ -281,7 +281,7 @@ export function NoteActionsMenu({
             // silently replaces that handler, which is how the submenu stopped
             // opening on hover while every other symptom looked fine.
             const hover = interactiveSurface({
-              hoverBg: item.destructive ? "var(--warning-soft)" : "var(--paper-3)",
+              hoverBg: item.destructive ? "var(--danger-soft)" : "var(--paper-3)",
             });
             const row = (
                 <button
@@ -322,7 +322,7 @@ export function NoteActionsMenu({
                   }}
                   style={{
                     ...ITEM_STYLE,
-                    color: item.destructive ? "var(--warning)" : "var(--fg-1)",
+                    color: item.destructive ? "var(--danger)" : "var(--fg-1)",
                   }}
                 >
                   <span
@@ -333,7 +333,7 @@ export function NoteActionsMenu({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      color: item.destructive ? "var(--warning)" : "var(--fg-3)",
+                      color: item.destructive ? "var(--danger)" : "var(--fg-3)",
                     }}
                   >
                     {item.icon !== undefined ? (
