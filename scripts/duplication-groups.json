@@ -749,6 +749,13 @@
         "copies": 3,
         "verdict": "justified",
         "reason": "A normalised-skeleton false positive, and the three anchors show it: they land at 2041, 2063 and 2365, which is a record builder, its wrapper and the opening of a test, so the match spans function boundaries rather than describing one body. What the skeleton sees is the order of a few `let`s, a call and a `collect` in short test-support functions that are a fixture, the fixture's caller and a test. Merging any two of them would be wrong: one builds data, one names the shape a test needs, and the third asserts. Recorded so the ratchet keeps its baseline without licensing a copy that exists."
+      },
+      {
+        "id": "core/src/plugins/mcp/tools_test.rs",
+        "lines": 35,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Two TEST BODIES in one file, matched on skeleton: build a `Source` fixture, call one verb, assert on the answer. The normaliser drops the fixture's data and the assertion's expectation, which are the whole of each test: one proves a hit whose note vanished is dropped from a search, the other proves an unknown note id is a different refusal from an out-of-scope one. Factoring the shared shape into a helper would hide which verb each test drives, which is the one thing a reader of a tool-surface test needs to see (myne-md/myne#1077)."
       }
     ],
     "baseline": [

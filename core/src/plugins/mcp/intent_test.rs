@@ -22,9 +22,10 @@ use super::intent::{
     RestorePoint, WriteAnswer,
 };
 use super::scope::{resolve_scope, ConnectionScope};
-use super::tools::McpNoteSource;
+use super::tools::{FileRow, McpNoteSource, ViewRow};
 use super::write_scope::resolve_write_scope;
 use crate::plugins::agent::tools::SearchHit;
+use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_indices::state::NoteRecord;
 use crate::test_support::block_on;
 use protocol::{McpConnectionGrant, McpScopeModel};
@@ -114,6 +115,22 @@ impl McpNoteSource for Source {
     }
 
     async fn search(&self, _query: &str, _limit: usize) -> Result<Vec<SearchHit>, McpToolError> {
+        Ok(Vec::new())
+    }
+
+    async fn files(&self) -> Result<Vec<FileRow>, McpToolError> {
+        Ok(Vec::new())
+    }
+
+    async fn file_text(&self, _attachment_id: &str) -> Result<Option<String>, McpToolError> {
+        Ok(None)
+    }
+
+    async fn calendar(&self, _from: &str, _to: &str) -> Result<Vec<CalendarRow>, McpToolError> {
+        Ok(Vec::new())
+    }
+
+    async fn views(&self) -> Result<Vec<ViewRow>, McpToolError> {
         Ok(Vec::new())
     }
 }

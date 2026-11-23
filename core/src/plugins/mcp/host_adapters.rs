@@ -52,6 +52,7 @@ use crate::plugins::notes::error::NoteReadError;
 use crate::plugins::notes::search_sync_core::note_search_core;
 use crate::plugins::prefs::commands::prefs_read_from_host;
 use crate::plugins::prefs::error::PrefsReadError;
+use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_indices::state::NoteRecord;
 use crate::plugins::vault_indices::VaultIndicesState;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
@@ -59,7 +60,9 @@ use crate::search::SearchIndexState;
 use crate::vault_io::VaultIo;
 
 use super::error::McpToolError;
-use super::tools::{call_tool, CallInputs, McpCallOutcome, McpNoteSource, WireCall};
+use super::tools::{
+    call_tool, CallInputs, FileRow, McpCallOutcome, McpNoteSource, ViewRow, WireCall,
+};
 
 /// The running vault, as the four read tools see it.
 ///
@@ -99,6 +102,16 @@ impl VaultNoteSource<'_> {
     }
 }
 
+/// The four reads that joined in myne-md/myne#1077, on the same vault the note
+/// reads use.
+///
+/// **Every one of them is a call into a command core the app already has**, which
+/// is the whole point: `attachment_list` reads the attachments catalog the
+/// library reads, `attachment_read` reads the text cache the search index reads,
+/// `calendar_read` asks the same bounded range the pane and the phone ask, and
+/// `view_list` reads `vault.prefs`. A second implementation of any of them would
+/// be a second answer to a question the app already answers, and the two would
+/// disagree the first time one side changed.
 #[async_trait]
 impl McpNoteSource for VaultNoteSource<'_> {
     async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, McpToolError> {
@@ -148,6 +161,85 @@ impl McpNoteSource for VaultNoteSource<'_> {
             }
         }
         Ok(hits)
+    }
+
+    async fn files(&self) -> Result<Vec<FileRow>, McpToolError> {
+        self.ensure_unlocked().await?;
+        let rows = crate::plugins::attachments::commands::catalog_list_from_host(
+            self.host, self.io, self.state,
+        )
+        .await
+        .map_err(|_| McpToolError::VaultUnavailable)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| FileRow {
+                attachment_id: row.id,
+                // Empty is the vault root, and the clamp reads `None` that way;
+                // `Some("")` would put an empty folder in front of a caller as if
+                // it were a name.
+                filename: (!row.filename.is_empty()).then_some(row.filename),
+                folder: (!row.folder.is_empty()).then_some(row.folder),
+            })
+            .collect())
+    }
+
+    async fn file_text(&self, attachment_id: &str) -> Result<Option<String>, McpToolError> {
+        self.ensure_unlocked().await?;
+        crate::plugins::attachments::commands::extracted_text_from_host(
+            self.host,
+            self.io,
+            self.state,
+            attachment_id,
+        )
+        .await
+        .map_err(|_| McpToolError::VaultUnavailable)
+    }
+
+    async fn calendar(&self, from: &str, to: &str) -> Result<Vec<CalendarRow>, McpToolError> {
+        self.ensure_unlocked().await?;
+        match crate::plugins::vault_indices::commands::vault_indices_calendar_range_from_host(
+            self.state,
+            self.indices,
+            from.to_string(),
+            to.to_string(),
+            true,
+        )
+        .await
+        {
+            Ok(range) => Ok(range.rows),
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::CalendarWindowTooWide {
+                    max_days,
+                },
+            ) => Err(McpToolError::CalendarWindowTooWide {
+                max_days: u32::try_from(max_days).unwrap_or(u32::MAX),
+            }),
+            // Everything else is "this device cannot answer right now": a locked
+            // vault, an unreadable meta, an index that is not there.
+            Err(_) => Err(McpToolError::VaultUnavailable),
+        }
+    }
+
+    async fn views(&self) -> Result<Vec<ViewRow>, McpToolError> {
+        self.ensure_unlocked().await?;
+        let prefs = prefs_read_from_host(self.host, self.state, self.io)
+            .await
+            .map_err(|_| McpToolError::VaultUnavailable)?;
+        Ok(prefs
+            .saved_views
+            .into_iter()
+            .map(|view| ViewRow {
+                view_id: view.id,
+                name: view.name,
+                view_type: match view.view_type {
+                    protocol::saved_view::ViewType::Table => "table",
+                    protocol::saved_view::ViewType::Cards => "cards",
+                    protocol::saved_view::ViewType::List => "list",
+                    protocol::saved_view::ViewType::Board => "board",
+                }
+                .to_string(),
+            })
+            .collect())
     }
 }
 
