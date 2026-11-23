@@ -201,8 +201,8 @@ A near-monochrome system. The warm-paper neutral ramp does almost all the work; 
 - **Ink Display** (`#0b0b09`): High-emphasis display type only.
 
 ### State (functional, never decorative)
-- **Brick Danger** (`#8a2a23`, soft `#f5e7e5`): Recovery-phrase mismatch, sync error, irreversible-warning copy. A muted brick, not a fire-engine red.
-- **Ochre Warning** (`#8a6a1f`, soft `#f5efde`): Soft warnings (clipboard timeout, autosave conflict). An ochre, not a school-bus yellow.
+- **Brick Danger** (`#8a2a23`, soft `#f5e7e5`, fill `#a8322a` under `#ffffff` ink): Recovery-phrase mismatch, sync error, irreversible-warning copy, and **the fill of any control that destroys something** — the delete confirmation's confirm is the one today. A muted brick, not a fire-engine red.
+- **Ochre Warning** (`#8a6a1f`, soft `#f5efde`): Soft warnings (clipboard timeout, autosave conflict). An ochre, not a school-bus yellow. **Never a destructive fill**: a control that destroys is painted in Danger (`decisions/ui/0794`).
 - **Forest Success** (`#2f6048`, soft `#e3eee8`): The very few places a green is needed (vault unlocked, file imported). A forest, not a kelly green. **Never** rendered as a checkmark badge on encrypted-status surfaces.
 
 ### Named Rules
