@@ -32,7 +32,7 @@ describe("AttachmentThumbnail — PDF", () => {
     canvas.toDataURL = () => "data:image/png;base64,RENDERED";
     mockedRender.mockResolvedValue(canvas);
 
-    render(
+    const { container } = render(
       <AttachmentThumbnail
         id="abc123"
         contentType="application/pdf"
@@ -47,14 +47,18 @@ describe("AttachmentThumbnail — PDF", () => {
     expect(arg.url).toContain("abc123");
     expect(arg.width).toBe(160);
 
-    const img = await screen.findByRole("img");
+    // The `<img>` ELEMENT, not the `img` ROLE: the fallback icon carries
+    // `role="img"` too (axe `aria-prohibited-attr`), so a role query answers
+    // "is anything a graphic" and stops distinguishing the rendered page.
+    await waitFor(() => expect(container.querySelector("img")).not.toBeNull());
+    const img = container.querySelector("img")!;
     expect(img.getAttribute("src")).toBe("data:image/png;base64,RENDERED");
   });
 
   it("falls back to the generic PDF icon when the render rejects", async () => {
     mockedRender.mockRejectedValue(new Error("pdf.js unavailable"));
 
-    render(
+    const { container } = render(
       <AttachmentThumbnail
         id="def456"
         contentType="application/pdf"
@@ -67,14 +71,14 @@ describe("AttachmentThumbnail — PDF", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("PDF document")).toBeTruthy();
     });
-    expect(screen.queryByRole("img")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
   });
 
   it("shows the PDF icon placeholder while the render is in flight", () => {
     // A never-resolving promise keeps the component in its loading state.
     mockedRender.mockReturnValue(new Promise(() => {}));
 
-    render(
+    const { container } = render(
       <AttachmentThumbnail
         id="ghi789"
         contentType="application/pdf"
@@ -84,13 +88,13 @@ describe("AttachmentThumbnail — PDF", () => {
     );
 
     expect(screen.getByLabelText("PDF document")).toBeTruthy();
-    expect(screen.queryByRole("img")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
   });
 });
 
 describe("AttachmentThumbnail — non-PDF", () => {
   it("renders an <img> for images and never invokes the PDF renderer", () => {
-    render(
+    const { container } = render(
       <AttachmentThumbnail
         id="img001"
         contentType="image/png"
@@ -99,13 +103,13 @@ describe("AttachmentThumbnail — non-PDF", () => {
       />,
     );
 
-    const img = screen.getByRole("img");
+    const img = container.querySelector("img")!;
     expect(img.getAttribute("alt")).toBe("photo.png");
     expect(mockedRender).not.toHaveBeenCalled();
   });
 
   it("renders the generic file icon for unknown types", () => {
-    render(
+    const { container } = render(
       <AttachmentThumbnail
         id="zip001"
         contentType="application/zip"
@@ -115,7 +119,7 @@ describe("AttachmentThumbnail — non-PDF", () => {
     );
 
     expect(screen.getByLabelText("File")).toBeTruthy();
-    expect(screen.queryByRole("img")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
     expect(mockedRender).not.toHaveBeenCalled();
   });
 });
