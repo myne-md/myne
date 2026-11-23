@@ -7,6 +7,7 @@
   "packageManager": "pnpm@11.8.0",
   "scripts": {
     "start": "node scripts/dev-menu.mjs",
+    "pi": "node workspace/pi.mjs",
     "dev": "vite",
     "dev:reset": "bash scripts/dev-reset.sh",
     "build": "tsc && vite build",
@@ -90,6 +91,7 @@
     "w3c-keyname": "2.2.8"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.6.0",
     "@tauri-apps/cli": "^2.12.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/react": "16.3.2",
