@@ -40,6 +40,7 @@ import type {
   CommandContext,
 } from "../commands";
 import type { NoteId } from "../notes/sidebarState";
+import { catalogList, type CatalogEntry } from "../lib/attachments";
 import {
   searchNotes,
   shouldApplyNoteSearchResult,
@@ -312,6 +313,30 @@ type Row =
       // own search doc). `id` is still the embedding note — opening the row opens
       // that note; the badge tells the user the match was inside an attachment.
       attachmentId: string | null;
+    }
+  | {
+      /**
+       * A FILE, matched by its own filename (myne-md/myne#1075).
+       *
+       * **Files are searched here rather than in a second field** because one
+       * question — "where is that slide?" — should not need two boxes. They are
+       * matched client-side against the catalog's filenames, which is the only
+       * field the catalog carries; the extracted text is searched by the NOTES
+       * section already, as an embedded-attachment hit on the note that embeds it.
+       */
+      kind: "file";
+      id: string;
+      filename: string;
+      folder: string;
+      /**
+       * The note this file is embedded in, when one of the note hits named it.
+       *
+       * `null` means no note in the current results references it, which is a
+       * real answer and the reason this row exists at all: a file no note
+       * references must still appear (the plan's acceptance criterion).
+       */
+      usedInTitle: string | null;
+      usedInNoteId: NoteId | null;
     };
 
 /**
@@ -321,6 +346,9 @@ type Row =
  * while cutting per-keystroke IPC. Flushed immediately on Enter.
  */
 const NOTE_SEARCH_DEBOUNCE_MS = 120;
+
+/** How many file rows the FILES section shows. A pointer, not a list. */
+const MAX_FILE_ROWS = 5;
 
 export function CommandPalette({
   open,
@@ -346,6 +374,10 @@ export function CommandPalette({
   // Backend full-text results for the NOTES section (MYND-40). Populated by the
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
+  // The attachment catalog, read ONCE per open rather than per keystroke: it is
+  // a decrypt of one blob, and a per-keystroke read would be a per-keystroke
+  // decrypt for a list that changes only when a file is imported.
+  const [catalog, setCatalog] = useState<readonly CatalogEntry[] | null>(null);
   // Client-side match-context snippets keyed by note id (only for body hits —
   // the index stores no body text, so each snippet is a `note_read` decrypt of a
   // VISIBLE result, generation-guarded by the effect's `cancelled` flag).
@@ -565,13 +597,35 @@ export function CommandPalette({
     };
   }, [open, query, noteHits, isTrashed, isTemplate]);
 
+  // The attachment catalog, read once per open (myne-md/myne#1075). A failed read
+  // leaves the FILES section empty rather than failing the palette: a search box
+  // that refuses to open because a blob could not be decrypted is worse than one
+  // that answers the notes it can.
+  useEffect(() => {
+    if (!open) {
+      setCatalog(null);
+      return;
+    }
+    let cancelled = false;
+    void catalogList()
+      .then((rows) => {
+        if (!cancelled) setCatalog(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   // Unified row list (MYND-40): COMMANDS (frontend fuzzy over the visible action
   // registry) followed by NOTES (backend full-text hits, only while the query is
   // non-empty). Scores are NOT mixed across sections — each is sorted by its own
   // engine and the sections render in a fixed order, so a command never competes
   // with a BM25 note score. Arrow nav iterates this flat list across both
   // sections; section labels are injected at render time and are not selectable.
-  const { rows, commandCount } = useMemo(() => {
+  const { rows, commandCount, noteCount } = useMemo(() => {
     const visibleActions: Array<{
       action: CommandAction;
       visibility: ActionVisibility;
@@ -625,11 +679,45 @@ export function CommandPalette({
               }),
             );
 
-    // `commandCount` is the fixed boundary between the COMMANDS and NOTES
-    // sections in the flat list (commands always lead) — used for section
-    // labels without re-scanning `rows`.
-    return { rows: [...commandRows, ...noteRows], commandCount: commandRows.length };
-  }, [query, ctx, noteHits, isTrashed, isTemplate, isArchived, t]);
+    // The FILES section (myne-md/myne#1075): a case-insensitive substring match
+    // on the filename, capped so the section stays a pointer rather than a list.
+    // A note hit that matched INSIDE an attachment already carries that
+    // attachment's id, so "used in" costs nothing here: it is read off the hits
+    // the NOTES section already returned.
+    const needle = query.trim().toLowerCase();
+    const usedBy = new Map<string, NoteSearchResult>();
+    for (const hit of noteHits) {
+      if (hit.attachment_id !== null && !usedBy.has(hit.attachment_id)) {
+        usedBy.set(hit.attachment_id, hit);
+      }
+    }
+    const fileRows: Row[] =
+      needle.length < 2 || catalog === null
+        ? []
+        : catalog
+            .filter((row) => row.filename.toLowerCase().includes(needle))
+            .slice(0, MAX_FILE_ROWS)
+            .map((row): Row => {
+              const hit = usedBy.get(row.id);
+              return {
+                kind: "file",
+                id: row.id,
+                filename: row.filename,
+                folder: (row as { folder?: string }).folder ?? "",
+                usedInTitle: hit === undefined ? null : hit.title,
+                usedInNoteId: hit === undefined ? null : hit.note_id,
+              };
+            });
+
+    // `commandCount` and `noteCount` are the fixed boundaries between the three
+    // sections in the flat list (commands, then notes, then files) — used for
+    // section labels without re-scanning `rows`.
+    return {
+      rows: [...commandRows, ...noteRows, ...fileRows],
+      commandCount: commandRows.length,
+      noteCount: noteRows.length,
+    };
+  }, [query, ctx, noteHits, catalog, isTrashed, isTemplate, isArchived, t]);
 
   // Left-ribbon pin state (myne-md/myne#699). The rail and this palette read the
   // same `ribbon_items` pref, so a pin here shows up there with no extra wiring;
@@ -701,6 +789,20 @@ export function CommandPalette({
           await row.action.run({ ...ctx, activatedByKey: viaKey });
         } catch {
           /* action failure surfaces via the action's own UX (toast / banner) */
+        }
+      } else if (row.kind === "file") {
+        // **The file opens where it lives.** A file embedded in a note opens that
+        // note, because that is where you can act on it; a file no note references
+        // opens the library, which is the only surface that can show it at all.
+        close();
+        try {
+          if (row.usedInNoteId !== null) {
+            await ctx.onSelectNote(row.usedInNoteId);
+          } else {
+            ctx.onOpenAttachments();
+          }
+        } catch {
+          /* selection failure surfaces via the host's own UX */
         }
       } else {
         close();
@@ -820,7 +922,11 @@ export function CommandPalette({
   // Label the sections only when both are present — a single-section list reads
   // cleaner unlabeled. The flat `rows` list is `[...commands, ...notes]`, so the
   // NOTES section starts at index `commandCount`.
-  const showSectionLabels = commandCount > 0 && rows.length > commandCount;
+  // Three sections now, so the labels appear when more than one is present.
+  const noteStart = commandCount;
+  const fileStart = commandCount + noteCount;
+  const showSectionLabels =
+    [commandCount > 0, noteCount > 0, rows.length > fileStart].filter(Boolean).length > 1;
 
   return (
     <div ref={backdropRef} style={BACKDROP_STYLE} onClick={onBackdropClick} role="presentation">
@@ -923,17 +1029,21 @@ export function CommandPalette({
               // the first note row (only when both sections are present).
               const label = !showSectionLabels
                 ? null
-                : i === 0
+                : i === 0 && commandCount > 0
                   ? t("commandPalette.sectionCommands")
-                  : i === commandCount
+                  : i === noteStart && noteCount > 0
                     ? t("commandPalette.sectionNotes")
-                    : null;
+                    : i === fileStart && rows.length > fileStart
+                      ? t("commandPalette.sectionFiles")
+                      : null;
               const key =
                 row.kind === "action"
                   ? row.action.id
-                  : // MYND-448a: disambiguate a note-body row from its
-                    // attachment-content row(s) — both carry the same note id.
-                    `note:${row.id}:${row.attachmentId ?? ""}`;
+                  : row.kind === "file"
+                    ? `file:${row.id}`
+                    : // MYND-448a: disambiguate a note-body row from its
+                      // attachment-content row(s) — both carry the same note id.
+                      `note:${row.id}:${row.attachmentId ?? ""}`;
               return (
                 <Fragment key={key}>
                   {label !== null && (
@@ -988,7 +1098,7 @@ function renderRow(
   index: number,
   selected: boolean,
   runRow: (row: Row, viaKey: boolean) => void | Promise<void>,
-  t: (key: string) => string,
+  t: (key: string, options?: Record<string, unknown>) => string,
   snippet: MatchSnippet | undefined,
   pinned: boolean,
   togglePin: (id: string) => void,
@@ -1086,6 +1196,34 @@ function renderRow(
           )}
           {actionBinding !== undefined && <Keycaps chord={actionBinding} />}
           {kbdFallback !== undefined && <span style={HINT_STYLE}>{kbdFallback}</span>}
+        </>
+      ) : row.kind === "file" ? (
+        <>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", width: "100%" }}
+            data-file-id={row.id}
+          >
+            <span style={{ flexShrink: 0, color: "var(--fg-3)" }}>
+              <Icon name="paperclip" size={12} />
+            </span>
+            <span
+              style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+              {row.filename}
+            </span>
+            {/* **Where it is used.** A file embedded in a note names that note,
+                because that is where it can be acted on; a file no note
+                references says so rather than staying silent, which is the
+                difference between "unused" and "we did not look". */}
+            <span style={HINT_STYLE} data-testid="palette.file-used-in">
+              {row.usedInTitle === null
+                ? t("commandPalette.fileUnused")
+                : t("commandPalette.fileUsedIn", { title: row.usedInTitle })}
+            </span>
+            {row.folder !== "" && (
+              <span style={HINT_STYLE}>{row.folder.replace(/\/$/, "")}</span>
+            )}
+          </div>
         </>
       ) : (
         <>

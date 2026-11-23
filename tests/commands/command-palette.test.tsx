@@ -22,12 +22,17 @@ import {
   it,
   vi,
 } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { CommandPalette } from "../../src/components/CommandPalette";
 import type { CommandContext } from "../../src/commands";
 import { searchNotes } from "../../src/notes/searchNotes";
+import { catalogList } from "../../src/lib/attachments";
 import type { NoteSearchResult } from "../../src/types/note-search-result";
 import { runAxe, formatViolations } from "../a11y/axe-config";
+
+vi.mock("../../src/lib/attachments", () => ({
+  catalogList: vi.fn(),
+}));
 
 vi.mock("../../src/notes/searchNotes", async () => {
   const actual = await vi.importActual<
@@ -100,6 +105,10 @@ describe("CommandPalette UI", () => {
     mockedSearch.mockReset();
     mockedSearch.mockResolvedValue([]);
     setRibbonItems.mockReset().mockResolvedValue(undefined);
+    // No files unless a test opts in, for the same reason the notes default is
+    // empty: the FILES section is a fixture, not a side effect.
+    vi.mocked(catalogList).mockReset();
+    vi.mocked(catalogList).mockResolvedValue([]);
   });
   afterEach(() => {
     cleanup();
@@ -420,5 +429,75 @@ describe("CommandPalette UI", () => {
     fireEvent.mouseDown(pin);
     expect(await screen.findByTestId("palette.pin-error")).toBeTruthy();
     expect(screen.getByText("Could not pin the command.")).toBeTruthy();
+  });
+
+  // ---- the FILES section (myne-md/myne#1075) ------------------------------
+
+  it("returns a file by filename, and says when no note uses it", async () => {
+    vi.mocked(catalogList).mockResolvedValue([
+      {
+        id: "a".repeat(64),
+        content_type: "application/pdf",
+        created_at: 1,
+        filename: "hafta-1.pdf",
+        size: 10,
+      },
+    ] as never);
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "hafta" } });
+
+    const row = await screen.findByTestId("palette.file-used-in");
+    // A file no note references still appears, and says so: "unused" and "we did
+    // not look" are different answers and only one of them is true here.
+    expect(row.textContent).toContain("not used in a note");
+    expect(screen.getByTestId("palette.option")).toBeTruthy();
+  });
+
+  it("names the note a file is used in, read off the note hits", async () => {
+    vi.mocked(catalogList).mockResolvedValue([
+      {
+        id: "b".repeat(64),
+        content_type: "application/pdf",
+        created_at: 1,
+        filename: "hafta-2.pdf",
+        size: 10,
+      },
+    ] as never);
+    mockedSearch.mockResolvedValue([
+      {
+        note_id: "n1",
+        title: "Ders Notları 1",
+        score: 1,
+        matched_in: { title: false, body: true },
+        attachment_id: "b".repeat(64),
+      },
+    ]);
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "hafta" } });
+
+    // The note hits arrive through the debounced search, so the row re-renders
+    // with the title once they land.
+    await waitFor(() =>
+      expect(screen.getByTestId("palette.file-used-in").textContent).toContain(
+        "Ders Notları 1",
+      ),
+    );
+  });
+
+  it("shows no FILES section for a one-character query", async () => {
+    vi.mocked(catalogList).mockResolvedValue([
+      {
+        id: "c".repeat(64),
+        content_type: "application/pdf",
+        created_at: 1,
+        filename: "hafta-3.pdf",
+        size: 10,
+      },
+    ] as never);
+    render(<CommandPalette open onClose={vi.fn()} ctx={buildCtx()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "h" } });
+    // Two characters is the floor: one letter matches most of a catalog and the
+    // section would be noise rather than a pointer.
+    expect(screen.queryByTestId("palette.file-used-in")).toBeNull();
   });
 });
