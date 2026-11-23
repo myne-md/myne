@@ -278,12 +278,18 @@ describe("SeedMemoryWizard", () => {
     await screen.findByTestId("settings.memory.seed.candidate-list");
 
     const box = screen.getByTestId("settings.memory.seed.candidate-select-0");
-    // The WCAG 2.2 pointer floor, from the token rather than a literal: this is
-    // the control the whole step exists for.
-    expect(box.style.width).toBe("var(--target-min)");
-    expect(box.style.height).toBe("var(--target-min)");
-    // Its whole header row is the label, so the words toggle it too.
-    expect(box.closest("label")).not.toBeNull();
+    // `<Checkbox>`: the BOX is painted at its own size and the ROW carries the
+    // `--target-min` target, which is the canon rule this step had backwards —
+    // `--target-min` on the box drew a 24px white tick beside 12px text
+    // (myne-md/myne#1099).
+    expect(box.getAttribute("role")).toBe("checkbox");
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    const painted = box.querySelector<HTMLElement>(".myne-checkbox__box")!;
+    expect(painted).not.toBeNull();
+    // 16px from the stylesheet, not an inline width: the skin lives in the
+    // component layer, so the assertion is that no inline size overrides it.
+    expect(box.style.width).toBe("");
+    expect(box.style.height).toBe("");
 
     const short = screen.getByTestId("settings.memory.seed.candidate-text-0");
     const long = screen.getByTestId("settings.memory.seed.candidate-text-1");
