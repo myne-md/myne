@@ -203,6 +203,39 @@ fn install_stage(failure: FailureKind) -> &'static str {
     }
 }
 
+/// The one install in flight, claimed on entry and released on every way out.
+///
+/// A `static` rather than state on the app handle because there is one updater
+/// per process by construction, and a guard that can be forgotten — a struct
+/// whose `Drop` releases the claim — rather than a pair of calls, because the
+/// early returns in `update_install` are exactly where a manual release goes
+/// missing and leaves the client refusing every later attempt with "already
+/// running" until the process restarts.
+struct InstallSlot;
+
+static INSTALL_IN_FLIGHT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+impl InstallSlot {
+    fn claim() -> Option<Self> {
+        use std::sync::atomic::Ordering;
+        INSTALL_IN_FLIGHT
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| InstallSlot)
+    }
+
+    #[cfg(test)]
+    fn in_flight() -> bool {
+        INSTALL_IN_FLIGHT.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+impl Drop for InstallSlot {
+    fn drop(&mut self) {
+        INSTALL_IN_FLIGHT.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
 /// Check for a signed update. Returns the running version's status; a failure
 /// is the `Err` arm, never a status value.
 #[tauri::command]
@@ -285,6 +318,34 @@ fn progress_step(total: Option<u64>) -> u64 {
 /// a callback the plugin already calls, and it turns "did not finish" into a number.
 #[tauri::command]
 pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateCheckError> {
+    // ONE INSTALL AT A TIME (myne-md/myne#1059). Two doors reach this command —
+    // the notice's confirm and the About row — and nothing used to stop both:
+    // the 2026-11-15 log carries two `update_install_started` twenty seconds
+    // apart, each downloading the same 208 MB artefact, each emitting progress
+    // on ONE event name. The renderer takes the last tick it receives, which is
+    // why the bar and the byte count went forward and back at once. The two
+    // then collided on the bundle itself, which is a plausible reading of why
+    // both failed `replace_bundle` with the OS refusing the move: the first had
+    // already renamed the app aside when the second tried the same rename.
+    //
+    // The guard is here rather than in the renderer because a guard in one door
+    // proves nothing about the other, and a `webview` that reloads mid-install
+    // starts from a clean state while the host keeps going.
+    let _slot = match InstallSlot::claim() {
+        Some(slot) => slot,
+        None => {
+            tracing::warn!(
+                event = "update_install_refused",
+                reason = "in_flight",
+                // The stage the page cannot see: a refusal here means an
+                // install was already running, so the failure the user is shown
+                // is about the SECOND press, not about the update.
+                stage = "claim"
+            );
+            return Err(UpdateCheckError::Other);
+        }
+    };
+
     let updater = updater_for(&app)?;
     let offer = updater
         .check()
@@ -444,6 +505,30 @@ mod tests {
     /// body with a constant left every test in this tree green. `clamp` also panics
     /// on inverted bounds, and a panic inside the download callback aborts an
     /// install that would otherwise have finished.
+    /// The claim is exclusive, and it is released by the guard's `Drop` rather
+    /// than by a call somebody has to remember. Both halves are asserted: a
+    /// guard that never releases would refuse every later install for the life
+    /// of the process, which is a worse failure than the one it prevents.
+    #[test]
+    fn one_install_is_claimed_at_a_time_and_released_on_drop() {
+        assert!(!InstallSlot::in_flight());
+        let first = InstallSlot::claim();
+        assert!(first.is_some());
+        assert!(InstallSlot::in_flight());
+
+        assert!(
+            InstallSlot::claim().is_none(),
+            "a second install was allowed to start while the first was running"
+        );
+
+        drop(first);
+        assert!(!InstallSlot::in_flight());
+        assert!(
+            InstallSlot::claim().is_some(),
+            "the slot stayed claimed after the first install ended"
+        );
+    }
+
     #[test]
     fn the_progress_step_is_a_percentage_inside_a_floor_and_a_cap() {
         // No `Content-Length`: no total to take a percentage of.

@@ -46,9 +46,13 @@ import { MyneMark } from "../components/primitives/MyneMark";
 import { VISUALLY_HIDDEN } from "../components/primitives/visuallyHidden";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { formatBytes } from "../components/attachments/format";
+import { openUrl } from "../platform/opener";
 import type { UpdateProgressState } from "../hooks/useUpdateAvailable";
 
 export type UpdatingPhase = "working" | "failed";
+
+/** Where a reader who cannot get past the failed screen gets the artefact. */
+const DOWNLOAD_PAGE = "https://myne.md/download/";
 
 export interface UpdatingScreenProps {
   phase: UpdatingPhase;
@@ -305,6 +309,33 @@ export function UpdatingScreen({
                 // machine the user is looking at.
                 t("update.failed.caption", { version: __APP_VERSION__ })
               }
+            </span>
+            {/* The manual route (myne-md/myne#1059). The stage this screen
+                cannot name is `replace_bundle`: the download verified and the OS
+                refused the bundle move, twice in the 2026-11-15 log. The artefact
+                on myne.md is the same one, so a reader who cannot get past here
+                has a way forward that does not depend on the updater. */}
+            {/* A sentence with the address in it, not a button: the line is one
+                instruction, and a button whose label is a paragraph reads as a
+                choice among the two below it. The click still goes through the
+                opener seam — the WebView drops an anchor's new window — while the
+                href keeps the address in the accessibility tree and in a copy. */}
+            <span style={CAPTION_STYLE}>
+              <a
+                href={DOWNLOAD_PAGE}
+                style={{ color: "var(--accent)" }}
+                data-testid="update.failed-manual"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openUrl(DOWNLOAD_PAGE).catch((error: unknown) => {
+                    if (import.meta.env.DEV) {
+                      console.warn("UpdatingScreen: openUrl failed", error);
+                    }
+                  });
+                }}
+              >
+                {t("update.failed.manual")}
+              </a>
             </span>
             <div style={ACTIONS_STYLE}>
               <Button
