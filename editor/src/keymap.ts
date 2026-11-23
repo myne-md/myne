@@ -9,8 +9,8 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { selectNextOccurrence } from "@codemirror/search";
-import { undo, redo, indentLess } from "@codemirror/commands";
-import { listAwareIndent } from "./list-indent";
+import { undo, redo } from "@codemirror/commands";
+import { listAwareIndent, listAwareOutdent } from "./list-indent";
 import { toggleWrap } from "./wrap-toggle";
 // List-prefix toggles are shared with the toolbar surfaces (single source).
 import { toggleListPrefix } from "./toolbar/commands";
@@ -150,7 +150,10 @@ const REBINDABLE_EDITOR_BINDINGS: readonly RebindableEditorBinding[] = [
   // width satisfies at most one marker. Everything else falls through to
   // `indentMore` inside it, so this stays behaviour-identical off a list.
   { id: "editor.indent", defaultKeys: ["Tab"], run: listAwareIndent },
-  { id: "editor.outdent", defaultKeys: ["Shift-Tab"], run: indentLess },
+  // `listAwareOutdent` (myne-md/myne#1064) for the mirror-image reason: outdenting
+  // a list line has to land on the level it belonged to AND leave the caret
+  // inside the item, which `indentLess` does neither of.
+  { id: "editor.outdent", defaultKeys: ["Shift-Tab"], run: listAwareOutdent },
 ];
 
 /** In-code default chords keyed by id — the display defaults the Hotkeys catalog
