@@ -490,7 +490,27 @@
       "transcriptNoteTitle": "{{name}} (přepis)",
       "transcriptSave": "Uložit jako poznámku",
       "transcriptSaved": "Přepis uložen jako poznámka.",
-      "transcriptSaveFailed": "Přepis se nepodařilo uložit jako poznámku."
+      "transcriptSaveFailed": "Přepis se nepodařilo uložit jako poznámku.",
+      "folderScopeAriaLabel": "Zobrazit soubory v jedné složce",
+      "selectAriaLabel": "Vybrat {{name}}",
+      "selectedCount_one": "{{count}} vybraný",
+      "selectedCount_few": "{{count}} vybrané",
+      "selectedCount_many": "{{count}} vybraných",
+      "selectedCount_other": "{{count}} vybraných",
+      "moveToAriaLabel": "Přesunout vybrané soubory do složky",
+      "moveFailed": "Vybrané soubory se nepodařilo přesunout. Nic se nezměnilo; zkuste to znovu.",
+      "importFolder": "Importovat složku",
+      "importFolderProgress": "Import {{done}} z {{total}}",
+      "importFolderDone_one": "{{imported}} soubor importován, {{skipped}} přeskočen.",
+      "importFolderDone_few": "{{imported}} soubory importovány, {{skipped}} přeskočeny.",
+      "importFolderDone_many": "{{imported}} souborů importováno, {{skipped}} přeskočeno.",
+      "importFolderDone_other": "{{imported}} souborů importováno, {{skipped}} přeskočeno.",
+      "importFolderCancelled_one": "Zastaveno po {{count}} souboru. Co se importovalo, je v knihovně.",
+      "importFolderCancelled_few": "Zastaveno po {{count}} souborech. Co se importovalo, je v knihovně.",
+      "importFolderCancelled_many": "Zastaveno po {{count}} souborech. Co se importovalo, je v knihovně.",
+      "importFolderCancelled_other": "Zastaveno po {{count}} souborech. Co se importovalo, je v knihovně.",
+      "importFolderFailed": "Tuto složku se nepodařilo přečíst. Nic se neimportovalo.",
+      "folderAll": "Všechny složky"
     },
     "thumbnail": {
       "audioLabel": "Zvuk: {{filename}}",
@@ -530,7 +550,12 @@
     "emptyState": "Zatím žádné přílohy. Klepnutím na Nahrát přidáte obrázek nebo PDF.",
     "insert": "Vložit",
     "pauseLabel": "Pozastavit {{filename}}",
-    "playLabel": "Přehrát {{filename}}"
+    "playLabel": "Přehrát {{filename}}",
+    "move": "Přesunout",
+    "folderAll": "Všechny složky",
+    "folderRoot": "Bez složky",
+    "folderPickerAria": "Složka pro {{name}}",
+    "folderMoveFailed": "Tento soubor se nepodařilo přesunout. Nic se nezměnilo; zkuste to znovu."
   },
   "backup": {
     "errors": {
@@ -609,7 +634,10 @@
     "resultsLabel": "Příkazy a poznámky",
     "pin": "Připnout na levou lištu",
     "unpin": "Odpinout z levé lišty",
-    "pinError": "Příkaz se nepodařilo připnout."
+    "pinError": "Příkaz se nepodařilo připnout.",
+    "sectionFiles": "Soubory",
+    "fileUsedIn": "v {{title}}",
+    "fileUnused": "nepoužívá se v žádné poznámce"
   },
   "commands": {
     "actions": {
@@ -933,6 +961,9 @@
       },
       "convertImportedAttachments": {
         "label": "Převést importované přílohy…"
+      },
+      "showHome": {
+        "label": "Přejít do Domova"
       }
     },
     "hotkeys": {
@@ -2345,7 +2376,8 @@
       "renameFailed": "Složku se nepodařilo přejmenovat, takže zůstává nezměněná.",
       "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Při každém odemčení se pod původním názvem znovu objeví prázdná složka; je bezpečné ji smazat a nic jiného se tím nezmění. Dalším přejmenováním složky ji neodstraníte.",
       "folderListFull": "Myne si pamatuje jen omezený počet složek a tento seznam je plný. Tato složka funguje dál, ale zmizí, až ji opustí její poslední poznámka. Smazáním složky, kterou už nepotřebujete, uvolníte místo.",
-      "folderNotRemembered": "Složka byla vytvořena, ale Myne si ji nedokázal zaznamenat. Zmizí, až ji opustí její poslední poznámka, a pokud bude ještě prázdná, bude při dalším odemčení pryč. Je bezpečné ji vytvořit znovu."
+      "folderNotRemembered": "Složka byla vytvořena, ale Myne si ji nedokázal zaznamenat. Zmizí, až ji opustí její poslední poznámka, a pokud bude ještě prázdná, bude při dalším odemčení pryč. Je bezpečné ji vytvořit znovu.",
+      "attachmentFolderRewriteFailed": "Složka byla přejmenována, ale soubory v ní uložené se s ní nepřesunuly. Stále uvádějí starou složku, takže chybí ve stromu knihovny i u agenta, kterému byla tato složka dána. Přesuňte je znovu ručně z Příloh, nebo složku přejmenujte zpět a pak znovu."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2753,7 +2785,8 @@
         "attachments": "Přílohy",
         "graph": "Graf",
         "tasks": "Úkoly",
-        "today": "Dnes"
+        "today": "Dnes",
+        "home": "Domov"
       },
       "placesLabel": "Přejít na",
       "results": "Výsledky"
@@ -2763,7 +2796,8 @@
       "tasksTab": "Úkoly",
       "loading": "Načítá se…",
       "untitledView": "Zobrazení bez názvu",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Domov"
     },
     "relativeTime": {
       "daysAgo": "před {{d}} dny",
@@ -3143,6 +3177,58 @@
       "pdf": "PDF",
       "submenuLabel": "Exportovat…",
       "txt": "Prostý text"
+    },
+    "home": {
+      "emptyTitle": "Vaše domovská plocha",
+      "emptyBody": "Tady se objeví karty s posledními poznámkami, dnešními úkoly a soubory, po kterých často saháte. Zatím není nic uspořádáno.",
+      "title": "Domov",
+      "arrange": "Uspořádat",
+      "arrangeTitle": "Uspořádat Domov",
+      "addCard": "Přidat kartu",
+      "removeCard": "Odebrat {{name}}",
+      "spanWide": "Široká",
+      "spanNarrow": "Úzká",
+      "onStart": "Při otevření aplikace",
+      "onStartHint": "Otevírat tuto domovskou plochu při spuštění, jen na tomto zařízení.",
+      "cards": {
+        "recentNotes": "Poslední poznámky",
+        "quickCapture": "Rychlé zachycení",
+        "todaysTasks": "Dnešní úkoly",
+        "calendarAgenda": "Blízko",
+        "favorites": "Oblíbené",
+        "referenceSets": "Sady odkazů",
+        "savedViews": "Uložená zobrazení",
+        "recentFiles": "Poslední soubory",
+        "writingStats": "Psaní",
+        "agentPrompt": "Zeptat se agenta",
+        "graph": "Váš trezor",
+        "unknown": "Karta není dostupná",
+        "unknownNote": "Tuto kartu přidala novější verze Myne, takže ji tato nedokáže vykreslit. Zůstává na svém místě.",
+        "pending": "Tato karta se staví.",
+        "loading": "Čtení trezoru…",
+        "recentNotesEmpty": "Na tomto zařízení ještě nebyla otevřena žádná poznámka. Otevřené se objeví tady.",
+        "favoritesEmpty": "Zatím není nic označeno hvězdou. Označte poznámku a objeví se tady.",
+        "todaysTasksEmpty": "Dnes nic není po termínu.",
+        "calendarAgendaEmpty": "Na příští týden není nic naplánováno.",
+        "recentFilesEmpty": "Zatím žádné soubory. Importujte jeden z knihovny souborů.",
+        "referenceSetsEmpty": "Žádná složka neobsahuje soubory. Uložte soubor do složky a objeví se tady.",
+        "savedViewsEmpty": "Zatím žádná uložená zobrazení.",
+        "writingStatsHint": "Počty slov se objeví tady, jak trezor roste.",
+        "quickCaptureHint": "Začněte poznámku, aniž byste opustili Domov.",
+        "agentPromptHint": "Zeptejte se agenta na cokoli ve svém trezoru.",
+        "agentPromptAction": "Otevřít agenta",
+        "graphCount": "{{count}} poznámek v grafu",
+        "openTasks": "Otevřít seznam úkolů",
+        "openCalendar": "Otevřít kalendář",
+        "openFiles": "Otevřít knihovnu souborů",
+        "openGraph": "Otevřít graf",
+        "fileCount_one": "{{count}} soubor",
+        "fileCount_few": "{{count}} soubory",
+        "fileCount_many": "{{count}} souborů",
+        "fileCount_other": "{{count}} souborů",
+        "statNotes": "{{count}} poznámek",
+        "statFavorites": "{{count}} v oblíbených"
+      }
     }
   },
   "photoNote": {
@@ -3438,7 +3524,8 @@
       "diagnosticFilesHelper_one": "Jeden soubor by obsahoval tento blok a k tomu {{count}} soubor protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
       "diagnosticFilesHelper_other": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souborů protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
       "diagnosticFilesHelper_few": "Jeden soubor by obsahoval tento blok a k tomu {{count}} soubory protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
-      "diagnosticFilesHelper_many": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souboru protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží."
+      "diagnosticFilesHelper_many": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souboru protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
+      "updateBlocked": "Myne odsud nemohl aktualizaci spustit, takže se nic nenainstalovalo. Zkuste to za chvíli znovu."
     },
     "vault": {
       "changePasswordButton": "Změnit heslo",
@@ -4115,7 +4202,21 @@
         "countsNotes_few": "Sdílí {{count}} poznámky ve {{folders}} složkách.",
         "countsNotes_many": "Sdílí {{count}} poznámek ve {{folders}} složkách.",
         "countsExcluded_few": "{{count}} složky vynechány.",
-        "countsExcluded_many": "{{count}} složek vynecháno."
+        "countsExcluded_many": "{{count}} složek vynecháno.",
+        "verb": {
+          "attachment_list": "Vypsat soubory",
+          "attachment_read": "Přečíst text souboru",
+          "calendar_read": "Přečíst kalendář",
+          "view_list": "Vypsat uložená zobrazení"
+        },
+        "wholeVaultLabel": "Číst a zapisovat celý trezor",
+        "wholeVaultHelper": "Každá složka, včetně těch, které vytvoříte později. Když některou níže vynecháte, zůstane vynechaná pro čtení i zápis.",
+        "excludeNothing": "Nic nevynecháno",
+        "scopeLineAll": "Dosáhne na každou poznámku v trezoru, včetně složek vytvořených později, a může kteroukoli změnit.",
+        "scopeLine": "Dosáhne na {{count}} poznámek v {{folders}} složkách a může v nich cokoli změnit.",
+        "toolsNote": "Čtení má limit: až {{count}} poznámek za {{minutes}} minut.",
+        "needsReapproval": "Schváleno starší verzí podle opačného pravidla. Toto sestavení pro něj nic nečte, dokud ho znovu neschválíte.",
+        "scopeLineWords": "Dosáhne na složky, které uvedete, a může v nich cokoli změnit."
       },
       "autoApplyLabel": "Automaticky uplatňovat navržené štítky",
       "autoApplyHelper": "Zapíše štítky do poznámky bez dotazu, jednou za relaci za poznámku, až po její úpravě. Jen na tomto zařízení. Vrácení zpět je pod poznámkou po zápisu."
@@ -4275,7 +4376,8 @@
         "vault": "Trezor",
         "data": "Data",
         "diagnostics": "Diagnostika",
-        "extensions": "Rozšíření prohlížeče"
+        "extensions": "Rozšíření prohlížeče",
+        "connections": "Připojení"
       },
       "passwordUpdatedToast": "Heslo aktualizováno",
       "title": "Nastavení"
@@ -4703,7 +4805,10 @@
       "errorTooShort": "Použijte alespoň {{count}} znaků/číslic.",
       "errorGeneric": "Přihlašovací údaj se nepodařilo nastavit. Zkuste to prosím znovu."
     },
-    "helperDisclosureLabel": "Více o tomto nastavení"
+    "helperDisclosureLabel": "Více o tomto nastavení",
+    "connections": {
+      "mcp": "Externí klienti MCP"
+    }
   },
   "storageLost": {
     "allSynced": "Nic se neztratilo: každá zdejší poznámka už na server dorazila.",
@@ -6237,7 +6342,8 @@
       "caption": "Myne {{version}} stále běží a vaše poznámky jsou nedotčené.",
       "hint": "Nový pokus spustí stahování od začátku.",
       "retry": "Zkusit znovu",
-      "back": "Zpět na odemknutí"
+      "back": "Zpět na odemknutí",
+      "manual": "Pokud se to opakuje, stáhněte novou verzi z myne.md a nainstalujte ji ručně. Aplikace, kterou máte, zůstane nedotčená."
     }
   },
   "identityFlow": {
@@ -6337,5 +6443,12 @@
     "joinFromQr": {
       "notFound": "Tento kód označuje trezor, který na tomto zařízení není mezi vašimi pozvánkami. Požádejte vlastníka trezoru, aby pozvánku této identitě poslal znovu."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Pojmenujte kalendář, například Osobní",
+      "calendarRequired": "Dejte události kalendář. Právě on události dává barvu a právě jeho tohle zobrazení může vypnout."
+    },
+    "calendarsToggleFailed": "Tento kalendář se nepřepnul. Zůstal tak, jak byl."
   }
 }

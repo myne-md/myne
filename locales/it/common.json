@@ -451,7 +451,24 @@
       "transcriptNoteTitle": "{{name}} (trascrizione)",
       "transcriptSave": "Salva come nota",
       "transcriptSaved": "Trascrizione salvata come nota.",
-      "transcriptSaveFailed": "Impossibile salvare la trascrizione come nota."
+      "transcriptSaveFailed": "Impossibile salvare la trascrizione come nota.",
+      "folderScopeAriaLabel": "Mostra i file di una cartella",
+      "selectAriaLabel": "Seleziona {{name}}",
+      "selectedCount_one": "{{count}} selezionato",
+      "selectedCount_many": "{{count}} di selezionati",
+      "selectedCount_other": "{{count}} selezionati",
+      "moveToAriaLabel": "Sposta i file selezionati in una cartella",
+      "moveFailed": "Non è stato possibile spostare i file selezionati. Non è cambiato nulla; riprova.",
+      "importFolder": "Importa una cartella",
+      "importFolderProgress": "Importazione di {{done}} su {{total}}",
+      "importFolderDone_one": "{{imported}} file importato, {{skipped}} ignorato.",
+      "importFolderDone_many": "{{imported}} di file importati, {{skipped}} ignorati.",
+      "importFolderDone_other": "{{imported}} file importati, {{skipped}} ignorati.",
+      "importFolderCancelled_one": "Fermato dopo {{count}} file. Ciò che è stato importato è nella libreria.",
+      "importFolderCancelled_many": "Fermato dopo {{count}} di file. Ciò che è stato importato è nella libreria.",
+      "importFolderCancelled_other": "Fermato dopo {{count}} file. Ciò che è stato importato è nella libreria.",
+      "importFolderFailed": "Non è stato possibile leggere quella cartella. Non è stato importato nulla.",
+      "folderAll": "Tutte le cartelle"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -488,7 +505,12 @@
     "emptyState": "Ancora nessun allegato. Tocca Carica per aggiungere un'immagine o un PDF.",
     "insert": "Inserisci",
     "pauseLabel": "Metti in pausa {{filename}}",
-    "playLabel": "Riproduci {{filename}}"
+    "playLabel": "Riproduci {{filename}}",
+    "move": "Sposta",
+    "folderAll": "Tutte le cartelle",
+    "folderRoot": "Nessuna cartella",
+    "folderPickerAria": "Cartella per {{name}}",
+    "folderMoveFailed": "Non è stato possibile spostare quel file. Non è cambiato nulla; riprova."
   },
   "backup": {
     "errors": {
@@ -567,7 +589,10 @@
     "resultsLabel": "Comandi e note",
     "pin": "Fissa al nastro sinistro",
     "unpin": "Sblocca dal nastro sinistro",
-    "pinError": "Impossibile fissare il comando."
+    "pinError": "Impossibile fissare il comando.",
+    "sectionFiles": "File",
+    "fileUsedIn": "in {{title}}",
+    "fileUnused": "non usato in nessuna nota"
   },
   "commands": {
     "actions": {
@@ -891,6 +916,9 @@
       },
       "convertImportedAttachments": {
         "label": "Converti gli allegati importati…"
+      },
+      "showHome": {
+        "label": "Vai alla home"
       }
     },
     "hotkeys": {
@@ -2258,7 +2286,8 @@
       "renameFailed": "Impossibile rinominare la cartella, quindi è invariata.",
       "deliberateWriteFailed": "La cartella è stata rinominata, ma non è stato possibile salvare una delle sue impostazioni. A ogni sblocco ricomparirà una cartella vuota con il vecchio nome; puoi eliminarla tranquillamente e non cambia nient'altro. Rinominare di nuovo la cartella non la farà sparire.",
       "folderListFull": "Myne può ricordare un numero limitato di cartelle, e quell'elenco è pieno. Questa cartella funziona comunque, ma sparirà quando ne uscirà l'ultima nota. Eliminare una cartella che non ti serve più libera spazio.",
-      "folderNotRemembered": "La cartella è stata creata, ma Myne non è riuscito a registrarla. Sparirà quando ne uscirà l'ultima nota, e al prossimo sblocco non ci sarà più se è ancora vuota. Puoi crearla di nuovo senza problemi."
+      "folderNotRemembered": "La cartella è stata creata, ma Myne non è riuscito a registrarla. Sparirà quando ne uscirà l'ultima nota, e al prossimo sblocco non ci sarà più se è ancora vuota. Puoi crearla di nuovo senza problemi.",
+      "attachmentFolderRewriteFailed": "La cartella è stata rinominata, ma i file archiviati al suo interno non sono stati spostati con lei. Portano ancora il nome della vecchia cartella, quindi mancano dall'albero della libreria e da un agente a cui è stata data questa cartella. Spostali di nuovo a mano da Allegati, oppure riporta indietro il nome della cartella e poi rinominala di nuovo."
     },
     "folderNote": {
       "defaultTitle": "Indice"
@@ -2648,7 +2677,8 @@
         "attachments": "Allegati",
         "graph": "Grafo",
         "tasks": "Attività",
-        "today": "Oggi"
+        "today": "Oggi",
+        "home": "Home"
       },
       "placesLabel": "Vai a",
       "results": "Risultati"
@@ -2658,7 +2688,8 @@
       "tasksTab": "Attività",
       "loading": "Caricamento…",
       "untitledView": "Vista senza titolo",
-      "agentTab": "Agente"
+      "agentTab": "Agente",
+      "homeTab": "Home"
     },
     "relativeTime": {
       "daysAgo": "{{d}} giorni fa",
@@ -3032,6 +3063,57 @@
       "pdf": "PDF",
       "submenuLabel": "Esporta…",
       "txt": "Testo semplice"
+    },
+    "home": {
+      "emptyTitle": "La tua superficie home",
+      "emptyBody": "Qui compariranno schede per le note recenti, le attività di oggi e i file che apri spesso. Non è ancora disposto nulla.",
+      "title": "Home",
+      "arrange": "Disponi",
+      "arrangeTitle": "Disponi la tua home",
+      "addCard": "Aggiungi una scheda",
+      "removeCard": "Rimuovi {{name}}",
+      "spanWide": "Larga",
+      "spanNarrow": "Stretta",
+      "onStart": "All'apertura dell'app",
+      "onStartHint": "Apri questa superficie home all'avvio, solo su questo dispositivo.",
+      "cards": {
+        "recentNotes": "Note recenti",
+        "quickCapture": "Acquisizione rapida",
+        "todaysTasks": "Attività di oggi",
+        "calendarAgenda": "In arrivo",
+        "favorites": "Preferiti",
+        "referenceSets": "Insiemi di riferimento",
+        "savedViews": "Viste salvate",
+        "recentFiles": "File recenti",
+        "writingStats": "Scrittura",
+        "agentPrompt": "Chiedi all'agente",
+        "graph": "Il tuo caveau",
+        "unknown": "Scheda non disponibile",
+        "unknownNote": "Questa scheda è stata aggiunta da una versione più recente di Myne, quindi questa non può disegnarla. Resta al suo posto.",
+        "pending": "Questa scheda è in costruzione.",
+        "loading": "Lettura del caveau…",
+        "recentNotesEmpty": "Nessuna nota è ancora stata aperta su questo dispositivo. Quelle che apri compaiono qui.",
+        "favoritesEmpty": "Niente è ancora nei preferiti. Metti una nota nei preferiti e compare qui.",
+        "todaysTasksEmpty": "Oggi non scade nulla.",
+        "calendarAgendaEmpty": "Non c'è nulla in programma per la prossima settimana.",
+        "recentFilesEmpty": "Ancora nessun file. Importane uno dalla libreria dei file.",
+        "referenceSetsEmpty": "Nessuna cartella contiene file. Archivia un file in una cartella e compare qui.",
+        "savedViewsEmpty": "Ancora nessuna vista salvata.",
+        "writingStatsHint": "I conteggi delle parole compaiono qui man mano che il caveau cresce.",
+        "quickCaptureHint": "Inizia una nota senza lasciare la tua home.",
+        "agentPromptHint": "Chiedi all'agente qualunque cosa del tuo caveau.",
+        "agentPromptAction": "Apri l'agente",
+        "graphCount": "{{count}} note nel grafo",
+        "openTasks": "Apri l'elenco delle attività",
+        "openCalendar": "Apri il calendario",
+        "openFiles": "Apri la libreria dei file",
+        "openGraph": "Apri il grafo",
+        "fileCount_one": "{{count}} file",
+        "fileCount_many": "{{count}} di file",
+        "fileCount_other": "{{count}} file",
+        "statNotes": "{{count}} note",
+        "statFavorites": "{{count}} nei preferiti"
+      }
     }
   },
   "photoNote": {
@@ -3320,7 +3402,8 @@
       },
       "diagnosticFilesHelper_one": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
       "diagnosticFilesHelper_other": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
-      "diagnosticFilesHelper_many": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va."
+      "diagnosticFilesHelper_many": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
+      "updateBlocked": "Myne non è riuscito ad avviare l'aggiornamento da qui, quindi non è stato installato nulla. Riprova tra un momento."
     },
     "vault": {
       "changePasswordButton": "Cambia password",
@@ -3984,7 +4067,21 @@
         "grantFailed": "Impossibile salvare l'approvazione. Nulla è cambiato.",
         "readSummary_many": "Può leggere {{count}} note in {{folders}} cartelle.",
         "countsNotes_many": "Condivide {{count}} note in {{folders}} cartelle.",
-        "countsExcluded_many": "{{count}} cartelle escluse."
+        "countsExcluded_many": "{{count}} cartelle escluse.",
+        "verb": {
+          "attachment_list": "Elenca i file",
+          "attachment_read": "Leggi il testo di un file",
+          "calendar_read": "Leggi il calendario",
+          "view_list": "Elenca le viste salvate"
+        },
+        "wholeVaultLabel": "Leggi e scrivi tutto il caveau",
+        "wholeVaultHelper": "Ogni cartella, comprese quelle che creerai dopo. Se ne lasci fuori una qui sotto, resta fuori sia dalle letture sia dalle scritture.",
+        "excludeNothing": "Nessuna esclusa",
+        "scopeLineAll": "Raggiunge ogni nota del caveau, comprese quelle nelle cartelle che creerai dopo, e può modificarle tutte.",
+        "scopeLine": "Raggiunge {{count}} note in {{folders}} cartelle e può cambiare qualunque cosa al loro interno.",
+        "toolsNote": "Le letture hanno un budget: fino a {{count}} note ogni {{minutes}} minuti.",
+        "needsReapproval": "Approvato da una versione precedente, con la regola opposta. Questa build non legge nulla per lui finché non lo approvi di nuovo.",
+        "scopeLineWords": "Raggiunge le cartelle che indichi e può cambiare qualunque cosa al loro interno."
       },
       "autoApplyLabel": "Applica automaticamente i tag suggeriti",
       "autoApplyHelper": "Scrive i tag nella nota senza chiedere, una volta per nota per sessione, solo dopo che la modifichi. Solo su questo dispositivo. Annulla è sotto la nota dopo la scrittura."
@@ -4142,7 +4239,8 @@
         "vault": "Cassaforte",
         "data": "Dati",
         "diagnostics": "Diagnostica",
-        "extensions": "Estensioni del browser"
+        "extensions": "Estensioni del browser",
+        "connections": "Connessioni"
       },
       "passwordUpdatedToast": "Password aggiornata",
       "title": "Impostazioni"
@@ -4564,7 +4662,10 @@
       "errorTooShort": "Usa almeno {{count}} caratteri/cifre.",
       "errorGeneric": "Impossibile impostare la credenziale. Riprova."
     },
-    "helperDisclosureLabel": "Scopri di più su questa impostazione"
+    "helperDisclosureLabel": "Scopri di più su questa impostazione",
+    "connections": {
+      "mcp": "Client MCP esterni"
+    }
   },
   "storageLost": {
     "allSynced": "Non è andato perso nulla: ogni nota presente qui aveva già raggiunto il server.",
@@ -6074,7 +6175,8 @@
       "caption": "Myne {{version}} è ancora in esecuzione e le tue note sono intatte.",
       "hint": "Riprovando, il download riparte da capo.",
       "retry": "Riprova",
-      "back": "Torna allo sblocco"
+      "back": "Torna allo sblocco",
+      "manual": "Se continua a succedere, scarica la nuova versione da myne.md e installala a mano. L'app che hai ora resta intatta."
     }
   },
   "identityFlow": {
@@ -6174,5 +6276,12 @@
     "joinFromQr": {
       "notFound": "Questo codice indica una cassaforte che non è tra i tuoi inviti su questo dispositivo. Chiedi al proprietario della cassaforte di inviare di nuovo l'invito a questa identità."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Dai un nome a un calendario, per esempio Personale",
+      "calendarRequired": "Assegna un calendario all'evento. È ciò che colora l'evento ed è ciò che questa vista può disattivare."
+    },
+    "calendarsToggleFailed": "Quel calendario non è stato commutato. È rimasto com'era."
   }
 }

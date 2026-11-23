@@ -451,7 +451,24 @@
       "transcriptNoteTitle": "{{name}} (transcrição)",
       "transcriptSave": "Guardar como nota",
       "transcriptSaved": "Transcrição guardada como nota.",
-      "transcriptSaveFailed": "Não foi possível guardar a transcrição como nota."
+      "transcriptSaveFailed": "Não foi possível guardar a transcrição como nota.",
+      "folderScopeAriaLabel": "Mostrar os ficheiros de uma pasta",
+      "selectAriaLabel": "Selecionar {{name}}",
+      "selectedCount_one": "{{count}} selecionado",
+      "selectedCount_many": "{{count}} de selecionados",
+      "selectedCount_other": "{{count}} selecionados",
+      "moveToAriaLabel": "Mover os ficheiros selecionados para uma pasta",
+      "moveFailed": "Não foi possível mover os ficheiros selecionados. Nada mudou; tente outra vez.",
+      "importFolder": "Importar uma pasta",
+      "importFolderProgress": "A importar {{done}} de {{total}}",
+      "importFolderDone_one": "{{imported}} ficheiro importado, {{skipped}} ignorado.",
+      "importFolderDone_many": "{{imported}} de ficheiros importados, {{skipped}} ignorados.",
+      "importFolderDone_other": "{{imported}} ficheiros importados, {{skipped}} ignorados.",
+      "importFolderCancelled_one": "Parado após {{count}} ficheiro. O que foi importado está na biblioteca.",
+      "importFolderCancelled_many": "Parado após {{count}} de ficheiros. O que foi importado está na biblioteca.",
+      "importFolderCancelled_other": "Parado após {{count}} ficheiros. O que foi importado está na biblioteca.",
+      "importFolderFailed": "Não foi possível ler essa pasta. Nada foi importado.",
+      "folderAll": "Todas as pastas"
     },
     "thumbnail": {
       "audioLabel": "Áudio: {{filename}}",
@@ -488,7 +505,12 @@
     "emptyState": "Ainda não há anexos. Toque em Carregar para adicionar uma imagem ou PDF.",
     "insert": "Inserir",
     "pauseLabel": "Pausar {{filename}}",
-    "playLabel": "Reproduzir {{filename}}"
+    "playLabel": "Reproduzir {{filename}}",
+    "move": "Mover",
+    "folderAll": "Todas as pastas",
+    "folderRoot": "Sem pasta",
+    "folderPickerAria": "Pasta para {{name}}",
+    "folderMoveFailed": "Não foi possível mover esse ficheiro. Nada mudou; tente outra vez."
   },
   "backup": {
     "errors": {
@@ -567,7 +589,10 @@
     "resultsLabel": "Comandos e notas",
     "pin": "Fixar à fita esquerda",
     "unpin": "Soltar da fita esquerda",
-    "pinError": "Não foi possível fixar o comando."
+    "pinError": "Não foi possível fixar o comando.",
+    "sectionFiles": "Ficheiros",
+    "fileUsedIn": "em {{title}}",
+    "fileUnused": "não usado em nenhuma nota"
   },
   "commands": {
     "actions": {
@@ -891,6 +916,9 @@
       },
       "convertImportedAttachments": {
         "label": "Converter anexos importados…"
+      },
+      "showHome": {
+        "label": "Ir para o início"
       }
     },
     "hotkeys": {
@@ -2258,7 +2286,8 @@
       "renameFailed": "Não foi possível mudar o nome da pasta, por isso fica inalterada.",
       "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Sempre que desbloquear, uma pasta vazia volta a aparecer com o nome antigo; pode apagá-la em segurança, sem que mais nada mude. Mudar o nome da pasta outra vez não a apaga.",
       "folderListFull": "O Myne só consegue guardar um número limitado de pastas, e essa lista está cheia. Esta pasta continua a funcionar, mas desaparece quando a sua última nota sair dela. Apagar uma pasta de que já não precisa liberta espaço.",
-      "folderNotRemembered": "A pasta foi criada, mas o Myne não conseguiu registá-la. Vai desaparecer quando a sua última nota sair dela e, se ainda estiver vazia, desaparece no próximo desbloqueio. Pode voltar a criá-la em segurança."
+      "folderNotRemembered": "A pasta foi criada, mas o Myne não conseguiu registá-la. Vai desaparecer quando a sua última nota sair dela e, se ainda estiver vazia, desaparece no próximo desbloqueio. Pode voltar a criá-la em segurança.",
+      "attachmentFolderRewriteFailed": "A pasta foi renomeada, mas os ficheiros guardados nela não foram movidos com ela. Continuam a indicar a pasta antiga, por isso faltam na árvore da biblioteca e a um agente a quem esta pasta foi dada. Mova-os novamente à mão a partir dos Anexos, ou renomeie a pasta para trás e depois outra vez."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -2648,7 +2677,8 @@
         "attachments": "Anexos",
         "graph": "Gráfico",
         "tasks": "Tarefas",
-        "today": "Hoje"
+        "today": "Hoje",
+        "home": "Início"
       },
       "placesLabel": "Ir para",
       "results": "Resultados"
@@ -2658,7 +2688,8 @@
       "tasksTab": "Tarefas",
       "loading": "A carregar…",
       "untitledView": "Vista sem título",
-      "agentTab": "Agente"
+      "agentTab": "Agente",
+      "homeTab": "Início"
     },
     "relativeTime": {
       "daysAgo": "há {{d}} dias",
@@ -3032,6 +3063,57 @@
       "pdf": "PDF",
       "submenuLabel": "Exportar…",
       "txt": "Texto simples"
+    },
+    "home": {
+      "emptyTitle": "A sua superfície de início",
+      "emptyBody": "Aqui vão aparecer cartões para as notas recentes, as tarefas de hoje e os ficheiros que abre mais vezes. Ainda não está nada organizado.",
+      "title": "Início",
+      "arrange": "Organizar",
+      "arrangeTitle": "Organizar o seu início",
+      "addCard": "Adicionar um cartão",
+      "removeCard": "Remover {{name}}",
+      "spanWide": "Largo",
+      "spanNarrow": "Estreito",
+      "onStart": "Quando a aplicação abre",
+      "onStartHint": "Abrir esta superfície de início ao arrancar, apenas neste dispositivo.",
+      "cards": {
+        "recentNotes": "Notas recentes",
+        "quickCapture": "Captura rápida",
+        "todaysTasks": "Tarefas de hoje",
+        "calendarAgenda": "A seguir",
+        "favorites": "Favoritos",
+        "referenceSets": "Conjuntos de referência",
+        "savedViews": "Vistas guardadas",
+        "recentFiles": "Ficheiros recentes",
+        "writingStats": "Escrita",
+        "agentPrompt": "Perguntar ao agente",
+        "graph": "O seu cofre",
+        "unknown": "Cartão indisponível",
+        "unknownNote": "Este cartão foi adicionado por uma versão mais recente do Myne, por isso esta não o consegue desenhar. Fica no lugar onde está.",
+        "pending": "Este cartão está a ser construído.",
+        "loading": "A ler o cofre…",
+        "recentNotesEmpty": "Ainda não foi aberta nenhuma nota neste dispositivo. As que abrir aparecem aqui.",
+        "favoritesEmpty": "Ainda não há nada nos favoritos. Marque uma nota e ela aparece aqui.",
+        "todaysTasksEmpty": "Hoje não vence nada.",
+        "calendarAgendaEmpty": "Não está nada marcado para a próxima semana.",
+        "recentFilesEmpty": "Ainda não há ficheiros. Importe um a partir da biblioteca de ficheiros.",
+        "referenceSetsEmpty": "Nenhuma pasta tem ficheiros. Guarde um ficheiro numa pasta e ele aparece aqui.",
+        "savedViewsEmpty": "Ainda não há vistas guardadas.",
+        "writingStatsHint": "As contagens de palavras aparecem aqui à medida que o cofre cresce.",
+        "quickCaptureHint": "Comece uma nota sem sair do seu início.",
+        "agentPromptHint": "Pergunte ao agente sobre qualquer coisa no seu cofre.",
+        "agentPromptAction": "Abrir o agente",
+        "graphCount": "{{count}} notas no grafo",
+        "openTasks": "Abrir a lista de tarefas",
+        "openCalendar": "Abrir o calendário",
+        "openFiles": "Abrir a biblioteca de ficheiros",
+        "openGraph": "Abrir o grafo",
+        "fileCount_one": "{{count}} ficheiro",
+        "fileCount_many": "{{count}} de ficheiros",
+        "fileCount_other": "{{count}} ficheiros",
+        "statNotes": "{{count}} notas",
+        "statFavorites": "{{count}} nos favoritos"
+      }
     }
   },
   "photoNote": {
@@ -3320,7 +3402,8 @@
       },
       "diagnosticFilesHelper_one": "Um ficheiro conteria este bloco mais {{count}} ficheiro de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
       "diagnosticFilesHelper_other": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
-      "diagnosticFilesHelper_many": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai."
+      "diagnosticFilesHelper_many": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
+      "updateBlocked": "O Myne não conseguiu iniciar a atualização a partir daqui, por isso nada foi instalado. Tente outra vez daqui a pouco."
     },
     "vault": {
       "changePasswordButton": "Mudar palavra-passe",
@@ -3984,7 +4067,21 @@
         "grantFailed": "Não foi possível guardar a aprovação. Nada foi alterado.",
         "readSummary_many": "Pode ler {{count}} notas em {{folders}} pastas.",
         "countsNotes_many": "Partilha {{count}} notas em {{folders}} pastas.",
-        "countsExcluded_many": "{{count}} pastas excluídas."
+        "countsExcluded_many": "{{count}} pastas excluídas.",
+        "verb": {
+          "attachment_list": "Listar ficheiros",
+          "attachment_read": "Ler o texto de um ficheiro",
+          "calendar_read": "Ler o calendário",
+          "view_list": "Listar as vistas guardadas"
+        },
+        "wholeVaultLabel": "Ler e escrever o cofre inteiro",
+        "wholeVaultHelper": "Todas as pastas, incluindo as que criar mais tarde. Se deixar uma de fora abaixo, fica de fora tanto para leituras como para escritas.",
+        "excludeNothing": "Nenhuma de fora",
+        "scopeLineAll": "Alcança cada nota do cofre, incluindo as de pastas que criar mais tarde, e pode alterar qualquer uma delas.",
+        "scopeLine": "Alcança {{count}} notas em {{folders}} pastas, e pode alterar tudo dentro delas.",
+        "toolsNote": "As leituras têm um limite: até {{count}} notas por cada {{minutes}} minutos.",
+        "needsReapproval": "Aprovado por uma versão mais antiga, sob a regra contrária. Esta compilação não lê nada por ele até o aprovar outra vez.",
+        "scopeLineWords": "Alcança as pastas que indicar, e pode alterar tudo dentro delas."
       },
       "autoApplyLabel": "Aplicar etiquetas sugeridas automaticamente",
       "autoApplyHelper": "Escreve as etiquetas na nota sem perguntar, uma vez por nota por sessão, só depois de a editar. Só neste dispositivo. A anulação fica sob a nota depois de escrever."
@@ -4142,7 +4239,8 @@
         "vault": "Cofre",
         "data": "Dados",
         "diagnostics": "Diagnóstico",
-        "extensions": "Extensões do navegador"
+        "extensions": "Extensões do navegador",
+        "connections": "Ligações"
       },
       "passwordUpdatedToast": "Palavra-passe atualizada",
       "title": "Definições"
@@ -4564,7 +4662,10 @@
       "errorTooShort": "Use pelo menos {{count}} carateres/dígitos.",
       "errorGeneric": "Não foi possível definir a credencial. Tente novamente."
     },
-    "helperDisclosureLabel": "Saber mais sobre esta definição"
+    "helperDisclosureLabel": "Saber mais sobre esta definição",
+    "connections": {
+      "mcp": "Clientes MCP externos"
+    }
   },
   "storageLost": {
     "allSynced": "Nada se perdeu: todas as notas aqui já tinham chegado ao servidor.",
@@ -6074,7 +6175,8 @@
       "caption": "O Myne {{version}} continua em execução e as suas notas não foram alteradas.",
       "hint": "Tentar novamente recomeça a descarga.",
       "retry": "Tentar novamente",
-      "back": "Voltar ao desbloqueio"
+      "back": "Voltar ao desbloqueio",
+      "manual": "Se continuar a acontecer, transfira a nova versão em myne.md e instale-a à mão. A aplicação que tem agora fica intacta."
     }
   },
   "identityFlow": {
@@ -6174,5 +6276,12 @@
     "joinFromQr": {
       "notFound": "Este código nomeia um cofre que não está nos seus convites neste dispositivo. Peça ao proprietário do cofre que volte a enviar o convite para esta identidade."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Dê um nome a um calendário, por exemplo Pessoal",
+      "calendarRequired": "Dê um calendário ao evento. É o que dá cor ao evento e é o que esta vista consegue desligar."
+    },
+    "calendarsToggleFailed": "Esse calendário não foi alterado. Ficou como estava."
   }
 }

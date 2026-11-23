@@ -490,7 +490,27 @@
       "transcriptNoteTitle": "{{name}} (transkrypcja)",
       "transcriptSave": "Zapisz jako notatkę",
       "transcriptSaved": "Transkrypcję zapisano jako notatkę.",
-      "transcriptSaveFailed": "Nie udało się zapisać transkrypcji jako notatki."
+      "transcriptSaveFailed": "Nie udało się zapisać transkrypcji jako notatki.",
+      "folderScopeAriaLabel": "Pokaż pliki w jednym folderze",
+      "selectAriaLabel": "Wybierz {{name}}",
+      "selectedCount_one": "{{count}} zaznaczony",
+      "selectedCount_few": "{{count}} zaznaczone",
+      "selectedCount_many": "{{count}} zaznaczonych",
+      "selectedCount_other": "{{count}} zaznaczonych",
+      "moveToAriaLabel": "Przenieś zaznaczone pliki do folderu",
+      "moveFailed": "Nie udało się przenieść zaznaczonych plików. Nic się nie zmieniło; spróbuj ponownie.",
+      "importFolder": "Importuj folder",
+      "importFolderProgress": "Importowanie {{done}} z {{total}}",
+      "importFolderDone_one": "Zaimportowano {{imported}} plik, pominięto {{skipped}}.",
+      "importFolderDone_few": "Zaimportowano {{imported}} pliki, pominięto {{skipped}}.",
+      "importFolderDone_many": "Zaimportowano {{imported}} plików, pominięto {{skipped}}.",
+      "importFolderDone_other": "Zaimportowano {{imported}} plików, pominięto {{skipped}}.",
+      "importFolderCancelled_one": "Zatrzymano po {{count}} pliku. Zaimportowane pliki są w bibliotece.",
+      "importFolderCancelled_few": "Zatrzymano po {{count}} plikach. Zaimportowane pliki są w bibliotece.",
+      "importFolderCancelled_many": "Zatrzymano po {{count}} plikach. Zaimportowane pliki są w bibliotece.",
+      "importFolderCancelled_other": "Zatrzymano po {{count}} plikach. Zaimportowane pliki są w bibliotece.",
+      "importFolderFailed": "Nie udało się odczytać tego folderu. Niczego nie zaimportowano.",
+      "folderAll": "Wszystkie foldery"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -530,7 +550,12 @@
     "emptyState": "Brak załączników. Dotknij Prześlij, aby dodać obraz lub plik PDF.",
     "insert": "Wstaw",
     "pauseLabel": "Wstrzymaj {{filename}}",
-    "playLabel": "Odtwórz {{filename}}"
+    "playLabel": "Odtwórz {{filename}}",
+    "move": "Przenieś",
+    "folderAll": "Wszystkie foldery",
+    "folderRoot": "Bez folderu",
+    "folderPickerAria": "Folder dla {{name}}",
+    "folderMoveFailed": "Nie udało się przenieść tego pliku. Nic się nie zmieniło; spróbuj ponownie."
   },
   "backup": {
     "errors": {
@@ -609,7 +634,10 @@
     "resultsLabel": "Polecenia i notatki",
     "pin": "Przypnij do lewego paska",
     "unpin": "Odepnij od lewego paska",
-    "pinError": "Nie udało się przypiąć polecenia."
+    "pinError": "Nie udało się przypiąć polecenia.",
+    "sectionFiles": "Pliki",
+    "fileUsedIn": "w {{title}}",
+    "fileUnused": "nieużywany w żadnej notatce"
   },
   "commands": {
     "actions": {
@@ -933,6 +961,9 @@
       },
       "convertImportedAttachments": {
         "label": "Konwertuj zaimportowane załączniki…"
+      },
+      "showHome": {
+        "label": "Przejdź do ekranu głównego"
       }
     },
     "hotkeys": {
@@ -2345,7 +2376,8 @@
       "renameFailed": "Nie udało się zmienić nazwy folderu, więc pozostał bez zmian.",
       "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Przy każdym odblokowaniu pod starą nazwą będzie pojawiać się pusty folder; można go bezpiecznie usunąć, co nie zmieni niczego innego. Ponowna zmiana nazwy folderu go nie usunie.",
       "folderListFull": "Myne może zapamiętać ograniczoną liczbę folderów, a ta lista jest pełna. Ten folder nadal działa, ale zniknie, gdy opuści go ostatnia notatka. Usunięcie folderu, którego już nie potrzebujesz, zwolni miejsce.",
-      "folderNotRemembered": "Folder został utworzony, ale Myne nie mogło go zapamiętać. Zniknie, gdy opuści go ostatnia notatka, a przy następnym odblokowaniu przepadnie, jeśli nadal będzie pusty. Ponowne utworzenie go jest bezpieczne."
+      "folderNotRemembered": "Folder został utworzony, ale Myne nie mogło go zapamiętać. Zniknie, gdy opuści go ostatnia notatka, a przy następnym odblokowaniu przepadnie, jeśli nadal będzie pusty. Ponowne utworzenie go jest bezpieczne.",
+      "attachmentFolderRewriteFailed": "Folder został zmieniony, ale pliki w nim zapisane nie przeniosły się razem z nim. Nadal wskazują stary folder, więc brakuje ich w drzewie biblioteki i u agenta, któremu przekazano ten folder. Przenieś je ponownie ręcznie z Załączników albo zmień nazwę folderu z powrotem i jeszcze raz."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2753,7 +2785,8 @@
         "attachments": "Załączniki",
         "graph": "Graf",
         "tasks": "Zadania",
-        "today": "Dziś"
+        "today": "Dziś",
+        "home": "Ekran główny"
       },
       "placesLabel": "Przejdź do",
       "results": "Wyniki"
@@ -2763,7 +2796,8 @@
       "tasksTab": "Zadania",
       "loading": "Ładowanie…",
       "untitledView": "Widok bez tytułu",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Ekran główny"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dni temu",
@@ -3143,6 +3177,58 @@
       "pdf": "PDF",
       "submenuLabel": "Eksportuj…",
       "txt": "Zwykły tekst"
+    },
+    "home": {
+      "emptyTitle": "Twój ekran główny",
+      "emptyBody": "Tutaj pojawią się karty z ostatnimi notatkami, dzisiejszymi zadaniami i plikami, po które często sięgasz. Nic nie jest jeszcze ułożone.",
+      "title": "Ekran główny",
+      "arrange": "Ułóż",
+      "arrangeTitle": "Ułóż swój ekran główny",
+      "addCard": "Dodaj kartę",
+      "removeCard": "Usuń {{name}}",
+      "spanWide": "Szeroka",
+      "spanNarrow": "Wąska",
+      "onStart": "Przy otwarciu aplikacji",
+      "onStartHint": "Otwieraj ten ekran główny przy starcie, tylko na tym urządzeniu.",
+      "cards": {
+        "recentNotes": "Ostatnie notatki",
+        "quickCapture": "Szybkie dodanie",
+        "todaysTasks": "Dzisiejsze zadania",
+        "calendarAgenda": "Wkrótce",
+        "favorites": "Ulubione",
+        "referenceSets": "Zestawy odniesień",
+        "savedViews": "Zapisane widoki",
+        "recentFiles": "Ostatnie pliki",
+        "writingStats": "Pisanie",
+        "agentPrompt": "Zapytaj agenta",
+        "graph": "Twój sejf",
+        "unknown": "Karta niedostępna",
+        "unknownNote": "Tę kartę dodała nowsza wersja Myne, więc ta nie potrafi jej narysować. Zostaje na swoim miejscu.",
+        "pending": "Ta karta jest w budowie.",
+        "loading": "Odczytywanie sejfu…",
+        "recentNotesEmpty": "Na tym urządzeniu nie otwarto jeszcze żadnej notatki. Otwarte pojawią się tutaj.",
+        "favoritesEmpty": "Nic nie jest jeszcze oznaczone gwiazdką. Oznacz notatkę, a pojawi się tutaj.",
+        "todaysTasksEmpty": "Na dziś nic nie przypada.",
+        "calendarAgendaEmpty": "W przyszłym tygodniu nic nie zaplanowano.",
+        "recentFilesEmpty": "Nie ma jeszcze plików. Zaimportuj jeden z biblioteki plików.",
+        "referenceSetsEmpty": "Żaden folder nie zawiera plików. Włóż plik do folderu, a pojawi się tutaj.",
+        "savedViewsEmpty": "Nie ma jeszcze zapisanych widoków.",
+        "writingStatsHint": "Liczniki słów pojawią się tutaj w miarę wzrostu sejfu.",
+        "quickCaptureHint": "Zacznij notatkę bez opuszczania ekranu głównego.",
+        "agentPromptHint": "Zapytaj agenta o cokolwiek w swoim sejfie.",
+        "agentPromptAction": "Otwórz agenta",
+        "graphCount": "{{count}} notatek w grafie",
+        "openTasks": "Otwórz listę zadań",
+        "openCalendar": "Otwórz kalendarz",
+        "openFiles": "Otwórz bibliotekę plików",
+        "openGraph": "Otwórz graf",
+        "fileCount_one": "{{count}} plik",
+        "fileCount_few": "{{count}} pliki",
+        "fileCount_many": "{{count}} plików",
+        "fileCount_other": "{{count}} plików",
+        "statNotes": "{{count}} notatek",
+        "statFavorites": "{{count}} w ulubionych"
+      }
     }
   },
   "photoNote": {
@@ -3438,7 +3524,8 @@
       "diagnosticFilesHelper_one": "Jeden plik zawierałby ten blok oraz {{count}} plik dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
       "diagnosticFilesHelper_other": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
       "diagnosticFilesHelper_few": "Jeden plik zawierałby ten blok oraz {{count}} pliki dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
-      "diagnosticFilesHelper_many": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi."
+      "diagnosticFilesHelper_many": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
+      "updateBlocked": "Myne nie zdołał uruchomić aktualizacji stąd, więc nic nie zainstalowano. Spróbuj ponownie za chwilę."
     },
     "vault": {
       "changePasswordButton": "Zmień hasło",
@@ -4115,7 +4202,21 @@
         "countsNotes_few": "Udostępnia {{count}} notatki w {{folders}} folderach.",
         "countsNotes_many": "Udostępnia {{count}} notatek w {{folders}} folderach.",
         "countsExcluded_few": "Wykluczono {{count}} foldery.",
-        "countsExcluded_many": "Wykluczono {{count}} folderów."
+        "countsExcluded_many": "Wykluczono {{count}} folderów.",
+        "verb": {
+          "attachment_list": "Wyświetl pliki",
+          "attachment_read": "Odczytaj tekst pliku",
+          "calendar_read": "Odczytaj kalendarz",
+          "view_list": "Wyświetl zapisane widoki"
+        },
+        "wholeVaultLabel": "Czytaj i zapisuj cały sejf",
+        "wholeVaultHelper": "Każdy folder, w tym te, które utworzysz później. Jeśli pominiesz folder poniżej, zostanie pominięty zarówno przy odczycie, jak i zapisie.",
+        "excludeNothing": "Nic nie pominięto",
+        "scopeLineAll": "Dociera do każdej notatki w sejfie, także w folderach utworzonych później, i może zmienić każdą z nich.",
+        "scopeLine": "Dociera do {{count}} notatek w {{folders}} folderach i może zmienić wszystko, co zawierają.",
+        "toolsNote": "Odczyty są limitowane: do {{count}} notatek na {{minutes}} minut.",
+        "needsReapproval": "Zatwierdzone przez starszą wersję, według odwrotnej reguły. Ta kompilacja nic dla niego nie czyta, dopóki nie zatwierdzisz ponownie.",
+        "scopeLineWords": "Dociera do wskazanych folderów i może zmienić wszystko, co zawierają."
       },
       "autoApplyLabel": "Stosuj sugerowane tagi automatycznie",
       "autoApplyHelper": "Zapisuje tagi w notatce bez pytania, raz na notatkę w sesji, dopiero po jej edycji. Tylko na tym urządzeniu. Cofnięcie znajduje się pod notatką po zapisie."
@@ -4275,7 +4376,8 @@
         "vault": "Skarbiec",
         "data": "Dane",
         "diagnostics": "Diagnostyka",
-        "extensions": "Rozszerzenia przeglądarki"
+        "extensions": "Rozszerzenia przeglądarki",
+        "connections": "Połączenia"
       },
       "passwordUpdatedToast": "Hasło zaktualizowane",
       "title": "Ustawienia"
@@ -4703,7 +4805,10 @@
       "errorTooShort": "Użyj co najmniej {{count}} znaków/cyfr.",
       "errorGeneric": "Nie udało się ustawić poświadczenia. Spróbuj ponownie."
     },
-    "helperDisclosureLabel": "Więcej o tym ustawieniu"
+    "helperDisclosureLabel": "Więcej o tym ustawieniu",
+    "connections": {
+      "mcp": "Zewnętrzni klienci MCP"
+    }
   },
   "storageLost": {
     "allSynced": "Nic nie przepadło: każda notatka stąd dotarła już na serwer.",
@@ -6237,7 +6342,8 @@
       "caption": "Myne {{version}} nadal działa, a Twoje notatki są nietknięte.",
       "hint": "Ponowna próba rozpoczyna pobieranie od nowa.",
       "retry": "Spróbuj ponownie",
-      "back": "Powrót do odblokowania"
+      "back": "Powrót do odblokowania",
+      "manual": "Jeśli to się powtarza, pobierz nową wersję z myne.md i zainstaluj ją ręcznie. Aplikacja, którą masz, pozostaje nietknięta."
     }
   },
   "identityFlow": {
@@ -6337,5 +6443,12 @@
     "joinFromQr": {
       "notFound": "Ten kod wskazuje skarbiec, którego nie ma w Twoich zaproszeniach na tym urządzeniu. Poproś właściciela skarbca o ponowne wysłanie zaproszenia do tej tożsamości."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Nazwij kalendarz, na przykład Prywatny",
+      "calendarRequired": "Przypisz wydarzeniu kalendarz. To on nadaje wydarzeniu kolor i to jego ten widok może wyłączyć."
+    },
+    "calendarsToggleFailed": "Ten kalendarz nie został przełączony. Pozostał bez zmian."
   }
 }
