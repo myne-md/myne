@@ -4020,8 +4020,7 @@
         "preferences": "Preferencias",
         "memory": "Memoria",
         "excluded": "Lo que la IA puede leer",
-        "history": "Historial de chats",
-        "externalAccess": "Acceso externo"
+        "history": "Historial de chats"
       },
       "externalAccess": {
         "label": "Acceso externo",

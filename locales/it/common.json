@@ -4020,8 +4020,7 @@
         "preferences": "Preferenze",
         "memory": "Memoria",
         "excluded": "Cosa può leggere l'AI",
-        "history": "Cronologia chat",
-        "externalAccess": "Accesso esterno"
+        "history": "Cronologia chat"
       },
       "externalAccess": {
         "label": "Accesso esterno",

@@ -4416,8 +4416,7 @@
         "preferences": "التفضيلات",
         "memory": "الذاكرة",
         "excluded": "ما يمكن لـ AI قراءته",
-        "history": "سجل الدردشة",
-        "externalAccess": "الوصول الخارجي"
+        "history": "سجل الدردشة"
       },
       "externalAccess": {
         "label": "الوصول الخارجي",

@@ -4152,8 +4152,7 @@
         "preferences": "Předvolby",
         "memory": "Paměť",
         "excluded": "Co může AI číst",
-        "history": "Historie chatu",
-        "externalAccess": "Externí přístup"
+        "history": "Historie chatu"
       },
       "externalAccess": {
         "label": "Externí přístup",

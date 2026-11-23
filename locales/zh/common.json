@@ -3888,8 +3888,7 @@
         "preferences": "偏好设置",
         "memory": "记忆",
         "excluded": "AI 能读取的内容",
-        "history": "聊天历史",
-        "externalAccess": "外部访问"
+        "history": "聊天历史"
       },
       "externalAccess": {
         "label": "外部访问",

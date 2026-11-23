@@ -3888,8 +3888,7 @@
         "preferences": "環境設定",
         "memory": "メモリ",
         "excluded": "AIが読み取れるもの",
-        "history": "チャット履歴",
-        "externalAccess": "外部アクセス"
+        "history": "チャット履歴"
       },
       "externalAccess": {
         "label": "外部アクセス",

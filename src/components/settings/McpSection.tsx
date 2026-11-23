@@ -66,7 +66,6 @@ import { ScrollArea } from "../primitives/ScrollArea";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
-import { SettingsSection } from "./SettingsSection";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 
 const CODE_STYLE: CSSProperties = {
@@ -565,10 +564,8 @@ export function McpSection({
   }, [flow?.wholeVault, preview, t]);
 
   return (
-    <SettingsSection
-      title={t("settings.ai.sections.externalAccess")}
-      testId="settings.mcp-external-access"
-    >
+    // No heading of its own — Connections names this door (myne-md/myne#1101).
+    <div data-testid="settings.mcp-external-access">
       <SettingRow
         anchorId="ai.external-access"
         testId="settings.mcp-enable"
@@ -1070,7 +1067,7 @@ export function McpSection({
           </div>
         </div>
       )}
-    </SettingsSection>
+    </div>
   );
 }
 

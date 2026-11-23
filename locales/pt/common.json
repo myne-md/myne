@@ -4020,8 +4020,7 @@
         "preferences": "Preferências",
         "memory": "Memória",
         "excluded": "O que a IA pode ler",
-        "history": "Histórico de conversas",
-        "externalAccess": "Acesso externo"
+        "history": "Histórico de conversas"
       },
       "externalAccess": {
         "label": "Acesso externo",
