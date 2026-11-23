@@ -1091,6 +1091,47 @@ pub async fn catalog_list_from_host(
     catalog_list_with_dir(io, &dir, state).await
 }
 
+/// One attachment's extracted text, for a caller inside the app rather than the
+/// IPC surface (myne-md/myne#1075).
+///
+/// **A separate entry point rather than a widened command**, because what the
+/// agent needs is not what the library needs: no bytes, no metadata, only the
+/// text a search or a summary would use, and `None` when nothing was extracted
+/// (a video, an unsupported type) so the caller can tell that from an empty
+/// file. The keys are derived here, under the vault's own generation, exactly as
+/// the import path derives them: reading under a hardcoded generation is the
+/// bug that made the cache write-only for every v0.2 vault.
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn extracted_text_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    attachment_id_hex: &str,
+) -> Result<Option<String>, CatalogListError> {
+    let Some(attachment_id) = hex_decode_id(attachment_id_hex) else {
+        return Ok(None);
+    };
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(CatalogListError::from)?;
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
+        .await
+        .ok_or(CatalogListError::Locked)?;
+    let (meta_version, account_number_hash) =
+        match read_account_number_hash(io, &dir.join("vault.meta")).await? {
+            Ok((v, h)) => (v, h),
+            Err(MetaParseFailed) => return Err(CatalogListError::InvalidVaultMeta),
+        };
+    let text_key = shared.derive(meta_version, SubkeyRole::AttachmentTextKey);
+    Ok(crate::plugins::attachments::text_cache::read_extracted(
+        &dir,
+        &text_key,
+        &account_number_hash,
+        &attachment_id,
+    )
+    .map(|extracted| extracted.text))
+}
+
 /// IPC wrapper. Delegates; the command name and payload the frontend
 /// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]

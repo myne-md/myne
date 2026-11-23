@@ -57,7 +57,7 @@ use crate::plugins::agent::apply::{
 };
 use crate::plugins::agent::engine::AgentEngine;
 use crate::plugins::agent::host_adapters::{
-    HostCalendar, NoteReadAdapter, RestoreAdapter, WriteAdapter,
+    HostAttachments, HostCalendar, NoteReadAdapter, RestoreAdapter, WriteAdapter,
 };
 use crate::plugins::agent::prompt::ProposedSetting;
 use crate::plugins::agent::run::AppliedRun;
@@ -932,7 +932,15 @@ pub async fn step<R: Runtime>(
     let report = move |p: RunProgress| {
         let _ = on_progress.send(p);
     };
+    // The agent's reach into the attachment library (myne-md/myne#1075). `Some`
+    // because the desktop can answer: the catalog read and the extracted-text
+    // read are both already there for the library's own screens.
+    let attachments = HostAttachments {
+        host: TauriHost::new(app.clone()),
+        runtime: vault,
+    };
     let deps = LoopDeps {
+        attachments: Some(&attachments),
         // **The client's own catalogue, resolved by the loop against this
         // crate's intent table** (myne-md/myne#850). A client that has built
         // none sends an empty list, and every `set_setting` is refused rather

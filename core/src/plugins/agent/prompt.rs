@@ -316,6 +316,11 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "actions:\n",
         "{\"action\":\"list_scope\"}\n",
         "{\"action\":\"read_note\",\"note_id\":\"...\"}\n",
+        // **One id space, two populations** (myne-md/myne#1075). A model that
+        // knows `read_note` only takes note ids never asks for a file, and the
+        // tool then looks like it cannot see them.
+        "read_note takes a note id or an attachment id; for a file it returns the ",
+        "text extracted from it, and a file cannot be edited.\n",
         "{\"action\":\"search_scope\",\"query\":\"...\"}\n",
         "{\"action\":\"search_vault\",\"query\":\"...\"}\n",
         "{\"action\":\"calendar_range\",\"from\":\"2026-11-01\",\"to\":\"2026-11-30\"}\n",
