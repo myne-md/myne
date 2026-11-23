@@ -469,8 +469,10 @@ describeE2E("mcp2 a left-out folder is unreadable through the connection (myne-m
         // the two assertions below rest on. Asserting it here means a grant that
         // was approved with an empty exclusion set fails as that, rather than as
         // "the folder is still listed" three lines further down.
+        // camelCase on the wire: `VaultState` is `#[serde(rename_all = "camelCase")]`,
+        // which is what mcp1 above already asserts against.
         const state = answers[1].result?.structuredContent ?? {};
-        expect(state.excluded_folder_count).toBe(1);
+        expect(state.excludedFolderCount).toBe(1);
 
         // vault_list answers an ARRAY of { folder, count }, where `folder: null`
         // is the vault ROOT (in scope, because nothing named the root).
