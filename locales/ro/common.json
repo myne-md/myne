@@ -4019,8 +4019,7 @@
         "preferences": "Preferințe",
         "memory": "Memorie",
         "excluded": "Ce poate citi AI",
-        "history": "Istoric chat",
-        "externalAccess": "Acces extern"
+        "history": "Istoric chat"
       },
       "externalAccess": {
         "label": "Acces extern",

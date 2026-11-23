@@ -3717,8 +3717,7 @@
         "preferences": "Tercihler",
         "memory": "Bellek",
         "excluded": "Yapay zekanın okuyabildikleri",
-        "history": "Sohbet geçmişi",
-        "externalAccess": "Dış erişim"
+        "history": "Sohbet geçmişi"
       },
       "externalAccess": {
         "label": "Dış erişim",

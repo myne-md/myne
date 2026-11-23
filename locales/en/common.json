@@ -3840,8 +3840,7 @@
         "preferences": "Preferences",
         "memory": "Memory",
         "excluded": "What AI can read",
-        "history": "Chat history",
-        "externalAccess": "External access"
+        "history": "Chat history"
       },
       "externalAccess": {
         "label": "External access",

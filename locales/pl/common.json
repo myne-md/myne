@@ -4151,8 +4151,7 @@
         "preferences": "Preferencje",
         "memory": "Pamięć",
         "excluded": "Co AI może czytać",
-        "history": "Historia czatu",
-        "externalAccess": "Dostęp zewnętrzny"
+        "history": "Historia czatu"
       },
       "externalAccess": {
         "label": "Dostęp zewnętrzny",
