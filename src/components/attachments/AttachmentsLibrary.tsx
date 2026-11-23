@@ -61,6 +61,7 @@ import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
 import { exportAttachment } from "../../editor/attachments/fileCardActions";
 import { Icon } from "../primitives/Icon";
 import { Button } from "../primitives/Button";
+import { Checkbox } from "../primitives/Checkbox";
 import { EmptyState } from "../primitives/EmptyState";
 import { Skeleton } from "../primitives/Skeleton";
 import { VISUALLY_HIDDEN as visuallyHidden } from "../primitives/visuallyHidden";
@@ -2113,24 +2114,22 @@ function AttachmentTile({
           onPreview={onPreview}
         />
         {/* Multi-select lives on the card rather than in the ⋮ menu, because a
-            move needs several cards and a menu is one card at a time. */}
-        <input
-          type="checkbox"
+            move needs several cards and a menu is one card at a time. The box is
+            the primitive's 16px paint and the primitive's own target floor is the
+            hit area, so the corner holds a checkbox rather than a white tile
+            (myne-md/myne#1099). */}
+        <Checkbox
           checked={selected}
           onChange={onToggleSelect}
           onClick={(e) => e.stopPropagation()}
-          aria-label={t("attachments.library.selectAriaLabel", {
+          ariaLabel={t("attachments.library.selectAriaLabel", {
             name: entry.filename,
           })}
-          data-testid="attachments.tile-select"
+          testId="attachments.tile-select"
           style={{
             position: "absolute",
-            top: "var(--space-1)",
-            left: "var(--space-1)",
-            // The pointer-target floor, not the glyph size: a 16px box with a
-            // 24px hit area is a control a thumb can find.
-            ...MIN_TARGET,
-            accentColor: "var(--accent)",
+            top: 0,
+            left: 0,
           }}
         />
       </div>
@@ -2276,16 +2275,14 @@ function AttachmentListRow({
       {...interactiveSurface()}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selected}
           onChange={onToggleSelect}
           onClick={(e) => e.stopPropagation()}
-          aria-label={t("attachments.library.selectAriaLabel", {
+          ariaLabel={t("attachments.library.selectAriaLabel", {
             name: entry.filename,
           })}
-          data-testid="attachments.row-select"
-          style={{ ...MIN_TARGET, accentColor: "var(--accent)" }}
+          testId="attachments.row-select"
         />
         <div
           style={{

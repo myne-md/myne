@@ -22,6 +22,7 @@ import { writeText as clipboardWriteText } from "../../platform/clipboardManager
 import { usePrefs } from "../../hooks/usePrefs";
 import { useDeviceBindings } from "../../hooks/useDeviceBindings";
 import { Button } from "../primitives/Button";
+import { Checkbox } from "../primitives/Checkbox";
 import { ModalShell } from "../primitives/ModalShell";
 import { IconButton } from "../primitives/IconButton";
 import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
@@ -485,14 +486,12 @@ export function MemberRosterPanel({
                   color: "var(--fg-1)",
                 }}
               >
-                <input
-                  type="checkbox"
-                  data-testid="member-roster.forget-ack"
+                <Checkbox
+                  testId="member-roster.forget-ack"
                   checked={forgetAck}
-                  onChange={(e) => setForgetAck(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+                  onChange={setForgetAck}
+                  ariaLabel={t("sync.memberRoster.identityForgetCheckbox")}
                 />
-                {t("sync.memberRoster.identityForgetCheckbox")}
               </label>
               {forgetError ? (
                 <p data-testid="member-roster.forget-error" style={{ ...ERROR_STYLE, margin: 0 }}>

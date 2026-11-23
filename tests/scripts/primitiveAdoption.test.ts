@@ -112,15 +112,24 @@ describe("what it deliberately does not count", () => {
   });
 
   it("ignores input types no primitive covers", () => {
-    // `Input` is a text field. Pointing it at a checkbox or a file picker would
-    // be the wrong component, so demanding it here would push people to a worse
+    // `Input` is a text field. Pointing it at a radio or a file picker would be
+    // the wrong component, so demanding it here would push people to a worse
     // answer than the one they have.
-    for (const t of ["checkbox", "radio", "range", "color", "file"]) {
+    for (const t of ["radio", "range", "color", "file"]) {
       fixture(`export function P() {\n  return <input type="${t}" />;\n}\n`);
       expect(run().out, `type=${t} must not be counted`).not.toContain(
         "__primitive_fixture__",
       );
     }
+  });
+
+  // `checkbox` left the exempt set when `<Checkbox>` landed and every one of the
+  // ten raw call sites adopted it (myne-md/myne#1099). The half that matters is
+  // this one: the exemption coming off is what makes the ratchet able to hold the
+  // conversion, and a version left in place would silently licence a new raw box.
+  it("counts a raw checkbox now that the primitive exists", () => {
+    fixture('export function P() {\n  return <input type="checkbox" />;\n}\n');
+    expect(run().out).toContain("__primitive_fixture__");
   });
 
   it("ignores a tag SPELLED inside a description, because that is prose about it", () => {
