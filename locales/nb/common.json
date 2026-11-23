@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (transkripsjon)",
       "transcriptSave": "Lagre som notat",
       "transcriptSaved": "Transkripsjonen er lagret som et notat.",
-      "transcriptSaveFailed": "Kunne ikke lagre transkripsjonen som et notat."
+      "transcriptSaveFailed": "Kunne ikke lagre transkripsjonen som et notat.",
+      "folderAll": "Alle mapper",
+      "folderScopeAriaLabel": "Vis filene i én mappe",
+      "importFolder": "Importer en mappe",
+      "importFolderCancelled_one": "Stoppet etter {{count}} fil. Det som ble importert, ligger i biblioteket.",
+      "importFolderCancelled_other": "Stoppet etter {{count}} filer. Det som ble importert, ligger i biblioteket.",
+      "importFolderDone_one": "{{imported}} fil importert, {{skipped}} hoppet over.",
+      "importFolderDone_other": "{{imported}} filer importert, {{skipped}} hoppet over.",
+      "importFolderFailed": "Mappen kunne ikke leses. Ingenting ble importert.",
+      "importFolderProgress": "Importerer {{done}} av {{total}}",
+      "moveFailed": "De valgte filene kunne ikke flyttes. Ingenting er endret; prøv igjen.",
+      "moveToAriaLabel": "Flytt de valgte filene til en mappe",
+      "selectAriaLabel": "Velg {{name}}",
+      "selectedCount_one": "{{count}} valgt",
+      "selectedCount_other": "{{count}} valgt"
     },
     "thumbnail": {
       "audioLabel": "Lyd: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Ingen vedlegg ennå. Trykk Last opp for å legge til et bilde eller en PDF.",
     "insert": "Sett inn",
     "pauseLabel": "Pause {{filename}}",
-    "playLabel": "Spill av {{filename}}"
+    "playLabel": "Spill av {{filename}}",
+    "folderAll": "Alle mapper",
+    "folderMoveFailed": "Filen kunne ikke flyttes. Ingenting er endret; prøv igjen.",
+    "folderPickerAria": "Mappe for {{name}}",
+    "folderRoot": "Ingen mappe",
+    "move": "Flytt"
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Kommandoer og notater",
     "pin": "Fest til venstre linje",
     "unpin": "Løsne fra venstre linje",
-    "pinError": "Kommandoen kunne ikke festes."
+    "pinError": "Kommandoen kunne ikke festes.",
+    "fileUnused": "brukes ikke i noen notat",
+    "fileUsedIn": "i {{title}}",
+    "sectionFiles": "Filer"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Konverter importerte vedlegg…"
+      },
+      "showHome": {
+        "label": "Gå til Hjem"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Kunne ikke gi mappen nytt navn, så den er uendret.",
       "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. En tom mappe dukker opp igjen under det gamle navnet hver gang du låser opp; det er trygt å slette den, og ingenting annet endres. Å gi mappen nytt navn igjen fjerner den ikke.",
       "folderListFull": "Myne kan huske et begrenset antall mapper, og den listen er full. Denne mappen virker fortsatt, men den forsvinner når det siste notatet forlater den. Å slette en mappe du ikke trenger lenger, gir plass.",
-      "folderNotRemembered": "Mappen ble opprettet, men Myne kunne ikke registrere den. Den forsvinner når det siste notatet forlater den, og den er borte ved neste opplåsing hvis den fortsatt er tom. Det er trygt å opprette den på nytt."
+      "folderNotRemembered": "Mappen ble opprettet, men Myne kunne ikke registrere den. Den forsvinner når det siste notatet forlater den, og den er borte ved neste opplåsing hvis den fortsatt er tom. Det er trygt å opprette den på nytt.",
+      "attachmentFolderRewriteFailed": "Mappen fikk nytt navn, men filene som lå i den flyttet ikke med. De viser fortsatt til den gamle mappen, så de mangler i bibliotektreet og hos en agent som har fått mappen. Flytt dem igjen for hånd fra Vedlegg, eller gi mappen det gamle navnet tilbake og deretter nytt navn igjen."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2543,7 +2569,8 @@
         "attachments": "Vedlegg",
         "graph": "Graf",
         "tasks": "Oppgaver",
-        "today": "I dag"
+        "today": "I dag",
+        "home": "Hjem"
       },
       "placesLabel": "Gå til",
       "results": "Resultater"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Oppgaver",
       "loading": "Laster…",
       "untitledView": "Visning uten tittel",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Hjem"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dager siden",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Eksporter…",
       "txt": "Ren tekst"
+    },
+    "home": {
+      "addCard": "Legg til et kort",
+      "arrange": "Ordne",
+      "arrangeTitle": "Ordne hjemflaten",
+      "cards": {
+        "agentPrompt": "Spør agenten",
+        "agentPromptAction": "Åpne agenten",
+        "agentPromptHint": "Spør agenten om hva som helst i hvelvet ditt.",
+        "calendarAgenda": "På vei",
+        "calendarAgendaEmpty": "Ingenting er planlagt den kommende uken.",
+        "favorites": "Favoritter",
+        "favoritesEmpty": "Ingenting er stjernemerket ennå. Stjernemerk et notat, så lander det her.",
+        "fileCount_one": "{{count}} fil",
+        "fileCount_other": "{{count}} filer",
+        "graph": "Hvelvet ditt",
+        "graphCount": "{{count}} notater i grafen",
+        "loading": "Leser hvelvet…",
+        "openCalendar": "Åpne kalenderen",
+        "openFiles": "Åpne filbiblioteket",
+        "openGraph": "Åpne grafen",
+        "openTasks": "Åpne oppgavelisten",
+        "pending": "Dette kortet bygges.",
+        "quickCapture": "Hurtigfangst",
+        "quickCaptureHint": "Begynn på et notat uten å forlate Hjem.",
+        "recentFiles": "Siste filer",
+        "recentFilesEmpty": "Ingen filer ennå. Importer en fra filbiblioteket.",
+        "recentNotes": "Siste notater",
+        "recentNotesEmpty": "Ingen notat er åpnet på denne enheten ennå. De du åpner, vises her.",
+        "referenceSets": "Referansesett",
+        "referenceSetsEmpty": "Ingen mappe inneholder filer. Legg en fil i en mappe, så vises den her.",
+        "savedViews": "Lagrede visninger",
+        "savedViewsEmpty": "Ingen lagrede visninger ennå.",
+        "statFavorites": "{{count}} stjernemerkede",
+        "statNotes": "{{count}} notater",
+        "todaysTasks": "Dagens oppgaver",
+        "todaysTasksEmpty": "Ingenting forfaller i dag.",
+        "unknown": "Kortet er ikke tilgjengelig",
+        "unknownNote": "Dette kortet ble lagt til av en nyere versjon av Myne, så denne kan ikke tegne det. Det blir stående på plassen sin.",
+        "writingStats": "Skriving",
+        "writingStatsHint": "Ordtall vises her etter hvert som hvelvet vokser."
+      },
+      "emptyBody": "Her dukker kort opp for siste notater, dagens oppgaver og filene du ofte åpner. Ingenting er ordnet ennå.",
+      "emptyTitle": "Din hjemflate",
+      "onStart": "Når appen åpnes",
+      "onStartHint": "Åpne denne hjemflaten ved start, bare på denne enheten.",
+      "removeCard": "Fjern {{name}}",
+      "spanNarrow": "Smal",
+      "spanWide": "Bred",
+      "title": "Hjem"
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnostikk"
       },
       "diagnosticFilesHelper_one": "Én fil vil inneholde denne blokken pluss {{count}} loggfil, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner.",
-      "diagnosticFilesHelper_other": "Én fil vil inneholde denne blokken pluss {{count}} loggfiler, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner."
+      "diagnosticFilesHelper_other": "Én fil vil inneholde denne blokken pluss {{count}} loggfiler, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner.",
+      "updateBlocked": "Myne kunne ikke starte oppdateringen herfra, så ingenting ble installert. Prøv igjen om litt."
     },
     "vault": {
       "changePasswordButton": "Endre passord",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "En mappe du lar stå ute deles ikke, og heller ikke noe inni den. Du velger blant alle mapper i dette hvelvet, så dette er det eneste stedet hele hvelvet er på bordet.",
         "approve": "Godkjenn",
         "grantRefused": "Denne godkjenningen ville ikke passe i hvelvets innstillingsbudsjett. Ingenting ble endret. Trekk tilbake en tilkobling du ikke lenger bruker, og prøv igjen.",
-        "grantFailed": "Kunne ikke lagre godkjenningen. Ingenting ble endret."
+        "grantFailed": "Kunne ikke lagre godkjenningen. Ingenting ble endret.",
+        "excludeNothing": "Ingenting holdt utenfor",
+        "needsReapproval": "Godkjent av en eldre versjon, under den motsatte regelen. Denne builden leser ingenting for den før du godkjenner på nytt.",
+        "scopeLine": "Når {{count}} notater i {{folders}} mapper, og kan endre alt i dem.",
+        "scopeLineAll": "Når hvert notat i hvelvet, også i mapper du lager senere, og kan endre hvilket som helst av dem.",
+        "scopeLineWords": "Når mappene du oppgir, og kan endre alt i dem.",
+        "toolsNote": "Lesing har et budsjett: opptil {{count}} notater per {{minutes}} minutter.",
+        "verb": {
+          "attachment_list": "List filer",
+          "attachment_read": "Les teksten i en fil",
+          "calendar_read": "Les kalenderen",
+          "view_list": "List lagrede visninger"
+        },
+        "wholeVaultHelper": "Hver mappe, også de du lager senere. Holder du en mappe utenfor nedenfor, er den utenfor både for lesing og skriving.",
+        "wholeVaultLabel": "Les og skriv hele hvelvet"
       },
       "autoApplyLabel": "Bruk foreslåtte tagger automatisk",
       "autoApplyHelper": "Skriver taggene inn i notatet uten å spørre, én gang per notat per økt, bare etter at du redigerte det. Bare på denne enheten. Angre ligger under notatet etter skriving."
@@ -4009,7 +4102,8 @@
         "vault": "Hvelv",
         "data": "Data",
         "diagnostics": "Diagnostikk",
-        "extensions": "Nettleserutvidelser"
+        "extensions": "Nettleserutvidelser",
+        "connections": "Tilkoblinger"
       },
       "passwordUpdatedToast": "Passord oppdatert",
       "title": "Innstillinger"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Bruk minst {{count}} tegn/sifre.",
       "errorGeneric": "Kunne ikke angi legitimasjonen. Prøv igjen."
     },
-    "helperDisclosureLabel": "Mer om denne innstillingen"
+    "helperDisclosureLabel": "Mer om denne innstillingen",
+    "connections": {
+      "mcp": "Eksterne MCP-klienter"
+    }
   },
   "storageLost": {
     "allSynced": "Ingenting gikk tapt: hvert notat her hadde allerede nådd serveren.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} kjører fortsatt, og notatene dine er urørt.",
       "hint": "Å prøve igjen starter nedlastingen på nytt.",
       "retry": "Prøv igjen",
-      "back": "Tilbake til opplåsing"
+      "back": "Tilbake til opplåsing",
+      "manual": "Hvis det fortsetter, last ned den nye versjonen fra myne.md og installer den for hånd. Appen du har nå, blir urørt."
     }
   },
   "identityFlow": {
@@ -6008,6 +6106,13 @@
     },
     "joinFromQr": {
       "notFound": "Denne koden viser til et hvelv som ikke ligger i invitasjonene dine på denne enheten. Be hvelveieren sende invitasjonen til denne identiteten på nytt."
+    }
+  },
+  "calendar": {
+    "calendarsToggleFailed": "Den kalenderen ble ikke endret. Den er som den var.",
+    "form": {
+      "calendarPlaceholder": "Gi kalenderen et navn, for eksempel Personlig",
+      "calendarRequired": "Gi hendelsen en kalender. Det er den som farger hendelsen, og det er den denne visningen kan slå av."
     }
   }
 }
