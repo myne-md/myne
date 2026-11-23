@@ -19,7 +19,7 @@ use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_indices::state::NoteRecord;
 use crate::test_support::block_on;
 use protocol::{McpConnectionGrant, McpScopeModel};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -820,9 +820,12 @@ fn a_search_through_the_call_surface_returns_in_scope_rows_and_excludes_the_rest
         result["content"][0]["text"].is_string(),
         "the text half must be present: {result}"
     );
-    let rows = result["structuredContent"]
+    // The list is nested under `items`, because `structuredContent` has to be a
+    // JSON object: a client SDK types it as a dictionary and refuses the call
+    // outright when a list arrives there (myne-md/myne#1106).
+    let rows = result["structuredContent"]["items"]
         .as_array()
-        .expect("structuredContent is the row array");
+        .expect("structuredContent.items is the row array");
     assert_eq!(rows.len(), 1, "the out-of-scope note came back: {rows:?}");
     assert_eq!(rows[0]["noteId"], "in");
     assert_eq!(rows[0]["folder"], "Projects");
@@ -878,16 +881,16 @@ fn the_two_no_argument_tools_answer_only_the_empty_object() {
     let map = grants(&[("claude-desktop", &["Private"])]);
     let source = Source::new(&[("a", Some("Projects"), "alpha")]);
     let arguments = json!({});
-    // `vault_list` answers with the row array itself and `vault_state` with an
-    // object, so each is read through the field it actually carries rather than
-    // through a shape invented here.
+    // `vault_list` answers with its rows under `items` and `vault_state` with the
+    // fields themselves, so each is read through the shape it actually carries
+    // rather than through one invented here.
     let McpCallOutcome::Result(list) = block_on(call_tool(
         inputs(&map, "claude-desktop", "vault_list", &arguments),
         &source,
     )) else {
         panic!("vault_list refused an empty argument object");
     };
-    assert_eq!(list["structuredContent"][0]["folder"], "projects/");
+    assert_eq!(list["structuredContent"]["items"][0]["folder"], "projects/");
 
     let McpCallOutcome::Result(state) = block_on(call_tool(
         inputs(&map, "claude-desktop", "vault_state", &arguments),
@@ -1345,5 +1348,86 @@ fn every_new_read_refuses_a_connection_with_no_grant() {
             McpCallOutcome::Refused(McpToolError::NoGrant),
             "{tool} answered a connection with no grant"
         );
+    }
+}
+
+/// `structuredContent` must be a JSON OBJECT, and a client SDK refuses the call
+/// before reading it otherwise (myne-md/myne#1106). Every read verb is driven once
+/// and the WIRE shape asserted, not the Rust type: `attachment_read` answers with
+/// `Option<String>`, so it had the same defect as the list verbs while looking
+/// nothing like them.
+#[test]
+fn every_read_answer_carries_an_object_in_structured_content() {
+    let map = grants(&[("claude-desktop", &["Private"])]);
+    let mut source = Source::new(&[("in", Some("Projects"), "the quarterly alpha report")]);
+    source.files.push(FileRow {
+        attachment_id: "aa".to_string(),
+        filename: Some("scan.png".to_string()),
+        folder: Some("Projects".to_string()),
+    });
+    source
+        .file_texts
+        .insert("aa".to_string(), "text from the scan".to_string());
+    source.views.push(ViewRow {
+        view_id: "v1".to_string(),
+        name: "Reading".to_string(),
+        view_type: "table".to_string(),
+    });
+
+    // The verbs whose answer IS a list.
+    let list_verbs = [
+        "note_search",
+        "vault_list",
+        "attachment_list",
+        "calendar_read",
+        "view_list",
+    ];
+    let cases = [
+        ("note_search", json!({ "query": "alpha" })),
+        ("note_read", json!({ "note_id": "in" })),
+        ("vault_list", json!({})),
+        ("vault_state", json!({})),
+        ("attachment_list", json!({})),
+        ("attachment_read", json!({ "attachment_id": "aa" })),
+        (
+            "calendar_read",
+            json!({ "from": "2030-01-01", "to": "2030-01-31" }),
+        ),
+        ("view_list", json!({})),
+    ];
+    for (tool, arguments) in cases {
+        let outcome = block_on(call_tool(
+            inputs(&map, "claude-desktop", tool, &arguments),
+            &source,
+        ));
+        let McpCallOutcome::Result(result) = outcome else {
+            panic!("{tool} refused an in-scope call: {outcome:?}");
+        };
+        let structured = &result["structuredContent"];
+        assert!(
+            structured.is_object(),
+            "{tool} answered structuredContent as {}: {result}",
+            match structured {
+                Value::Null => "null",
+                Value::Bool(_) => "a boolean",
+                Value::Number(_) => "a number",
+                Value::String(_) => "a string",
+                Value::Array(_) => "an array",
+                Value::Object(_) => "an object",
+            }
+        );
+        if list_verbs.contains(&tool) {
+            assert!(
+                structured["items"].is_array(),
+                "{tool} answers with a list, so it belongs under `items`: {result}"
+            );
+            // The text half keeps the bare list, so a text-only client parses what
+            // it always parsed.
+            let text = result["content"][0]["text"].as_str().unwrap_or_default();
+            assert!(
+                serde_json::from_str::<Value>(text).is_ok_and(|parsed| parsed.is_array()),
+                "{tool}'s text block must stay a bare list: {text}"
+            );
+        }
     }
 }
