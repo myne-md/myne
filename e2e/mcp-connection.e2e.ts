@@ -246,7 +246,11 @@ async function approveLeavingOut(session: Session, folder: string): Promise<void
   // Step 2, the name. Next is disabled until it is non-empty, which is the
   // product's own rule rather than this spec's.
   await session.byTestId("settings.mcp-step-config", { timeoutMs: UI_TIMEOUT_MS });
-  await (await session.byTestId("settings.mcp-connection-name")).sendKeys(CONNECTION_NAME);
+  // `replaceText`, not `sendKeys`: the client step PRE-FILLS the name with the
+  // preset id (`chooseClient`), so keystrokes append and the grant is stored
+  // under `claude-desktop` + this name — which the shim then cannot find by the
+  // name the frame announces.
+  await (await session.byTestId("settings.mcp-connection-name")).replaceText(CONNECTION_NAME);
   await (await session.byTestId("settings.mcp-flow-next")).click();
 
   // Step 3, the scope. Whole-vault is the default, so the folder list means the
@@ -387,8 +391,15 @@ describeE2E("mcp1 External access opens the door and approves a deny-list grant 
         ]);
         expect(answers).toHaveLength(2);
 
+        // The compiled catalog is `mcp/src/tool_list.rs` and the guard over it is
+        // `scripts/check-mcp-tool-surface.mjs`; this is the third holder of the
+        // same roster, so it names all thirteen verbs the shim advertises. The
+        // four attachment/calendar/view reads joined in myne-md/myne#1077.
         const catalog = answers[0].result?.tools ?? [];
         expect(catalog.map((tool) => tool.name).sort()).toEqual([
+          "attachment_list",
+          "attachment_read",
+          "calendar_read",
           "note_append",
           "note_create",
           "note_edit",
@@ -398,6 +409,7 @@ describeE2E("mcp1 External access opens the door and approves a deny-list grant 
           "note_set_field",
           "vault_list",
           "vault_state",
+          "view_list",
         ]);
 
         const state = answers[1].result?.structuredContent ?? {};
@@ -448,9 +460,17 @@ describeE2E("mcp2 a left-out folder is unreadable through the connection (myne-m
 
         const answers = runMcp(app, [
           callFrame(1, "vault_list"),
-          callFrame(2, "note_search", { query: HIDDEN_NEEDLE }),
+          callFrame(2, "vault_state"),
+          callFrame(3, "note_search", { query: HIDDEN_NEEDLE }),
         ]);
-        expect(answers).toHaveLength(2);
+        expect(answers).toHaveLength(3);
+
+        // `vault_state` reports the exclusion the grant STORED, which is the fact
+        // the two assertions below rest on. Asserting it here means a grant that
+        // was approved with an empty exclusion set fails as that, rather than as
+        // "the folder is still listed" three lines further down.
+        const state = answers[1].result?.structuredContent ?? {};
+        expect(state.excluded_folder_count).toBe(1);
 
         // vault_list answers an ARRAY of { folder, count }, where `folder: null`
         // is the vault ROOT (in scope, because nothing named the root).
@@ -462,8 +482,8 @@ describeE2E("mcp2 a left-out folder is unreadable through the connection (myne-m
         // note_search: the note inside the left-out folder is unreachable, and
         // it is unreachable as "no results" rather than as a refusal, because
         // the search itself is inside the scope.
-        expect(answers[1].result?.isError).toBe(false);
-        const searchText = JSON.stringify(answers[1].result?.structuredContent ?? {});
+        expect(answers[2].result?.isError).toBe(false);
+        const searchText = JSON.stringify(answers[2].result?.structuredContent ?? {});
         expect(searchText).not.toContain(HIDDEN_NEEDLE);
       },
     );
