@@ -128,8 +128,13 @@ function AudioThumbnail({ id, filename }: { id: string; filename: string }) {
 
 /** Generic PDF / file icon — the always-works fallback (SYNC-5). */
 function FileIcon({ size, label }: { size: number; label: string }) {
+  // `role="img"` is what makes the label permitted: a generic `div` may not carry
+  // `aria-label` (axe `aria-prohibited-attr`), and the wrapper is the graphic, not a
+  // container with contents of its own. Found by the populated library fixture in
+  // the story catalogue, which is the first state that ever rendered this branch of
+  // the thumbnail (myne-md/myne#1073, task 17).
   return (
-    <div style={ICON_WRAP_STYLE} aria-label={label}>
+    <div role="img" style={ICON_WRAP_STYLE} aria-label={label}>
       <Icon name="file-text" size={Math.round(size * 0.42)} />
     </div>
   );

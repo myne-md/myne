@@ -35,6 +35,7 @@ import {
   attachmentImport,
   attachmentReadExtractedText,
   attachmentRename,
+  attachmentSetFolders,
   attachmentUnusedList,
   catalogList,
   type AttachmentExtractedText,
@@ -42,6 +43,9 @@ import {
   type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
+import { listFolderPaths, type FolderPathOption } from "../../notes/listFolderPaths";
+import { folderMatchesScope } from "../../notes/attachmentFolderScope";
+import { importFolderTree } from "../../notes/attachments/folderImport";
 import { useWarmAttachmentRefs } from "./useWarmAttachmentRefs";
 import {
   startTranscription,
@@ -322,6 +326,24 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("created-desc");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  // The folder the library is scoped to, or `null` for every folder (myne-md/myne#1075).
+  // The vault's OWN folder paths, from the same source the sidebar and the
+  // new-note picker read, so a file is filed in a folder a note can also be in.
+  const [folderScope, setFolderScope] = useState<string | null>(null);
+  const [folderPaths, setFolderPaths] = useState<readonly FolderPathOption[]>([]);
+  // Multi-select, for the move that a bulk import makes necessary: filing four
+  // hundred rows one at a time is not a workflow.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // One move in flight at a time: a second one would race the catalog write
+  // and the refresh, and the bar already reports the first.
+  const movingRef = useRef(false);
+  // A directory import, with the two things a long one needs: a count and a way
+  // out (myne-md/myne#1075).
+  const [folderImport, setFolderImport] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const folderImportCancel = useRef(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   // Fix (MYND-164 dogfooding): the focus ring belongs on the WHOLE search bar,
@@ -404,6 +426,33 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
     void refresh();
   }, [refresh]);
 
+  // The folder set, refreshed whenever the catalog is: a folder that only
+  // exists because a file was just filed into it must appear in the picker.
+  useEffect(() => {
+    let cancelled = false;
+    void listFolderPaths()
+      .then((paths) => {
+        if (!cancelled) setFolderPaths(paths);
+      })
+      .catch(() => {
+        /* locked vault or a read failure: the scope control simply offers the root */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
+
+  const folderOptions: readonly SelectOption<string>[] = useMemo(() => {
+    const root: SelectOption<string> = {
+      value: "",
+      label: t("attachments.library.folderAll"),
+    };
+    return [
+      root,
+      ...folderPaths.map((p) => ({ value: p.path, label: p.label })),
+    ];
+  }, [folderPaths, t]);
+
   // Derived, filtered + sorted view of the catalog.
   const visible = useMemo(() => {
     const rows = entries ?? [];
@@ -413,6 +462,11 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
         return false;
       }
       if (q !== "" && !e.filename.toLowerCase().includes(q)) return false;
+      // A scope covers its SUBTREE: "the files in Ders Notları" has to mean the
+      // ones a term's subfolders hold, or the answer is half a term.
+      if (folderScope !== null && !folderMatchesScope(e.folder, folderScope)) {
+        return false;
+      }
       return true;
     });
     const sorted = [...filtered].sort((a, b) => {
@@ -428,7 +482,7 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
       }
     });
     return sorted;
-  }, [entries, query, sort, typeFilter]);
+  }, [entries, query, sort, typeFilter, folderScope]);
 
   // ---- actions -----------------------------------------------------------
 
@@ -463,6 +517,72 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
       }
     },
     [refresh],
+  );
+
+  /**
+   * Import a directory tree, keeping its shape (myne-md/myne#1075).
+   *
+   * The picked folder's own name becomes the top folder in the library, so
+   * picking `Ders Notları` with `Hafta 1/slides.pdf` inside files the slide under
+   * `Ders Notları/Hafta 1/`. Without that the import flattens a term into one
+   * place, which is the state the folder field exists to avoid.
+   */
+  const handleImportFolder = useCallback(async () => {
+    const picked = await openFileDialog({ directory: true, multiple: false });
+    if (typeof picked !== "string" || picked === "") return;
+    const top = picked.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+    folderImportCancel.current = false;
+    setFolderImport({ done: 0, total: 0 });
+    try {
+      const summary = await importFolderTree(picked, {
+        onProgress: (done, total) => setFolderImport({ done, total }),
+        shouldCancel: () => folderImportCancel.current,
+        folderFor: (rel) => {
+          const slash = rel.lastIndexOf("/");
+          return slash === -1 ? `${top}/` : `${top}/${rel.slice(0, slash)}/`;
+        },
+      });
+      await refresh();
+      if (summary.cancelled) {
+        showAttachmentToast(
+          t("attachments.library.importFolderCancelled", {
+            count: summary.imported,
+          }),
+        );
+      } else {
+        showAttachmentToast(
+          t("attachments.library.importFolderDone", {
+            imported: summary.imported,
+            skipped: Object.values(summary.skipped).reduce((a, b) => a + b, 0),
+          }),
+          "success",
+        );
+      }
+    } catch {
+      showAttachmentToast(t("attachments.library.importFolderFailed"), "error");
+    } finally {
+      setFolderImport(null);
+    }
+  }, [refresh, t]);
+
+  /** File every selected row into one folder (myne-md/myne#1075). */
+  const handleMoveSelected = useCallback(
+    async (folder: string) => {
+      if (selected.size === 0 || movingRef.current) return;
+      movingRef.current = true;
+      try {
+        await attachmentSetFolders(
+          [...selected].map((id) => ({ id, folder })),
+        );
+        setSelected(new Set());
+        await refresh();
+      } catch {
+        showAttachmentToast(t("attachments.library.moveFailed"), "error");
+      } finally {
+        movingRef.current = false;
+      }
+    },
+    [selected, refresh, t],
   );
 
   const handleImport = useCallback(async () => {
@@ -701,6 +821,14 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
     entry,
     itemRef: observeItem(entry.id),
     renaming: renamingId === entry.id,
+    selected: selected.has(entry.id),
+    onToggleSelect: () =>
+      setSelected((cur) => {
+        const next = new Set(cur);
+        if (next.has(entry.id)) next.delete(entry.id);
+        else next.add(entry.id);
+        return next;
+      }),
     cache: ctx.cache,
     popoverOpen: openPopoverId === entry.id,
     // Opening a used-in popover closes any open ⋮ menu (single overlay at a time).
@@ -857,6 +985,15 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
             aria-label={t("attachments.library.filterAriaLabel")}
           />
           <Select
+            value={folderScope ?? ""}
+            options={folderOptions}
+            onChange={(v) => {
+              setFolderScope(v === "" ? null : v);
+              setSelected(new Set());
+            }}
+            aria-label={t("attachments.library.folderScopeAriaLabel")}
+          />
+          <Select
             value={sort}
             options={sortOptions}
             onChange={setSort}
@@ -886,6 +1023,25 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
             hoverColor="var(--accent)"
             spinning={importing}
           />
+          <ToolbarActionButton
+            icon="folder-plus"
+            label={
+              folderImport === null
+                ? t("attachments.library.importFolder")
+                : t("attachments.library.importFolderProgress", {
+                    done: folderImport.done,
+                    total: folderImport.total,
+                  })
+            }
+            onClick={() => {
+              if (folderImport === null) void handleImportFolder();
+              else folderImportCancel.current = true;
+            }}
+            disabled={importing}
+            hoverColor="var(--accent)"
+            spinning={folderImport !== null}
+            testId="attachments.import-folder"
+          />
         </div>
       </div>
 
@@ -893,6 +1049,42 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
           (the common case); the MYND-424 sync engine becomes the registry's
           writer when it lands. */}
       <AttachmentSyncProgress hideWhenEmpty />
+
+      {/* The selection bar. It appears only while something is selected, so the
+          library's resting state is unchanged, and it carries the one action a
+          bulk import makes necessary: filing many rows at once (myne-md/myne#1075). */}
+      {selected.size > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-2) var(--space-3)",
+            margin: "0 var(--space-3)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--accent)",
+            background: "var(--bg-1)",
+          }}
+          data-testid="attachments.selection-bar"
+        >
+          <span style={{ fontSize: "var(--text-sm)" }}>
+            {t("attachments.library.selectedCount", { count: selected.size })}
+          </span>
+          <Button
+            variant="ghost"
+            onClick={() => setSelected(new Set())}
+            data-testid="attachments.selection-clear"
+          >
+            {t("common.clear")}
+          </Button>
+          <Select
+            value=""
+            options={folderOptions}
+            onChange={(v) => void handleMoveSelected(v)}
+            aria-label={t("attachments.library.moveToAriaLabel")}
+          />
+        </div>
+      )}
 
       <div
         style={
@@ -1296,6 +1488,10 @@ interface ItemActionProps {
    *  the one that does not goes back to painting placeholders forever. */
   itemRef: (el: Element | null) => void;
   renaming: boolean;
+  /** Whether this item is in the multi-select set (myne-md/myne#1075). */
+  selected: boolean;
+  /** Add or remove this item from the multi-select set. */
+  onToggleSelect: () => void;
   cache: ReadonlyMap<NoteId, import("../../notes/loadNoteBatch").TitleRecord>;
   /** Whether THIS item's used-in-notes popover is the one open (Fix 6). */
   popoverOpen: boolean;
@@ -1818,6 +2014,8 @@ const THUMB_BOX_STYLE: CSSProperties = {
   borderBottom: "1px solid var(--line-1)",
   overflow: "hidden",
   background: "var(--paper-2)",
+  // The selection checkbox is positioned against this box.
+  position: "relative",
 };
 
 const TILE_META_STYLE: CSSProperties = {
@@ -1856,6 +2054,8 @@ function AttachmentTile({
   entry,
   itemRef,
   renaming,
+  selected,
+  onToggleSelect,
   cache,
   popoverOpen,
   onTogglePopover,
@@ -1879,6 +2079,7 @@ function AttachmentTile({
   actionMenuAt,
   onCloseActionMenu,
 }: ItemActionProps) {
+  const { t } = useTranslation();
   return (
     <div
       ref={itemRef}
@@ -1905,6 +2106,27 @@ function AttachmentTile({
           entry={entry}
           size={160}
           onPreview={onPreview}
+        />
+        {/* Multi-select lives on the card rather than in the ⋮ menu, because a
+            move needs several cards and a menu is one card at a time. */}
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={t("attachments.library.selectAriaLabel", {
+            name: entry.filename,
+          })}
+          data-testid="attachments.tile-select"
+          style={{
+            position: "absolute",
+            top: "var(--space-1)",
+            left: "var(--space-1)",
+            // The pointer-target floor, not the glyph size: a 16px box with a
+            // 24px hit area is a control a thumb can find.
+            ...MIN_TARGET,
+            accentColor: "var(--accent)",
+          }}
         />
       </div>
       <div style={TILE_META_STYLE}>
@@ -2008,6 +2230,8 @@ function AttachmentListRow({
   entry,
   itemRef,
   renaming,
+  selected,
+  onToggleSelect,
   cache,
   popoverOpen,
   onTogglePopover,
@@ -2031,6 +2255,7 @@ function AttachmentListRow({
   actionMenuAt,
   onCloseActionMenu,
 }: ItemActionProps) {
+  const { t } = useTranslation();
   return (
     <div
       ref={itemRef}
@@ -2045,20 +2270,33 @@ function AttachmentListRow({
       }}
       {...interactiveSurface()}
     >
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: "var(--radius-1)",
-          overflow: "hidden",
-          border: "1px solid var(--line-1)",
-        }}
-      >
-        <ThumbnailWithPreview
-          entry={entry}
-          size={28}
-          onPreview={onPreview}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={t("attachments.library.selectAriaLabel", {
+            name: entry.filename,
+          })}
+          data-testid="attachments.row-select"
+          style={{ ...MIN_TARGET, accentColor: "var(--accent)" }}
         />
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "var(--radius-1)",
+            overflow: "hidden",
+            border: "1px solid var(--line-1)",
+          }}
+        >
+          <ThumbnailWithPreview
+            entry={entry}
+            size={28}
+            onPreview={onPreview}
+          />
+        </div>
       </div>
       {renaming ? (
         <RenameInput

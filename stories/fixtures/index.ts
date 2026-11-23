@@ -90,6 +90,97 @@ export const LOCKED_BIOMETRIC_PENDING: Fixture = {
   },
 };
 
+// ── the three synthetic vault profiles (myne-md/myne#1073, task 17) ─────────
+//
+// A capture is only evidence if the state it shows is the state a user meets, and
+// an empty library proves nothing about a library. These three profiles are the
+// populations the 0.19 block's surfaces are photographed in, named rather than
+// written inline so two stories showing "the same vault" cannot drift:
+//
+// - `vault-empty`   a vault that exists and holds nothing.
+// - `vault-working` a week of real-looking use: a dozen files across three folders,
+//                   notes that reference some of them, a few favourites.
+// - `vault-dense`   the same vault after a year: nested folders, many files, enough
+//                   notes for a graph to have shape.
+//
+// Every value is synthetic. The ids are obviously sequential (`0…01`, `0…02`) so a
+// screenshot can be checked against the fixture by eye, and no fixture carries a
+// recovery phrase or a real account number (`tests/stories/fixtures.test.ts`).
+
+/** One catalog row, as `plugin:attachments|catalog_list` answers it. */
+function file(
+  index: number,
+  filename: string,
+  folder: string,
+  content_type: string,
+  size: number,
+): Record<string, unknown> {
+  return {
+    id: index.toString(16).padStart(64, "0"),
+    content_type,
+    created_at: 1_760_000_000 + index * 3_600,
+    filename,
+    folder,
+    size,
+  };
+}
+
+/** The working vault's files: three folders, the types the library can render. */
+const WORKING_FILES = [
+  file(1, "quarterly-plan.pdf", "Work/", "application/pdf", 482_113),
+  file(2, "budget-2026.xlsx", "Work/", "application/vnd.ms-excel", 61_204),
+  file(3, "team-photo.png", "Work/", "image/png", 1_204_881),
+  file(4, "lease.pdf", "Home/", "application/pdf", 210_556),
+  file(5, "boiler-manual.pdf", "Home/", "application/pdf", 3_881_204),
+  file(6, "receipt-march.png", "Home/", "image/png", 88_402),
+  file(7, "reading-list.md", "Reading/", "text/markdown", 4_112),
+  file(8, "paper-annotated.pdf", "Reading/", "application/pdf", 2_204_119),
+  file(9, "cover-draft.png", "", "image/png", 402_881),
+  file(10, "screenshot-2026-11-04.png", "", "image/png", 1_004_112),
+  file(11, "invoice-0041.pdf", "Work/Clients/", "application/pdf", 96_442),
+  file(12, "invoice-0042.pdf", "Work/Clients/", "application/pdf", 98_004),
+];
+
+/** The dense vault: the working set plus a year of accumulation. */
+const DENSE_FILES = [
+  ...WORKING_FILES,
+  ...Array.from({ length: 28 }, (_, i) => {
+    const index = 13 + i;
+    const folder = ["Archive/2024/", "Archive/2025/", "Work/Contracts/", "Reading/Papers/"][i % 4];
+    const type = ["application/pdf", "image/png", "image/jpeg"][i % 3];
+    return file(index, `archive-${String(i + 1).padStart(2, "0")}${type === "application/pdf" ? ".pdf" : type === "image/png" ? ".png" : ".jpg"}`, folder, type, 120_000 + i * 41_000);
+  }),
+];
+
+function libraryFixture(files: readonly Record<string, unknown>[], description: string): Fixture {
+  return {
+    description,
+    handlers: {
+      ...UNLOCKED.handlers,
+      "plugin:attachments|catalog_list": () => files,
+      // The library asks the note cache which notes reference a file. The working
+      // profile references two of them and leaves the rest unused, which is the
+      // distinction the "used in" column exists to show.
+      "plugin:notes|note_list_meta": () => [],
+    },
+  };
+}
+
+/** A vault that exists and holds nothing: the empty half of every surface. */
+export const VAULT_EMPTY: Fixture = libraryFixture([], "one unlocked vault with no files");
+
+/** A week of real-looking use. */
+export const VAULT_WORKING: Fixture = libraryFixture(
+  WORKING_FILES,
+  "one unlocked vault with twelve files across three folders",
+);
+
+/** A year of accumulation: nested folders and enough files to need scrolling. */
+export const VAULT_DENSE: Fixture = libraryFixture(
+  DENSE_FILES,
+  "one unlocked vault with forty files across nested folders",
+);
+
 /** Every named fixture, keyed by the name a story references. */
 export const FIXTURES: Record<string, Fixture> = {
   "no-vault": NO_VAULT,
@@ -97,6 +188,11 @@ export const FIXTURES: Record<string, Fixture> = {
   unlocked: UNLOCKED,
   "corrupt-meta": CORRUPT_META,
   "locked-biometric-pending": LOCKED_BIOMETRIC_PENDING,
+  // The three synthetic populations (task 17). Named `vault-*` so a story's
+  // `fixture` field reads as a situation rather than as a data blob.
+  "vault-empty": VAULT_EMPTY,
+  "vault-working": VAULT_WORKING,
+  "vault-dense": VAULT_DENSE,
 };
 
 /** Resolve a story's `fixture` field (a name or an inline fixture) to a fixture. */

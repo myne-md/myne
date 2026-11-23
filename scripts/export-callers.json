@@ -32,7 +32,7 @@
   "src/notes/import/base/importBase.ts": 2,
   "src/notes/import/conflict.ts": 1,
   "src/notes/import/notion/names.ts": 1,
-  "src/notes/import/ports.ts": 3,
+  "src/notes/import/ports.ts": 2,
   "src/notes/import/sources/csv.ts": 1,
   "src/notes/import/sources/enex.ts": 1,
   "src/notes/import/sources/html.ts": 2,
