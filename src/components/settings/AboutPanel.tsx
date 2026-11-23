@@ -44,8 +44,14 @@ import { useTranslation } from "react-i18next";
 import { servedBuildInfo, type BuildInfo } from "../../platform/build-info";
 import { openUrl } from "../../platform/opener";
 import { has } from "../../platform/capabilities";
-import { updateCheck, updateInstall, getAutoCheck, setAutoCheck, type UpdateCheckError, type UpdateStatus } from "../../platform/update";
-import { renameFlushHooks } from "../../notes/renameFlushHook";
+import {
+  updateCheck,
+  getAutoCheck,
+  setAutoCheck,
+  type UpdateCheckError,
+  type UpdateStatus,
+} from "../../platform/update";
+import { useUpdateFlow } from "../../hooks/updateFlow";
 import { LEGAL_LINKS, legalUrl, type LegalDoc } from "../../lib/legal-urls";
 import { usePrefs } from "../../hooks/usePrefs";
 import { Button } from "../primitives/Button";
@@ -224,34 +230,24 @@ export function AboutPanel() {
   // looking inert next to it. One control, two states, and the row's height never
   // moves.
   //
-  // This is still the SECOND install door and deliberately not the notice's flow
-  // (myne-md/myne#870): it flushes and installs without locking the vault, so it
-  // has no confirm, no `updating` Stage and no failure surface of its own. The
-  // notice's confirm is the path that locks first, and unifying the two is a
-  // product decision recorded in `design-notes/ui/0686` rather than taken here.
-  // What this door no longer does is swallow a failed flush: the install would
-  // then exit the process with unsaved edits in memory, so a refusal stops it and
-  // says so on the row.
-  const [installing, setInstalling] = useState(false);
-  const [flushRefused, setFlushRefused] = useState(false);
+  // The SAME flow the notice drives, and no second install path (myne-md/myne#1059).
+  //
+  // This row used to be the second door onto `updateInstall`: it flushed the panes
+  // and installed, without locking the vault and without an `updating` Stage, so
+  // pressing it produced a row stuck on "working" while an install ran behind a
+  // screen that never appeared — and pressing it while the notice's own install was
+  // running produced two downloads of the same artefact over one progress stream.
+  // `design-notes/ui/0686` recorded the split as a product decision and called
+  // unifying it a decision rather than a fix; the owner took that decision on
+  // 2026-11-18, so the row now asks the flow, which flushes, locks, enters the
+  // updating screen and installs in that order.
+  const flow = useUpdateFlow();
+  const installing = flow?.working ?? false;
+  const blockedHere = flow?.blocked ?? null;
   const runUpdateInstall = () => {
-    setInstalling(true);
-    setFlushRefused(false);
-    void (async () => {
-      // Flush unsaved note edits before the process exits to install, as every
-      // other exit path does.
-      try {
-        await renameFlushHooks().flushOpenPanes();
-      } catch {
-        setInstalling(false);
-        setFlushRefused(true);
-        return;
-      }
-      updateInstall().catch(() => {
-        setInstalling(false);
-        setCheck({ kind: "failed", error: "other" });
-      });
-    })();
+    // The offered line stays: it is what the row is installing, and the flow's
+    // own screens take over from here.
+    flow?.confirm();
   };
 
   const updateOffered =
@@ -403,9 +399,13 @@ export function AboutPanel() {
               )
             }
           >
-            {flushRefused && (
+            {blockedHere !== null && (
               <p style={FLUSH_REFUSED_STYLE} data-testid="about.update-blocked">
-                {t("settings.about.updateFlushFailed")}
+                {t(
+                  blockedHere === "flush"
+                    ? "settings.about.updateFlushFailed"
+                    : "settings.about.updateBlocked",
+                )}
               </p>
             )}
           </SettingRow>

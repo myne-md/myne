@@ -3129,6 +3129,7 @@
       "updateChannelBeta": "Beta",
       "updateChannelLabel": "Update channel",
       "updateChannelStable": "Stable",
+      "updateBlocked": "Myne could not start the update from here, so nothing was installed. Try again in a moment.",
       "updateCheckButton": "Check for updates",
       "updateChecking": "Checking…",
       "updateFailed": "Couldn't check for updates. It will retry later.",
@@ -4417,7 +4418,8 @@
     "failed": {
       "heading": "The update did not finish",
       "caption": "Myne {{version}} is still running and your notes are untouched.",
-      "back": "Back to unlock"
+      "back": "Back to unlock",
+      "manual": "If it keeps happening, download the new version from myne.md and install it by hand. The app you have now is untouched."
     }
   },
   "sync": {

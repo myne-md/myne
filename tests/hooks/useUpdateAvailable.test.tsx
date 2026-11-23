@@ -240,6 +240,34 @@ describe("the install's progress stream", () => {
     });
   });
 
+  it("never reports a byte count below the one it already showed", async () => {
+    // myne-md/myne#1059: two installs on one event name made the bar and the
+    // readout run backwards ("190mb -> 178mb -> 200mb"). The host refuses a
+    // second install now, and this is the other half: the display cannot regress
+    // even if something else ever emits on this name.
+    const { hook } = await mountChecked();
+    await settle();
+    const tick = (downloaded: number, total: number | null = 8192) =>
+      act(() => {
+        h.state.progressHandler?.({
+          payload: { phase: "downloading", downloaded, total },
+        });
+      });
+
+    tick(5000);
+    tick(3000); // a lower number arrives out of order
+    expect(hook.result.current.progress.downloaded).toBe(5000);
+
+    tick(6000);
+    expect(hook.result.current.progress.downloaded).toBe(6000);
+
+    // A tick that carries no total does not erase the one already measured,
+    // because the bar would then fall back to indeterminate mid-download.
+    tick(7000, null);
+    expect(hook.result.current.progress.total).toBe(8192);
+    expect(hook.result.current.progress.downloaded).toBe(7000);
+  });
+
   it("resets to the starting shape when a retry begins a new attempt", async () => {
     h.state.installShouldReject = true;
     const { hook } = await mountChecked();
