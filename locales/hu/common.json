@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (átirat)",
       "transcriptSave": "Mentés jegyzetként",
       "transcriptSaved": "Az átirat jegyzetként elmentve.",
-      "transcriptSaveFailed": "Nem sikerült az átiratot jegyzetként elmenteni."
+      "transcriptSaveFailed": "Nem sikerült az átiratot jegyzetként elmenteni.",
+      "folderScopeAriaLabel": "Egy mappa fájljainak megjelenítése",
+      "selectAriaLabel": "{{name}} kiválasztása",
+      "selectedCount_one": "{{count}} kiválasztva",
+      "selectedCount_other": "{{count}} kiválasztva",
+      "moveToAriaLabel": "A kiválasztott fájlok áthelyezése mappába",
+      "moveFailed": "A kiválasztott fájlokat nem sikerült áthelyezni. Semmi sem változott; próbáld újra.",
+      "importFolder": "Mappa importálása",
+      "importFolderProgress": "Importálás: {{done}} / {{total}}",
+      "importFolderDone_one": "{{imported}} fájl importálva, {{skipped}} kihagyva.",
+      "importFolderDone_other": "{{imported}} fájl importálva, {{skipped}} kihagyva.",
+      "importFolderCancelled_one": "Leállt {{count}} fájl után. Az importáltak a könyvtárban vannak.",
+      "importFolderCancelled_other": "Leállt {{count}} fájl után. Az importáltak a könyvtárban vannak.",
+      "importFolderFailed": "A mappát nem sikerült beolvasni. Semmi sem lett importálva.",
+      "folderAll": "Minden mappa"
     },
     "thumbnail": {
       "audioLabel": "Hang: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Még nincs melléklet. Koppintson a Feltöltés gombra kép vagy PDF hozzáadásához.",
     "insert": "Beszúrás",
     "pauseLabel": "{{filename}} szüneteltetése",
-    "playLabel": "{{filename}} lejátszása"
+    "playLabel": "{{filename}} lejátszása",
+    "move": "Áthelyezés",
+    "folderAll": "Minden mappa",
+    "folderRoot": "Nincs mappa",
+    "folderPickerAria": "Mappa ehhez: {{name}}",
+    "folderMoveFailed": "A fájlt nem sikerült áthelyezni. Semmi sem változott; próbáld újra."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Parancsok és jegyzetek",
     "pin": "Rögzítés a bal oldali szalaghoz",
     "unpin": "Feloldás a bal oldali szalagtól",
-    "pinError": "A parancsot nem sikerült rögzíteni."
+    "pinError": "A parancsot nem sikerült rögzíteni.",
+    "sectionFiles": "Fájlok",
+    "fileUsedIn": "itt: {{title}}",
+    "fileUnused": "egyetlen jegyzetben sem használt"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Importált mellékletek konvertálása…"
+      },
+      "showHome": {
+        "label": "Ugrás a Kezdőlapra"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Nem sikerült átnevezni a mappát, ezért változatlan.",
       "deliberateWriteFailed": "A mappa átnevezése sikerült, de az egyik beállítását nem sikerült menteni. Minden feloldáskor újra megjelenik egy üres mappa a régi néven; nyugodtan törölheted, ez semmi mást nem változtat meg. Az ismételt átnevezés nem tünteti el.",
       "folderListFull": "A Myne csak korlátozott számú mappát tud megjegyezni, és ez a lista megtelt. Ez a mappa továbbra is működik, de eltűnik, amikor kikerül belőle az utolsó jegyzet. Ha törölsz egy már nem szükséges mappát, azzal helyet szabadítasz fel.",
-      "folderNotRemembered": "A mappa létrejött, de a Myne nem tudta feljegyezni. Eltűnik, amikor kikerül belőle az utolsó jegyzet, és a következő feloldáskor megszűnik, ha még mindig üres. Nyugodtan létrehozhatod újra."
+      "folderNotRemembered": "A mappa létrejött, de a Myne nem tudta feljegyezni. Eltűnik, amikor kikerül belőle az utolsó jegyzet, és a következő feloldáskor megszűnik, ha még mindig üres. Nyugodtan létrehozhatod újra.",
+      "attachmentFolderRewriteFailed": "A mappa át lett nevezve, de a benne tárolt fájlok nem mozdultak vele. Még mindig a régi mappát nevezik meg, ezért hiányoznak a könyvtárfából és az abból a mappából dolgozó agentből. Helyezd át őket újra kézzel a Mellékletekből, vagy nevezd vissza a mappát, majd nevezd át újra."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2543,7 +2569,8 @@
         "attachments": "Mellékletek",
         "graph": "Gráf",
         "tasks": "Feladatok",
-        "today": "Ma"
+        "today": "Ma",
+        "home": "Kezdőlap"
       },
       "placesLabel": "Ugrás ide",
       "results": "Találatok"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Feladatok",
       "loading": "Betöltés…",
       "untitledView": "Névtelen nézet",
-      "agentTab": "Ügynök"
+      "agentTab": "Ügynök",
+      "homeTab": "Kezdőlap"
     },
     "relativeTime": {
       "daysAgo": "{{d}} napja",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Exportálás…",
       "txt": "Egyszerű szöveg"
+    },
+    "home": {
+      "emptyTitle": "A kezdőfelületed",
+      "emptyBody": "Itt fognak megjelenni a legutóbbi jegyzetek, a mai feladatok és a gyakran megnyitott fájlok kártyái. Még semmi sincs elrendezve.",
+      "title": "Kezdőlap",
+      "arrange": "Elrendezés",
+      "arrangeTitle": "Kezdőlap elrendezése",
+      "addCard": "Kártya hozzáadása",
+      "removeCard": "{{name}} eltávolítása",
+      "spanWide": "Széles",
+      "spanNarrow": "Keskeny",
+      "onStart": "Az alkalmazás megnyitásakor",
+      "onStartHint": "Ennek a kezdőfelületnek a megnyitása indításkor, csak ezen az eszközön.",
+      "cards": {
+        "recentNotes": "Legutóbbi jegyzetek",
+        "quickCapture": "Gyorsrögzítés",
+        "todaysTasks": "Mai feladatok",
+        "calendarAgenda": "Hamarosan",
+        "favorites": "Kedvencek",
+        "referenceSets": "Hivatkozási készletek",
+        "savedViews": "Mentett nézetek",
+        "recentFiles": "Legutóbbi fájlok",
+        "writingStats": "Írás",
+        "agentPrompt": "Kérdezd az agentet",
+        "graph": "A széfed",
+        "unknown": "A kártya nem elérhető",
+        "unknownNote": "Ezt a kártyát a Myne újabb verziója adta hozzá, ezért ez nem tudja kirajzolni. A helyén marad.",
+        "pending": "Ez a kártya épül.",
+        "loading": "Széf olvasása…",
+        "recentNotesEmpty": "Ezen az eszközön még nem nyílt meg jegyzet. Az általad megnyitottak itt jelennek meg.",
+        "favoritesEmpty": "Még semmi sincs csillaggal megjelölve. Jelölj meg egy jegyzetet, és idekerül.",
+        "todaysTasksEmpty": "Ma semmi sem jár le.",
+        "calendarAgendaEmpty": "A következő hétre semmi sincs betervezve.",
+        "recentFilesEmpty": "Még nincsenek fájlok. Importálj egyet a fájlkönyvtárból.",
+        "referenceSetsEmpty": "Egyetlen mappa sem tartalmaz fájlokat. Tegyél egy fájlt egy mappába, és itt megjelenik.",
+        "savedViewsEmpty": "Még nincsenek mentett nézetek.",
+        "writingStatsHint": "A szószámok itt jelennek meg, ahogy a széf növekszik.",
+        "quickCaptureHint": "Kezdj jegyzetet anélkül, hogy elhagynád a Kezdőlapot.",
+        "agentPromptHint": "Kérdezd az agentet bármiről a széfedben.",
+        "agentPromptAction": "Az agent megnyitása",
+        "graphCount": "{{count}} jegyzet a gráfban",
+        "openTasks": "Feladatlista megnyitása",
+        "openCalendar": "Naptár megnyitása",
+        "openFiles": "Fájlkönyvtár megnyitása",
+        "openGraph": "Gráf megnyitása",
+        "fileCount_one": "{{count}} fájl",
+        "fileCount_other": "{{count}} fájl",
+        "statNotes": "{{count}} jegyzet",
+        "statFavorites": "{{count}} csillagos"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnosztika"
       },
       "diagnosticFilesHelper_one": "Egy fájl ezt a blokkot tartalmazná, plusz {{count}} naplófájlt, összesen {{size}}. Semmi nem megy el sehová; te választod meg, hová kerül.",
-      "diagnosticFilesHelper_other": "Egy fájl ezt a blokkot tartalmazná, plusz {{count}} naplófájlt, összesen {{size}}. Semmi nem megy el sehová; te választod meg, hová kerül."
+      "diagnosticFilesHelper_other": "Egy fájl ezt a blokkot tartalmazná, plusz {{count}} naplófájlt, összesen {{size}}. Semmi nem megy el sehová; te választod meg, hová kerül.",
+      "updateBlocked": "A Myne nem tudta innen elindítani a frissítést, ezért semmi sem települt. Próbáld újra egy pillanat múlva."
     },
     "vault": {
       "changePasswordButton": "Jelszó módosítása",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "A kihagyott mappa nem osztozik, és semmi, ami benne van. A széf minden mappájából választhatsz, ezért ez az egyetlen hely, ahol az egész széf az asztalon van.",
         "approve": "Jóváhagyás",
         "grantRefused": "Ez a megadás nem férne bele a széf beállításainak költségvetésébe. Semmi nem változott. Vond vissza egy olyan kapcsolatot, amelyet már nem használsz, majd próbáld újra.",
-        "grantFailed": "A jóváhagyást nem sikerült elmenteni. Semmi nem változott."
+        "grantFailed": "A jóváhagyást nem sikerült elmenteni. Semmi nem változott.",
+        "verb": {
+          "attachment_list": "Fájlok listázása",
+          "attachment_read": "Egy fájl szövegének olvasása",
+          "calendar_read": "Naptár olvasása",
+          "view_list": "Mentett nézetek listázása"
+        },
+        "wholeVaultLabel": "A teljes széf olvasása és írása",
+        "wholeVaultHelper": "Minden mappa, a később létrehozottak is. Ha lent kihagysz egy mappát, az olvasásból és írásból is kimarad.",
+        "excludeNothing": "Nincs kihagyva semmi",
+        "scopeLineAll": "Eléri a széf minden jegyzetét, a később létrehozott mappákban is, és bármelyiket módosíthatja.",
+        "scopeLine": "Elér {{count}} jegyzetet {{folders}} mappában, és bármit módosíthat bennük.",
+        "toolsNote": "Az olvasások keretezettek: legfeljebb {{count}} jegyzet {{minutes}} percenként.",
+        "needsReapproval": "Egy régebbi verzió hagyta jóvá, az ellenkező szabály szerint. Ez a build semmit sem olvas neki, amíg újra nem hagyod jóvá.",
+        "scopeLineWords": "Eléri az általad megnevezett mappákat, és bármit módosíthat bennük."
       },
       "autoApplyLabel": "Javasolt címkék automatikus alkalmazása",
       "autoApplyHelper": "A címkéket kérdés nélkül írja be a jegyzetbe, munkamenetenként széfenként egyszer, csak miután szerkesztetted. Csak ezen az eszközön. A visszavonás a jegyzet alatt található az írás után."
@@ -4009,7 +4102,8 @@
         "vault": "Széf",
         "data": "Adatok",
         "diagnostics": "Diagnosztika",
-        "extensions": "Böngészőbővítmények"
+        "extensions": "Böngészőbővítmények",
+        "connections": "Kapcsolatok"
       },
       "passwordUpdatedToast": "Jelszó frissítve",
       "title": "Beállítások"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Használj legalább {{count}} karaktert/számjegyet.",
       "errorGeneric": "Nem sikerült beállítani a hitelesítő adatot. Próbáld újra."
     },
-    "helperDisclosureLabel": "Több erről a beállításról"
+    "helperDisclosureLabel": "Több erről a beállításról",
+    "connections": {
+      "mcp": "Külső MCP-kliensek"
+    }
   },
   "storageLost": {
     "allSynced": "Semmi nem veszett el: az itteni jegyzetek mindegyike már eljutott a szerverre.",
@@ -5909,7 +6006,8 @@
       "caption": "A Myne {{version}} továbbra is fut, és a jegyzeteid érintetlenek.",
       "hint": "Az újrapróbálkozás elölről kezdi a letöltést.",
       "retry": "Újrapróbálás",
-      "back": "Vissza a feloldáshoz"
+      "back": "Vissza a feloldáshoz",
+      "manual": "Ha továbbra is előfordul, töltsd le az új verziót a myne.md oldalról, és telepítsd kézzel. A mostani alkalmazásod érintetlen marad."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Ez a kód olyan széfet nevez meg, amely nincs a meghívóid között ezen az eszközön. Kérd meg a széf tulajdonosát, hogy küldje el újra a meghívót ennek az identitásnak."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Adj nevet egy naptárnak, például Személyes",
+      "calendarRequired": "Adj az eseménynek naptárat. Az színezi az eseményt, és ezt tudja ez a nézet kikapcsolni."
+    },
+    "calendarsToggleFailed": "Az a naptár nem váltott. Maradt, ahogy volt."
   }
 }

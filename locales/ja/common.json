@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}}（文字起こし）",
       "transcriptSave": "ノートとして保存",
       "transcriptSaved": "文字起こしをノートとして保存しました。",
-      "transcriptSaveFailed": "文字起こしをノートとして保存できませんでした。"
+      "transcriptSaveFailed": "文字起こしをノートとして保存できませんでした。",
+      "folderScopeAriaLabel": "1つのフォルダ内のファイルを表示",
+      "selectAriaLabel": "{{name}} を選択",
+      "selectedCount_one": "{{count}} 件選択中",
+      "selectedCount_other": "{{count}} 件選択中",
+      "moveToAriaLabel": "選択したファイルをフォルダへ移動",
+      "moveFailed": "選択したファイルを移動できませんでした。何も変わっていません。もう一度お試しください。",
+      "importFolder": "フォルダを読み込む",
+      "importFolderProgress": "{{total}} 件中 {{done}} 件を読み込み中",
+      "importFolderDone_one": "{{imported}} 件のファイルを読み込み、{{skipped}} 件をスキップしました。",
+      "importFolderDone_other": "{{imported}} 件のファイルを読み込み、{{skipped}} 件をスキップしました。",
+      "importFolderCancelled_one": "{{count}} 件で停止しました。読み込んだものはライブラリにあります。",
+      "importFolderCancelled_other": "{{count}} 件で停止しました。読み込んだものはライブラリにあります。",
+      "importFolderFailed": "そのフォルダを読み取れませんでした。何も読み込まれていません。",
+      "folderAll": "すべてのフォルダ"
     },
     "thumbnail": {
       "audioLabel": "オーディオ：{{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "添付ファイルはまだありません。アップロードをタップして画像またはPDFを追加してください。",
     "insert": "挿入",
     "pauseLabel": "{{filename}}を一時停止",
-    "playLabel": "{{filename}}を再生"
+    "playLabel": "{{filename}}を再生",
+    "move": "移動",
+    "folderAll": "すべてのフォルダ",
+    "folderRoot": "フォルダなし",
+    "folderPickerAria": "{{name}} のフォルダ",
+    "folderMoveFailed": "そのファイルを移動できませんでした。何も変わっていません。もう一度お試しください。"
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "コマンドとノート",
     "pin": "左リボンにピン留め",
     "unpin": "左リボンからピン解除",
-    "pinError": "コマンドをピン留めできませんでした。"
+    "pinError": "コマンドをピン留めできませんでした。",
+    "sectionFiles": "ファイル",
+    "fileUsedIn": "{{title}} 内",
+    "fileUnused": "どのノートでも使われていません"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "インポートされた添付ファイルを変換…"
+      },
+      "showHome": {
+        "label": "ホームへ移動"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "フォルダ名を変更できなかったため、変更されていません。",
       "deliberateWriteFailed": "フォルダの名前は変更しましたが、その設定の1つを保存できませんでした。ロック解除のたびに、古い名前の空のフォルダが再び現れます。このフォルダは削除しても問題なく、ほかには何も変わりません。もう一度名前を変更しても、このフォルダは消えません。",
       "folderListFull": "Myneが記憶しておけるフォルダの数には上限があり、その一覧はいっぱいです。このフォルダは引き続き使えますが、最後のノートがなくなると消えます。不要になったフォルダを削除すると空きができます。",
-      "folderNotRemembered": "フォルダは作成しましたが、Myneはそれを記録できませんでした。最後のノートがなくなると消え、空のままであれば次のロック解除時になくなります。もう一度作成しても問題ありません。"
+      "folderNotRemembered": "フォルダは作成しましたが、Myneはそれを記録できませんでした。最後のノートがなくなると消え、空のままであれば次のロック解除時になくなります。もう一度作成しても問題ありません。",
+      "attachmentFolderRewriteFailed": "フォルダの名前は変わりましたが、中に入っていたファイルは移動しませんでした。ファイルは古いフォルダ名を持ったままなので、ライブラリツリーにも、このフォルダを渡されたエージェントにも現れません。添付ファイルから手作業でもう一度移動するか、フォルダ名を元に戻してからもう一度変更してください。"
     },
     "folderNote": {
       "defaultTitle": "インデックス"
@@ -2543,7 +2569,8 @@
         "attachments": "添付ファイル",
         "graph": "グラフ",
         "tasks": "タスク",
-        "today": "今日"
+        "today": "今日",
+        "home": "ホーム"
       },
       "placesLabel": "移動先",
       "results": "結果"
@@ -2553,7 +2580,8 @@
       "tasksTab": "タスク",
       "loading": "読み込み中…",
       "untitledView": "無題のビュー",
-      "agentTab": "エージェント"
+      "agentTab": "エージェント",
+      "homeTab": "ホーム"
     },
     "relativeTime": {
       "daysAgo": "{{d}}日前",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "書き出し…",
       "txt": "プレーンテキスト"
+    },
+    "home": {
+      "emptyTitle": "あなたのホーム画面",
+      "emptyBody": "最近のノート、今日のタスク、よく開くファイルのカードがここに並びます。まだ何も整列されていません。",
+      "title": "ホーム",
+      "arrange": "整列",
+      "arrangeTitle": "ホームを整列",
+      "addCard": "カードを追加",
+      "removeCard": "{{name}} を削除",
+      "spanWide": "広い",
+      "spanNarrow": "狭い",
+      "onStart": "アプリを開いたとき",
+      "onStartHint": "起動時にこのホーム画面を開きます。このデバイスのみ。",
+      "cards": {
+        "recentNotes": "最近のノート",
+        "quickCapture": "クイックキャプチャ",
+        "todaysTasks": "今日のタスク",
+        "calendarAgenda": "近日中",
+        "favorites": "お気に入り",
+        "referenceSets": "参照セット",
+        "savedViews": "保存したビュー",
+        "recentFiles": "最近のファイル",
+        "writingStats": "執筆",
+        "agentPrompt": "エージェントに聞く",
+        "graph": "保管庫",
+        "unknown": "このカードは利用できません",
+        "unknownNote": "このカードはより新しいバージョンの Myne が追加したため、このバージョンでは描画できません。場所はそのまま残ります。",
+        "pending": "このカードは準備中です。",
+        "loading": "保管庫を読み込み中…",
+        "recentNotesEmpty": "このデバイスではまだノートを開いていません。開いたノートがここに表示されます。",
+        "favoritesEmpty": "まだスターが付いていません。ノートにスターを付けるとここに表示されます。",
+        "todaysTasksEmpty": "今日が期限のものはありません。",
+        "calendarAgendaEmpty": "来週の予定はありません。",
+        "recentFilesEmpty": "ファイルはまだありません。ファイルライブラリから読み込んでください。",
+        "referenceSetsEmpty": "どのフォルダにもファイルがありません。ファイルをフォルダに入れるとここに表示されます。",
+        "savedViewsEmpty": "保存したビューはまだありません。",
+        "writingStatsHint": "保管庫が大きくなると語数がここに表示されます。",
+        "quickCaptureHint": "ホームを離れずにノートを始められます。",
+        "agentPromptHint": "保管庫の中のことを何でもエージェントに聞けます。",
+        "agentPromptAction": "エージェントを開く",
+        "graphCount": "グラフ内の {{count}} 件のノート",
+        "openTasks": "タスク一覧を開く",
+        "openCalendar": "カレンダーを開く",
+        "openFiles": "ファイルライブラリを開く",
+        "openGraph": "グラフを開く",
+        "fileCount_one": "{{count}} 件のファイル",
+        "fileCount_other": "{{count}} 件のファイル",
+        "statNotes": "{{count}} 件のノート",
+        "statFavorites": "{{count}} 件のスター"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "診断"
       },
       "diagnosticFilesHelper_one": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。",
-      "diagnosticFilesHelper_other": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。"
+      "diagnosticFilesHelper_other": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。",
+      "updateBlocked": "Myne はここから更新を開始できなかったため、何もインストールされていません。しばらくしてからもう一度お試しください。"
     },
     "vault": {
       "changePasswordButton": "パスワードを変更",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "除外したフォルダは共有されず、その中身も共有されません。この保管庫のすべてのフォルダから選ぶため、保管庫全体がここに提示される唯一の場所です。",
         "approve": "承認",
         "grantRefused": "この承認は保管庫の設定予算に収まりません。何も変更されていません。使っていない接続を1つ取り消してから、もう一度お試しください。",
-        "grantFailed": "承認を保存できませんでした。何も変更されていません。"
+        "grantFailed": "承認を保存できませんでした。何も変更されていません。",
+        "verb": {
+          "attachment_list": "ファイルを一覧",
+          "attachment_read": "ファイルのテキストを読む",
+          "calendar_read": "カレンダーを読む",
+          "view_list": "保存したビューを一覧"
+        },
+        "wholeVaultLabel": "保管庫全体を読み書き",
+        "wholeVaultHelper": "すべてのフォルダ（後から作成するフォルダも含む）。下でフォルダを外すと、読み取りも書き込みも外れます。",
+        "excludeNothing": "除外なし",
+        "scopeLineAll": "保管庫のすべてのノート（後から作成するフォルダも含む）に届き、どれでも変更できます。",
+        "scopeLine": "{{folders}} 個のフォルダ内の {{count}} 件のノートに届き、その中のすべてを変更できます。",
+        "toolsNote": "読み取りには上限があります: {{minutes}} 分あたり最大 {{count}} 件のノート。",
+        "needsReapproval": "古いバージョンが逆の規則で承認したものです。このビルドでは、承認し直すまで何も読み取りません。",
+        "scopeLineWords": "指定したフォルダに届き、その中のすべてを変更できます。"
       },
       "autoApplyLabel": "提案されたタグを自動で適用",
       "autoApplyHelper": "編集後に、セッションごとにノート1回、確認なしでタグを書き込みます。この端末のみ。書き込んだ後はノートの下に元に戻すがあります。"
@@ -4009,7 +4102,8 @@
         "vault": "保管庫",
         "data": "データ",
         "diagnostics": "診断",
-        "extensions": "ブラウザ拡張機能"
+        "extensions": "ブラウザ拡張機能",
+        "connections": "接続"
       },
       "passwordUpdatedToast": "パスワードを更新しました",
       "title": "設定"
@@ -4420,7 +4514,10 @@
       "errorTooShort": "{{count}}文字／桁以上にしてください。",
       "errorGeneric": "認証情報を設定できませんでした。もう一度お試しください。"
     },
-    "helperDisclosureLabel": "この設定の詳細"
+    "helperDisclosureLabel": "この設定の詳細",
+    "connections": {
+      "mcp": "外部 MCP クライアント"
+    }
   },
   "storageLost": {
     "allSynced": "失われたものはありません。ここにあったすべてのノートは、すでにサーバーに届いていました。",
@@ -5906,7 +6003,8 @@
       "caption": "Myne {{version}} は引き続き動作しており、ノートはそのままです。",
       "hint": "もう一度試すと、ダウンロードは最初からやり直しになります。",
       "retry": "もう一度試す",
-      "back": "ロック解除に戻る"
+      "back": "ロック解除に戻る",
+      "manual": "繰り返す場合は、myne.md から新しいバージョンをダウンロードして手動でインストールしてください。今お使いのアプリはそのまま残ります。"
     }
   },
   "identityFlow": {
@@ -6006,5 +6104,12 @@
     "joinFromQr": {
       "notFound": "このコードが示す保管庫は、このデバイスの招待の中にありません。保管庫の所有者に、このアイデンティティへもう一度招待を送ってもらってください。"
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "カレンダーに名前を付けてください（例: 個人）",
+      "calendarRequired": "予定にカレンダーを指定してください。予定の色を決めるのはカレンダーで、このビューがオフにできるのもカレンダーです。"
+    },
+    "calendarsToggleFailed": "そのカレンダーは切り替わりませんでした。元のままです。"
   }
 }

@@ -598,7 +598,33 @@
       "transcriptNoteTitle": "{{name}} (تفريغ نصي)",
       "transcriptSave": "حفظ كملاحظة",
       "transcriptSaved": "حُفظ التفريغ النصي كملاحظة.",
-      "transcriptSaveFailed": "تعذّر حفظ التفريغ النصي كملاحظة."
+      "transcriptSaveFailed": "تعذّر حفظ التفريغ النصي كملاحظة.",
+      "folderScopeAriaLabel": "إظهار الملفات في مجلد واحد",
+      "selectAriaLabel": "تحديد {{name}}",
+      "selectedCount_zero": "المحدد: {{count}}",
+      "selectedCount_one": "المحدد: {{count}}",
+      "selectedCount_two": "المحدد: {{count}}",
+      "selectedCount_few": "المحدد: {{count}}",
+      "selectedCount_many": "المحدد: {{count}}",
+      "selectedCount_other": "المحدد: {{count}}",
+      "moveToAriaLabel": "نقل الملفات المحددة إلى مجلد",
+      "moveFailed": "لم يتم نقل الملفات المحددة. لم يتغير شيء؛ حاول مرة أخرى.",
+      "importFolder": "استيراد مجلد",
+      "importFolderProgress": "جارٍ استيراد {{done}} من {{total}}",
+      "importFolderDone_zero": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+      "importFolderDone_one": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+      "importFolderDone_two": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+      "importFolderDone_few": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+      "importFolderDone_many": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+      "importFolderDone_other": "تم استيراد {{imported}}، وتخطي {{skipped}}.",
+      "importFolderCancelled_zero": "توقف بعد {{count}}. ما تم استيراده موجود في المكتبة.",
+      "importFolderCancelled_one": "توقف بعد {{count}}. ما تم استيراده موجود في المكتبة.",
+      "importFolderCancelled_two": "توقف بعد {{count}}. ما تم استيراده موجود في المكتبة.",
+      "importFolderCancelled_few": "توقف بعد {{count}}. ما تم استيراده موجود في المكتبة.",
+      "importFolderCancelled_many": "توقف بعد {{count}}. ما تم استيراده موجود في المكتبة.",
+      "importFolderCancelled_other": "توقف بعد {{count}}. ما تم استيراده موجود في المكتبة.",
+      "importFolderFailed": "تعذرت قراءة ذلك المجلد. لم يتم استيراد شيء.",
+      "folderAll": "كل المجلدات"
     },
     "thumbnail": {
       "audioLabel": "صوت: {{filename}}",
@@ -614,7 +640,12 @@
     },
     "needsApp": "تنظيف المرفقات يتطلب التطبيق.",
     "noUnused": "لا توجد مرفقات غير مستخدمة: كل ملف مُشار إليه.",
-    "scanError": "تعذّر الفحص بحثًا عن مرفقات غير مستخدمة."
+    "scanError": "تعذّر الفحص بحثًا عن مرفقات غير مستخدمة.",
+    "move": "نقل",
+    "folderAll": "كل المجلدات",
+    "folderRoot": "بلا مجلد",
+    "folderPickerAria": "مجلد {{name}}",
+    "folderMoveFailed": "لم يتم نقل ذلك الملف. لم يتغير شيء؛ حاول مرة أخرى."
   },
   "backup": {
     "errors": {
@@ -693,7 +724,10 @@
     "resultsLabel": "الأوامر والملاحظات",
     "pin": "تثبيت على الشريط الأيسر",
     "unpin": "إلغاء التثبيت من الشريط الأيسر",
-    "pinError": "تعذر تثبيت الأمر."
+    "pinError": "تعذر تثبيت الأمر.",
+    "sectionFiles": "الملفات",
+    "fileUsedIn": "في {{title}}",
+    "fileUnused": "غير مستخدم في أي ملاحظة"
   },
   "commands": {
     "actions": {
@@ -1017,6 +1051,9 @@
       },
       "convertImportedAttachments": {
         "label": "تحويل المرفقات المستوردة…"
+      },
+      "showHome": {
+        "label": "الانتقال إلى الرئيسية"
       }
     },
     "hotkeys": {
@@ -2519,7 +2556,8 @@
       "renameFailed": "تعذّر إعادة تسمية المجلد، لذا بقي دون تغيير.",
       "deliberateWriteFailed": "أُعيدت تسمية المجلد، لكن تعذّر حفظ أحد إعداداته. سيظهر مجلد فارغ بالاسم القديم في كل مرة تفتح فيها قفل الخزنة؛ ويمكنك حذفه بأمان دون أن يتغيّر أي شيء آخر. إعادة تسمية المجلد مرة أخرى لن تزيله.",
       "folderListFull": "يستطيع Myne تذكّر عدد محدود من المجلدات، وتلك القائمة ممتلئة. هذا المجلد يعمل رغم ذلك، لكنه سيختفي عندما تغادره آخر ملاحظة فيه. حذف مجلد لم تعد بحاجة إليه يوفّر مكانًا.",
-      "folderNotRemembered": "أُنشئ المجلد، لكن تعذّر على Myne تسجيله. سيختفي عندما تغادره آخر ملاحظة فيه، ويزول عند فتح القفل التالي إن بقي فارغًا. إعادة إنشائه آمنة."
+      "folderNotRemembered": "أُنشئ المجلد، لكن تعذّر على Myne تسجيله. سيختفي عندما تغادره آخر ملاحظة فيه، ويزول عند فتح القفل التالي إن بقي فارغًا. إعادة إنشائه آمنة.",
+      "attachmentFolderRewriteFailed": "أُعيدت تسمية المجلد، لكن الملفات المحفوظة فيه لم تنتقل معه. ما زالت تشير إلى المجلد القديم، لذلك تغيب عن شجرة المكتبة وعن أي وكيل أُعطي هذا المجلد. انقلها يدويًا مرة أخرى من المرفقات، أو أعد اسم المجلد ثم غيّره مرة أخرى."
     },
     "folderNote": {
       "defaultTitle": "الفهرس"
@@ -2963,7 +3001,8 @@
         "attachments": "المرفقات",
         "graph": "الرسم البياني",
         "tasks": "المهام",
-        "today": "اليوم"
+        "today": "اليوم",
+        "home": "الرئيسية"
       },
       "placesLabel": "الانتقال إلى",
       "results": "النتائج"
@@ -2973,7 +3012,8 @@
       "tasksTab": "المهام",
       "loading": "جارٍ التحميل…",
       "untitledView": "عرض بلا عنوان",
-      "agentTab": "الوكيل"
+      "agentTab": "الوكيل",
+      "homeTab": "الرئيسية"
     },
     "relativeTime": {
       "daysAgo": "قبل {{d}} أيام",
@@ -3365,6 +3405,60 @@
       "pdf": "PDF",
       "submenuLabel": "تصدير…",
       "txt": "نص عادي"
+    },
+    "home": {
+      "emptyTitle": "سطحك الرئيسي",
+      "emptyBody": "ستظهر هنا بطاقات لأحدث الملاحظات ومهام اليوم والملفات التي تفتحها كثيرًا. لم يُرتَّب شيء بعد.",
+      "title": "الرئيسية",
+      "arrange": "ترتيب",
+      "arrangeTitle": "ترتيب سطحك الرئيسي",
+      "addCard": "إضافة بطاقة",
+      "removeCard": "إزالة {{name}}",
+      "spanWide": "عريضة",
+      "spanNarrow": "ضيقة",
+      "onStart": "عند فتح التطبيق",
+      "onStartHint": "افتح هذا السطح الرئيسي عند البدء، على هذا الجهاز فقط.",
+      "cards": {
+        "recentNotes": "أحدث الملاحظات",
+        "quickCapture": "التقاط سريع",
+        "todaysTasks": "مهام اليوم",
+        "calendarAgenda": "قريبًا",
+        "favorites": "المفضلة",
+        "referenceSets": "مجموعات مرجعية",
+        "savedViews": "العروض المحفوظة",
+        "recentFiles": "أحدث الملفات",
+        "writingStats": "الكتابة",
+        "agentPrompt": "اسأل الوكيل",
+        "graph": "خزنتك",
+        "unknown": "البطاقة غير متاحة",
+        "unknownNote": "أضافت هذه البطاقة نسخة أحدث من Myne، لذلك لا تستطيع هذه النسخة رسمها. تبقى في مكانها.",
+        "pending": "هذه البطاقة قيد الإنشاء.",
+        "loading": "جارٍ قراءة الخزنة…",
+        "recentNotesEmpty": "لم تُفتح أي ملاحظة على هذا الجهاز بعد. التي تفتحها تظهر هنا.",
+        "favoritesEmpty": "لا شيء مميز بنجمة بعد. ميّز ملاحظة بنجمة لتظهر هنا.",
+        "todaysTasksEmpty": "لا شيء مستحق اليوم.",
+        "calendarAgendaEmpty": "لا شيء مجدول للأسبوع القادم.",
+        "recentFilesEmpty": "لا ملفات بعد. استورد ملفًا من مكتبة الملفات.",
+        "referenceSetsEmpty": "لا مجلد يحتوي ملفات. ضع ملفًا في مجلد ليظهر هنا.",
+        "savedViewsEmpty": "لا عروض محفوظة بعد.",
+        "writingStatsHint": "تظهر أعداد الكلمات هنا مع نمو الخزنة.",
+        "quickCaptureHint": "ابدأ ملاحظة دون مغادرة الرئيسية.",
+        "agentPromptHint": "اسأل الوكيل عن أي شيء في خزنتك.",
+        "agentPromptAction": "فتح الوكيل",
+        "graphCount": "{{count}} ملاحظة في الرسم",
+        "openTasks": "فتح قائمة المهام",
+        "openCalendar": "فتح التقويم",
+        "openFiles": "فتح مكتبة الملفات",
+        "openGraph": "فتح الرسم",
+        "fileCount_zero": "الملفات: {{count}}",
+        "fileCount_one": "الملفات: {{count}}",
+        "fileCount_two": "الملفات: {{count}}",
+        "fileCount_few": "الملفات: {{count}}",
+        "fileCount_many": "الملفات: {{count}}",
+        "fileCount_other": "الملفات: {{count}}",
+        "statNotes": "{{count}} ملاحظة",
+        "statFavorites": "{{count}} مميزة بنجمة"
+      }
     }
   },
   "photoNote": {
@@ -3674,7 +3768,8 @@
       "diagnosticFilesHelper_zero": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملف سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
       "diagnosticFilesHelper_two": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملفَي سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
       "diagnosticFilesHelper_few": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملفات سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
-      "diagnosticFilesHelper_many": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملف سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب."
+      "diagnosticFilesHelper_many": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملف سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
+      "updateBlocked": "لم يستطع Myne بدء التحديث من هنا، لذلك لم يُثبَّت شيء. حاول مرة أخرى بعد قليل."
     },
     "vault": {
       "changePasswordButton": "تغيير كلمة المرور",
@@ -4377,7 +4472,21 @@
         "countsExcluded_zero": "ترجمة: {{count}} folders excluded.",
         "countsExcluded_two": "ترجمة: {{count}} folders excluded.",
         "countsExcluded_few": "ترجمة: {{count}} folders excluded.",
-        "countsExcluded_many": "ترجمة: {{count}} folders excluded."
+        "countsExcluded_many": "ترجمة: {{count}} folders excluded.",
+        "verb": {
+          "attachment_list": "سرد الملفات",
+          "attachment_read": "قراءة نص ملف",
+          "calendar_read": "قراءة التقويم",
+          "view_list": "سرد العروض المحفوظة"
+        },
+        "wholeVaultLabel": "قراءة الخزنة بأكملها وكتابتها",
+        "wholeVaultHelper": "كل مجلد، بما فيها المجلدات التي تنشئها لاحقًا. إذا استثنيت مجلدًا أدناه، فإنه يُستثنى من القراءة والكتابة معًا.",
+        "excludeNothing": "لا شيء مستثنى",
+        "scopeLineAll": "يصل إلى كل ملاحظة في الخزنة، بما فيها مجلدات تنشئها لاحقًا، ويمكنه تغيير أي منها.",
+        "scopeLine": "يصل إلى {{count}} ملاحظة في {{folders}} مجلدات، ويمكنه تغيير أي شيء فيها.",
+        "toolsNote": "القراءات محدودة: حتى {{count}} ملاحظة كل {{minutes}} دقيقة.",
+        "needsReapproval": "اعتمدته نسخة أقدم وفق القاعدة المعاكسة. هذه النسخة لا تقرأ شيئًا من أجله حتى تعتمده مرة أخرى.",
+        "scopeLineWords": "يصل إلى المجلدات التي تسميها، ويمكنه تغيير أي شيء فيها."
       },
       "autoApplyLabel": "تطبيق الوسوم المقترحة تلقائيًا",
       "autoApplyHelper": "يكتب الوسوم في الملاحظة دون سؤال، مرة واحدة لكل ملاحظة في كل جلسة، فقط بعد أن تعدلها. على هذا الجهاز فقط. التراجع يوجد تحت الملاحظة بعد الكتابة."
@@ -4541,7 +4650,8 @@
         "vault": "خزنة",
         "data": "البيانات",
         "diagnostics": "تشخيص",
-        "extensions": "امتدادات المتصفح"
+        "extensions": "امتدادات المتصفح",
+        "connections": "الاتصالات"
       },
       "passwordUpdatedToast": "تم تحديث كلمة المرور",
       "title": "الإعدادات"
@@ -4981,7 +5091,10 @@
       "errorTooShort": "استخدم {{count}} حرفًا/رقمًا على الأقل.",
       "errorGeneric": "تعذّر ضبط بيانات الفتح. أعد المحاولة."
     },
-    "helperDisclosureLabel": "المزيد عن هذا الإعداد"
+    "helperDisclosureLabel": "المزيد عن هذا الإعداد",
+    "connections": {
+      "mcp": "عملاء MCP الخارجيون"
+    }
   },
   "storageLost": {
     "allSynced": "لم يُفقد شيء: كل ملاحظة هنا كانت قد وصلت إلى الخادم بالفعل.",
@@ -6563,7 +6676,8 @@
       "caption": "لا يزال Myne {{version}} يعمل وملاحظاتك لم يمسّها شيء.",
       "hint": "إعادة المحاولة تبدأ التنزيل من جديد.",
       "retry": "أعد المحاولة",
-      "back": "العودة إلى فتح القفل"
+      "back": "العودة إلى فتح القفل",
+      "manual": "إذا تكرر ذلك، نزّل النسخة الجديدة من myne.md وثبّتها يدويًا. التطبيق الذي لديك الآن لن يُمس."
     }
   },
   "identityFlow": {
@@ -6663,5 +6777,12 @@
     "joinFromQr": {
       "notFound": "يشير هذا الرمز إلى خزنة ليست ضمن دعواتك على هذا الجهاز. اطلب من مالك الخزنة إرسال الدعوة إلى هذه الهوية من جديد."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "سمِّ تقويمًا، مثل شخصي",
+      "calendarRequired": "أعطِ الحدث تقويمًا. التقويم هو ما يلوّن الحدث، وهو ما يستطيع هذا العرض إيقافه."
+    },
+    "calendarsToggleFailed": "لم يُبدَّل ذلك التقويم. بقي كما كان."
   }
 }

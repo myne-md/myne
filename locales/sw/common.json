@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (unukuzi)",
       "transcriptSave": "Hifadhi kama dokezo",
       "transcriptSaved": "Unukuzi umehifadhiwa kama dokezo.",
-      "transcriptSaveFailed": "Haikuweza kuhifadhi unukuzi kama dokezo."
+      "transcriptSaveFailed": "Haikuweza kuhifadhi unukuzi kama dokezo.",
+      "folderScopeAriaLabel": "Onyesha faili zilizo katika folda moja",
+      "selectAriaLabel": "Chagua {{name}}",
+      "selectedCount_one": "{{count}} zimechaguliwa",
+      "selectedCount_other": "{{count}} zimechaguliwa",
+      "moveToAriaLabel": "Hamisha faili zilizochaguliwa hadi folda",
+      "moveFailed": "Faili zilizochaguliwa hazikuweza kuhamishwa. Hakuna kilichobadilika; jaribu tena.",
+      "importFolder": "Leta folda",
+      "importFolderProgress": "Inaleta {{done}} kati ya {{total}}",
+      "importFolderDone_one": "Faili {{imported}} zimeletwa, {{skipped}} zimerukwa.",
+      "importFolderDone_other": "Faili {{imported}} zimeletwa, {{skipped}} zimerukwa.",
+      "importFolderCancelled_one": "Ilisimama baada ya faili {{count}}. Kilicholetwa kiko kwenye maktaba.",
+      "importFolderCancelled_other": "Ilisimama baada ya faili {{count}}. Kilicholetwa kiko kwenye maktaba.",
+      "importFolderFailed": "Folda hiyo haikuweza kusomwa. Hakuna kilicholetwa.",
+      "folderAll": "Folda zote"
     },
     "thumbnail": {
       "audioLabel": "Sauti: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Bado hakuna viambatisho. Gusa Pakia ili kuongeza picha au PDF.",
     "insert": "Weka",
     "pauseLabel": "Sitisha {{filename}}",
-    "playLabel": "Cheza {{filename}}"
+    "playLabel": "Cheza {{filename}}",
+    "move": "Hamisha",
+    "folderAll": "Folda zote",
+    "folderRoot": "Bila folda",
+    "folderPickerAria": "Folda ya {{name}}",
+    "folderMoveFailed": "Faili hiyo haikuweza kuhamishwa. Hakuna kilichobadilika; jaribu tena."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Amri na notisi",
     "pin": "Bandika kwenye utepe wa kushoto",
     "unpin": "Ondoa kwenye utepe wa kushoto",
-    "pinError": "Amri haiwezi kubandikwa."
+    "pinError": "Amri haiwezi kubandikwa.",
+    "sectionFiles": "Faili",
+    "fileUsedIn": "katika {{title}}",
+    "fileUnused": "haitumiki katika noti yoyote"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Badilisha viambatisho vilivyoingizwa…"
+      },
+      "showHome": {
+        "label": "Nenda Mwanzo"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Haikuweza kubadilisha jina la folda, kwa hivyo imebaki vilevile.",
       "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Folda tupu itaonekana tena kwa jina la zamani kila unapofungua kasha; kuifuta ni salama na hakubadilishi kitu kingine chochote. Kubadilisha jina la folda tena hakutaiondoa.",
       "folderListFull": "Myne inaweza kukumbuka idadi finyu ya folda, na orodha hiyo imejaa. Folda hii bado inafanya kazi, lakini itatoweka pale dokezo lake la mwisho litakapoondoka humo. Kufuta folda usiyoihitaji tena hutengeneza nafasi.",
-      "folderNotRemembered": "Folda imeundwa, lakini Myne haikuweza kuihifadhi kwenye orodha yake. Itatoweka pale dokezo lake la mwisho litakapoondoka humo, na itakuwa imekwisha utakapofungua kasha tena ikiwa bado ni tupu. Ni salama kuiunda tena."
+      "folderNotRemembered": "Folda imeundwa, lakini Myne haikuweza kuihifadhi kwenye orodha yake. Itatoweka pale dokezo lake la mwisho litakapoondoka humo, na itakuwa imekwisha utakapofungua kasha tena ikiwa bado ni tupu. Ni salama kuiunda tena.",
+      "attachmentFolderRewriteFailed": "Folda ilibadilishwa jina, lakini faili zilizokuwa ndani yake hazikuhamia pamoja nayo. Bado zinataja folda ya zamani, kwa hiyo hazionekani kwenye mti wa maktaba wala kwa wakala aliyepokea folda hii. Zihamishe tena kwa mkono kutoka Viambatisho, au rudisha jina la folda kisha ubadilishe tena."
     },
     "folderNote": {
       "defaultTitle": "Faharasa"
@@ -2543,7 +2569,8 @@
         "attachments": "Viambatisho",
         "graph": "Grafu",
         "tasks": "Kazi",
-        "today": "Leo"
+        "today": "Leo",
+        "home": "Mwanzo"
       },
       "placesLabel": "Nenda kwa",
       "results": "Matokeo"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Kazi",
       "loading": "Inapakia…",
       "untitledView": "Mwonekano bila jina",
-      "agentTab": "Wakala"
+      "agentTab": "Wakala",
+      "homeTab": "Mwanzo"
     },
     "relativeTime": {
       "daysAgo": "siku {{d}} zilizopita",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Hamisha…",
       "txt": "Maandishi sahili"
+    },
+    "home": {
+      "emptyTitle": "Uso wako wa mwanzo",
+      "emptyBody": "Kadi za noti za hivi karibuni, kazi za leo na faili unazofungua mara nyingi zitaonekana hapa. Hakuna kilichopangwa bado.",
+      "title": "Mwanzo",
+      "arrange": "Panga",
+      "arrangeTitle": "Panga uso wako wa mwanzo",
+      "addCard": "Ongeza kadi",
+      "removeCard": "Ondoa {{name}}",
+      "spanWide": "Pana",
+      "spanNarrow": "Nyembamba",
+      "onStart": "Programu inapofunguka",
+      "onStartHint": "Fungua uso huu wa mwanzo wakati wa kuanza, kwenye kifaa hiki pekee.",
+      "cards": {
+        "recentNotes": "Noti za hivi karibuni",
+        "quickCapture": "Kukamata haraka",
+        "todaysTasks": "Kazi za leo",
+        "calendarAgenda": "Zinazokuja",
+        "favorites": "Vipendwa",
+        "referenceSets": "Seti za marejeleo",
+        "savedViews": "Mionekano iliyohifadhiwa",
+        "recentFiles": "Faili za hivi karibuni",
+        "writingStats": "Uandishi",
+        "agentPrompt": "Uliza wakala",
+        "graph": "Kasha lako",
+        "unknown": "Kadi haipatikani",
+        "unknownNote": "Kadi hii iliongezwa na toleo jipya zaidi la Myne, kwa hiyo toleo hili haliwezi kuichora. Inabaki mahali pake.",
+        "pending": "Kadi hii inajengwa.",
+        "loading": "Inasoma kasha…",
+        "recentNotesEmpty": "Hakuna noti iliyofunguliwa kwenye kifaa hiki bado. Unazofungua zitaonekana hapa.",
+        "favoritesEmpty": "Hakuna kilichowekwa nyota bado. Weka nyota kwenye noti na itaonekana hapa.",
+        "todaysTasksEmpty": "Hakuna kinachostahili leo.",
+        "calendarAgendaEmpty": "Hakuna kilichopangwa kwa wiki ijayo.",
+        "recentFilesEmpty": "Hakuna faili bado. Leta moja kutoka maktaba ya faili.",
+        "referenceSetsEmpty": "Hakuna folda yenye faili. Weka faili kwenye folda na itaonekana hapa.",
+        "savedViewsEmpty": "Hakuna mionekano iliyohifadhiwa bado.",
+        "writingStatsHint": "Idadi ya maneno itaonekana hapa kasha linapokua.",
+        "quickCaptureHint": "Anza noti bila kuondoka Mwanzo.",
+        "agentPromptHint": "Muulize wakala kuhusu chochote kwenye kasha lako.",
+        "agentPromptAction": "Fungua wakala",
+        "graphCount": "Noti {{count}} kwenye grafu",
+        "openTasks": "Fungua orodha ya kazi",
+        "openCalendar": "Fungua kalenda",
+        "openFiles": "Fungua maktaba ya faili",
+        "openGraph": "Fungua grafu",
+        "fileCount_one": "Faili {{count}}",
+        "fileCount_other": "Faili {{count}}",
+        "statNotes": "Noti {{count}}",
+        "statFavorites": "{{count}} zenye nyota"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Uchunguzi"
       },
       "diagnosticFilesHelper_one": "Faili moja lingekuwa na kizuizi hiki pamoja na faili {{count}} la kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda.",
-      "diagnosticFilesHelper_other": "Faili moja lingekuwa na kizuizi hiki pamoja na mafaili {{count}} ya kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda."
+      "diagnosticFilesHelper_other": "Faili moja lingekuwa na kizuizi hiki pamoja na mafaili {{count}} ya kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda.",
+      "updateBlocked": "Myne haikuweza kuanzisha sasisho kutoka hapa, kwa hiyo hakuna kilichosakinishwa. Jaribu tena baada ya muda mfupi."
     },
     "vault": {
       "changePasswordButton": "Badilisha nenosiri",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "Folda unayoiacha nje haishirikiwi, wala chochote kilicho ndani yake. Unachagua kutoka kila folda kwenye kasha hili, kwa hivyo hapa ndipo kasha lote lipo kwenye meza.",
         "approve": "Idhinisha",
         "grantRefused": "Idhini hii haikuweza kuingia kwenye bajeti ya mipangilio ya kasha. Hakuna kilichobadilika. Futa muunganisho usiotumia tena, kisha ujaribu tena.",
-        "grantFailed": "Haikuweza kuhifadhi idhini. Hakuna kilichobadilika."
+        "grantFailed": "Haikuweza kuhifadhi idhini. Hakuna kilichobadilika.",
+        "verb": {
+          "attachment_list": "Orodhesha faili",
+          "attachment_read": "Soma maandishi ya faili",
+          "calendar_read": "Soma kalenda",
+          "view_list": "Orodhesha mionekano iliyohifadhiwa"
+        },
+        "wholeVaultLabel": "Soma na uandike kasha zima",
+        "wholeVaultHelper": "Kila folda, ikiwa ni pamoja na unazounda baadaye. Ukiacha folda moja nje hapa chini, inabaki nje kwa usomaji na uandishi.",
+        "excludeNothing": "Hakuna kilichoachwa nje",
+        "scopeLineAll": "Inafikia kila noti kwenye kasha, ikiwa ni pamoja na folda unazounda baadaye, na inaweza kubadilisha yoyote.",
+        "scopeLine": "Inafikia noti {{count}} katika folda {{folders}}, na inaweza kubadilisha chochote ndani yao.",
+        "toolsNote": "Usomaji una kikomo: hadi noti {{count}} kwa kila dakika {{minutes}}.",
+        "needsReapproval": "Ilidhinishwa na toleo la zamani chini ya kanuni iliyo kinyume. Toleo hili halisomi chochote kwa ajili yake hadi uidhinishe tena.",
+        "scopeLineWords": "Inafikia folda unazotaja, na inaweza kubadilisha chochote ndani yao."
       },
       "autoApplyLabel": "Tumia tagi zilizopendekezwa kiotomatiki",
       "autoApplyHelper": "Inaandika tagi kwenye dokezo bila kuuliza, mara moja kwa kila dokezo kwa kipindi, tu baada ya kukiandika. Kwenye kifaa hiki tu. Kutendua kupo chini ya dokezo baada ya kuandika."
@@ -4009,7 +4102,8 @@
         "vault": "Kasha",
         "data": "Data",
         "diagnostics": "Uchunguzi",
-        "extensions": "Viendelezi vya kivinjari"
+        "extensions": "Viendelezi vya kivinjari",
+        "connections": "Miunganisho"
       },
       "passwordUpdatedToast": "Nenosiri limesasishwa",
       "title": "Mipangilio"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Tumia angalau herufi/tarakimu {{count}}.",
       "errorGeneric": "Imeshindwa kuweka kitambulisho. Tafadhali jaribu tena."
     },
-    "helperDisclosureLabel": "Zaidi kuhusu mpangilio huu"
+    "helperDisclosureLabel": "Zaidi kuhusu mpangilio huu",
+    "connections": {
+      "mcp": "Wateja wa MCP wa nje"
+    }
   },
   "storageLost": {
     "allSynced": "Hakuna kilichopotea: kila dokezo hapa lilikuwa tayari limefika kwenye seva.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} bado inaendesha na madokezo yako hayaguswi.",
       "hint": "Kujaribu tena huanza upakuaji upya.",
       "retry": "Jaribu tena",
-      "back": "Rudi kwenye kufungua"
+      "back": "Rudi kwenye kufungua",
+      "manual": "Ikiendelea, pakua toleo jipya kutoka myne.md na ulisakinishe kwa mkono. Programu uliyo nayo sasa haiguswi."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Msimbo huu unataja kasha ambalo halipo kwenye mialiko yako kwenye kifaa hiki. Mwombe mmiliki wa kasha atume mkaribisho kwa utambulisho huu tena."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Ipe kalenda jina, kwa mfano Binafsi",
+      "calendarRequired": "Ipe tukio kalenda. Kalenda ndiyo inayotoa rangi ya tukio, na ndiyo kitu ambacho mwonekano huu unaweza kuzima."
+    },
+    "calendarsToggleFailed": "Kalenda hiyo haikubadilishwa. Inabaki kama ilivyokuwa."
   }
 }
