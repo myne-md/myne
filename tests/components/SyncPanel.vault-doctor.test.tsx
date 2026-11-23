@@ -103,8 +103,12 @@ describe("the authority sentence, derived from the doctor", () => {
       syncDetail: "identity_locked",
       doctor: { authority: { state: "device_key" } },
     });
+    // `doctorReads()` counts INVOCATIONS, so it turns 1 before the answer has been
+    // applied: asserting the absence synchronously here read the class fallback that
+    // is still on screen and failed under CI's parallel load while passing alone.
+    // Wait for the line to clear, which is the state this test is about.
     await waitFor(() => expect(doctorReads()).toBe(1));
-    expect(verdictLine()).toBeNull();
+    await waitFor(() => expect(verdictLine()).toBeNull());
   });
 
   it("falls back to the failure class when the doctor cannot be read", async () => {
