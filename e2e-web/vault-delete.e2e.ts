@@ -153,8 +153,20 @@ describeE2E("deleting the vault erases the OPFS container", () => {
         testIdSelector("delete-vault.local-erase-disclosure"),
         { timeoutMs: 15_000 },
       );
+      // `waitForElement` answers the node as soon as it EXISTS; W3C `getText`
+      // reports "" for one that has not painted yet, which is how this failed
+      // once with an empty string against a literal that was on screen a frame
+      // later. Wait for the text itself, then compare it for equality: the
+      // assertion stays exact.
+      const shown = await session.waitUntil(
+        async () => {
+          const painted = (await disclosure.text()).trim();
+          return painted.length > 0 ? painted : null;
+        },
+        { label: "the local-erase disclosure to paint", timeoutMs: 15_000 },
+      );
       expect(
-        (await disclosure.text()).trim(),
+        shown,
         `the local-erase disclosure does not match its constant in ` +
           `src/lib/load-bearing-copy.ts. That literal is the guarantee, not a ` +
           `description of it: a paraphrase that drifts is a different promise, and ` +
