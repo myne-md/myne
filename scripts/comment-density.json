@@ -603,7 +603,7 @@
     "src/components/settings/FocusModeSettings.tsx": 10,
     "src/components/settings/HelperDisclosure.tsx": 192,
     "src/components/settings/HotkeysPanel.tsx": 76,
-    "src/components/settings/McpSection.tsx": 122,
+    "src/components/settings/McpSection.tsx": 123,
     "src/components/settings/MemberPasswordSettings.tsx": 29,
     "src/components/settings/MemorySection.tsx": 65,
     "src/components/settings/ModelPathButton.tsx": 39,

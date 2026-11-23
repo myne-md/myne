@@ -3887,8 +3887,7 @@
         "preferences": "पसंद",
         "memory": "मेमोरी",
         "excluded": "AI क्या पढ़ सकता है",
-        "history": "चैट इतिहास",
-        "externalAccess": "बाहरी पहुँच"
+        "history": "चैट इतिहास"
       },
       "externalAccess": {
         "label": "बाहरी पहुँच",

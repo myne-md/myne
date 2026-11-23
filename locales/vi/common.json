@@ -3887,8 +3887,7 @@
         "preferences": "Tùy chọn",
         "memory": "Bộ nhớ",
         "excluded": "AI có thể đọc gì",
-        "history": "Lịch sử trò chuyện",
-        "externalAccess": "Truy cập ngoài"
+        "history": "Lịch sử trò chuyện"
       },
       "externalAccess": {
         "label": "Truy cập ngoài",

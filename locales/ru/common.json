@@ -4151,8 +4151,7 @@
         "preferences": "Предпочтения",
         "memory": "Память",
         "excluded": "Что может читать ИИ",
-        "history": "История чата",
-        "externalAccess": "Внешний доступ"
+        "history": "История чата"
       },
       "externalAccess": {
         "label": "Внешний доступ",

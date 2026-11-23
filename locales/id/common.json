@@ -3887,8 +3887,7 @@
         "preferences": "Preferensi",
         "memory": "Memori",
         "excluded": "Apa yang dapat dibaca AI",
-        "history": "Riwayat obrolan",
-        "externalAccess": "Akses eksternal"
+        "history": "Riwayat obrolan"
       },
       "externalAccess": {
         "label": "Akses eksternal",

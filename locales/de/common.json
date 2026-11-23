@@ -3887,8 +3887,7 @@
         "preferences": "Einstellungen",
         "memory": "Gedächtnis",
         "excluded": "Was die KI lesen darf",
-        "history": "Chat-Verlauf",
-        "externalAccess": "Externer Zugriff"
+        "history": "Chat-Verlauf"
       },
       "externalAccess": {
         "label": "Externer Zugriff",

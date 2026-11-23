@@ -3887,8 +3887,7 @@
         "preferences": "পছন্দ",
         "memory": "স্মৃতি",
         "excluded": "AI কী পড়তে পারে",
-        "history": "চ্যাট ইতিহাস",
-        "externalAccess": "এক্সটার্নাল অ্যাক্সেস"
+        "history": "চ্যাট ইতিহাস"
       },
       "externalAccess": {
         "label": "এক্সটার্নাল অ্যাক্সেস",
