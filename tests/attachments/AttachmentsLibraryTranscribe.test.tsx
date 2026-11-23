@@ -55,6 +55,7 @@ const mockedToast = vi.mocked(showAttachmentToast);
 const AUDIO: CatalogEntry = {
   id: "a".repeat(64),
   content_type: "audio/wav",
+  folder: "",
   created_at: 1_700_000_000,
   filename: "voice.wav",
   size: 2048,
@@ -62,6 +63,7 @@ const AUDIO: CatalogEntry = {
 const IMAGE: CatalogEntry = {
   id: "b".repeat(64),
   content_type: "image/png",
+  folder: "",
   created_at: 1_700_000_500,
   filename: "pic.png",
   size: 4096,

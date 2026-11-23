@@ -245,7 +245,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "UnlinkedMentionsSection": { file: "src/notes/components/UnlinkedMentionsSection.tsx", line: 192 },
   "Unlock": { file: "src/screens/Unlock.tsx", line: 462 },
   "UpdateNotice": { file: "src/components/update/UpdateNotice.tsx", line: 151 },
-  "UpdatingScreen": { file: "src/screens/UpdatingScreen.tsx", line: 272 },
+  "UpdatingScreen": { file: "src/screens/UpdatingScreen.tsx", line: 270 },
   "UsedInNotesPopover": { file: "src/components/attachments/UsedInNotesPopover.tsx", line: 69 },
   "VaultExportModal": { file: "src/components/export/VaultExportModal.tsx", line: 200 },
   "VaultPanel": { file: "src/components/settings/VaultPanel.tsx", line: 367 },

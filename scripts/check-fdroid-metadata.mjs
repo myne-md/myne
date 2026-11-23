@@ -378,7 +378,10 @@ export function scanTreeAt(root) {
 
   let icon = null;
   try {
-    icon = readFileSync(join(meta, "images", "icon.png"));
+    // `Buffer.from` rather than the read result itself: `readFileSync` answers a
+    // `NonSharedBuffer`, and `checkMetadata`'s contract is a plain `Buffer`, so
+    // copying once here keeps the scan's type the one the guard declares.
+    icon = Buffer.from(readFileSync(join(meta, "images", "icon.png")));
   } catch {
     icon = null;
   }
@@ -392,7 +395,7 @@ export function scanTreeAt(root) {
   return {
     version,
     packageVersion,
-    recipe: recipeText,
+    recipe: /** @type {string} */ (recipeText),
     changelogs,
     texts,
     icon,

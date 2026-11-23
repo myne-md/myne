@@ -26,6 +26,7 @@ const UNUSED: CatalogEntry[] = [
   {
     id: "a".repeat(64),
     content_type: "image/png",
+    folder: "",
     created_at: 1,
     filename: "orphan.png",
     size: 2048,
@@ -33,6 +34,7 @@ const UNUSED: CatalogEntry[] = [
   {
     id: "b".repeat(64),
     content_type: "image/png",
+    folder: "",
     created_at: 2,
     filename: "never-inserted.png",
     size: 1024,

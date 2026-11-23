@@ -349,7 +349,9 @@ describe("SettingsModal: the rail scrolls instead of crushing its rows (myne-md/
   // declarations that decide it: the scroll box, and the row height and padding
   // that must not be negotiated.
   it("gives the tab list the scroll and the rows a fixed height", () => {
-    render(<SettingsModal vaultId="v1" open onClose={vi.fn()} />);
+    render(
+      <SettingsModal vaultId="v1" open onClose={vi.fn()} onDeleteVaultSuccess={vi.fn()} />,
+    );
     const nav = screen.getByRole("tablist");
     expect(nav.style.overflowY).toBe("auto");
     // `min-height: 0` is what lets the box be SHORTER than its content in a flex

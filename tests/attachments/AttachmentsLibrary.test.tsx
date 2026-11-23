@@ -39,6 +39,7 @@ const mockedRefs = vi.mocked(referencingNotes);
 const ENTRY: CatalogEntry = {
   id: "a".repeat(64),
   content_type: "image/png",
+  folder: "",
   created_at: 1_700_000_000,
   filename: "diagram.png",
   size: 2048,
