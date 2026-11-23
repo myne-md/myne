@@ -536,7 +536,7 @@
     "src/components/RepairResidueBanner.tsx": 25,
     "src/components/ScreenCaptureEscape.tsx": 153,
     "src/components/SecretPhraseReveal.tsx": 59,
-    "src/components/SettingsModal.tsx": 316,
+    "src/components/SettingsModal.tsx": 322,
     "src/components/SkipToContent.tsx": 38,
     "src/components/Spinner.tsx": 98,
     "src/components/TemplatesManager.tsx": 59,
