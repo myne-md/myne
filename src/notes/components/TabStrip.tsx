@@ -469,6 +469,11 @@ export function TabStrip({
       // is paint only, so a themed strip's tab hit areas are exactly where an
       // unthemed one's were — the property task 14 measures.
       {...ornamentRole("chrome")}
+      // The key here is this element's own padding, which is the leading gap between
+      // the back/forward cluster and the first tab: a drag starts only from a node
+      // carrying the attribute, so tabs and the `+` are unaffected
+      // (myne-md/myne#1108). Unconditional, like the trailing filler.
+      {...dragRegionProps()}
       style={{
         ...stripStyle,
         paddingInlineStart: STRIP_BASE_PADDING_LEFT + insetLeft,
