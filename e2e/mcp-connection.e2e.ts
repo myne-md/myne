@@ -67,7 +67,6 @@ import {
   enableDeveloperMode,
   nameNewNote,
   openSettings,
-  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { describeE2E, scenario } from "./support/scenario";
@@ -233,20 +232,36 @@ async function enableExternalAccess(session: Session): Promise<void> {
  */
 async function approveLeavingOut(session: Session, folder: string): Promise<void> {
   await (await session.byTestId("settings.mcp-add")).click();
-  await session.byTestId("settings.mcp-grant", { timeoutMs: UI_TIMEOUT_MS });
 
-  await (await session.byTestId("settings.mcp-grant-name")).sendKeys(CONNECTION_NAME);
+  // Step 1, the client. The guided path is what a user gets since
+  // myne-md/myne#1077; the preset only decides which configuration snippet is
+  // offered, so any of them serves this suite's subject.
+  await session.byTestId("settings.mcp-step-clients", { timeoutMs: UI_TIMEOUT_MS });
+  const [card] = await session.findElements(
+    `${testIdSelector("settings.mcp-client")}[data-client="claude-desktop"]`,
+  );
+  if (card === undefined) throw new Error("the client step offered no claude-desktop card");
+  await card.click();
 
-  await (await session.byTestId("settings.mcp-grant-exclude")).click();
+  // Step 2, the name. Next is disabled until it is non-empty, which is the
+  // product's own rule rather than this spec's.
+  await session.byTestId("settings.mcp-step-config", { timeoutMs: UI_TIMEOUT_MS });
+  await (await session.byTestId("settings.mcp-connection-name")).sendKeys(CONNECTION_NAME);
+  await (await session.byTestId("settings.mcp-flow-next")).click();
+
+  // Step 3, the scope. Whole-vault is the default, so the folder list means the
+  // EXCLUSION set here — which is exactly the grant this suite is about.
+  await session.byTestId("settings.mcp-step-scope", { timeoutMs: UI_TIMEOUT_MS });
+  await (await session.byTestId("settings.mcp-access-picker-toggle")).click();
   // The picker's option value is the HOST's folder path, and the host writes
-  // paths with a trailing slash (`e2eptrivate/` — what every other sidebar spec
+  // paths with a trailing slash (`e2eprivate/` — what every other sidebar spec
   // matches). Accept either spelling rather than encode one: this spec's subject
   // is the exclusion rule, not the separator.
   const option = await session.waitUntil(
     async () => {
       const [found] = await session.findElements(
-        `${testIdSelector("settings.mcp-grant-exclude-option")}[data-value="${folder}"], ` +
-          `${testIdSelector("settings.mcp-grant-exclude-option")}[data-value="${folder}/"]`,
+        `${testIdSelector("settings.mcp-access-picker-option")}[data-value="${folder}"], ` +
+          `${testIdSelector("settings.mcp-access-picker-option")}[data-value="${folder}/"]`,
       );
       return found ?? null;
     },
@@ -254,18 +269,20 @@ async function approveLeavingOut(session: Session, folder: string): Promise<void
   );
   await option.click();
 
-  // The count the user read and the bytes written must be the same decision, so
-  // wait for the host's preview to carry the exclusion before approving.
+  // The selection the user made and the bytes written must be the same decision,
+  // so wait for the picker to report the row as selected before approving.
   await session.waitUntil(
-    async () =>
-      (await (await session.byTestId("settings.mcp-grant-counts")).attribute("data-excluded-count")) ===
-      "1"
-        ? true
-        : null,
-    { label: "the grant preview counts one exclusion", timeoutMs: 10_000 },
+    async () => {
+      const [selected] = await session.findElements(
+        `${testIdSelector("settings.mcp-access-picker-option")}[data-value="${folder}"][data-selected="true"], ` +
+          `${testIdSelector("settings.mcp-access-picker-option")}[data-value="${folder}/"][data-selected="true"]`,
+      );
+      return selected ?? null;
+    },
+    { label: "the exclusion picker reflecting the choice", timeoutMs: 10_000 },
   );
 
-  await (await session.byTestId("settings.mcp-grant-approve")).click();
+  await (await session.byTestId("settings.mcp-approve")).click();
   await session.byTestId("settings.mcp-connection", { timeoutMs: UI_TIMEOUT_MS });
 }
 
@@ -496,8 +513,7 @@ describeE2E("mcp3 revoke and lock are refusals rather than protocol errors (myne
 
         // Re-approve, then lock: the same call is now refused for a different
         // reason, told apart because the fix is different.
-        await openSettings(s, "ai");
-        await selectSettingsTopic(s, "ai", "limits");
+        await openSettings(s, "connections");
         await approveLeavingOut(s, LEFT_OUT_FOLDER);
         await closeSettings(s);
 
