@@ -569,12 +569,32 @@ export function SettingsModal({
   useEffect(() => {
     if (open) setSelected(initialPanel ?? "account");
   }, [open, initialPanel]);
+  // **A panel the caller EXPLICITLY asked for renders even while the gate hides
+  // it from the rail** (myne-md/myne#1097): the caller is a button named for the
+  // panel it wants, and `decisions/ui/0402` calls that flag a UI-DISCOVERY gate.
+  // Only that gate is bypassed. A missing capability is a platform fact, so a
+  // panel whose host cannot answer it stays hidden whatever the caller asks.
+  const requestedPastGate = useMemo(() => {
+    if (initialPanel === undefined) return null;
+    if (panels.some((p) => p.id === initialPanel)) return null;
+    const meta = PANELS_BASE.find((p) => p.id === initialPanel);
+    if (meta === undefined || meta.group !== "developer" || prefs.developer_mode) {
+      return null;
+    }
+    const capabilityPresent =
+      (meta.capability === undefined || capabilities.has(meta.capability)) &&
+      (meta.anyOf === undefined || meta.anyOf.some((c) => capabilities.has(c)));
+    return capabilityPresent ? initialPanel : null;
+  }, [initialPanel, panels, prefs.developer_mode]);
+
   // If the selected panel drops out of the roster (Developer mode turned off
   // while its group was open), fall back to Account rather than stranding the
-  // content pane on a panel no longer reachable from the rail.
+  // content pane on a panel no longer reachable from the rail. The one exception
+  // is the panel this open explicitly asked for.
   useEffect(() => {
+    if (selected === requestedPastGate) return;
     if (!panels.some((p) => p.id === selected)) setSelected("account");
-  }, [panels, selected]);
+  }, [panels, selected, requestedPastGate]);
   const [childInFlight, setChildInFlight] = useState(false);
   const [childDialogOpen, setChildDialogOpen] = useState(false);
   // Settings search (MYND-536). A non-empty query swaps the content pane from
