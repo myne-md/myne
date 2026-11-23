@@ -460,6 +460,10 @@ const V = {
     "ported",
     "The in-app tier's delivery: an in-memory pending set, `setTimeout`, and an injected callback. No notification API and no `@tauri-apps/*` — a browser runs it as written. The OS-registration tier, when it lands, is what will need a seam member here.",
   ],
+  "src/lib/reminderOsNotifier.ts": [
+    "adapted",
+    "The OS-registration tier its sibling above predicted (myne#1076). It reaches the host ONLY through the seam, and the `reminders` plugin has no web arm, so on web every call is the dispatcher's typed refusal — which is what the shared core wants: it counts a throwing notifier as a FAILED operation rather than a silent one. It ships as written; nothing about it is desktop-only code, only its answer is.",
+  ],
   "src/lib/reminderPermission.ts": [
     "ported",
     "Pure policy over an injected platform API. No production API implementation exists on either client — the in-app tier needs no permission, since nothing is handed to the operating system.",
@@ -669,6 +673,10 @@ const V = {
   "src/hooks/useReminderScheduler.ts": [
     "adapted",
     "The hook itself is timers over an injected notifier and runs as written. What differs is its input: the task list comes from the vault-indices plugin, which the web dispatcher still answers `Pending` (task 31), so the pass finds nothing to register until that lands. It fails quiet rather than loud — an empty target set is a valid pass.",
+  ],
+  "src/hooks/updateFlow.tsx": [
+    "adapted",
+    "The one update flow, passed down as a context so the Settings About row asks it instead of calling the install command itself (myne#1059). It is a wrapper over `useUpdateAvailable`, so its web answer is that hook's: the `selfUpdate` capability is absent, the check never runs and no notice mounts. It ships and renders nothing on web rather than being excluded, because the surface that reads it is shared.",
   ],
   "src/hooks/useRevealAfterIdleLock.ts": [
     "adapted",

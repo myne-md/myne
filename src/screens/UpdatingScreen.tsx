@@ -48,11 +48,17 @@ import { stageRootStyle } from "../components/primitives/stageRoot";
 import { formatBytes } from "../components/attachments/format";
 import { openUrl } from "../platform/opener";
 import type { UpdateProgressState } from "../hooks/useUpdateAvailable";
+import { NATIVE_DOWNLOAD_URL } from "./WebNoAccount";
 
 export type UpdatingPhase = "working" | "failed";
 
-/** Where a reader who cannot get past the failed screen gets the artefact. */
-const DOWNLOAD_PAGE = "https://myne.md/download/";
+/**
+ * Where a reader who cannot get past the failed screen gets the artefact.
+ *
+ * The app's one download link, imported rather than respelled: the two spellings
+ * differed by a trailing slash and nothing else.
+ */
+const DOWNLOAD_PAGE = NATIVE_DOWNLOAD_URL;
 
 export interface UpdatingScreenProps {
   phase: UpdatingPhase;
