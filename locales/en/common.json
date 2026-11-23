@@ -2311,7 +2311,7 @@
         "reasonUnknown": "Myne couldn't say why."
       },
       "offer": {
-        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported. Nothing leaves this device, and your original files stay exactly where they are.",
+        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported, and your original files stay exactly where they are.",
         "laterHint": "You can always import later from Settings → Storage.",
         "title": "Import your notes?"
       },
