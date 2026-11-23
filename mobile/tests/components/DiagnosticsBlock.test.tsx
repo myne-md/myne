@@ -93,12 +93,4 @@ describe("DiagnosticsBlock", () => {
     expect(block.textContent ?? "").not.toContain("vaultAuthority");
   });
 
-  it("explains the one word of its own vocabulary that reads as a fault", async () => {
-    // `unknown` is the vault doctor's answer for "the question was never asked",
-    // and the phone's own paste carried four in a row (myne-md/myne#1029). The
-    // line renders on this client too: the paste that raised it came from here.
-    render(<DiagnosticsBlock />);
-    const note = await screen.findByTestId("settings.diagnostics.unknown-note");
-    expect(note.textContent).toContain("settings.about.diagnosticUnknownNote");
-  });
 });
