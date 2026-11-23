@@ -38,7 +38,7 @@
 // through to `indentMore` untouched, so indented code still indents by the
 // editor's unit and every other language keeps its own indentation service.
 
-import { indentMore } from "@codemirror/commands";
+import { indentLess, indentMore } from "@codemirror/commands";
 import type { StateCommand } from "@codemirror/state";
 
 /** Leading-whitespace width of `text`, counting a tab as the next multiple of 4. */
@@ -168,3 +168,128 @@ export const listAwareIndent: StateCommand = ({ state, dispatch }) => {
   );
   return true;
 };
+
+/**
+ * Shift-Tab on a list line: outdent one level and leave the caret inside the item
+ * (myne-md/myne#1064).
+ *
+ * The report: after an outdent the next character landed in front of the marker
+ * (`P- [ ]`), which also stops the line parsing as a task, so the checkbox goes
+ * and the todo leaves the Tasks panel. `indentLess` removes up to one
+ * `indentUnit` of leading whitespace and maps the selection by that length, which
+ * is right at depth 1 by accident and says nothing about the caret: one at the
+ * line's start — where an empty rendered item leaves it — stays in front of the
+ * marker.
+ *
+ * So: step out to the enclosing list line's indent, and floor the caret at the
+ * item's CONTENT column, past the `[ ]` as well as the bullet. Off a list line
+ * this is still `indentLess`.
+ */
+export const listAwareOutdent: StateCommand = ({ state, dispatch }) => {
+  const range = state.selection.main;
+  const line = state.doc.lineAt(range.head);
+  // A selection that spans lines is `indentLess`'s job, for the same reason the
+  // indent side defers: it outdents every line in the range, and re-deriving that
+  // per line here would be re-implementing it.
+  if (!range.empty) return indentLess({ state, dispatch });
+  if (!isListItemLine(line.text)) return indentLess({ state, dispatch });
+
+  const ownWidth = indentWidth(line.text);
+  const ownChars = leadingWhitespaceChars(line.text);
+
+  const preceding: string[] = [];
+  for (let n = line.number - 1; n >= 1 && preceding.length < 64; n--) {
+    const text = state.doc.line(n).text;
+    if (text.trim() === "") break; // a blank line ends the list context
+    preceding.push(text);
+  }
+  preceding.reverse();
+
+  // The step out is to the nearest shallower list line's INDENT — the level this
+  // item belonged to — or to column 0 when there is none.
+  let targetWidth = 0;
+  for (let i = preceding.length - 1; i >= 0; i--) {
+    const candidate = preceding[i]!;
+    if (contentColumn(candidate) === null) continue;
+    const indent = indentWidth(candidate);
+    if (indent < ownWidth) {
+      targetWidth = indent;
+      break;
+    }
+  }
+
+  // How many leading characters to delete to reach `targetWidth`. Characters
+  // rather than columns, because a tab can cross the target in one step.
+  let removeChars = 0;
+  let removedWidth = 0;
+  while (removeChars < ownChars && removedWidth < ownWidth - targetWidth) {
+    const ch = line.text[removeChars]!;
+    removedWidth += ch === "\t" ? 4 - (removedWidth % 4) : 1;
+    removeChars += 1;
+  }
+
+  const head = range.head;
+  const anchor = range.anchor;
+
+  if (removeChars === 0) {
+    // Already at the outermost level: consume the key, change nothing except
+    // flooring the caret inside the item.
+    dispatch(
+      state.update({
+        selection: floorSelection(line.text, line.from, head, anchor),
+        userEvent: "input.indent",
+      }),
+    );
+    return true;
+  }
+
+  // Delete leading WHITESPACE only, never the marker: the item must keep parsing.
+  const next = state.update({
+    changes: { from: line.from, to: line.from + removeChars },
+    // The caret keeps its position in the TEXT, then is floored at the NEW
+    // line's content column — which is the fix: an outdent can no longer leave
+    // it in front of the marker.
+    selection: floorSelection(
+      line.text.slice(removeChars),
+      line.from,
+      head - removeChars,
+      anchor - removeChars,
+    ),
+    userEvent: "input.indent",
+    scrollIntoView: true,
+  });
+  dispatch(next);
+  return true;
+};
+
+/** Leading whitespace characters of `text` (the indentation's length in bytes). */
+function leadingWhitespaceChars(text: string): number {
+  let n = 0;
+  while (n < text.length && (text[n] === " " || text[n] === "\t")) n += 1;
+  return n;
+}
+
+/** Where an item's CONTENT starts, past the bullet AND the `[ ] ` marker: a caret
+ *  between the two is the same defect one character along. */
+function itemContentColumn(text: string): number {
+  const base = contentColumn(text);
+  if (base === null) return 0;
+  const rest = text.slice(base);
+  const task = /^\[[ xX]\]([ \t]+)/.exec(rest);
+  return task === null ? base : base + 3 + task[1]!.length;
+}
+
+/** Both ends floored, not only the head: a range that began before the marker
+ *  would otherwise start the next edit outside the item. */
+function floorSelection(
+  text: string,
+  lineFrom: number,
+  head: number,
+  anchor: number,
+): { anchor: number; head: number } {
+  const floor = lineFrom + itemContentColumn(text);
+  return {
+    anchor: Math.max(anchor, floor),
+    head: Math.max(head, floor),
+  };
+}
