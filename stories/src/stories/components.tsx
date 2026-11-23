@@ -856,6 +856,36 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/attachmentslibrary/working",
+    group: "components",
+    surface: "AttachmentsLibrary",
+    state: "working",
+    description:
+      "The library on a vault a week old: twelve files across three folders, the folder scope listing them, and the per-tile checkbox that the bulk move acts on. Some files are referenced by notes and some are not, which is what the used-in column distinguishes.",
+    tags: ["components", "attachments", "library", "populated", "folders", "bulk-move"],
+    fixture: "vault-working",
+    render: () => (
+      <SidebarStateProvider>
+        <AttachmentsLibrary />
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "components/attachmentslibrary/dense",
+    group: "components",
+    surface: "AttachmentsLibrary",
+    state: "dense",
+    description:
+      "The same library after a year: forty files in nested folders, long enough to scroll and to make the folder scope's value visible rather than theoretical. Look for the scope control naming a folder and the list showing only what is in it.",
+    tags: ["components", "attachments", "library", "populated", "dense", "folders"],
+    fixture: "vault-dense",
+    render: () => (
+      <SidebarStateProvider>
+        <AttachmentsLibrary />
+      </SidebarStateProvider>
+    ),
+  },
+  {
     id: "components/cleanunusedattachmentsdialog/default",
     group: "components",
     surface: "CleanUnusedAttachmentsDialog",

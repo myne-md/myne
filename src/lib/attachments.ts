@@ -343,19 +343,13 @@ export type AttachmentPlacementError =
  * File a batch of attachments into vault folders (Slot::Unlocked-gated,
  * myne-md/myne#1075).
  *
- * Not exported yet, on purpose and temporarily: the library's multi-select move
- * is its second caller and lands in the branch above this one, so until then the
- * folder rename is the only thing that writes a placement. `check-export-callers`
- * keeps a new file at zero unreferenced exports, and an exemption recorded for a
- * consumer that does not exist yet is the shape that outlives its reason.
- *
- * One command for two acts, because they are the same write: the multi-select
+ * Two callers, and they are why it is one command: the library's multi-select
  * move hands several ids one destination, and a folder rename hands each row
  * under the old path its rewritten one. All-or-nothing on validation, so a batch
  * with one bad row writes nothing, and an assignment that would change nothing is
  * skipped rather than bumping a version for free.
  */
-async function attachmentSetFolders(
+export async function attachmentSetFolders(
   assignments: readonly AttachmentFolderAssignment[],
 ): Promise<void> {
   if (assignments.length === 0) return;
