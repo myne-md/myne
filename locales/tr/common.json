@@ -2088,6 +2088,7 @@
         "body": "Myne düz Markdown yazar ve sonucu siz yazarken gösterir.\n\n## Temeller\nBir sözcüğü **kalın** ya da *italik* yapın veya araya `satır içi kod` ekleyin.\n\n## Bir liste\n- Bir öğe\n- Başka bir öğe\n  - İç içe bir öğe\n\n## Bir alıntı\n> Yıllarca saklanan küçük notlar, hiç yazmadığınız büyük notları yener.\n\n## Bir tablo\n| Kısayol | Ne yapar |\n| --- | --- |\n| Cmd/Ctrl + B | Kalın |\n| Cmd/Ctrl + K | Bağlantı ekle |\n\n## Biraz kod\n```\nconsole.log(\"hello from Myne\")\n```\n\nHazır olduğunuzda [[{{index}}]] notuna dönün.\n"
       },
       "tasks": {
+        "title": "Görevler",
         "body": "`- [ ]` ile başlayan her satır bir görevdir. Myne, notlarınızın tamamındaki açık görevleri tek bir Görevler görünümünde toplar; böylece hiçbiri notlar arasında kaybolmaz.\n\n- [ ] [[{{markdown}}]] notunu okuyun\n- [ ] Kendi görevinizi ekleyin\n- [ ] Son tarihli bir tane deneyin 📅 2030-12-31\n- [x] Kasanızı oluşturun\n\nBuradaki bir kutuyu işaretleyin, sonra listenin güncellenmesini izlemek için kenar çubuğundaki Görevler görünümünü açın.\n\n[[{{index}}]] notuna dönün.\n"
       },
       "links": {
