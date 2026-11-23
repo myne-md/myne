@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}}（转录文本）",
       "transcriptSave": "保存为笔记",
       "transcriptSaved": "转录文本已保存为笔记。",
-      "transcriptSaveFailed": "无法将转录文本保存为笔记。"
+      "transcriptSaveFailed": "无法将转录文本保存为笔记。",
+      "folderScopeAriaLabel": "显示一个文件夹中的文件",
+      "selectAriaLabel": "选择 {{name}}",
+      "selectedCount_one": "已选择 {{count}} 个",
+      "selectedCount_other": "已选择 {{count}} 个",
+      "moveToAriaLabel": "将选中的文件移到文件夹",
+      "moveFailed": "无法移动选中的文件。没有发生任何更改；请重试。",
+      "importFolder": "导入文件夹",
+      "importFolderProgress": "正在导入 {{done}} / {{total}}",
+      "importFolderDone_one": "已导入 {{imported}} 个文件，跳过 {{skipped}} 个。",
+      "importFolderDone_other": "已导入 {{imported}} 个文件，跳过 {{skipped}} 个。",
+      "importFolderCancelled_one": "在第 {{count}} 个文件后停止。已导入的内容在文件库中。",
+      "importFolderCancelled_other": "在第 {{count}} 个文件后停止。已导入的内容在文件库中。",
+      "importFolderFailed": "无法读取该文件夹。没有导入任何内容。",
+      "folderAll": "所有文件夹"
     },
     "thumbnail": {
       "audioLabel": "音频：{{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "尚无附件。点按“上传”以添加图片或 PDF。",
     "insert": "插入",
     "pauseLabel": "暂停 {{filename}}",
-    "playLabel": "播放 {{filename}}"
+    "playLabel": "播放 {{filename}}",
+    "move": "移动",
+    "folderAll": "所有文件夹",
+    "folderRoot": "无文件夹",
+    "folderPickerAria": "{{name}} 的文件夹",
+    "folderMoveFailed": "无法移动该文件。没有发生任何更改；请重试。"
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "命令和笔记",
     "pin": "固定到左侧功能条",
     "unpin": "从左侧功能条取消固定",
-    "pinError": "无法固定该命令。"
+    "pinError": "无法固定该命令。",
+    "sectionFiles": "文件",
+    "fileUsedIn": "在 {{title}} 中",
+    "fileUnused": "未在任何笔记中使用"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "转换导入的附件…"
+      },
+      "showHome": {
+        "label": "前往首页"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "无法重命名文件夹，因此未更改。",
       "deliberateWriteFailed": "文件夹已重命名，但它的一项设置未能保存。每次解锁时，都会有一个空文件夹以旧名称重新出现；删除它是安全的，不会改动其他任何内容。再次重命名该文件夹并不会清除它。",
       "folderListFull": "Myne 能记住的文件夹数量有限，而该列表已满。此文件夹仍可使用，但当最后一篇笔记离开它时，它就会消失。删除一个你不再需要的文件夹可以腾出空间。",
-      "folderNotRemembered": "文件夹已创建，但 Myne 未能记录它。当最后一篇笔记离开它时，它就会消失；如果它仍然是空的，下次解锁时它就不在了。再次创建它是安全的。"
+      "folderNotRemembered": "文件夹已创建，但 Myne 未能记录它。当最后一篇笔记离开它时，它就会消失；如果它仍然是空的，下次解锁时它就不在了。再次创建它是安全的。",
+      "attachmentFolderRewriteFailed": "文件夹已重命名，但存放在其中的文件没有随之移动。它们仍指向旧文件夹，因此在文件库树中缺席，也在这个文件夹被授予的智能体那里缺席。请从附件中手动再次移动它们，或把文件夹改回原名后再改一次。"
     },
     "folderNote": {
       "defaultTitle": "索引"
@@ -2543,7 +2569,8 @@
         "attachments": "附件",
         "graph": "图谱",
         "tasks": "任务",
-        "today": "今天"
+        "today": "今天",
+        "home": "首页"
       },
       "placesLabel": "前往",
       "results": "结果"
@@ -2553,7 +2580,8 @@
       "tasksTab": "任务",
       "loading": "正在加载…",
       "untitledView": "无标题视图",
-      "agentTab": "智能体"
+      "agentTab": "智能体",
+      "homeTab": "首页"
     },
     "relativeTime": {
       "daysAgo": "{{d}} 天前",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "导出…",
       "txt": "纯文本"
+    },
+    "home": {
+      "emptyTitle": "你的首页界面",
+      "emptyBody": "最近笔记、今天的任务和你常打开的文件会以卡片出现在这里。还没有做任何布置。",
+      "title": "首页",
+      "arrange": "布置",
+      "arrangeTitle": "布置你的首页",
+      "addCard": "添加卡片",
+      "removeCard": "移除 {{name}}",
+      "spanWide": "宽",
+      "spanNarrow": "窄",
+      "onStart": "应用打开时",
+      "onStartHint": "启动时打开此首页界面，仅限本设备。",
+      "cards": {
+        "recentNotes": "最近笔记",
+        "quickCapture": "快速记录",
+        "todaysTasks": "今天的任务",
+        "calendarAgenda": "即将到来",
+        "favorites": "收藏",
+        "referenceSets": "引用集",
+        "savedViews": "已保存视图",
+        "recentFiles": "最近文件",
+        "writingStats": "写作",
+        "agentPrompt": "询问智能体",
+        "graph": "你的保险库",
+        "unknown": "此卡片不可用",
+        "unknownNote": "此卡片由更新版本的 Myne 添加，本版本无法绘制。它仍留在原位。",
+        "pending": "此卡片正在构建中。",
+        "loading": "正在读取保险库…",
+        "recentNotesEmpty": "此设备上还没有打开过笔记。你打开的笔记会出现在这里。",
+        "favoritesEmpty": "还没有任何收藏。给笔记加星后它就会出现在这里。",
+        "todaysTasksEmpty": "今天没有到期项。",
+        "calendarAgendaEmpty": "下周没有已安排的日程。",
+        "recentFilesEmpty": "还没有文件。请从文件库导入一个。",
+        "referenceSetsEmpty": "没有任何文件夹存放文件。把文件放入文件夹后它就会出现在这里。",
+        "savedViewsEmpty": "还没有已保存的视图。",
+        "writingStatsHint": "随着保险库增长，字数会出现在这里。",
+        "quickCaptureHint": "不离开首页即可开始一条笔记。",
+        "agentPromptHint": "向智能体询问保险库中的任何内容。",
+        "agentPromptAction": "打开智能体",
+        "graphCount": "关系图中有 {{count}} 条笔记",
+        "openTasks": "打开任务列表",
+        "openCalendar": "打开日历",
+        "openFiles": "打开文件库",
+        "openGraph": "打开关系图",
+        "fileCount_one": "{{count}} 个文件",
+        "fileCount_other": "{{count}} 个文件",
+        "statNotes": "{{count}} 条笔记",
+        "statFavorites": "{{count}} 个收藏"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "诊断"
       },
       "diagnosticFilesHelper_one": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。",
-      "diagnosticFilesHelper_other": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。"
+      "diagnosticFilesHelper_other": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。",
+      "updateBlocked": "Myne 无法从这里开始更新，因此没有安装任何内容。请稍后重试。"
     },
     "vault": {
       "changePasswordButton": "更改密码",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "你留出的文件夹不会被共享，其中的内容也不会。你从本保险库的所有文件夹中选择，因此这是整个保险库摆上台面的唯一位置。",
         "approve": "批准",
         "grantRefused": "此授权无法放入保险库的设置预算。未更改任何内容。请撤销不再使用的连接后重试。",
-        "grantFailed": "无法保存批准。未更改任何内容。"
+        "grantFailed": "无法保存批准。未更改任何内容。",
+        "verb": {
+          "attachment_list": "列出文件",
+          "attachment_read": "读取文件文本",
+          "calendar_read": "读取日历",
+          "view_list": "列出已保存视图"
+        },
+        "wholeVaultLabel": "读取并写入整个保险库",
+        "wholeVaultHelper": "每个文件夹，包括你以后创建的。如果在下面排除某个文件夹，它在读取和写入时都会被排除。",
+        "excludeNothing": "未排除任何项",
+        "scopeLineAll": "可及保险库中的每条笔记，包括你以后创建的文件夹，并能修改其中任何一条。",
+        "scopeLine": "可及 {{folders}} 个文件夹中的 {{count}} 条笔记，并能修改其中的任何内容。",
+        "toolsNote": "读取有配额：每 {{minutes}} 分钟最多 {{count}} 条笔记。",
+        "needsReapproval": "由旧版本按相反规则批准。在你重新批准之前，此版本不会为它读取任何内容。",
+        "scopeLineWords": "可及你指定的文件夹，并能修改其中的任何内容。"
       },
       "autoApplyLabel": "自动应用建议的标签",
       "autoApplyHelper": "编辑笔记后，每次每篇笔记仅一次，自动将标签写入笔记，无需询问。仅在此设备。写入后可在笔记下方撤销。"
@@ -4009,7 +4102,8 @@
         "vault": "保险库",
         "data": "数据",
         "diagnostics": "诊断",
-        "extensions": "浏览器扩展"
+        "extensions": "浏览器扩展",
+        "connections": "连接"
       },
       "passwordUpdatedToast": "密码已更新",
       "title": "设置"
@@ -4420,7 +4514,10 @@
       "errorTooShort": "请使用至少 {{count}} 个字符/数字。",
       "errorGeneric": "无法设置凭据。请重试。"
     },
-    "helperDisclosureLabel": "关于此设置的更多信息"
+    "helperDisclosureLabel": "关于此设置的更多信息",
+    "connections": {
+      "mcp": "外部 MCP 客户端"
+    }
   },
   "storageLost": {
     "allSynced": "没有丢失任何内容：这里的每一篇笔记都已到达服务器。",
@@ -5906,7 +6003,8 @@
       "caption": "Myne {{version}} 仍在运行，你的笔记未受影响。",
       "hint": "重试会重新开始下载。",
       "retry": "重试",
-      "back": "返回解锁"
+      "back": "返回解锁",
+      "manual": "如果反复出现，请从 myne.md 下载新版本并手动安装。你现在使用的应用不受影响。"
     }
   },
   "identityFlow": {
@@ -6006,5 +6104,12 @@
     "joinFromQr": {
       "notFound": "此代码指向的保险库不在本设备的邀请中。请让保险库所有者重新向此身份发送邀请。"
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "给日历起个名字，例如「个人」",
+      "calendarRequired": "为事件指定日历。日历决定事件的颜色，也是此视图可以关闭的对象。"
+    },
+    "calendarsToggleFailed": "该日历没有被切换。它保持原样。"
   }
 }

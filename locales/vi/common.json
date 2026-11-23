@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (bản chép lời)",
       "transcriptSave": "Lưu thành ghi chú",
       "transcriptSaved": "Đã lưu bản chép lời thành ghi chú.",
-      "transcriptSaveFailed": "Không thể lưu bản chép lời thành ghi chú."
+      "transcriptSaveFailed": "Không thể lưu bản chép lời thành ghi chú.",
+      "folderScopeAriaLabel": "Hiện các tệp trong một thư mục",
+      "selectAriaLabel": "Chọn {{name}}",
+      "selectedCount_one": "Đã chọn {{count}}",
+      "selectedCount_other": "Đã chọn {{count}}",
+      "moveToAriaLabel": "Chuyển các tệp đã chọn vào một thư mục",
+      "moveFailed": "Không thể chuyển các tệp đã chọn. Không có gì thay đổi; hãy thử lại.",
+      "importFolder": "Nhập một thư mục",
+      "importFolderProgress": "Đang nhập {{done}} / {{total}}",
+      "importFolderDone_one": "Đã nhập {{imported}} tệp, bỏ qua {{skipped}}.",
+      "importFolderDone_other": "Đã nhập {{imported}} tệp, bỏ qua {{skipped}}.",
+      "importFolderCancelled_one": "Đã dừng sau {{count}} tệp. Những gì đã nhập nằm trong thư viện.",
+      "importFolderCancelled_other": "Đã dừng sau {{count}} tệp. Những gì đã nhập nằm trong thư viện.",
+      "importFolderFailed": "Không thể đọc thư mục đó. Không có gì được nhập.",
+      "folderAll": "Tất cả thư mục"
     },
     "thumbnail": {
       "audioLabel": "Âm thanh: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Chưa có tệp đính kèm. Chạm Tải lên để thêm hình ảnh hoặc PDF.",
     "insert": "Chèn",
     "pauseLabel": "Tạm dừng {{filename}}",
-    "playLabel": "Phát {{filename}}"
+    "playLabel": "Phát {{filename}}",
+    "move": "Chuyển",
+    "folderAll": "Tất cả thư mục",
+    "folderRoot": "Không thư mục",
+    "folderPickerAria": "Thư mục cho {{name}}",
+    "folderMoveFailed": "Không thể chuyển tệp đó. Không có gì thay đổi; hãy thử lại."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Lệnh và ghi chú",
     "pin": "Ghim vào dải bên trái",
     "unpin": "Bỏ ghim khỏi dải bên trái",
-    "pinError": "Không ghim được lệnh."
+    "pinError": "Không ghim được lệnh.",
+    "sectionFiles": "Tệp",
+    "fileUsedIn": "trong {{title}}",
+    "fileUnused": "không dùng trong ghi chú nào"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Chuyển đổi tệp đính kèm đã nhập…"
+      },
+      "showHome": {
+        "label": "Đi tới Trang chủ"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Không đổi được tên thư mục, nên không đổi.",
       "deliberateWriteFailed": "Thư mục đã được đổi tên, nhưng một cài đặt của nó không lưu được. Mỗi lần bạn mở khóa, một thư mục trống sẽ lại xuất hiện với tên cũ; xóa nó là an toàn và không thay đổi gì khác. Đổi tên thư mục lần nữa sẽ không làm nó biến mất.",
       "folderListFull": "Myne chỉ ghi nhớ được một số lượng thư mục có hạn, và danh sách đó đã đầy. Thư mục này vẫn hoạt động, nhưng nó sẽ biến mất khi ghi chú cuối cùng rời khỏi nó. Xóa một thư mục bạn không cần nữa sẽ tạo thêm chỗ.",
-      "folderNotRemembered": "Thư mục đã được tạo, nhưng Myne không ghi nhận được nó. Nó sẽ biến mất khi ghi chú cuối cùng rời khỏi nó, và nếu vẫn còn trống thì nó sẽ mất ở lần mở khóa tiếp theo. Tạo lại thư mục này là an toàn."
+      "folderNotRemembered": "Thư mục đã được tạo, nhưng Myne không ghi nhận được nó. Nó sẽ biến mất khi ghi chú cuối cùng rời khỏi nó, và nếu vẫn còn trống thì nó sẽ mất ở lần mở khóa tiếp theo. Tạo lại thư mục này là an toàn.",
+      "attachmentFolderRewriteFailed": "Thư mục đã được đổi tên, nhưng các tệp nằm trong đó không được chuyển theo. Chúng vẫn ghi tên thư mục cũ, nên bị thiếu khỏi cây thư viện và khỏi một agent được cấp thư mục này. Hãy chuyển lại chúng bằng tay từ Tệp đính kèm, hoặc đổi tên thư mục về như cũ rồi đổi lại."
     },
     "folderNote": {
       "defaultTitle": "Mục lục"
@@ -2543,7 +2569,8 @@
         "attachments": "Tệp đính kèm",
         "graph": "Đồ thị",
         "tasks": "Nhiệm vụ",
-        "today": "Hôm nay"
+        "today": "Hôm nay",
+        "home": "Trang chủ"
       },
       "placesLabel": "Đi tới",
       "results": "Kết quả"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Công việc",
       "loading": "Đang tải…",
       "untitledView": "Chế độ xem không có tiêu đề",
-      "agentTab": "Tác nhân AI"
+      "agentTab": "Tác nhân AI",
+      "homeTab": "Trang chủ"
     },
     "relativeTime": {
       "daysAgo": "{{d}} ngày trước",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Xuất…",
       "txt": "Văn bản thuần"
+    },
+    "home": {
+      "emptyTitle": "Bề mặt trang chủ của bạn",
+      "emptyBody": "Thẻ cho ghi chú gần đây, việc hôm nay và những tệp bạn hay mở sẽ xuất hiện ở đây. Chưa có gì được sắp xếp.",
+      "title": "Trang chủ",
+      "arrange": "Sắp xếp",
+      "arrangeTitle": "Sắp xếp trang chủ của bạn",
+      "addCard": "Thêm thẻ",
+      "removeCard": "Gỡ {{name}}",
+      "spanWide": "Rộng",
+      "spanNarrow": "Hẹp",
+      "onStart": "Khi ứng dụng mở",
+      "onStartHint": "Mở bề mặt trang chủ này khi khởi động, chỉ trên thiết bị này.",
+      "cards": {
+        "recentNotes": "Ghi chú gần đây",
+        "quickCapture": "Ghi nhanh",
+        "todaysTasks": "Việc hôm nay",
+        "calendarAgenda": "Sắp tới",
+        "favorites": "Yêu thích",
+        "referenceSets": "Bộ tham chiếu",
+        "savedViews": "Chế độ xem đã lưu",
+        "recentFiles": "Tệp gần đây",
+        "writingStats": "Viết",
+        "agentPrompt": "Hỏi agent",
+        "graph": "Kho của bạn",
+        "unknown": "Thẻ không khả dụng",
+        "unknownNote": "Thẻ này được thêm bởi phiên bản Myne mới hơn, nên phiên bản này không vẽ được. Thẻ vẫn giữ nguyên chỗ.",
+        "pending": "Thẻ này đang được dựng.",
+        "loading": "Đang đọc kho…",
+        "recentNotesEmpty": "Chưa mở ghi chú nào trên thiết bị này. Những ghi chú bạn mở sẽ hiện ở đây.",
+        "favoritesEmpty": "Chưa có gì được gắn sao. Gắn sao một ghi chú và nó sẽ hiện ở đây.",
+        "todaysTasksEmpty": "Hôm nay không có gì đến hạn.",
+        "calendarAgendaEmpty": "Tuần tới không có gì được lên lịch.",
+        "recentFilesEmpty": "Chưa có tệp. Nhập một tệp từ thư viện tệp.",
+        "referenceSetsEmpty": "Không thư mục nào chứa tệp. Đưa một tệp vào thư mục và nó sẽ hiện ở đây.",
+        "savedViewsEmpty": "Chưa có chế độ xem đã lưu.",
+        "writingStatsHint": "Số từ hiện ở đây khi kho lớn dần.",
+        "quickCaptureHint": "Bắt đầu ghi chú mà không rời Trang chủ.",
+        "agentPromptHint": "Hỏi agent về bất cứ điều gì trong kho của bạn.",
+        "agentPromptAction": "Mở agent",
+        "graphCount": "{{count}} ghi chú trong đồ thị",
+        "openTasks": "Mở danh sách việc",
+        "openCalendar": "Mở lịch",
+        "openFiles": "Mở thư viện tệp",
+        "openGraph": "Mở đồ thị",
+        "fileCount_one": "{{count}} tệp",
+        "fileCount_other": "{{count}} tệp",
+        "statNotes": "{{count}} ghi chú",
+        "statFavorites": "{{count}} được gắn sao"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Chẩn đoán"
       },
       "diagnosticFilesHelper_one": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi.",
-      "diagnosticFilesHelper_other": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi."
+      "diagnosticFilesHelper_other": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi.",
+      "updateBlocked": "Myne không thể bắt đầu cập nhật từ đây, nên không có gì được cài. Hãy thử lại sau giây lát."
     },
     "vault": {
       "changePasswordButton": "Đổi mật khẩu",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "Thư mục bạn bỏ qua không được chia sẻ, và cả mọi thứ trong đó. Bạn chọn từ mọi thư mục trong kho này, nên đây là nơi toàn bộ kho nằm trên bàn.",
         "approve": "Phê duyệt",
         "grantRefused": "Phê duyệt này không vừa ngân sách cài đặt của kho. Không có gì thay đổi. Thu hồi kết nối bạn không còn dùng, rồi thử lại.",
-        "grantFailed": "Không lưu được phê duyệt. Không có gì thay đổi."
+        "grantFailed": "Không lưu được phê duyệt. Không có gì thay đổi.",
+        "verb": {
+          "attachment_list": "Liệt kê tệp",
+          "attachment_read": "Đọc văn bản một tệp",
+          "calendar_read": "Đọc lịch",
+          "view_list": "Liệt kê chế độ xem đã lưu"
+        },
+        "wholeVaultLabel": "Đọc và ghi toàn bộ kho",
+        "wholeVaultHelper": "Mọi thư mục, kể cả thư mục bạn tạo sau này. Nếu để một thư mục ra ngoài bên dưới, nó ra ngoài cho cả đọc và ghi.",
+        "excludeNothing": "Không để ra ngoài",
+        "scopeLineAll": "Với tới mọi ghi chú trong kho, kể cả trong thư mục bạn tạo sau này, và có thể thay đổi bất kỳ ghi chú nào.",
+        "scopeLine": "Với tới {{count}} ghi chú trong {{folders}} thư mục, và có thể thay đổi mọi thứ trong đó.",
+        "toolsNote": "Lượt đọc có hạn mức: tối đa {{count}} ghi chú mỗi {{minutes}} phút.",
+        "needsReapproval": "Được một phiên bản cũ phê duyệt theo quy tắc ngược lại. Bản dựng này không đọc gì cho nó cho tới khi bạn phê duyệt lại.",
+        "scopeLineWords": "Với tới những thư mục bạn nêu, và có thể thay đổi mọi thứ trong đó."
       },
       "autoApplyLabel": "Tự động áp dụng thẻ gợi ý",
       "autoApplyHelper": "Ghi thẻ vào ghi chú mà không hỏi, mỗi ghi chú một lần mỗi phiên, chỉ sau khi bạn sửa nó. Chỉ trên thiết bị này. Hoàn tác ở dưới ghi chú sau khi ghi."
@@ -4009,7 +4102,8 @@
         "vault": "Kho lưu trữ",
         "data": "Dữ liệu",
         "diagnostics": "Chẩn đoán",
-        "extensions": "Tiện ích mở rộng trình duyệt"
+        "extensions": "Tiện ích mở rộng trình duyệt",
+        "connections": "Kết nối"
       },
       "passwordUpdatedToast": "Đã cập nhật mật khẩu",
       "title": "Cài đặt"
@@ -4420,7 +4514,10 @@
       "errorTooShort": "Dùng ít nhất {{count}} ký tự/chữ số.",
       "errorGeneric": "Không đặt được thông tin xác thực. Vui lòng thử lại."
     },
-    "helperDisclosureLabel": "Tìm hiểu thêm về cài đặt này"
+    "helperDisclosureLabel": "Tìm hiểu thêm về cài đặt này",
+    "connections": {
+      "mcp": "Máy khách MCP bên ngoài"
+    }
   },
   "storageLost": {
     "allSynced": "Không có gì bị mất: mọi ghi chú ở đây đều đã lên máy chủ.",
@@ -5906,7 +6003,8 @@
       "caption": "Myne {{version}} vẫn đang chạy và ghi chú của bạn không bị đụng tới.",
       "hint": "Thử lại sẽ bắt đầu tải xuống từ đầu.",
       "retry": "Thử lại",
-      "back": "Quay lại màn hình mở khóa"
+      "back": "Quay lại màn hình mở khóa",
+      "manual": "Nếu vẫn tiếp diễn, hãy tải phiên bản mới từ myne.md và cài bằng tay. Ứng dụng bạn đang có vẫn nguyên vẹn."
     }
   },
   "identityFlow": {
@@ -6006,5 +6104,12 @@
     "joinFromQr": {
       "notFound": "Mã này nêu tên một kho không có trong lời mời trên thiết bị này. Hãy đề nghị chủ kho gửi lại lời mời tới danh tính này."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Đặt tên cho lịch, ví dụ Cá nhân",
+      "calendarRequired": "Gán một lịch cho sự kiện. Lịch là thứ tô màu sự kiện và là thứ chế độ xem này có thể tắt."
+    },
+    "calendarsToggleFailed": "Lịch đó không được bật tắt. Nó vẫn như cũ."
   }
 }

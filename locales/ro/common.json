@@ -451,7 +451,24 @@
       "transcriptNoteTitle": "{{name}} (transcriere)",
       "transcriptSave": "Salvează ca notă",
       "transcriptSaved": "Transcrierea a fost salvată ca notă.",
-      "transcriptSaveFailed": "Transcrierea nu a putut fi salvată ca notă."
+      "transcriptSaveFailed": "Transcrierea nu a putut fi salvată ca notă.",
+      "folderScopeAriaLabel": "Arată fișierele dintr-un folder",
+      "selectAriaLabel": "Selectează {{name}}",
+      "selectedCount_one": "{{count}} selectat",
+      "selectedCount_few": "{{count}} selectate",
+      "selectedCount_other": "{{count}} de selectate",
+      "moveToAriaLabel": "Mută fișierele selectate într-un folder",
+      "moveFailed": "Fișierele selectate nu au putut fi mutate. Nu s-a schimbat nimic; încearcă din nou.",
+      "importFolder": "Importă un folder",
+      "importFolderProgress": "Se importă {{done}} din {{total}}",
+      "importFolderDone_one": "{{imported}} fișier importat, {{skipped}} omis.",
+      "importFolderDone_few": "{{imported}} fișiere importate, {{skipped}} omise.",
+      "importFolderDone_other": "{{imported}} de fișiere importate, {{skipped}} omise.",
+      "importFolderCancelled_one": "Oprit după {{count}} fișier. Ce s-a importat este în bibliotecă.",
+      "importFolderCancelled_few": "Oprit după {{count}} fișiere. Ce s-a importat este în bibliotecă.",
+      "importFolderCancelled_other": "Oprit după {{count}} de fișiere. Ce s-a importat este în bibliotecă.",
+      "importFolderFailed": "Folderul nu a putut fi citit. Nu s-a importat nimic.",
+      "folderAll": "Toate folderele"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -488,7 +505,12 @@
     "emptyState": "Niciun atașament încă. Apasă pe Încarcă pentru a adăuga o imagine sau un PDF.",
     "insert": "Inserează",
     "pauseLabel": "Pune pe pauză {{filename}}",
-    "playLabel": "Redă {{filename}}"
+    "playLabel": "Redă {{filename}}",
+    "move": "Mută",
+    "folderAll": "Toate folderele",
+    "folderRoot": "Fără folder",
+    "folderPickerAria": "Folder pentru {{name}}",
+    "folderMoveFailed": "Fișierul nu a putut fi mutat. Nu s-a schimbat nimic; încearcă din nou."
   },
   "backup": {
     "errors": {
@@ -567,7 +589,10 @@
     "resultsLabel": "Comenzi și note",
     "pin": "Fixează pe bara stângă",
     "unpin": "Desfixează de pe bara stângă",
-    "pinError": "Comanda nu a putut fi fixată."
+    "pinError": "Comanda nu a putut fi fixată.",
+    "sectionFiles": "Fișiere",
+    "fileUsedIn": "în {{title}}",
+    "fileUnused": "nefolosit în nicio notă"
   },
   "commands": {
     "actions": {
@@ -891,6 +916,9 @@
       },
       "convertImportedAttachments": {
         "label": "Convertește atașamentele importate…"
+      },
+      "showHome": {
+        "label": "Mergi la Acasă"
       }
     },
     "hotkeys": {
@@ -2258,7 +2286,8 @@
       "renameFailed": "Folderul nu a putut fi redenumit, așa că a rămas neschimbat.",
       "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. De fiecare dată când deblochezi, un folder gol va reapărea sub numele vechi; îl poți șterge în siguranță și nu se schimbă nimic altceva. O nouă redenumire a folderului nu îl va elimina.",
       "folderListFull": "Myne poate reține un număr limitat de foldere, iar acea listă este plină. Acest folder funcționează în continuare, dar va dispărea când ultima lui notă îl părăsește. Ștergerea unui folder de care nu mai ai nevoie face loc.",
-      "folderNotRemembered": "Folderul a fost creat, dar Myne nu l-a putut înregistra. Va dispărea când ultima lui notă îl părăsește, iar dacă este încă gol, dispare la următoarea deblocare. Îl poți crea din nou în siguranță."
+      "folderNotRemembered": "Folderul a fost creat, dar Myne nu l-a putut înregistra. Va dispărea când ultima lui notă îl părăsește, iar dacă este încă gol, dispare la următoarea deblocare. Îl poți crea din nou în siguranță.",
+      "attachmentFolderRewriteFailed": "Folderul a fost redenumit, dar fișierele păstrate în el nu s-au mutat odată cu el. Încă indică folderul vechi, așa că lipsesc din arborele bibliotecii și dintr-un agent căruia i-a fost dat acest folder. Mută-le din nou manual din Atașamente, sau redenumește folderul înapoi și apoi din nou."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2648,7 +2677,8 @@
         "attachments": "Atașamente",
         "graph": "Grafic",
         "tasks": "Sarcini",
-        "today": "Astăzi"
+        "today": "Astăzi",
+        "home": "Acasă"
       },
       "placesLabel": "Mergi la",
       "results": "Rezultate"
@@ -2658,7 +2688,8 @@
       "tasksTab": "Sarcini",
       "loading": "Se încarcă…",
       "untitledView": "Vizualizare fără titlu",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Acasă"
     },
     "relativeTime": {
       "daysAgo": "acum {{d}} zile",
@@ -3032,6 +3063,57 @@
       "pdf": "PDF",
       "submenuLabel": "Exportă…",
       "txt": "Text simplu"
+    },
+    "home": {
+      "emptyTitle": "Suprafața ta de start",
+      "emptyBody": "Aici vor apărea carduri pentru notele recente, sarcinile de azi și fișierele pe care le deschizi des. Nimic nu este încă aranjat.",
+      "title": "Acasă",
+      "arrange": "Aranjează",
+      "arrangeTitle": "Aranjează-ți Acasă",
+      "addCard": "Adaugă un card",
+      "removeCard": "Elimină {{name}}",
+      "spanWide": "Lat",
+      "spanNarrow": "Îngust",
+      "onStart": "Când aplicația se deschide",
+      "onStartHint": "Deschide această suprafață de start la pornire, doar pe acest dispozitiv.",
+      "cards": {
+        "recentNotes": "Note recente",
+        "quickCapture": "Captură rapidă",
+        "todaysTasks": "Sarcinile de azi",
+        "calendarAgenda": "În curând",
+        "favorites": "Favorite",
+        "referenceSets": "Seturi de referință",
+        "savedViews": "Vizualizări salvate",
+        "recentFiles": "Fișiere recente",
+        "writingStats": "Scriere",
+        "agentPrompt": "Întreabă agentul",
+        "graph": "Seiful tău",
+        "unknown": "Cardul nu este disponibil",
+        "unknownNote": "Acest card a fost adăugat de o versiune mai nouă a Myne, așa că aceasta nu îl poate desena. Rămâne pe loc.",
+        "pending": "Acest card este în construcție.",
+        "loading": "Se citește seiful…",
+        "recentNotesEmpty": "Nicio notă nu a fost deschisă încă pe acest dispozitiv. Cele pe care le deschizi apar aici.",
+        "favoritesEmpty": "Nimic nu are stea încă. Pune o stea pe o notă și va apărea aici.",
+        "todaysTasksEmpty": "Azi nu expiră nimic.",
+        "calendarAgendaEmpty": "Nimic nu este programat pentru săptămâna viitoare.",
+        "recentFilesEmpty": "Nu există fișiere încă. Importă unul din biblioteca de fișiere.",
+        "referenceSetsEmpty": "Niciun folder nu conține fișiere. Pune un fișier într-un folder și va apărea aici.",
+        "savedViewsEmpty": "Nu există vizualizări salvate încă.",
+        "writingStatsHint": "Numărul de cuvinte apare aici pe măsură ce seiful crește.",
+        "quickCaptureHint": "Începe o notă fără să pleci din Acasă.",
+        "agentPromptHint": "Întreabă agentul despre orice din seiful tău.",
+        "agentPromptAction": "Deschide agentul",
+        "graphCount": "{{count}} note în graf",
+        "openTasks": "Deschide lista de sarcini",
+        "openCalendar": "Deschide calendarul",
+        "openFiles": "Deschide biblioteca de fișiere",
+        "openGraph": "Deschide graful",
+        "fileCount_one": "{{count}} fișier",
+        "fileCount_few": "{{count}} fișiere",
+        "fileCount_other": "{{count}} de fișiere",
+        "statNotes": "{{count}} note",
+        "statFavorites": "{{count}} cu stea"
+      }
     }
   },
   "photoNote": {
@@ -3320,7 +3402,8 @@
       },
       "diagnosticFilesHelper_one": "Un fișier ar conține acest bloc plus {{count}} fișier jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
       "diagnosticFilesHelper_other": "Un fișier ar conține acest bloc plus {{count}} de fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
-      "diagnosticFilesHelper_few": "Un fișier ar conține acest bloc plus {{count}} fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge."
+      "diagnosticFilesHelper_few": "Un fișier ar conține acest bloc plus {{count}} fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
+      "updateBlocked": "Myne nu a putut porni actualizarea de aici, așa că nu s-a instalat nimic. Încearcă din nou într-un moment."
     },
     "vault": {
       "changePasswordButton": "Schimbă parola",
@@ -3984,7 +4067,21 @@
         "grantFailed": "Aprobarea nu a putut fi salvată. Nimic nu s-a schimbat.",
         "readSummary_few": "Poate citi {{count}} note în {{folders}} dosare.",
         "countsNotes_few": "Partajează {{count}} note în {{folders}} dosare.",
-        "countsExcluded_few": "{{count}} dosare excluse."
+        "countsExcluded_few": "{{count}} dosare excluse.",
+        "verb": {
+          "attachment_list": "Listează fișierele",
+          "attachment_read": "Citește textul unui fișier",
+          "calendar_read": "Citește calendarul",
+          "view_list": "Listează vizualizările salvate"
+        },
+        "wholeVaultLabel": "Citește și scrie tot seiful",
+        "wholeVaultHelper": "Fiecare folder, inclusiv cele pe care le creezi mai târziu. Dacă lași unul afară mai jos, rămâne afară și pentru citire, și pentru scriere.",
+        "excludeNothing": "Nimic lăsat afară",
+        "scopeLineAll": "Ajunge la fiecare notă din seif, inclusiv în foldere create mai târziu, și poate schimba oricare dintre ele.",
+        "scopeLine": "Ajunge la {{count}} note în {{folders}} foldere și poate schimba orice din ele.",
+        "toolsNote": "Citirile au un buget: până la {{count}} note la fiecare {{minutes}} minute.",
+        "needsReapproval": "Aprobat de o versiune mai veche, după regula opusă. Această versiune nu citește nimic pentru el până nu îl aprobi din nou.",
+        "scopeLineWords": "Ajunge la folderele pe care le numești și poate schimba orice din ele."
       },
       "autoApplyLabel": "Aplică automat etichetele sugerate",
       "autoApplyHelper": "Scrie etichetele în notă fără a întreba, o dată pe notă per sesiune, doar după ce o editezi. Doar pe acest dispozitiv. Anularea stă sub notă după ce scrie."
@@ -4142,7 +4239,8 @@
         "vault": "Seif",
         "data": "Date",
         "diagnostics": "Diagnostic",
-        "extensions": "Extensii de browser"
+        "extensions": "Extensii de browser",
+        "connections": "Conexiuni"
       },
       "passwordUpdatedToast": "Parolă actualizată",
       "title": "Setări"
@@ -4564,7 +4662,10 @@
       "errorTooShort": "Folosește cel puțin {{count}} caractere/cifre.",
       "errorGeneric": "Acreditarea nu a putut fi setată. Încearcă din nou."
     },
-    "helperDisclosureLabel": "Mai multe despre această setare"
+    "helperDisclosureLabel": "Mai multe despre această setare",
+    "connections": {
+      "mcp": "Clienți MCP externi"
+    }
   },
   "storageLost": {
     "allSynced": "Nu s-a pierdut nimic: fiecare notă de aici ajunsese deja pe server.",
@@ -6074,7 +6175,8 @@
       "caption": "Myne {{version}} rulează în continuare, iar notele tale sunt neatinse.",
       "hint": "Dacă încerci din nou, descărcarea o ia de la capăt.",
       "retry": "Încearcă din nou",
-      "back": "Înapoi la deblocare"
+      "back": "Înapoi la deblocare",
+      "manual": "Dacă se repetă, descarcă versiunea nouă de pe myne.md și instaleaz-o manual. Aplicația pe care o ai acum rămâne neatinsă."
     }
   },
   "identityFlow": {
@@ -6174,5 +6276,12 @@
     "joinFromQr": {
       "notFound": "Acest cod indică un seif care nu se află în invitațiile tale de pe acest dispozitiv. Cere proprietarului seifului să trimită din nou invitația către această identitate."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Dă un nume unui calendar, de exemplu Personal",
+      "calendarRequired": "Dă evenimentului un calendar. El colorează evenimentul și el este ceea ce această vizualizare poate opri."
+    },
+    "calendarsToggleFailed": "Calendarul nu a fost comutat. A rămas cum era."
   }
 }

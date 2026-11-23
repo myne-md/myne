@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (transkripsi)",
       "transcriptSave": "Simpan sebagai catatan",
       "transcriptSaved": "Transkripsi disimpan sebagai catatan.",
-      "transcriptSaveFailed": "Tidak dapat menyimpan transkripsi sebagai catatan."
+      "transcriptSaveFailed": "Tidak dapat menyimpan transkripsi sebagai catatan.",
+      "folderScopeAriaLabel": "Tampilkan berkas dalam satu folder",
+      "selectAriaLabel": "Pilih {{name}}",
+      "selectedCount_one": "{{count}} dipilih",
+      "selectedCount_other": "{{count}} dipilih",
+      "moveToAriaLabel": "Pindahkan berkas yang dipilih ke folder",
+      "moveFailed": "Berkas yang dipilih tidak dapat dipindahkan. Tidak ada yang berubah; coba lagi.",
+      "importFolder": "Impor folder",
+      "importFolderProgress": "Mengimpor {{done}} dari {{total}}",
+      "importFolderDone_one": "{{imported}} berkas diimpor, {{skipped}} dilewati.",
+      "importFolderDone_other": "{{imported}} berkas diimpor, {{skipped}} dilewati.",
+      "importFolderCancelled_one": "Dihentikan setelah {{count}} berkas. Yang sudah diimpor ada di pustaka.",
+      "importFolderCancelled_other": "Dihentikan setelah {{count}} berkas. Yang sudah diimpor ada di pustaka.",
+      "importFolderFailed": "Folder itu tidak dapat dibaca. Tidak ada yang diimpor.",
+      "folderAll": "Semua folder"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Belum ada lampiran. Ketuk Unggah untuk menambahkan gambar atau PDF.",
     "insert": "Sisipkan",
     "pauseLabel": "Jeda {{filename}}",
-    "playLabel": "Putar {{filename}}"
+    "playLabel": "Putar {{filename}}",
+    "move": "Pindahkan",
+    "folderAll": "Semua folder",
+    "folderRoot": "Tanpa folder",
+    "folderPickerAria": "Folder untuk {{name}}",
+    "folderMoveFailed": "Berkas itu tidak dapat dipindahkan. Tidak ada yang berubah; coba lagi."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Perintah dan catatan",
     "pin": "Sematkan ke pita kiri",
     "unpin": "Lepas dari pita kiri",
-    "pinError": "Perintah tidak dapat disematkan."
+    "pinError": "Perintah tidak dapat disematkan.",
+    "sectionFiles": "Berkas",
+    "fileUsedIn": "di {{title}}",
+    "fileUnused": "tidak dipakai di catatan mana pun"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Konversi lampiran yang diimpor…"
+      },
+      "showHome": {
+        "label": "Buka Beranda"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Tidak dapat mengubah nama folder, jadi tidak berubah.",
       "deliberateWriteFailed": "Nama folder sudah diganti, tetapi salah satu pengaturannya tidak dapat disimpan. Sebuah folder kosong akan muncul lagi dengan nama lama setiap kali Anda membuka kunci; folder itu aman untuk dihapus dan menghapusnya tidak mengubah apa pun yang lain. Mengganti nama folder lagi tidak akan menghilangkannya.",
       "folderListFull": "Myne hanya dapat mengingat sejumlah folder tertentu, dan daftar itu sudah penuh. Folder ini tetap berfungsi, tetapi akan hilang saat catatan terakhirnya keluar dari folder ini. Menghapus folder yang tidak Anda perlukan lagi akan memberi ruang.",
-      "folderNotRemembered": "Folder berhasil dibuat, tetapi Myne tidak dapat mencatatnya. Folder itu akan hilang saat catatan terakhirnya keluar, dan akan lenyap saat Anda membuka kunci berikutnya jika folder itu masih kosong. Aman untuk membuatnya lagi."
+      "folderNotRemembered": "Folder berhasil dibuat, tetapi Myne tidak dapat mencatatnya. Folder itu akan hilang saat catatan terakhirnya keluar, dan akan lenyap saat Anda membuka kunci berikutnya jika folder itu masih kosong. Aman untuk membuatnya lagi.",
+      "attachmentFolderRewriteFailed": "Folder sudah diganti nama, tetapi berkas di dalamnya tidak ikut pindah. Berkas masih menyebut folder lama, jadi berkas hilang dari pohon pustaka dan dari agen yang diberi folder ini. Pindahkan lagi secara manual dari Lampiran, atau ganti nama folder kembali lalu ganti lagi."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2543,7 +2569,8 @@
         "attachments": "Lampiran",
         "graph": "Grafik",
         "tasks": "Tugas",
-        "today": "Hari ini"
+        "today": "Hari ini",
+        "home": "Beranda"
       },
       "placesLabel": "Buka",
       "results": "Hasil"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Tugas",
       "loading": "Memuat…",
       "untitledView": "Tampilan tanpa judul",
-      "agentTab": "Agen"
+      "agentTab": "Agen",
+      "homeTab": "Beranda"
     },
     "relativeTime": {
       "daysAgo": "{{d}} hari lalu",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Ekspor…",
       "txt": "Teks biasa"
+    },
+    "home": {
+      "emptyTitle": "Permukaan beranda Anda",
+      "emptyBody": "Kartu untuk catatan terbaru, tugas hari ini, dan berkas yang sering Anda buka akan muncul di sini. Belum ada yang ditata.",
+      "title": "Beranda",
+      "arrange": "Tata",
+      "arrangeTitle": "Tata beranda Anda",
+      "addCard": "Tambah kartu",
+      "removeCard": "Hapus {{name}}",
+      "spanWide": "Lebar",
+      "spanNarrow": "Sempit",
+      "onStart": "Saat aplikasi dibuka",
+      "onStartHint": "Buka permukaan beranda ini saat mulai, hanya di perangkat ini.",
+      "cards": {
+        "recentNotes": "Catatan terbaru",
+        "quickCapture": "Tangkapan cepat",
+        "todaysTasks": "Tugas hari ini",
+        "calendarAgenda": "Akan datang",
+        "favorites": "Favorit",
+        "referenceSets": "Kumpulan rujukan",
+        "savedViews": "Tampilan tersimpan",
+        "recentFiles": "Berkas terbaru",
+        "writingStats": "Menulis",
+        "agentPrompt": "Tanya agen",
+        "graph": "Brankas Anda",
+        "unknown": "Kartu tidak tersedia",
+        "unknownNote": "Kartu ini ditambahkan oleh versi Myne yang lebih baru, jadi versi ini tidak dapat menggambarnya. Kartu tetap di tempatnya.",
+        "pending": "Kartu ini sedang dibangun.",
+        "loading": "Membaca brankas…",
+        "recentNotesEmpty": "Belum ada catatan yang dibuka di perangkat ini. Yang Anda buka akan muncul di sini.",
+        "favoritesEmpty": "Belum ada yang diberi bintang. Beri bintang pada catatan dan catatan itu muncul di sini.",
+        "todaysTasksEmpty": "Tidak ada yang jatuh tempo hari ini.",
+        "calendarAgendaEmpty": "Tidak ada yang dijadwalkan minggu depan.",
+        "recentFilesEmpty": "Belum ada berkas. Impor satu dari pustaka berkas.",
+        "referenceSetsEmpty": "Tidak ada folder yang berisi berkas. Simpan berkas ke folder dan berkas muncul di sini.",
+        "savedViewsEmpty": "Belum ada tampilan tersimpan.",
+        "writingStatsHint": "Jumlah kata muncul di sini seiring brankas bertambah.",
+        "quickCaptureHint": "Mulai catatan tanpa meninggalkan Beranda.",
+        "agentPromptHint": "Tanyakan apa pun di brankas Anda kepada agen.",
+        "agentPromptAction": "Buka agen",
+        "graphCount": "{{count}} catatan di graf",
+        "openTasks": "Buka daftar tugas",
+        "openCalendar": "Buka kalender",
+        "openFiles": "Buka pustaka berkas",
+        "openGraph": "Buka graf",
+        "fileCount_one": "{{count}} berkas",
+        "fileCount_other": "{{count}} berkas",
+        "statNotes": "{{count}} catatan",
+        "statFavorites": "{{count}} berbintang"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnostik"
       },
       "diagnosticFilesHelper_one": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi.",
-      "diagnosticFilesHelper_other": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi."
+      "diagnosticFilesHelper_other": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi.",
+      "updateBlocked": "Myne tidak dapat memulai pembaruan dari sini, jadi tidak ada yang dipasang. Coba lagi sebentar lagi."
     },
     "vault": {
       "changePasswordButton": "Ubah kata sandi",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "Folder yang Anda lewati tidak dibagikan, dan apa pun di dalamnya juga. Anda memilih dari setiap folder di brankas ini, jadi ini satu-satunya tempat seluruh brankas ada di atas meja.",
         "approve": "Setujui",
         "grantRefused": "Pemberian ini tidak akan muat dalam anggaran pengaturan brankas. Tidak ada yang berubah. Cabut koneksi yang tidak lagi Anda gunakan, lalu coba lagi.",
-        "grantFailed": "Persetujuan tidak dapat disimpan. Tidak ada yang berubah."
+        "grantFailed": "Persetujuan tidak dapat disimpan. Tidak ada yang berubah.",
+        "verb": {
+          "attachment_list": "Daftar berkas",
+          "attachment_read": "Baca teks berkas",
+          "calendar_read": "Baca kalender",
+          "view_list": "Daftar tampilan tersimpan"
+        },
+        "wholeVaultLabel": "Baca dan tulis seluruh brankas",
+        "wholeVaultHelper": "Setiap folder, termasuk yang Anda buat nanti. Jika satu folder dikecualikan di bawah, folder itu dikecualikan untuk baca dan tulis.",
+        "excludeNothing": "Tidak ada yang dikecualikan",
+        "scopeLineAll": "Menjangkau setiap catatan di brankas, termasuk di folder yang Anda buat nanti, dan dapat mengubah salah satunya.",
+        "scopeLine": "Menjangkau {{count}} catatan di {{folders}} folder, dan dapat mengubah apa pun di dalamnya.",
+        "toolsNote": "Pembacaan dibatasi: hingga {{count}} catatan per {{minutes}} menit.",
+        "needsReapproval": "Disetujui versi lama dengan aturan sebaliknya. Build ini tidak membaca apa pun untuknya sampai Anda menyetujui ulang.",
+        "scopeLineWords": "Menjangkau folder yang Anda sebutkan, dan dapat mengubah apa pun di dalamnya."
       },
       "autoApplyLabel": "Terapkan tag yang disarankan secara otomatis",
       "autoApplyHelper": "Menulis tag ke catatan tanpa bertanya, sekali per catatan per sesi, hanya setelah Anda menyuntingnya. Hanya di perangkat ini. Urungkan ada di bawah catatan setelah ia menulis."
@@ -4009,7 +4102,8 @@
         "vault": "Brankas",
         "data": "Data",
         "diagnostics": "Diagnostik",
-        "extensions": "Ekstensi peramban"
+        "extensions": "Ekstensi peramban",
+        "connections": "Koneksi"
       },
       "passwordUpdatedToast": "Kata sandi diperbarui",
       "title": "Pengaturan"
@@ -4420,7 +4514,10 @@
       "errorTooShort": "Gunakan minimal {{count}} karakter/digit.",
       "errorGeneric": "Kredensial tidak dapat disetel. Silakan coba lagi."
     },
-    "helperDisclosureLabel": "Selengkapnya tentang pengaturan ini"
+    "helperDisclosureLabel": "Selengkapnya tentang pengaturan ini",
+    "connections": {
+      "mcp": "Klien MCP eksternal"
+    }
   },
   "storageLost": {
     "allSynced": "Tidak ada yang hilang: setiap catatan di sini sudah sampai ke server.",
@@ -5906,7 +6003,8 @@
       "caption": "Myne {{version}} masih berjalan dan catatan Anda tidak tersentuh.",
       "hint": "Mencoba lagi akan memulai ulang unduhannya.",
       "retry": "Coba lagi",
-      "back": "Kembali ke buka kunci"
+      "back": "Kembali ke buka kunci",
+      "manual": "Jika terus terjadi, unduh versi baru dari myne.md dan pasang secara manual. Aplikasi yang Anda pakai sekarang tidak tersentuh."
     }
   },
   "identityFlow": {
@@ -6006,5 +6104,12 @@
     "joinFromQr": {
       "notFound": "Kode ini menyebut brankas yang tidak ada di undangan Anda di perangkat ini. Mintalah pemilik brankas mengirim ulang undangan ke identitas ini."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Beri nama kalender, misalnya Pribadi",
+      "calendarRequired": "Beri kalender untuk acara. Kalender itulah yang mewarnai acara, dan itulah yang dapat dimatikan tampilan ini."
+    },
+    "calendarsToggleFailed": "Kalender itu tidak diubah. Tetap seperti semula."
   }
 }
