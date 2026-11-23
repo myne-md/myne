@@ -394,7 +394,21 @@
       "transcriptNoteTitle": "{{name}} (metin dökümü)",
       "transcriptSave": "Not olarak kaydet",
       "transcriptSaved": "Metin dökümü not olarak kaydedildi.",
-      "transcriptSaveFailed": "Metin dökümü not olarak kaydedilemedi."
+      "transcriptSaveFailed": "Metin dökümü not olarak kaydedilemedi.",
+      "folderScopeAriaLabel": "Bir klasördeki dosyaları göster",
+      "selectAriaLabel": "{{name}} öğesini seç",
+      "selectedCount_one": "{{count}} seçili",
+      "selectedCount_other": "{{count}} seçili",
+      "moveToAriaLabel": "Seçili dosyaları bir klasöre taşı",
+      "moveFailed": "Seçili dosyalar taşınamadı. Hiçbir şey değişmedi; tekrar deneyin.",
+      "importFolder": "Klasör içe aktar",
+      "importFolderProgress": "{{total}} öğeden {{done}} tanesi içe aktarılıyor",
+      "importFolderDone_one": "{{imported}} dosya içe aktarıldı, {{skipped}} tanesi atlandı.",
+      "importFolderDone_other": "{{imported}} dosya içe aktarıldı, {{skipped}} tanesi atlandı.",
+      "importFolderCancelled_one": "{{count}} dosyadan sonra durdu. İçe aktarılanlar kütüphanede.",
+      "importFolderCancelled_other": "{{count}} dosyadan sonra durdu. İçe aktarılanlar kütüphanede.",
+      "importFolderFailed": "O klasör okunamadı. Hiçbir şey içe aktarılmadı.",
+      "folderAll": "Tüm klasörler"
     },
     "thumbnail": {
       "audioLabel": "Ses: {{filename}}",
@@ -427,7 +441,12 @@
     "emptyState": "Henüz ek yok. Görsel veya PDF eklemek için Yükle’ye dokunun.",
     "insert": "Ekle",
     "pauseLabel": "{{filename}} duraklat",
-    "playLabel": "{{filename}} oynat"
+    "playLabel": "{{filename}} oynat",
+    "move": "Taşı",
+    "folderAll": "Tüm klasörler",
+    "folderRoot": "Klasör yok",
+    "folderPickerAria": "{{name}} için klasör",
+    "folderMoveFailed": "O dosya taşınamadı. Hiçbir şey değişmedi; tekrar deneyin."
   },
   "backup": {
     "errors": {
@@ -499,7 +518,10 @@
     "resultsLabel": "Komutlar ve notlar",
     "pin": "Sol şeride sabitle",
     "unpin": "Sol şeritten kaldır",
-    "pinError": "Komut sabitlenemedi."
+    "pinError": "Komut sabitlenemedi.",
+    "sectionFiles": "Dosyalar",
+    "fileUsedIn": "{{title}} içinde",
+    "fileUnused": "bir notta kullanılmıyor"
   },
   "commands": {
     "actions": {
@@ -821,6 +843,9 @@
       },
       "convertImportedAttachments": {
         "label": "İçe aktarılmış ekleri dönüştür…"
+      },
+      "showHome": {
+        "label": "Ana sayfaya git"
       }
     },
     "hotkeys": {
@@ -2123,7 +2148,8 @@
       "renameFailed": "Klasör yeniden adlandırılamadı, bu yüzden değişmedi.",
       "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Kasanın kilidini her açışınızda eski adla boş bir klasör yeniden belirecek; onu silmek güvenlidir ve başka hiçbir şeyi değiştirmez. Klasörü yeniden adlandırmak bunu temizlemez.",
       "folderListFull": "Myne yalnızca sınırlı sayıda klasörü hatırlayabilir ve o liste dolu. Bu klasör yine de çalışır, ancak içindeki son not ondan ayrıldığında kaybolacak. Artık ihtiyacınız olmayan bir klasörü silmek yer açar.",
-      "folderNotRemembered": "Klasör oluşturuldu ancak Myne onu kaydedemedi. İçindeki son not ondan ayrıldığında kaybolacak ve hâlâ boşsa bir sonraki kilit açılışında gitmiş olacak. Yeniden oluşturmak güvenlidir."
+      "folderNotRemembered": "Klasör oluşturuldu ancak Myne onu kaydedemedi. İçindeki son not ondan ayrıldığında kaybolacak ve hâlâ boşsa bir sonraki kilit açılışında gitmiş olacak. Yeniden oluşturmak güvenlidir.",
+      "attachmentFolderRewriteFailed": "Klasör yeniden adlandırıldı, ama altına konmuş dosyalar onunla taşınamadı. Dosyalar hâlâ eski klasörün adını taşıyor, bu yüzden kütüphane ağacında ve bu klasöre erişen agent'ta görünmüyorlar. Ekler'den elle yeniden taşıyın, ya da klasörü geri alıp bir kez daha adlandırın."
     },
     "folderNote": {
       "defaultTitle": "Dizin"
@@ -2469,7 +2495,8 @@
         "attachments": "Ekler",
         "graph": "Grafik",
         "tasks": "Görevler",
-        "today": "Bugün"
+        "today": "Bugün",
+        "home": "Ana sayfa"
       },
       "placesLabel": "Şuraya git",
       "results": "Sonuçlar"
@@ -2477,7 +2504,8 @@
     "pane": {
       "graphTab": "Grafik",
       "tasksTab": "Görevler",
-      "agentTab": "Ajan"
+      "agentTab": "Ajan",
+      "homeTab": "Ana sayfa"
     },
     "relativeTime": {
       "daysAgo": "{{d}} gün önce",
@@ -2811,6 +2839,56 @@
       "pdf": "PDF",
       "submenuLabel": "Dışa aktar…",
       "txt": "Düz metin"
+    },
+    "home": {
+      "emptyTitle": "Ana yüzeyiniz",
+      "emptyBody": "Son notlar, bugünün görevleri ve elinizin sık gittiği dosyalar için kartlar burada olacak. Henüz hiçbir şey düzenlenmedi.",
+      "title": "Ana sayfa",
+      "arrange": "Düzenle",
+      "arrangeTitle": "Ana yüzeyinizi düzenleyin",
+      "addCard": "Kart ekle",
+      "removeCard": "{{name}} kartını kaldır",
+      "spanWide": "Geniş",
+      "spanNarrow": "Dar",
+      "onStart": "Uygulama açıldığında",
+      "onStartHint": "Başlangıçta bu ana yüzeyi aç, yalnızca bu cihazda.",
+      "cards": {
+        "recentNotes": "Son notlar",
+        "quickCapture": "Hızlı yakalama",
+        "todaysTasks": "Bugünün görevleri",
+        "calendarAgenda": "Yaklaşanlar",
+        "favorites": "Sık kullanılanlar",
+        "referenceSets": "Referans kümeleri",
+        "savedViews": "Kayıtlı görünümler",
+        "recentFiles": "Son dosyalar",
+        "writingStats": "Yazma",
+        "agentPrompt": "Agent'a sor",
+        "graph": "Kasanız",
+        "unknown": "Kullanılamayan kart",
+        "unknownNote": "Bu kart Myne'ın daha yeni bir sürümü tarafından eklendi, bu sürüm onu çizemiyor. Yerinde tutuluyor.",
+        "pending": "Bu kart oluşturuluyor.",
+        "loading": "Kasa okunuyor…",
+        "recentNotesEmpty": "Bu cihazda henüz hiç not açılmadı. Açtıklarınız burada görünür.",
+        "favoritesEmpty": "Henüz hiçbir şey yıldızlanmadı. Bir notu yıldızlayın, buraya düşer.",
+        "todaysTasksEmpty": "Bugün için hiçbir şey yok.",
+        "calendarAgendaEmpty": "Önümüzdeki hafta hiçbir şey planlanmadı.",
+        "recentFilesEmpty": "Henüz dosya yok. Dosya kütüphanesinden bir tane içe aktarın.",
+        "referenceSetsEmpty": "Hiçbir klasörde dosya yok. Bir dosyayı klasöre koyun, burada görünsün.",
+        "savedViewsEmpty": "Henüz kayıtlı görünüm yok.",
+        "writingStatsHint": "Kasa büyüdükçe sözcük sayıları burada görünür.",
+        "quickCaptureHint": "Ana yüzeyinizden çıkmadan bir not başlatın.",
+        "agentPromptHint": "Kasanızdaki her şeyi agent'a sorun.",
+        "agentPromptAction": "Agent'ı aç",
+        "graphCount": "{{count}} not grafikte",
+        "openTasks": "Görev listesini aç",
+        "openCalendar": "Takvimi aç",
+        "openFiles": "Dosya kütüphanesini aç",
+        "openGraph": "Grafiği aç",
+        "fileCount_one": "{{count}} dosya",
+        "fileCount_other": "{{count}} dosya",
+        "statNotes": "{{count}} not",
+        "statFavorites": "{{count}} yıldızlı"
+      }
     }
   },
   "password": {
@@ -3052,7 +3130,8 @@
         "diagnostics": "Tanılama"
       },
       "diagnosticFilesHelper_one": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz.",
-      "diagnosticFilesHelper_other": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz."
+      "diagnosticFilesHelper_other": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz.",
+      "updateBlocked": "Myne güncellemeyi buradan başlatamadı, bu yüzden hiçbir şey kurulmadı. Birazdan tekrar deneyin."
     },
     "vault": {
       "changePasswordError": {
@@ -3679,7 +3758,21 @@
         "excludeHelper": "Dışarıda bıraktığınız bir klasör paylaşılmaz, içindekiler de. Kasadaki her klasörden seçiyorsunuz, bu yüzden tüm kasa tek yerde masada.",
         "approve": "Onayla",
         "grantRefused": "Bu onay kasadaki ayarlar bütçesine sığmaz. Hiçbir şey değişmedi. Kullanmadığınız bir bağlantıyı iptal edip tekrar deneyin.",
-        "grantFailed": "Onay kaydedilemedi. Hiçbir şey değişmedi."
+        "grantFailed": "Onay kaydedilemedi. Hiçbir şey değişmedi.",
+        "verb": {
+          "attachment_list": "Dosyaları listele",
+          "attachment_read": "Bir dosyanın metnini oku",
+          "calendar_read": "Takvimi oku",
+          "view_list": "Kayıtlı görünümleri listele"
+        },
+        "wholeVaultLabel": "Kasanın tamamını oku ve yaz",
+        "wholeVaultHelper": "Aşağıda dışarıda bırakmadığınız her klasör, sonradan oluşturduklarınız dahil. Birini aşağıda dışarıda bırakırsanız, hem okumalar hem yazmalar için dışarıda kalır.",
+        "excludeNothing": "Dışarıda bırakılan yok",
+        "scopeLineAll": "Kasadaki her nota erişir, sonradan oluşturduğunuz klasörler dahil, ve hepsini değiştirebilir.",
+        "scopeLine": "{{folders}} klasördeki {{count}} nota erişir ve içlerindeki her şeyi değiştirebilir.",
+        "toolsNote": "Okumalar bütçelidir: {{minutes}} dakikada en fazla {{count}} not.",
+        "needsReapproval": "Daha eski bir sürüm tarafından, tersi kurala göre onaylandı. Siz yeniden onaylayana kadar bu sürüm onun için hiçbir şey okumaz.",
+        "scopeLineWords": "Adını verdiğiniz klasörlere erişir ve içlerindeki her şeyi değiştirebilir."
       },
       "autoApplyLabel": "Önerilen etiketleri otomatik uygula",
       "autoApplyHelper": "Bir notu düzenledikten sonra, oturum başına not başına bir kez, sormadan etiketleri nota yazar. Yalnızca bu cihazda. Yazdıktan sonra notun altında Geri Al bulunur."
@@ -3818,7 +3911,8 @@
         "vault": "Kasa",
         "data": "Veri",
         "diagnostics": "Tanılama",
-        "extensions": "Tarayıcı uzantıları"
+        "extensions": "Tarayıcı uzantıları",
+        "connections": "Bağlantılar"
       },
       "passwordUpdatedToast": "Parola güncellendi",
       "title": "Ayarlar"
@@ -4212,7 +4306,10 @@
       "errorTooShort": "En az {{count}} karakter/hane kullanın.",
       "errorGeneric": "Kimlik bilgisi belirlenemedi. Lütfen tekrar deneyin."
     },
-    "helperDisclosureLabel": "Bu ayar hakkında daha fazla"
+    "helperDisclosureLabel": "Bu ayar hakkında daha fazla",
+    "connections": {
+      "mcp": "Harici MCP istemcileri"
+    }
   },
   "storageLost": {
     "allSynced": "Hiçbir şey kaybolmadı: buradaki her not sunucuya çoktan ulaşmıştı.",
@@ -5637,7 +5734,8 @@
       "heading": "Güncelleme tamamlanmadı",
       "caption": "Myne {{version}} hâlâ çalışıyor ve notlarınıza dokunulmadı.",
       "hint": "Yeniden denemek indirmeyi baştan başlatır.",
-      "back": "Kilit açmaya dön"
+      "back": "Kilit açmaya dön",
+      "manual": "Sorun sürerse, yeni sürümü myne.md adresinden indirip elle kurun. Şu anki uygulamanıza dokunulmadı."
     }
   },
   "identityFlow": {
@@ -5728,5 +5826,12 @@
     "body": "Bu kimliği yalnızca bu cihazdan kaldırır. Sunucu hesabı ve sahip olduğu ya da katıldığı kasalar etkilenmez; kimliği 24 kelimelik ifadesiyle başka bir cihazda geri alabilirsiniz.",
     "savedPhraseTail": "Bu ifadeyi kaydetmediyseniz bu cihaz onu geri alamaz.",
     "rosterTail": "Bu cihazdaki davetler ve kadro işlemleri için kimliğin yeniden kilidinin açılması gerekir."
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Takvime bir ad verin, örneğin Kişisel",
+      "calendarRequired": "Etkinliğe bir takvim verin. Etkinliğin rengini o belirler ve bu görünümün kapatabildiği şey odur."
+    },
+    "calendarsToggleFailed": "O takvim değiştirilmedi. Olduğu gibi duruyor."
   }
 }

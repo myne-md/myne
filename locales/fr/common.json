@@ -451,7 +451,24 @@
       "transcriptNoteTitle": "{{name}} (transcription)",
       "transcriptSave": "Enregistrer comme note",
       "transcriptSaved": "Transcription enregistrée comme note.",
-      "transcriptSaveFailed": "Impossible d'enregistrer la transcription comme note."
+      "transcriptSaveFailed": "Impossible d'enregistrer la transcription comme note.",
+      "folderScopeAriaLabel": "Afficher les fichiers d'un dossier",
+      "selectAriaLabel": "Sélectionner {{name}}",
+      "selectedCount_one": "{{count}} sélectionné",
+      "selectedCount_many": "{{count}} de sélectionnés",
+      "selectedCount_other": "{{count}} sélectionnés",
+      "moveToAriaLabel": "Déplacer les fichiers sélectionnés vers un dossier",
+      "moveFailed": "Les fichiers sélectionnés n'ont pas pu être déplacés. Rien n'a changé ; réessayez.",
+      "importFolder": "Importer un dossier",
+      "importFolderProgress": "Importation de {{done}} sur {{total}}",
+      "importFolderDone_one": "{{imported}} fichier importé, {{skipped}} ignoré.",
+      "importFolderDone_many": "{{imported}} de fichiers importés, {{skipped}} ignorés.",
+      "importFolderDone_other": "{{imported}} fichiers importés, {{skipped}} ignorés.",
+      "importFolderCancelled_one": "Arrêté après {{count}} fichier. Ce qui a été importé est dans la bibliothèque.",
+      "importFolderCancelled_many": "Arrêté après {{count}} de fichiers. Ce qui a été importé est dans la bibliothèque.",
+      "importFolderCancelled_other": "Arrêté après {{count}} fichiers. Ce qui a été importé est dans la bibliothèque.",
+      "importFolderFailed": "Ce dossier n'a pas pu être lu. Rien n'a été importé.",
+      "folderAll": "Tous les dossiers"
     },
     "thumbnail": {
       "audioLabel": "Audio : {{filename}}",
@@ -488,7 +505,12 @@
     "emptyState": "Aucune pièce jointe pour l'instant. Appuyez sur Importer pour ajouter une image ou un PDF.",
     "insert": "Insérer",
     "pauseLabel": "Mettre en pause {{filename}}",
-    "playLabel": "Lire {{filename}}"
+    "playLabel": "Lire {{filename}}",
+    "move": "Déplacer",
+    "folderAll": "Tous les dossiers",
+    "folderRoot": "Aucun dossier",
+    "folderPickerAria": "Dossier pour {{name}}",
+    "folderMoveFailed": "Ce fichier n'a pas pu être déplacé. Rien n'a changé ; réessayez."
   },
   "backup": {
     "errors": {
@@ -567,7 +589,10 @@
     "resultsLabel": "Commandes et notes",
     "pin": "Épingler au ruban gauche",
     "unpin": "Détacher du ruban gauche",
-    "pinError": "Impossible d'épingler la commande."
+    "pinError": "Impossible d'épingler la commande.",
+    "sectionFiles": "Fichiers",
+    "fileUsedIn": "dans {{title}}",
+    "fileUnused": "utilisé dans aucune note"
   },
   "commands": {
     "actions": {
@@ -891,6 +916,9 @@
       },
       "convertImportedAttachments": {
         "label": "Convertir les pièces jointes importées…"
+      },
+      "showHome": {
+        "label": "Aller à l'accueil"
       }
     },
     "hotkeys": {
@@ -2258,7 +2286,8 @@
       "renameFailed": "Impossible de renommer le dossier, il est donc inchangé.",
       "deliberateWriteFailed": "Le dossier a été renommé, mais l'un de ses réglages n'a pas pu être enregistré. Un dossier vide réapparaîtra sous l'ancien nom à chaque déverrouillage ; vous pouvez le supprimer sans risque, cela ne change rien d'autre. Renommer le dossier à nouveau ne le fera pas disparaître.",
       "folderListFull": "Myne ne peut mémoriser qu'un nombre limité de dossiers, et cette liste est pleine. Ce dossier fonctionne toujours, mais il disparaîtra quand sa dernière note en sortira. Supprimer un dossier dont vous n'avez plus besoin libère de la place.",
-      "folderNotRemembered": "Le dossier a été créé, mais Myne n'a pas pu l'enregistrer. Il disparaîtra quand sa dernière note en sortira, et il aura disparu au prochain déverrouillage s'il est encore vide. Vous pouvez le recréer sans risque."
+      "folderNotRemembered": "Le dossier a été créé, mais Myne n'a pas pu l'enregistrer. Il disparaîtra quand sa dernière note en sortira, et il aura disparu au prochain déverrouillage s'il est encore vide. Vous pouvez le recréer sans risque.",
+      "attachmentFolderRewriteFailed": "Le dossier a été renommé, mais les fichiers qui y étaient rangés n'ont pas pu suivre. Ils portent encore l'ancien nom, ils sont donc absents de l'arborescence de la bibliothèque et d'un agent à qui ce dossier a été donné. Déplacez-les à nouveau à la main depuis les pièces jointes, ou renommez le dossier en arrière puis à nouveau."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2648,7 +2677,8 @@
         "attachments": "Pièces jointes",
         "graph": "Graphe",
         "tasks": "Tâches",
-        "today": "Aujourd'hui"
+        "today": "Aujourd'hui",
+        "home": "Accueil"
       },
       "placesLabel": "Aller à",
       "results": "Résultats"
@@ -2658,7 +2688,8 @@
       "tasksTab": "Tâches",
       "loading": "Chargement…",
       "untitledView": "Vue sans titre",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Accueil"
     },
     "relativeTime": {
       "daysAgo": "il y a {{d}} jours",
@@ -3032,6 +3063,57 @@
       "pdf": "PDF",
       "submenuLabel": "Exporter…",
       "txt": "Texte brut"
+    },
+    "home": {
+      "emptyTitle": "Votre surface d'accueil",
+      "emptyBody": "Des cartes pour les notes récentes, les tâches du jour et les fichiers que vous consultez souvent apparaîtront ici. Rien n'est encore disposé.",
+      "title": "Accueil",
+      "arrange": "Disposer",
+      "arrangeTitle": "Disposer votre accueil",
+      "addCard": "Ajouter une carte",
+      "removeCard": "Retirer {{name}}",
+      "spanWide": "Large",
+      "spanNarrow": "Étroit",
+      "onStart": "À l'ouverture de l'application",
+      "onStartHint": "Ouvrir cette surface d'accueil au démarrage, sur cet appareil uniquement.",
+      "cards": {
+        "recentNotes": "Notes récentes",
+        "quickCapture": "Capture rapide",
+        "todaysTasks": "Tâches du jour",
+        "calendarAgenda": "À venir",
+        "favorites": "Favoris",
+        "referenceSets": "Ensembles de référence",
+        "savedViews": "Vues enregistrées",
+        "recentFiles": "Fichiers récents",
+        "writingStats": "Écriture",
+        "agentPrompt": "Demander à l'agent",
+        "graph": "Votre coffre",
+        "unknown": "Carte indisponible",
+        "unknownNote": "Cette carte a été ajoutée par une version plus récente de Myne ; celle-ci ne peut pas la dessiner. Elle reste à sa place.",
+        "pending": "Cette carte est en cours de construction.",
+        "loading": "Lecture du coffre…",
+        "recentNotesEmpty": "Aucune note ouverte sur cet appareil pour l'instant. Celles que vous ouvrez apparaissent ici.",
+        "favoritesEmpty": "Rien n'est encore marqué d'une étoile. Marquez une note, elle arrive ici.",
+        "todaysTasksEmpty": "Rien n'est dû aujourd'hui.",
+        "calendarAgendaEmpty": "Rien n'est prévu dans la semaine qui vient.",
+        "recentFilesEmpty": "Aucun fichier pour l'instant. Importez-en un depuis la bibliothèque de fichiers.",
+        "referenceSetsEmpty": "Aucun dossier ne contient de fichiers. Rangez un fichier dans un dossier, il apparaît ici.",
+        "savedViewsEmpty": "Aucune vue enregistrée pour l'instant.",
+        "writingStatsHint": "Les nombres de mots apparaissent ici à mesure que le coffre grandit.",
+        "quickCaptureHint": "Commencez une note sans quitter votre accueil.",
+        "agentPromptHint": "Posez à l'agent vos questions sur tout ce que contient votre coffre.",
+        "agentPromptAction": "Ouvrir l'agent",
+        "graphCount": "{{count}} notes dans le graphe",
+        "openTasks": "Ouvrir la liste des tâches",
+        "openCalendar": "Ouvrir le calendrier",
+        "openFiles": "Ouvrir la bibliothèque de fichiers",
+        "openGraph": "Ouvrir le graphe",
+        "fileCount_one": "{{count}} fichier",
+        "fileCount_many": "{{count}} de fichiers",
+        "fileCount_other": "{{count}} fichiers",
+        "statNotes": "{{count}} notes",
+        "statFavorites": "{{count}} en favori"
+      }
     }
   },
   "photoNote": {
@@ -3320,7 +3402,8 @@
       },
       "diagnosticFilesHelper_one": "Un fichier contiendrait ce bloc plus {{count}} fichier journal, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va.",
       "diagnosticFilesHelper_other": "Un fichier contiendrait ce bloc plus {{count}} fichiers journaux, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va.",
-      "diagnosticFilesHelper_many": "Un fichier contiendrait ce bloc plus {{count}} de fichiers journaux, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va."
+      "diagnosticFilesHelper_many": "Un fichier contiendrait ce bloc plus {{count}} de fichiers journaux, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va.",
+      "updateBlocked": "Myne n'a pas pu lancer la mise à jour depuis ici, donc rien n'a été installé. Réessayez dans un instant."
     },
     "vault": {
       "changePasswordButton": "Changer le mot de passe",
@@ -3984,7 +4067,21 @@
         "grantFailed": "Impossible d'enregistrer l'approbation. Rien n'a changé.",
         "readSummary_many": "Peut lire {{count}} notes dans {{folders}} dossiers.",
         "countsNotes_many": "Partage {{count}} notes dans {{folders}} dossiers.",
-        "countsExcluded_many": "{{count}} dossiers exclus."
+        "countsExcluded_many": "{{count}} dossiers exclus.",
+        "verb": {
+          "attachment_list": "Lister les fichiers",
+          "attachment_read": "Lire le texte d'un fichier",
+          "calendar_read": "Lire le calendrier",
+          "view_list": "Lister les vues enregistrées"
+        },
+        "wholeVaultLabel": "Lire et écrire tout le coffre",
+        "wholeVaultHelper": "Chaque dossier, y compris ceux que vous créerez plus tard. Laissez-en un de côté ci-dessous et il est exclu des lectures comme des écritures.",
+        "excludeNothing": "Rien de mis de côté",
+        "scopeLineAll": "Atteint chaque note du coffre, y compris dans les dossiers que vous créerez plus tard, et peut toutes les modifier.",
+        "scopeLine": "Atteint {{count}} notes dans {{folders}} dossiers, et peut tout y modifier.",
+        "toolsNote": "Les lectures ont un budget : jusqu'à {{count}} notes par {{minutes}} minutes.",
+        "needsReapproval": "Approuvé par une version plus ancienne, sous la règle inverse. Cette version ne lit rien pour lui tant que vous ne l'approuvez pas de nouveau.",
+        "scopeLineWords": "Atteint les dossiers que vous nommez, et peut tout y modifier."
       },
       "autoApplyLabel": "Appliquer automatiquement les étiquettes suggérées",
       "autoApplyHelper": "Écrit les étiquettes dans la note sans demander, une fois par note et par session, seulement après que vous l'avez modifiée. Sur cet appareil uniquement. Annuler se trouve sous la note après écriture."
@@ -4142,7 +4239,8 @@
         "vault": "Coffre",
         "data": "Données",
         "diagnostics": "Diagnostic",
-        "extensions": "Extensions de navigateur"
+        "extensions": "Extensions de navigateur",
+        "connections": "Connexions"
       },
       "passwordUpdatedToast": "Mot de passe mis à jour",
       "title": "Paramètres"
@@ -4564,7 +4662,10 @@
       "errorTooShort": "Utilisez au moins {{count}} caractères/chiffres.",
       "errorGeneric": "Impossible de définir l'identifiant. Veuillez réessayer."
     },
-    "helperDisclosureLabel": "En savoir plus sur ce réglage"
+    "helperDisclosureLabel": "En savoir plus sur ce réglage",
+    "connections": {
+      "mcp": "Clients MCP externes"
+    }
   },
   "storageLost": {
     "allSynced": "Rien n'a été perdu : chaque note présente ici avait déjà atteint le serveur.",
@@ -6074,7 +6175,8 @@
       "caption": "Myne {{version}} fonctionne toujours et vos notes sont intactes.",
       "hint": "Réessayer relance le téléchargement depuis le début.",
       "retry": "Réessayer",
-      "back": "Retour au déverrouillage"
+      "back": "Retour au déverrouillage",
+      "manual": "Si cela se reproduit, téléchargez la nouvelle version sur myne.md et installez-la à la main. L'application que vous avez reste intacte."
     }
   },
   "identityFlow": {
@@ -6174,5 +6276,12 @@
     "joinFromQr": {
       "notFound": "Ce code désigne un coffre-fort qui n'est pas dans vos invitations sur cet appareil. Demandez au propriétaire du coffre-fort de renvoyer l'invitation à cette identité."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Nommez un calendrier, par exemple Personnel",
+      "calendarRequired": "Donnez un calendrier à l'événement. C'est lui qui colore l'événement, et c'est ce que cette vue peut désactiver."
+    },
+    "calendarsToggleFailed": "Ce calendrier n'a pas été basculé. Il est resté tel quel."
   }
 }
