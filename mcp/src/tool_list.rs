@@ -72,6 +72,39 @@ pub fn catalog() -> Vec<Value> {
                 },
                 "required": ["query"],
                 "additionalProperties": false
+            },
+            // The hit list is nested under `items`: `structuredContent` is an object.
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "One entry per match, in ranked order.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "noteId": {
+                                    "type": "string",
+                                    "description": "The id to hand to note_read."
+                                },
+                                "title": {
+                                    "type": ["string", "null"],
+                                    "description": "The note's title, or null when it has none."
+                                },
+                                "folder": {
+                                    "type": ["string", "null"],
+                                    "description": "The note's folder as the note carries it, or null at the vault root."
+                                },
+                                "excerpt": {
+                                    "type": "string",
+                                    "description": "A bounded window of the note around the match."
+                                }
+                            },
+                            "required": ["noteId", "excerpt"]
+                        }
+                    }
+                },
+                "required": ["items"]
             }
         }),
         json!({
@@ -100,6 +133,32 @@ pub fn catalog() -> Vec<Value> {
                 "type": "object",
                 "properties": {},
                 "additionalProperties": false
+            },
+            // As `note_search`: the folder list is nested under `items`.
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "One entry per folder in the read scope.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "folder": {
+                                    "type": ["string", "null"],
+                                    "description": "The folder path, or null for the vault root."
+                                },
+                                "count": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Live notes whose folder is exactly this one."
+                                }
+                            },
+                            "required": ["folder", "count"]
+                        }
+                    }
+                },
+                "required": ["items"]
             }
         }),
         json!({
@@ -252,6 +311,18 @@ pub fn catalog() -> Vec<Value> {
                     }
                 },
                 "additionalProperties": false
+            },
+            // A list answer is nested under `items`; the element shape is left open
+            // so a validating client can never reject a field this file forgot.
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "One entry per file in the read scope: its id, its filename and the folder it is filed in."
+                    }
+                },
+                "required": ["items"]
             }
         }),
         json!({
@@ -270,6 +341,15 @@ pub fn catalog() -> Vec<Value> {
                 },
                 "required": ["attachment_id"],
                 "additionalProperties": false
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": ["string", "null"],
+                        "description": "The extracted text, or null when nothing was extracted."
+                    }
+                }
             }
         }),
         json!({
@@ -293,6 +373,20 @@ pub fn catalog() -> Vec<Value> {
                 },
                 "required": ["from", "to"],
                 "additionalProperties": false
+            },
+            // `structuredContent` is a JSON OBJECT, so a list answer is nested under
+            // `items` and declared here. The element shape is left open on purpose:
+            // a client that validates must never be handed a schema this file got
+            // wrong, which would fail the call it exists to protect.
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "One entry per calendar occurrence inside the window, each naming the note it lives in."
+                    }
+                },
+                "required": ["items"]
             }
         }),
         json!({
@@ -304,6 +398,16 @@ pub fn catalog() -> Vec<Value> {
                 "type": "object",
                 "properties": {},
                 "additionalProperties": false
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "One entry per saved view: its id, its name and its kind."
+                    }
+                },
+                "required": ["items"]
             }
         }),
     ]
