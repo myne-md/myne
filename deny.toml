@@ -101,6 +101,15 @@ ignore = [
     # Drop this when arti moves to rusqlite 0.41. If the sidecar ever opens a
     # database some other process can write, the argument is void — re-argue it.
     "RUSTSEC-2026-0459",  # bundled SQLite (CVE-2026-119375), arti cache only.
+    #
+    # RUSTSEC-2026-0542, humantime unmaintained (added 2026-11-23). Status-only
+    # advisory: no vulnerability, and the crate's job here is formatting a
+    # duration into a log line. It reaches us only through arti — `cargo tree -i
+    # humantime` answers arti, arti-client and humantime-serde, all of them in
+    # the sidecar's own tree — and `cargo tree -p myne-desktop -i humantime`
+    # matches nothing, so the audited desktop binary does not carry it. No safe
+    # upgrade exists (the crate has no successor); drop this when arti drops it.
+    "RUSTSEC-2026-0542",  # humantime unmaintained; arti-only, sidecar process.
 
     # ── the `zip` extraction advisories, published together on 2026-10-17 ─────
     # RUSTSEC-2026-0367 / -0368 / -0369 are all one surface: `ZipArchive::extract`,
@@ -147,6 +156,25 @@ ignore = [
     "RUSTSEC-2026-0368",  # zip: extracted symlink may point outside the destination
     "RUSTSEC-2026-0369",  # zip: permissions applied through extracted symlinks
     "RUSTSEC-2026-0429",  # zip: symlink-target buffer sized from the declared uncompressed size
+    #
+    # Two more on the same sink, added 2026-11-23 from a fresh run that reported
+    # them (both published after the block above was written):
+    #
+    # RUSTSEC-2026-0545 is the AES path — an entry's HMAC is checked only after
+    # the declared compressed size has been consumed, and an AE-2 entry carries
+    # no CRC-32, so tampered ciphertext can decrypt to altered plaintext with no
+    # error. It is gated on zip's `aes-crypto` feature, and NO crate in this
+    # lock enables it: all three zip packages list no `aes`, `cbc`, `pbkdf2` or
+    # `sha1` in their `dependencies` block, so the code is not compiled into any
+    # binary we ship. Re-check that against the LOCK, not against a manifest.
+    # RUSTSEC-2026-0548 is `ZipStreamReader`, which takes entry names from the
+    # local file header instead of the central directory. `grep -rn
+    # ZipStreamReader` over src-tauri/src, core/src, mobile/src-tauri/src,
+    # protocol/, format/ and cli/ matches nothing; and the upstream fix is
+    # opt-in even after an upgrade (`enforce_header_consistency(true)`), so the
+    # version alone would not settle it either.
+    "RUSTSEC-2026-0545",  # zip: AES entry auth unchecked (aes-crypto off in this lock)
+    "RUSTSEC-2026-0548",  # zip: ZipStreamReader local-header names (API unused here)
 
     # ── the `zbus` family, unmaintained (2026-10-17) ─────────────────────────
     # RUSTSEC-2026-0370 / -0371 / -0372: upstream merged `zvariant`,
