@@ -412,7 +412,21 @@
       "transcriptNoteTitle": "{{name}} (Transkript)",
       "transcriptSave": "Als Notiz speichern",
       "transcriptSaved": "Transkript als Notiz gespeichert.",
-      "transcriptSaveFailed": "Das Transkript konnte nicht als Notiz gespeichert werden."
+      "transcriptSaveFailed": "Das Transkript konnte nicht als Notiz gespeichert werden.",
+      "folderScopeAriaLabel": "Die Dateien in einem Ordner anzeigen",
+      "selectAriaLabel": "{{name}} auswählen",
+      "selectedCount_one": "{{count}} ausgewählt",
+      "selectedCount_other": "{{count}} ausgewählt",
+      "moveToAriaLabel": "Die ausgewählten Dateien in einen Ordner verschieben",
+      "moveFailed": "Die ausgewählten Dateien konnten nicht verschoben werden. Es hat sich nichts geändert; versuchen Sie es erneut.",
+      "importFolder": "Ordner importieren",
+      "importFolderProgress": "{{done}} von {{total}} werden importiert",
+      "importFolderDone_one": "{{imported}} Datei importiert, {{skipped}} übersprungen.",
+      "importFolderDone_other": "{{imported}} Dateien importiert, {{skipped}} übersprungen.",
+      "importFolderCancelled_one": "Nach {{count}} Datei gestoppt. Was importiert wurde, ist in der Bibliothek.",
+      "importFolderCancelled_other": "Nach {{count}} Dateien gestoppt. Was importiert wurde, ist in der Bibliothek.",
+      "importFolderFailed": "Dieser Ordner konnte nicht gelesen werden. Es wurde nichts importiert.",
+      "folderAll": "Alle Ordner"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -446,7 +460,12 @@
     "emptyState": "Noch keine Anhänge. Tippe auf „Hochladen“, um ein Bild oder PDF hinzuzufügen.",
     "insert": "Einfügen",
     "pauseLabel": "{{filename}} pausieren",
-    "playLabel": "{{filename}} abspielen"
+    "playLabel": "{{filename}} abspielen",
+    "move": "Verschieben",
+    "folderAll": "Alle Ordner",
+    "folderRoot": "Kein Ordner",
+    "folderPickerAria": "Ordner für {{name}}",
+    "folderMoveFailed": "Diese Datei konnte nicht verschoben werden. Es hat sich nichts geändert; versuchen Sie es erneut."
   },
   "backup": {
     "errors": {
@@ -525,7 +544,10 @@
     "resultsLabel": "Befehle und Notizen",
     "pin": "An linker Leiste anheften",
     "unpin": "Von linker Leiste lösen",
-    "pinError": "Der Befehl konnte nicht angeheftet werden."
+    "pinError": "Der Befehl konnte nicht angeheftet werden.",
+    "sectionFiles": "Dateien",
+    "fileUsedIn": "in {{title}}",
+    "fileUnused": "in keiner Notiz verwendet"
   },
   "commands": {
     "actions": {
@@ -849,6 +871,9 @@
       },
       "convertImportedAttachments": {
         "label": "Importierte Anhänge umwandeln…"
+      },
+      "showHome": {
+        "label": "Zur Startseite"
       }
     },
     "hotkeys": {
@@ -2171,7 +2196,8 @@
       "renameFailed": "Der Ordner konnte nicht umbenannt werden, er ist also unverändert.",
       "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Bei jedem Entsperren erscheint erneut ein leerer Ordner mit dem alten Namen; Sie können ihn sicher löschen, ohne dass sich sonst etwas ändert. Ein erneutes Umbenennen des Ordners entfernt ihn nicht.",
       "folderListFull": "Myne kann sich nur eine begrenzte Anzahl von Ordnern merken, und diese Liste ist voll. Dieser Ordner funktioniert weiterhin, verschwindet aber, sobald seine letzte Notiz ihn verlässt. Wenn Sie einen Ordner löschen, den Sie nicht mehr brauchen, wird wieder Platz frei.",
-      "folderNotRemembered": "Der Ordner wurde erstellt, aber Myne konnte ihn nicht vermerken. Er verschwindet, sobald seine letzte Notiz ihn verlässt, und ist beim nächsten Entsperren weg, wenn er dann noch leer ist. Sie können ihn gefahrlos erneut erstellen."
+      "folderNotRemembered": "Der Ordner wurde erstellt, aber Myne konnte ihn nicht vermerken. Er verschwindet, sobald seine letzte Notiz ihn verlässt, und ist beim nächsten Entsperren weg, wenn er dann noch leer ist. Sie können ihn gefahrlos erneut erstellen.",
+      "attachmentFolderRewriteFailed": "Der Ordner wurde umbenannt, aber die darin abgelegten Dateien konnten nicht mitwandern. Sie nennen weiterhin den alten Ordner und fehlen deshalb im Bibliotheksbaum und bei einem Agenten, dem dieser Ordner gegeben wurde. Verschieben Sie sie in den Anhängen von Hand erneut, oder benennen Sie den Ordner zurück und noch einmal um."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2543,7 +2569,8 @@
         "attachments": "Anhänge",
         "graph": "Graph",
         "tasks": "Aufgaben",
-        "today": "Heute"
+        "today": "Heute",
+        "home": "Startseite"
       },
       "placesLabel": "Gehe zu",
       "results": "Ergebnisse"
@@ -2553,7 +2580,8 @@
       "tasksTab": "Aufgaben",
       "loading": "Wird geladen…",
       "untitledView": "Ansicht ohne Titel",
-      "agentTab": "Agent"
+      "agentTab": "Agent",
+      "homeTab": "Startseite"
     },
     "relativeTime": {
       "daysAgo": "vor {{d}} Tagen",
@@ -2921,6 +2949,56 @@
       "pdf": "PDF",
       "submenuLabel": "Exportieren…",
       "txt": "Nur Text"
+    },
+    "home": {
+      "emptyTitle": "Ihre Startfläche",
+      "emptyBody": "Karten für letzte Notizen, heutige Aufgaben und die Dateien, nach denen Sie oft greifen, erscheinen hier. Noch ist nichts angeordnet.",
+      "title": "Startseite",
+      "arrange": "Anordnen",
+      "arrangeTitle": "Startfläche anordnen",
+      "addCard": "Karte hinzufügen",
+      "removeCard": "{{name}} entfernen",
+      "spanWide": "Breit",
+      "spanNarrow": "Schmal",
+      "onStart": "Beim Öffnen der App",
+      "onStartHint": "Diese Startfläche beim Start öffnen, nur auf diesem Gerät.",
+      "cards": {
+        "recentNotes": "Letzte Notizen",
+        "quickCapture": "Schnellerfassung",
+        "todaysTasks": "Heutige Aufgaben",
+        "calendarAgenda": "Demnächst",
+        "favorites": "Favoriten",
+        "referenceSets": "Referenzsätze",
+        "savedViews": "Gespeicherte Ansichten",
+        "recentFiles": "Letzte Dateien",
+        "writingStats": "Schreiben",
+        "agentPrompt": "Den Agenten fragen",
+        "graph": "Ihr Tresor",
+        "unknown": "Nicht verfügbare Karte",
+        "unknownNote": "Diese Karte wurde von einer neueren Version von Myne hinzugefügt; diese hier kann sie nicht zeichnen. Sie bleibt an ihrem Platz.",
+        "pending": "Diese Karte wird gebaut.",
+        "loading": "Tresor wird gelesen…",
+        "recentNotesEmpty": "Auf diesem Gerät wurde noch keine Notiz geöffnet. Was Sie öffnen, erscheint hier.",
+        "favoritesEmpty": "Noch nichts mit Stern. Versehen Sie eine Notiz mit einem Stern, landet sie hier.",
+        "todaysTasksEmpty": "Heute ist nichts fällig.",
+        "calendarAgendaEmpty": "In der nächsten Woche ist nichts geplant.",
+        "recentFilesEmpty": "Noch keine Dateien. Importieren Sie eine aus der Dateibibliothek.",
+        "referenceSetsEmpty": "In keinem Ordner liegen Dateien. Legen Sie eine Datei in einen Ordner, und sie erscheint hier.",
+        "savedViewsEmpty": "Noch keine gespeicherten Ansichten.",
+        "writingStatsHint": "Wortzahlen erscheinen hier, während der Tresor wächst.",
+        "quickCaptureHint": "Beginnen Sie eine Notiz, ohne Ihre Startfläche zu verlassen.",
+        "agentPromptHint": "Fragen Sie den Agenten nach allem in Ihrem Tresor.",
+        "agentPromptAction": "Agenten öffnen",
+        "graphCount": "{{count}} Notizen im Graphen",
+        "openTasks": "Aufgabenliste öffnen",
+        "openCalendar": "Kalender öffnen",
+        "openFiles": "Dateibibliothek öffnen",
+        "openGraph": "Graphen öffnen",
+        "fileCount_one": "{{count}} Datei",
+        "fileCount_other": "{{count}} Dateien",
+        "statNotes": "{{count}} Notizen",
+        "statFavorites": "{{count}} mit Stern"
+      }
     }
   },
   "photoNote": {
@@ -3202,7 +3280,8 @@
         "diagnostics": "Diagnose"
       },
       "diagnosticFilesHelper_one": "Eine Datei würde diesen Block plus {{count}} Protokolldatei enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
-      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht."
+      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
+      "updateBlocked": "Myne konnte die Aktualisierung von hier aus nicht starten, es wurde also nichts installiert. Versuchen Sie es gleich noch einmal."
     },
     "vault": {
       "changePasswordButton": "Passwort ändern",
@@ -3853,7 +3932,21 @@
         "excludeHelper": "Ein Ordner, den Sie auslassen, wird nicht geteilt, und auch nichts in ihm. Sie wählen aus allen Ordnern in diesem Tresor, daher ist dies der eine Ort, an dem der ganze Tresor auf dem Tisch liegt.",
         "approve": "Genehmigen",
         "grantRefused": "Diese Genehmigung würde nicht in das Einstellungsbudget des Tresors passen. Es wurde nichts geändert. Entziehen Sie eine Verbindung, die Sie nicht mehr nutzen, und versuchen Sie es erneut.",
-        "grantFailed": "Die Genehmigung konnte nicht gespeichert werden. Es wurde nichts geändert."
+        "grantFailed": "Die Genehmigung konnte nicht gespeichert werden. Es wurde nichts geändert.",
+        "verb": {
+          "attachment_list": "Dateien auflisten",
+          "attachment_read": "Den Text einer Datei lesen",
+          "calendar_read": "Den Kalender lesen",
+          "view_list": "Gespeicherte Ansichten auflisten"
+        },
+        "wholeVaultLabel": "Den ganzen Tresor lesen und schreiben",
+        "wholeVaultHelper": "Jeder Ordner, auch die, die Sie später anlegen. Lassen Sie unten einen aus, ist er für Lesen und Schreiben gleichermaßen ausgenommen.",
+        "excludeNothing": "Nichts ausgelassen",
+        "scopeLineAll": "Erreicht jede Notiz im Tresor, auch in Ordnern, die Sie später anlegen, und kann jede davon ändern.",
+        "scopeLine": "Erreicht {{count}} Notizen in {{folders}} Ordnern und kann alles darin ändern.",
+        "toolsNote": "Lesen ist begrenzt: bis zu {{count}} Notizen pro {{minutes}} Minuten.",
+        "needsReapproval": "Von einer älteren Version unter der umgekehrten Regel genehmigt. Dieser Build liest nichts dafür, bis Sie erneut zustimmen.",
+        "scopeLineWords": "Erreicht die von Ihnen benannten Ordner und kann alles darin ändern."
       },
       "autoApplyLabel": "Vorgeschlagene Tags automatisch anwenden",
       "autoApplyHelper": "Schreibt die Tags ohne Nachfrage in die Notiz, einmal pro Notiz und Sitzung, nur nachdem Sie sie bearbeitet haben. Nur auf diesem Gerät. Rückgängig steht unter der Notiz, nachdem geschrieben wurde."
@@ -4009,7 +4102,8 @@
         "vault": "Tresor",
         "data": "Daten",
         "diagnostics": "Diagnose",
-        "extensions": "Browser-Erweiterungen"
+        "extensions": "Browser-Erweiterungen",
+        "connections": "Verbindungen"
       },
       "passwordUpdatedToast": "Passwort aktualisiert",
       "title": "Einstellungen"
@@ -4423,7 +4517,10 @@
       "errorTooShort": "Verwenden Sie mindestens {{count}} Zeichen/Ziffern.",
       "errorGeneric": "Die Anmeldedaten konnten nicht festgelegt werden. Bitte versuchen Sie es erneut."
     },
-    "helperDisclosureLabel": "Mehr zu dieser Einstellung"
+    "helperDisclosureLabel": "Mehr zu dieser Einstellung",
+    "connections": {
+      "mcp": "Externe MCP-Clients"
+    }
   },
   "storageLost": {
     "allSynced": "Es ging nichts verloren: Jede Notiz hier hatte den Server bereits erreicht.",
@@ -5909,7 +6006,8 @@
       "caption": "Myne {{version}} läuft noch und Ihre Notizen sind unberührt.",
       "hint": "Ein erneuter Versuch startet den Download von vorne.",
       "retry": "Erneut versuchen",
-      "back": "Zurück zur Entsperrung"
+      "back": "Zurück zur Entsperrung",
+      "manual": "Wenn es weiterhin passiert, laden Sie die neue Version von myne.md herunter und installieren Sie sie von Hand. Die App, die Sie jetzt haben, bleibt unverändert."
     }
   },
   "identityFlow": {
@@ -6009,5 +6107,12 @@
     "joinFromQr": {
       "notFound": "Dieser Code benennt einen Tresor, der auf diesem Gerät nicht in Ihren Einladungen ist. Bitten Sie den Tresor-Eigentümer, die Einladung erneut an diese Identität zu senden."
     }
+  },
+  "calendar": {
+    "form": {
+      "calendarPlaceholder": "Geben Sie dem Kalender einen Namen, etwa Privat",
+      "calendarRequired": "Geben Sie dem Termin einen Kalender. Er bestimmt die Farbe des Termins und ist das, was diese Ansicht abschalten kann."
+    },
+    "calendarsToggleFailed": "Dieser Kalender wurde nicht umgeschaltet. Er ist unverändert."
   }
 }
