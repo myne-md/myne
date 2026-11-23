@@ -23,8 +23,8 @@ import {
   EditorView,
   ViewPlugin,
   type ViewUpdate,
-  WidgetType,
 } from "@codemirror/view";
+import { LineHeightWidget } from "../widget-line-coords";
 import {
   editorFocusChanged,
   editorFocusField,
@@ -74,7 +74,7 @@ function attachMathClick(el: HTMLElement, view: EditorView, from: number): void 
   });
 }
 
-class MathWidget extends WidgetType {
+class MathWidget extends LineHeightWidget {
   constructor(
     private readonly html: string,
     private readonly key: string,
@@ -125,7 +125,7 @@ class MathWidget extends WidgetType {
 
 /** Invalid / mid-typing LaTeX: show the raw source with a subtle failure hint
  *  (faint underline + the KaTeX message on hover) — task 4. */
-class MathErrorWidget extends WidgetType {
+class MathErrorWidget extends LineHeightWidget {
   constructor(
     private readonly source: string,
     private readonly message: string,
