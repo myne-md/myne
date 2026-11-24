@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Project-wide password length floor for the auth pipeline.
 //!
 //! Single source of truth for the minimum number of Unicode characters a
 //! master password must contain before any Argon2id-bound auth plugin
 //! (`vault_creation`, `vault_recover`, `vault_change_password`) accepts
-//! it. Pinned by `agent-tooling/design-notes.md` 2026-05-06 entry "Auth-pipeline
+//! it. Pinned by `decisions.md` 2026-05-06 entry "Auth-pipeline
 //! backend MIN_PASSWORD_LEN floor; project-wide retroactive".
 //!
 //! ## What this is and is not

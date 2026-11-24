@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Backend-held person identity (B2B identity substrate, myne-md/myne#698).
 //!
 //! The owner's person keypair lives HERE. in process memory, held by

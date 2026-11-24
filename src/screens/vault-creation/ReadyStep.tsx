@@ -7,7 +7,7 @@
 //     (<CreateVault>) wires it through to App.tsx, which transitions
 //     the stage to the terminal `editor` screen. Originally this called
 //     `getCurrentWindow().close()`; revised by
-//     agent-tooling/features/empty-editor-shell/prd.md (2026-04-28).
+//     private-companion/features/empty-editor-shell/prd.md (2026-04-28).
 //     Vault-detected Welcome and lock/relock semantics remain a future
 //     vault-unlock feature — until then, the editor is terminal and
 //     there is no path back to Welcome from inside it.

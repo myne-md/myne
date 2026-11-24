@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `transcribe` / `read_transcript` Tauri commands — the mobile port of the
 //! desktop local_inference transcription commands (MYND-563). **Transcription
 //! only** — the desktop infer/chat/semantic-search commands are out of

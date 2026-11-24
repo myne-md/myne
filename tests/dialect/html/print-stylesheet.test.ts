@@ -1,7 +1,7 @@
 // Print stylesheet coverage guard (MYND-255 task 3).
 //
 // The class vocabulary below is PINNED — it is the emitter's complete emitted
-// class set as documented in agent-tooling/features/note-export-pdf/progress.md
+// class set as documented in private-companion/features/note-export-pdf/progress.md
 // (task 2 handoff). If the emitter grows a class, add it BOTH there and here,
 // and style it in print-stylesheet.ts — this test failing loudly on drift is
 // the point. Also pins the pagination rules, the embedded light token values,
@@ -171,7 +171,7 @@ describe("page geometry + pagination rules", () => {
 
 describe("design-token fidelity (light palette, embedded values)", () => {
   // Standalone document: the print CSS must EMBED the light token values
-  // (agent-tooling/docs/design/colors_and_type.css :root). Spot-pin the load-bearing ones.
+  // (design/colors_and_type.css :root). Spot-pin the load-bearing ones.
   it.each([
     ["--fg-1", "#1a1a17"],
     ["--fg-2", "#3a3934"],

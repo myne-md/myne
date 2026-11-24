@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Snapshot capture + retention policy for encrypted per-note version history
 //! (MYND-96). Pure logic, no I/O — owned by the snapshot-format-retention layer
 //! and called inline by the notes write-path (`should_snapshot`) and by the

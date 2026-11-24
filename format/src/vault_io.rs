@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The vault filesystem seam, host-free half.
 //!
 //! Moved out of `myne-core` so the `format/` crate can carry the `VaultIo`

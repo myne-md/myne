@@ -1,10 +1,10 @@
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: AGPL-3.0-only
 [package]
 name = "myne-format"
 version = "0.1.0"
 description = "Myne: the on-disk format crate: NC05 read path, MYB1 backup container, the VaultIo seam, and the export-naming vocabulary"
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 repository = "https://github.com/myne-md/myne"
 publish = false
 

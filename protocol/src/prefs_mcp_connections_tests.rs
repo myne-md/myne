@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The external MCP connection grant as a `vault.prefs` field
 //! (external-mcp-connection task 3; myne-md/myne#923).
 //!

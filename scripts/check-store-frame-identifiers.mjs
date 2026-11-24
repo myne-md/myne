@@ -30,7 +30,7 @@
 //
 // WHAT IT DELIBERATELY DOES NOT DO, because the alternative is worse: it does not
 // re-derive the Damm-32 check character. The quasigroup table is a frozen literal
-// in `agent-tooling/docs/spec/account-number.md` §4.2, its single other copy is gated by the
+// in `docs/spec/account-number.md` §4.2, its single other copy is gated by the
 // `damm32-table-drift` guard, and a third copy here would be exactly the
 // duplication that guard exists to stop. The pinned value's check character was
 // verified against the Rust implementation (`protocol/src/account_number.rs`) once,

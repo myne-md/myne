@@ -1,4 +1,4 @@
-// Spec: agent-tooling/docs/spec/wikilink.md §2 (forms 1–9). Registered `before: "Link"`
+// Spec: docs/spec/wikilink.md §2 (forms 1–9). Registered `before: "Link"`
 // per §2.2 so `[[…]]` and `![[…]]` outrank standard `[text](url)` parsing.
 
 import type { MarkdownConfig } from "@lezer/markdown";

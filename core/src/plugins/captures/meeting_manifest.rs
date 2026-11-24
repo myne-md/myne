@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local **pending-meeting manifest** — the grouping half of the Apple
 //! Watch meeting-capture lane (myne-md/myne#812).
 //!

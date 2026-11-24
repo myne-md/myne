@@ -12,7 +12,7 @@ version = "0.19.0"
 description = "Myne — mobile client"
 authors = ["Myne"]
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 # App crate, never published — lets cargo-deny's allow-wildcard-paths apply to
 # the `../../{protocol,core}` path deps (crates.io disallows path deps, so it
 # rejects wildcard paths on publishable crates). Matches the desktop crate.
@@ -149,7 +149,7 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "m
 tracing = "0.1"
 # The actual log sink (desktop `lib.rs` parity). Without it every mobile
 # `tracing::*!` event is silently dropped — the device checklists
-# (`agent-tooling/docs/dev/device-matrix.md` §7) read these events via the iOS dev console /
+# (`dev-notes/device-matrix.md` §7) read these events via the iOS dev console /
 # `adb logcat -s RustStdoutStderr`. NOT a new audit surface: already in the
 # shared lock via the `tracing-test` dev-dependency.
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

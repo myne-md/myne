@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `secret-export` plugin — mobile host.
 //!
 //! Owns the single `save_secret_text` IPC command — the narrow-seam file write

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri-layer error type bubbling up to the frontend.
 //!
 //! Mirrors `protocol::ProtocolError` in spirit (no `String` field

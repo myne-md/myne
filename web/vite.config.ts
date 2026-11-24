@@ -388,7 +388,7 @@ function devDeploymentPlugin(): Plugin {
   return {
     name: "myne:dev-deployment",
     // Never during a build: the bundle has to stay the byte-identical artefact the
-    // container ships (`agent-tooling/docs/self-host-web.md`).
+    // container ships (`docs/self-host-web.md`).
     apply: "serve",
     configureServer(server) {
       // Called for its throw: a malformed origin must stop the dev server with the
@@ -444,7 +444,7 @@ export default defineConfig({
     // `check-bundle-record.mjs --has` refuses to deploy a bundle whose hash is
     // not already published in a reviewed commit. That precondition is only
     // satisfiable because the container bundle is a pure function of the
-    // non-`agent-tooling/docs/` tree: build it, hash it, write the row in a docs-only commit,
+    // non-`docs/` tree: build it, hash it, write the row in a docs-only commit,
     // and the bundle for that new commit is still the same bytes. A define that
     // reads the commit puts the hash on the wrong side of that: recording the
     // hash changes the commit, which changes the hash, which needs recording.
@@ -459,7 +459,7 @@ export default defineConfig({
     //
     // The tempting alternative is to feed this from `MYNE_BUILD_COMMIT`, which the
     // by-hand build passes as a `--build-arg`
-    // (`operations/runbooks/web-client-deploy.md`), as `web-docker-build` did before it
+    // (`runbook/runbooks/web-client-deploy.md`), as `web-docker-build` did before it
     // left the pipeline (myne-md/myne#584). That is the deadlock above, arriving on
     // the first deploy after the change.
     //

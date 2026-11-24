@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Offensive red-team round 3 — coverage completion:
 //!  * integrity of the 4 remaining opaque-plaintext blob types
 //!    (MYS1 search, MYW1 workspace, MYD1 dictionary, MYI1 indices)

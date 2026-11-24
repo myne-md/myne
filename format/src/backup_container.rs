@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `.myne-backup` container codec — the read/verify half (spec
-//! `agent-tooling/docs/spec/protocol.md` §9.11).
+//! `docs/spec/protocol.md` §9.11).
 //!
 //! Moved out of the desktop crate so the `myne-decrypt` CLI can read a backup
 //! container without pulling the desktop host. The writer (`write_container`,

@@ -34,7 +34,7 @@ export interface HarnessEnv {
 }
 
 /** The lane's supported browsers. Chromium and Firefox are the CI matrix
- *  (`agent-tooling/design-notes.md` 2026-07-27); Safari is a manual macOS gate and is
+ *  (`decisions.md` 2026-07-27); Safari is a manual macOS gate and is
  *  accepted here so a local run on a Mac is possible, never in CI. */
 export const SUPPORTED_BROWSERS = ["chrome", "firefox", "safari"] as const;
 export type SupportedBrowser = (typeof SUPPORTED_BROWSERS)[number];
@@ -58,7 +58,7 @@ export function harnessSupport(
       reason:
         `MYNE_WEB_E2E_BROWSER="${env.browser}" is not one of ` +
         `${SUPPORTED_BROWSERS.join(", ")}. Safari runs only on a macOS host and ` +
-        `never in CI (agent-tooling/design-notes.md 2026-07-27 — the runner is Linux-only).`,
+        `never in CI (decisions.md 2026-07-27 — the runner is Linux-only).`,
     };
   }
   if (env.browser === "safari" && process.platform !== "darwin") {
@@ -66,7 +66,7 @@ export function harnessSupport(
       ok: false,
       reason:
         "the Safari seat requires a macOS host; it is a manual per-release gate, " +
-        "not a CI lane (agent-tooling/docs/dev/e2e.md, the browser matrix).",
+        "not a CI lane (dev-notes/e2e.md, the browser matrix).",
     };
   }
   if (!bundleExists(env.bundleDir)) {
@@ -80,7 +80,7 @@ export function harnessSupport(
       ok: false,
       reason:
         "no WebDriver endpoint configured: set MYNE_WEB_E2E_DRIVER_PORT and start " +
-        "the pinned chromedriver/geckodriver (agent-tooling/docs/dev/e2e.md). Browser binaries " +
+        "the pinned chromedriver/geckodriver (dev-notes/e2e.md). Browser binaries " +
         "are pinned or self-hosted — never an unpinned download in a blocking step.",
     };
   }

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! What Settings shows about external access, resolved host-side
 //! (external-mcp-connection, myne-md/myne#923).
 //!

@@ -8,9 +8,9 @@
 // any new English value in `locales/en/common.json`, commit, and translate the
 // new key in whichever catalogs you are keeping current — the catalogs are
 // authored in-repo (there is no external translation platform; Weblate was
-// retired in `agent-tooling/design-notes/ui/0629`).
+// retired in `decisions/ui/0629`).
 //
-// See `agent-tooling/docs/dev/i18n.md` for the full add-a-string workflow.
+// See `dev-notes/i18n.md` for the full add-a-string workflow.
 
 import { defineConfig } from "i18next-cli";
 import { presentSharedRoots } from "./scripts/lib/shared-roots.mjs";
@@ -22,7 +22,7 @@ import { presentSharedRoots } from "./scripts/lib/shared-roots.mjs";
 // extractor CLI rather than by Node with an import"). It had drifted: the roster
 // holds nine trees and this list held six, so `client-core/src`, `ornaments/src`
 // and `stories/src` were never scanned and a `t()` key added there was invisible
-// to the documented add-a-string procedure (`agent-tooling/docs/dev/i18n.md`) — the exact
+// to the documented add-a-string procedure (`dev-notes/i18n.md`) — the exact
 // failure the note was written about, one package later (audit 2026-10-18 R0.4).
 //
 // The stated reason was wrong rather than merely stale: this file IS loaded by
@@ -71,7 +71,7 @@ export default defineConfig({
     // by hand", and it is the opposite: every run rewrites and re-orders all 32
     // catalogs (~2500 changed lines in `en` alone for one new key), which buries
     // the actual change, makes `git blame` on a string useless, and contradicts
-    // the repo's positional-insertion rule (`src/AGENTS.md`, `agent-tooling/docs/dev/i18n.md`).
+    // the repo's positional-insertion rule (`src/AGENTS.md`, `dev-notes/i18n.md`).
     // With it off, extraction leaves existing order alone and appends a new key
     // at the end. The result is an additions-only diff you then move next to its
     // siblings by hand.

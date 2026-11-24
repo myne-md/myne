@@ -89,7 +89,7 @@ baked in** and generates the CSP from a runtime `MYNE_SYNC_ORIGIN`. It is not a
 convenience: a static server with default headers silently loses cross-origin
 isolation and the zero-third-party guarantee, and nothing in the app can detect
 that. **No client-IP access logging.** The image's server config deletes every
-IP-bearing field from the log stream (the same filter `operations/bundle/Caddyfile`
+IP-bearing field from the log stream (the same filter `runbook/bundle/Caddyfile`
 uses at the sync edge, verbatim) and skips the health route entirely. This
 matters more here than almost anywhere: **a page load on this origin is a vault
 opening**, so a default access log would be a record of when each user opens
@@ -97,9 +97,9 @@ their notes. If you front this origin with your own proxy or CDN, **the
 obligation moves to you** — the container cannot scrub a log it does not write.
 
 Normative obligations, the rebuild-and-verify procedure and the AGPL §13
-source offer are in [`agent-tooling/docs/self-host-web.md`](../agent-tooling/docs/self-host-web.md) —
+source offer are in [`docs/self-host-web.md`](../docs/self-host-web.md) —
 this file stays a contributor's map of the target, not an operator runbook
-(`agent-tooling/docs/AGENTS.md`, operator-doc placement).
+(`docs/AGENTS.md`, operator-doc placement).
 
 ## State
 
@@ -137,6 +137,6 @@ deleted the `scripts/check-web-no-phrase.mjs` artefact grep that enforced it).
 What remains absent is the B2B member plane, quick-unlock and backup
 import/export — a runtime capability refusal rather than a build-time
 substitution. Sync is required: there is no offline-first first run.
-[`agent-tooling/docs/threat-model.md`](../agent-tooling/docs/threat-model.md) A15 / TB11 states what the
+[`docs/threat-model.md`](../docs/threat-model.md) A15 / TB11 states what the
 served-code delivery channel costs relative to a signed desktop build, and A18
 records that no rule now tells a user which phrase prompt is legitimate.

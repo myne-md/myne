@@ -218,7 +218,7 @@ describe("the Privacy row states its bounds, one press away", () => {
     //
     // The three explanatory paragraphs that used to open in a sheet are GONE on
     // both clients (owner, 2026-11-08: the popover was the noise). The four
-    // limits stay recorded in `agent-tooling/docs/threat-model.md` §7
+    // limits stay recorded in `docs/threat-model.md` §7
     // (`decisions/clients/0799`).
     invoke.mockResolvedValue({ hidden: false, available: true });
     const container = await renderBlockAsync();

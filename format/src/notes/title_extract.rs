@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Hybrid byte-range slice extractor for `note_titles_batch`.
 //!
 //! Per the 2026-05-15 MYND-82 grill Q3 (hybrid byte-range parse), this
@@ -16,9 +16,9 @@
 //!
 //! Spec touchpoints:
 //!
-//! - `agent-tooling/design-notes.md` 2026-05-15 "Note title write target" (the
+//! - `decisions.md` 2026-05-15 "Note title write target" (the
 //!   read-precedence chain whose source slices this function returns).
-//! - `agent-tooling/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
+//! - `private-companion/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
 //!   Q3 (hybrid byte-range design rationale).
 
 const FM_OPENER: &[u8] = b"---\n";
@@ -37,7 +37,7 @@ pub struct TitleSlices<'a> {
 
 /// Locate the FM block boundary and the first H1 line.
 ///
-/// FM detection follows `agent-tooling/docs/spec/markdown-dialect.md` §3.6
+/// FM detection follows `docs/spec/markdown-dialect.md` §3.6
 /// "line-1-anchored detection": the source must begin with `"---\n"`,
 /// and the closer is the next line that consists exactly of `"---"`.
 /// An opener without a matching closer is treated as **no

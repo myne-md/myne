@@ -10,7 +10,7 @@ version = "0.1.0"
 description = "Myne mobile — iOS AVFoundation QR scanner (device-join via QR, MYND-466)"
 authors = ["Myne"]
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 # Mandatory for tauri-plugin build scripts; must equal the crate name exactly.
 links = "tauri-plugin-qr-scan"
 

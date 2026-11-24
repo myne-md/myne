@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Joining a generation someone else's migration produced (myne-md/myne#447).
 //!
 //! The §10.4.1 migration re-keys a vault on ONE device. Every peer then meets a
@@ -169,7 +169,7 @@ async fn drop_artefacts_under_replaced_root(io: &dyn VaultIo, vault_root: &Path)
 
     // The roster drop takes `vault.quickunlock` and leaves the Keychain wrap key
     // that opens it. This peer never re-seals the old generation, so nothing else
-    // would ever remove it (myne-md/myne#761, `agent-tooling/design-notes/security/0709`).
+    // would ever remove it (myne-md/myne#761, `decisions/security/0709`).
     // Called before the `vault.meta` write at the end of this function, so the
     // address is still readable.
     crate::plugins::quick_unlock::commands::invalidate_credential(vault_root);

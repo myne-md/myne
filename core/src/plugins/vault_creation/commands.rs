@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri commands for the vault-creation flow.
 //!
 //! - [`begin`]  → session creation (Task 12).
@@ -908,9 +908,9 @@ pub(crate) async fn commit_with_vault_path(
     // startup probe + frontend state machine should keep the user out
     // of create-vault when artefacts are present.
     //
-    // See: `agent-tooling/sessions/grill/2026-05-02-app-state-machine.md`
-    // Q12 (original variant) + `agent-tooling/features/app-state-machine/prd.md`
-    // + `agent-tooling/sessions/grill/2026-05-26-mynd-105-vault-delete.md` Q7
+    // See: `private-companion/sessions/grill/2026-05-02-app-state-machine.md`
+    // Q12 (original variant) + `private-companion/features/app-state-machine/prd.md`
+    // + `private-companion/sessions/grill/2026-05-26-mynd-105-vault-delete.md` Q7
     // (taxonomy broadening + rename) + `decisions.md` 2026-05-26
     // "vault_create defensive guard extension".
     let vault_dir = vault_path

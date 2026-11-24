@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The device-wide erase sweep: make EVERY vault's cached name unreadable.
 //!
 //! [`store::erase`] is the per-vault operation and this is the whole-device one.

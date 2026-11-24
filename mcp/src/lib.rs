@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 #![forbid(unsafe_code)]
 //! `myne-mcp` — the MCP front-end to a Myne vault (external-mcp-connection
 //! task 1; myne-md/myne#923).

@@ -31,7 +31,7 @@
 // which is a one-off and not repeatable in a unit test. The spec holds the file
 // contents; the API and the guard agree today.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -43,6 +43,7 @@ import {
   REPO_ROOT,
   RULESET_DIR,
   RULESET_NAMES,
+  SETUP_SH_PATH,
   directPushReposInSetupSh,
   readRuleset,
   repoRoster,
@@ -87,7 +88,7 @@ describe("branch-ruleset roster", () => {
     expect(roster[0]).toBe("myne");
   });
 
-  it("keeps the direct-push exemption identical in both copies", () => {
+  it.skipIf(!existsSync(SETUP_SH_PATH))("keeps the direct-push exemption identical in both copies", () => {
     // `workspace/setup.sh` cannot import this file, so the list exists twice by
     // necessity. Both directions are asserted: a repo dropped from one copy and
     // kept in the other is the drift that would either break a documented

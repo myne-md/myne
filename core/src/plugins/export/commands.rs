@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_export_markdown` — decrypt the whole vault (or one folder
 //! subtree) into a plaintext Obsidian-shape markdown tree (MYND-211).
 //!

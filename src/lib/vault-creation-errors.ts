@@ -1,7 +1,7 @@
 // AppError → user-facing message mapping for the vault-creation flow.
 //
 // Implements the design session decisions in
-// agent-tooling/sessions/design/2026-04-28-vault-creation-frontend.md (Q7).
+// private-companion/sessions/design/2026-04-28-vault-creation-frontend.md (Q7).
 //
 // Display strategy is hibrit: SessionExpired and SessionNotFound route to
 // <SessionLostStep> (dedicated screen, "Start over" → RESET); everything

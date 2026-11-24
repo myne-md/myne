@@ -4,7 +4,7 @@
 // variant** (the deterministic `StubEngine` — no model file in the repo; SYNC-5).
 // The audited production bundle never enables that feature, so this suite runs
 // ONLY when the AI-feature binary is under test — gated on `MYNE_E2E_AI=1`, which
-// the feature-flagged build sets (see `agent-tooling/docs/dev/e2e.md`).
+// the feature-flagged build sets (see `dev-notes/e2e.md`).
 //
 //   wa1 — enable AI → open a note → (a) pause on a bare cursor → the dimmed
 //         `ai.ghost-text` widget appears → Tab accepts it as plain markdown into

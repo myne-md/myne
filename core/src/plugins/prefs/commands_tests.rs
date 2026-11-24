@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 use super::*;
 use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
 use crate::test_support::ScopedTempDir;

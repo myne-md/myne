@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Test-only helpers for this crate's host-build test modules.
 //!
 //! # Why a `block_on` of our own, and why it re-polls

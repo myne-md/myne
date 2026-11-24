@@ -1,26 +1,19 @@
-// Where the documentation tree lives, for every guard that reads or writes it.
+// Where the public documentation tree lives, for every guard that reads or writes it.
 //
-// The specification, the threat model, the design canon and the decision log moved out of this
-// repository into the private `agent-tooling` companion, so a guard that verifies a document now
-// depends on a clone that may not be there. Two callers exist and they want opposite things: a
-// developer's checkout has the companion beside this repo and must run the gate, while CI clones
-// it into a scratch directory and says so with `MYNE_AGENTS_DIR`. A checkout with neither (a fork
-// pull request) gets the note below rather than a red that names a file nobody can see.
+// The public tree is `docs/` in this repository. It carries the specification, the threat model,
+// the glossary and the bundle-hash record. The decision log, the design canon and the internal
+// development notes are private and are not present in a public checkout; a guard that needs one
+// of those files must skip with the note below rather than fail on a file no reader can see.
 //
-// The root is derived from this file rather than from the caller's cwd, because the guards run
-// from the repo root, from `scripts/`, and from a `--root` argument in tests.
-//
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** The `docs` directory of the companion: `MYNE_AGENTS_DIR/docs`, else `agent-tooling/docs`. */
-export const DOCS_ROOT = process.env.MYNE_AGENTS_DIR
-  ? join(process.env.MYNE_AGENTS_DIR, "docs")
-  : join(REPO, "agent-tooling", "docs");
+/** The public documentation directory. */
+export const DOCS_ROOT = join(REPO, "docs");
 
 /** Join a path inside the documentation tree. */
 export const docsPath = (...parts) => join(DOCS_ROOT, ...parts);
@@ -30,5 +23,5 @@ export const docsPresent = () => existsSync(DOCS_ROOT);
 
 /** The one sentence a guard prints when it cannot check anything. */
 export const DOCS_ABSENT =
-  `the agent-tooling companion is not in this checkout (looked in ${DOCS_ROOT}), so this ` +
-  "documentation gate did not run; point MYNE_AGENTS_DIR at a clone of it to run it";
+  `the public docs/ tree is not in this checkout (looked in ${DOCS_ROOT}), so this ` +
+  "documentation gate did not run";

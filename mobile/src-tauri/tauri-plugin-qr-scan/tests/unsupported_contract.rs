@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The off-iOS refusal crosses IPC as the kind the WebView matches on —
 //! myne-md/myne#557, the `enrolment.qr-scan` bullet.
 //!

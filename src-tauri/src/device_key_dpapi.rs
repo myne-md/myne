@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Windows device-key store: DPAPI, user-scoped, with this app's entropy
 //! (`decisions/protocol/0761`, `identity-seat-portability` task 10).
 //!

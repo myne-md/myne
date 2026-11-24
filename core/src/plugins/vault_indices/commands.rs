@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_indices` Tauri command handlers (MYND-31 / A11, Task 1).
 //!
 //! - [`vault_indices_apply`] — Slot::Unlocked-gated upsert of a note's

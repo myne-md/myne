@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `prefs` Tauri plugin (MYND-160 Task 9).
 //!
 //! Owns the `prefs_read` + `set_screen_capture_protection` IPC
@@ -14,11 +14,11 @@
 //!
 //! ## Design history
 //!
-//! - PRD: `agent-tooling/features/vault-prefs-blob/prd.md`
-//! - Grilling: `agent-tooling/sessions/grill/2026-05-27-mynd-160-encrypted-prefs-blob.md`
+//! - PRD: `private-companion/features/vault-prefs-blob/prd.md`
+//! - Grilling: `private-companion/sessions/grill/2026-05-27-mynd-160-encrypted-prefs-blob.md`
 //!   Q1 (subkey source), Q3 (storage layer + fall-back-to-defaults),
 //!   Q4 (file format + AAD), Q5 (runtime control flow), Q6 (loose ends)
-//! - Tasks: `agent-tooling/features/vault-prefs-blob/tasks.md`
+//! - Tasks: `private-companion/features/vault-prefs-blob/tasks.md`
 //! - decisions.md: 2026-05-27 entries — "Vault preferences blob
 //!   (vault.prefs): root_key-derived prefs_key, MYP1 magic, JSON
 //!   inner, account_number_hash AAD" + "Lock-on-default-ON" +

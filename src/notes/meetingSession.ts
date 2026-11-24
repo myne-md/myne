@@ -18,7 +18,7 @@
 // making it safe needs a flush-then-reload handshake through the live pane.
 // Creating the note once at the end has no second writer at all, so the failure
 // cannot happen rather than being guarded against. The deviation is recorded in
-// `agent-tooling/features/meeting-notes/progress.md`.
+// `private-companion/features/meeting-notes/progress.md`.
 //
 // # Transcription
 //

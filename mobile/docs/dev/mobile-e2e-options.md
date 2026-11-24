@@ -6,7 +6,7 @@
 
 ## 1. What the desktop e2e stack is (the thing we want to reuse)
 
-(Full detail: main repo `agent-tooling/docs/dev/e2e.md` + `e2e/AGENTS.md`.)
+(Full detail: main repo `dev-notes/e2e.md` + `e2e/AGENTS.md`.)
 
 - **Runner**: Vitest (`vitest run --config .config/vitest/e2e.config.ts`), serial
   (`fileParallelism:false`), 180 s/test, 2 retries.
@@ -99,7 +99,7 @@ it's the fastest path to a happy-path smoke gate.
 4. **CI runners** — Android: emulator on the existing Linux Woodpecker runner
    (KVM). iOS: a mac runner (Woodpecker mac agent or a GitHub-Actions mac job)
    — gate it like the desktop's secret-gated `sync-sim` step.
-5. **Decision to record** in the main repo `agent-tooling/design-notes.md` (mobile e2e
+5. **Decision to record** in the main repo `decisions.md` (mobile e2e
    driver choice + the Linux-only-desktop precedent it parallels).
 
 ## 7. Out of scope / native-only

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `attachment://<id>` async custom-URI-scheme handler — mobile Tauri glue.
 //!
 //! Serves decrypted attachment bytes to the WebView so `<img src>` / `<embed>` /

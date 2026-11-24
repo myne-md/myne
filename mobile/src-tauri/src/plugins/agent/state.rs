@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The mobile agent's backend registry (myne-md/myne#456).
 //!
 //! **A phone's registry has no local model in it**, and that is the decision

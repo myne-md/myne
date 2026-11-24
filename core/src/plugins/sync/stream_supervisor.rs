@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Shared machinery for the sync tree's two long-lived SSE supervisors: the
 //! contentless `/sync/poke` listener (`poke_listener.rs`) and the live-awareness
 //! `/sync/awareness` listener (`awareness_listener.rs`). Both follow the SAME

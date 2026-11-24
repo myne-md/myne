@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! B2B device-to-person bindings: the `MYU5` vault singleton codec
-//! (`agent-tooling/docs/spec/protocol.md` §9.30; the `member-devices` feature).
+//! (`docs/spec/protocol.md` §9.30; the `member-devices` feature).
 //!
 //! One blob per shared vault holding a versioned, optionally tombstoned map of
 //! `device_id -> { person_fingerprint, version, tombstone }`. The blob is sealed
@@ -29,7 +29,7 @@
 //! device id and the person the row CLAIMS, verified on read against that person's
 //! public half from the roster.
 //!
-//! **What that is worth.** `agent-tooling/design-notes/protocol/0660` records that a revision's
+//! **What that is worth.** `decisions/protocol/0660` records that a revision's
 //! actor is NOT a signature: anyone who can edit the document can set it. The
 //! signature here protects the BINDING RECORD, not the authorship of a note, and the
 //! surfaces that render a name from a binding must not imply otherwise. What it buys

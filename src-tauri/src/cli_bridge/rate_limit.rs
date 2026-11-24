@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Command-socket rate limit (cli-thin-client task 10; MYND-490).
 //!
 //! **This is a slowdown, not a protection, and that distinction is binding
-//! on every string in this file.** `agent-tooling/docs/threat-model.md` §7's entry for
+//! on every string in this file.** `docs/threat-model.md` §7's entry for
 //! this door is explicit that no identity gatekeeper exists: a program
 //! running as the same OS user can invoke the legitimate CLI, so nothing
 //! here decides *who* is allowed through. What the limiter does is bound

@@ -42,7 +42,7 @@
 #   CARGO_TARGET_AARCH64_APPLE_IOS_LINKER=mobile/scripts/ios-link.sh cargo build ...
 #
 # Upstream has no released fix (swift-rs 1.0.8 is the latest). Remove this
-# wrapper when one lands. See `operations/runbooks/ios-app-store-release.md` §4b.
+# wrapper when one lands. See `runbook/runbooks/ios-app-store-release.md` §4b.
 set -u
 
 REAL_LD="${MYNE_IOS_REAL_LD:-/usr/bin/clang}"

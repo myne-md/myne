@@ -2,7 +2,7 @@
 //
 // When the undo offer ends, and when it does not (myne-md/myne#533).
 //
-// `agent-tooling/design-notes/ai/0515` states the lifetime exactly: "The offer therefore
+// `decisions/ai/0515` states the lifetime exactly: "The offer therefore
 // ends at the next apply or at vault lock, whichever comes first." The store
 // disagreed with that in two places, and both were invisible because
 // `useUndoLastRun` re-reads the host whenever `applied` changes identity, which
@@ -93,7 +93,7 @@ describe("the undo offer's lifetime", () => {
 
 // A step in flight outlives the lock that was supposed to end the run, and its
 // reply carries a `Proposal` whose edits hold anchors and replacements copied
-// verbatim out of note bodies. `agent-tooling/design-notes/ai/0515` and `threat-model.md`
+// verbatim out of note bodies. `decisions/ai/0515` and `threat-model.md`
 // §7 both say nothing an agent run holds survives a vault lock; without an
 // epoch the reply simply landed afterwards and put that plaintext back.
 describe("a step that lands after the vault was left", () => {
@@ -158,7 +158,7 @@ describe("a step that lands after the vault was left", () => {
 // `notesRead` and `charsOffDevice`, so run one's reply added its totals to run
 // two's freshly zeroed counters and `settleRunIntoChat` froze the merged
 // figures onto run two's turn. `charsOffDevice` is the disclosure figure
-// `agent-tooling/design-notes/ai/0515` names as the compensating control for the uncapped
+// `decisions/ai/0515` names as the compensating control for the uncapped
 // remote arm, so a merged total is a false statement about how much of the
 // user's text left the device.
 describe("a second run invalidates the first run's in-flight legs", () => {

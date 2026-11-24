@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `clipper-pairing` Tauri plugin (TB10, `ext-foundation-handoff` task 4).
 //!
 //! Owns the WebView side of the browser-extension **pairing handshake**: the

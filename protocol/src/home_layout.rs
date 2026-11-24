@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The home surface's card layout, as a `vault.prefs` member (myne-md/myne#1074).
 //!

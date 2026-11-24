@@ -4,7 +4,7 @@
 // **What this module is, and what it deliberately is not.** myne-md/myne#477
 // asks for two things at once that pull in opposite directions: the routing
 // decision should have one implementation, and each client's navigation shape
-// should stay its own. `agent-tooling/design-notes/clients/0488` is explicit that the
+// should stay its own. `decisions/clients/0488` is explicit that the
 // screens SHOULD differ, so a shared `Stage` union would be the wrong answer:
 // mobile has no `account-entry` and no `pending-approval`, and widening its
 // union to hold two variants it can never reach would make every exhaustive

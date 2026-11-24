@@ -3,7 +3,7 @@
 // `useAutosave` fake-timer state-machine tests.
 //
 // Per `editor-mvp-baseline` PRD Testing Decisions § Vitest V2.5 stance +
-// `agent-tooling/features/notes-sidebar-autosave/pr-review.md` deferred
+// `private-companion/features/notes-sidebar-autosave/pr-review.md` deferred
 // follow-up: these tests ride along the jsdom devDep adopted in MYND-36
 // T1. They assert γ1+γ2 hybrid state transitions:
 //

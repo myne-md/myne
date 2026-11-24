@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Clip-handoff rate limiter (TB10, user story 21).
 //!
 //! A runaway or compromised extension build (A14) could flood the vault

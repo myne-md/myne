@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0
-//! Single canonical HKDF helper — see `agent-tooling/docs/spec/protocol.md` § 3.2, § 3.4.
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Single canonical HKDF helper — see `docs/spec/protocol.md` § 3.2, § 3.4.
 //!
 //! Every subkey derivation in the v0.1 protocol MUST go through
 //! [`derive_subkey`]. Direct calls to `hkdf::Hkdf::expand` from outside
@@ -267,7 +267,7 @@ const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
 /// `"group-roster-blob"`.
 const ROLE_STR_GROUP_ROSTER_KEY: &[u8] = b"group-roster-key";
 /// KEK for the B2B member-names singleton (`vault.member-names`, `MYO5`;
-/// `agent-tooling/docs/spec/protocol.md` §9.29, `decisions/protocol/0666`). Group-tier: a member
+/// `docs/spec/protocol.md` §9.29, `decisions/protocol/0666`). Group-tier: a member
 /// holds the shared `group_key` and can therefore derive it, which is the point of
 /// the family.
 const ROLE_STR_MEMBER_NAMES_KEY: &[u8] = b"member-names-key";
@@ -277,7 +277,7 @@ const ROLE_STR_MEMBER_NAMES_KEY: &[u8] = b"member-names-key";
 /// Derives an identifier, not key material.
 const ROLE_STR_MEMBER_NAMES_SYNC_ID: &[u8] = b"member-names-sync-id";
 /// KEK for the B2B device-to-person binding singleton (`vault.device-bindings`,
-/// `MYU5`; `agent-tooling/docs/spec/protocol.md` §9.30, the `member-devices` feature). Group-tier:
+/// `MYU5`; `docs/spec/protocol.md` §9.30, the `member-devices` feature). Group-tier:
 /// a member holds the shared `group_key` and can therefore derive it, which is the
 /// point of the family.
 const ROLE_STR_DEVICE_BINDING_KEY: &[u8] = b"device-binding-key";

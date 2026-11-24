@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The sync **proxy gate** — where the transport is allowed to send bytes
 //! (desktop Tor routing, MYND-650 task 2).
 //!

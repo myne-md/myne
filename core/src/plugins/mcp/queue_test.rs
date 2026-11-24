@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The external MCP write queue (external-mcp-connection task 13).
 //
 // What is asserted here is the bookkeeping a person's decision rests on: a retry

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Background OCR backlog worker (MYND-441).
 //!
 //! ## Why this exists

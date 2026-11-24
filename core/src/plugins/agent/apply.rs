@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Applying an approved change set.
 //!
 //! The order here is the whole module, and it is not negotiable:

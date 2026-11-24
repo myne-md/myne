@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The dispatcher: one inbound line in, at most one outbound message out.
 //!
 //! It is a pure function of `(frame, session revision)` and one IO edge, the

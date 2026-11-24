@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `share-import` plugin (mobile) — the share-import staging queue for files
 //! shared into Myne via the OS share sheet (iOS Share Extension / Android
 //! `ACTION_SEND`).
@@ -12,7 +12,7 @@
 //! unavailable (Android Keystore provider is the SF1 open item), so the seal
 //! commands no-op cleanly.
 //!
-//! See: main repo `agent-tooling/design-notes.md` (share-import; MYND-507).
+//! See: main repo `decisions.md` (share-import; MYND-507).
 
 // Re-exported so `crate::plugins::share_import::{commands, error}::…` paths resolve.
 #[allow(unused_imports)]

@@ -10,13 +10,13 @@
 // the voice scenarios need and the deterministic engine nine of the ten AI
 // scenarios assert against. `.woodpecker/main.yml`'s `tauri-compile` builds with
 // the same two features even though nothing on the push pipeline consumes the
-// stubs, and `agent-tooling/design-notes/ops/0529` states why: it is what keeps those
+// stubs, and `decisions/ops/0529` states why: it is what keeps those
 // compile arms alive on every push, so they cannot bit-rot between releases and
 // hand the manual lane a build failure at the one moment nobody has time for it.
 //
 // That protection is only real while the two lists AGREE, and until this guard
 // existed nothing checked it. Four prose blocks asserted it (`main.yml`'s build
-// comment, `e2e.yml`'s, the decision entry and `agent-tooling/docs/dev/e2e.md`), which is four
+// comment, `e2e.yml`'s, the decision entry and `dev-notes/e2e.md`), which is four
 // copies of a claim and zero enforcement. Add a feature on the E2E side only and
 // the per-push compile silently stops covering it; the discovery is a red build
 // inside the pre-release lane.
@@ -133,7 +133,7 @@ export function check(configs) {
           "`--features` flag. Both builds are supposed to carry " +
           "`voice-capture-stub,local-inference-stub`: on the E2E side because the " +
           "suite needs the stubs, on the push side so those compile arms cannot " +
-          "bit-rot between releases (agent-tooling/design-notes/ops/0529).",
+          "bit-rot between releases (decisions/ops/0529).",
       );
       continue;
     }

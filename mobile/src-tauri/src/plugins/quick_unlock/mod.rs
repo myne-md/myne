@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Quick-unlock (PIN + biometric) plugin — mobile host.
 //!
 //! Quick-unlock stores a third wrapped copy of `root_key` in the device-local
@@ -10,7 +10,7 @@
 //! with the desktop client): the PIN path, the OS-free `*_with_dir` cores, and
 //! the Apple-Keychain biometric provider + command branch (macOS Touch ID / iOS
 //! Face ID + Touch ID behind `kSecAccessControlBiometryCurrentSet`; the
-//! threat-model trade-off is analyzed in the main repo's `agent-tooling/design-notes.md`
+//! threat-model trade-off is analyzed in the main repo's `decisions.md`
 //! 2026-07-12 entry). On Android the biometric commands return
 //! `HardwareUnavailable` until an Android Keystore provider lands (Android
 //! packaging itself is not initialized yet).

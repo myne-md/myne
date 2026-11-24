@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Per-person private AI profile codec — `profiles/<profile-id>`, `MYY5`
 //! (spec § 9.28, `decisions/protocol/0594`).
 //!

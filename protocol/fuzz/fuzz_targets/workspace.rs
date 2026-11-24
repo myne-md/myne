@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Fuzz target: `decode_workspace_blob` (`MYW1` vault.workspace, spec §9.7).
 //!
 //! Untrusted blob + fixed dummy key/hash. Pre-decrypt 34-byte header parse is

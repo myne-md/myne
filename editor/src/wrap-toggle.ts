@@ -5,7 +5,7 @@
 // again on the wrapped text → `foo`, not `****foo****`).
 //
 // Decision pipeline (per the 2026-05-17 markdown edge-case research
-// catalog at `agent-tooling/researches/2026-05-17-markdown-toggle-edge-cases.md`):
+// catalog at `private-companion/researches/2026-05-17-markdown-toggle-edge-cases.md`):
 //
 //   1. **Smart-toggle for collapsed cursor at marker boundary.** Cursor
 //      right before a `close` marker that has a matching opener earlier

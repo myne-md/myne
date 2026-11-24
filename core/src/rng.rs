@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `OsRng`, the one production RNG adapter for the B2B identity paths
 //! (myne-md/myne#698).
 //!

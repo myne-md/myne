@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `themes` Tauri command handlers + pure cores (MYND-486).
 //!
 //! The vault-content custom-theme store: an encrypted `vault.themes` (`MYT1`)

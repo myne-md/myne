@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Why an external connection's tool call was refused.
 //!
 //! Every variant here is a *decision the host made*, and each one is answered as

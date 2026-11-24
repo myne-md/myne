@@ -159,7 +159,7 @@ function main() {
       fail(
         `${c.what} ${c.baked} in ${c.bakedFrom} against ${c.pinned} in ${c.pinnedFrom}.\n` +
           "  The image is what every sysdeps step runs on. Rebuild and republish it\n" +
-          "  (operations/runbooks/ci-base-image.md), then update ci/image.json and the\n" +
+          "  (runbook/runbooks/ci-base-image.md), then update ci/image.json and the\n" +
           "  digest in the workflow files.",
       );
     }

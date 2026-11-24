@@ -103,7 +103,7 @@ export function harnessSupported(): { ok: boolean; reason?: string } {
   if (process.platform !== "linux") {
     return {
       ok: false,
-      reason: `tauri-driver supports Linux/Windows only and this harness targets Linux (platform: ${process.platform}). Run via the container — see agent-tooling/docs/dev/e2e.md.`,
+      reason: `tauri-driver supports Linux/Windows only and this harness targets Linux (platform: ${process.platform}). Run via the container — see dev-notes/e2e.md.`,
     };
   }
   if (!existsSync(defaultAppPath())) {
@@ -281,7 +281,7 @@ async function waitForDriver(baseUrl: string, proc: ChildProcess): Promise<void>
   while (Date.now() < deadline) {
     if (proc.exitCode !== null) {
       throw new Error(
-        `tauri-driver exited early (code ${proc.exitCode}). Is WebKitWebDriver installed? See agent-tooling/docs/dev/e2e.md.`,
+        `tauri-driver exited early (code ${proc.exitCode}). Is WebKitWebDriver installed? See dev-notes/e2e.md.`,
       );
     }
     try {

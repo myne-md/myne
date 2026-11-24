@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The person credential, held in the Worker's memory for the session
 //! (myne-md/myne#911 task 13).
 //!

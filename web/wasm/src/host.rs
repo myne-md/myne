@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! [`HostCtx`] for the browser (phase3-web-client task 17).
 //!
 //! The web counterpart of `myne-core`'s `TauriHost`. Like [`crate::opfs`], it

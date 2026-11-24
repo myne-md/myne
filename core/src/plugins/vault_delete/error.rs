@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_delete` IPC error enum.
 //!
 //! Closed taxonomy mirroring the `NoteDeleteError` shape — DENY-list
@@ -57,7 +57,7 @@ pub enum VaultDeleteError {
     VaultBusyAuth,
 
     /// **Unreachable from current code paths** as of MYND-108-bis
-    /// (`agent-tooling/design-notes.md` 2026-05-26 entry "MYND-108-bis vault_delete
+    /// (`decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
     /// extended to accept Slot::Empty + vault.meta-exists"): the
     /// `Slot::Empty + vault.meta-exists` state that previously surfaced
     /// this variant is now the lost-credentials no-keys happy path

@@ -1,6 +1,6 @@
 // CLI terminal-access suite (cli-thin-client task 14; MYND-490;
-// `agent-tooling/design-notes.md` "CLI terminal access is a default-off, unlock-gated local
-// socket with a folder exclusion list (MYND-490)"; `agent-tooling/docs/threat-model.md` §7).
+// `decisions.md` "CLI terminal access is a default-off, unlock-gated local
+// socket with a folder exclusion list (MYND-490)"; `docs/threat-model.md` §7).
 //
 // This is the ONLY lane that drives both halves of the door at once: the
 // production desktop binary through tauri-driver, and the production `myne`

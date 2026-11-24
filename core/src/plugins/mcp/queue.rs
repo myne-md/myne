@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The queue of writes a connection attempted into a folder it may READ but not
 // WRITE (external-mcp-connection task 13; `decisions/ai/0752`).
 //

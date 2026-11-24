@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The live-awareness up-path coalescing state machine (epic live-collab;
 //! `SYNC-5`). Shared and UNGATED: the native awareness supervisor and the web
 //! Worker both bind to this one answer, so the ~100 ms floor cannot drift between

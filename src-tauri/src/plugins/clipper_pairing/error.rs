@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Closed error surface for the `clipper-pairing` IPC commands (TB10, task 4).
 //!
 //! DENY-list clean per `src-tauri/AGENTS.md` "Secret-handling logging

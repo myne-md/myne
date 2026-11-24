@@ -1,7 +1,7 @@
 // `<CMEditor>` - minimal React wrapper around CodeMirror 6's `EditorView`.
 //
-// Per `editor-mvp-baseline` PRD (agent-tooling/features/editor-mvp-baseline/prd.md)
-// + grill `agent-tooling/sessions/grill/2026-05-16-mynd-36-editor-inner-scope.md`:
+// Per `editor-mvp-baseline` PRD (private-companion/features/editor-mvp-baseline/prd.md)
+// + grill `private-companion/sessions/grill/2026-05-16-mynd-36-editor-inner-scope.md`:
 // custom ~30-LOC wrapper, NOT `@uiw/react-codemirror`. The trade is ~30 LOC
 // of code-we-own against ~6 transitive packages and the wrong-palette
 // `theme-one-dark` that doesn't fit Myne's design system.

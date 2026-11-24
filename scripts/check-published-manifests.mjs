@@ -5,7 +5,7 @@
 // # The failure this prevents
 //
 // It happened on v0.10.0, and the release evidence records it
-// (`agent-tooling/releases/v0.10.0.md`): the stable manifest was published, the
+// (`private-companion/releases/v0.10.0.md`): the stable manifest was published, the
 // beta one was not, and every beta install reported "you are on the latest
 // version" while a newer release sat on the other channel. The maintainer's own
 // install was a beta build, so this was not a hypothetical user. Nothing
@@ -28,8 +28,8 @@
 // It reads the live origin, so it can only answer about a release that has
 // already been published, and running it on every commit would make a red
 // pipeline mean "the network was slow". It is a publish precondition, the same
-// shape as `check-bundle-record.mjs --has` and `operations/scripts/check-image-multiarch.sh`:
-// it is named in `operations/runbooks/desktop-self-update-publish.md` and in
+// shape as `check-bundle-record.mjs --has` and `runbook/scripts/check-image-multiarch.sh`:
+// it is named in `runbook/runbooks/desktop-self-update-publish.md` and in
 // phase 8 of the release checklist, and it runs from the machine that published.
 //
 // Like its network-bound sibling `scripts/check-referenced-digests.mjs`, an

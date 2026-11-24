@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! What a named external connection may read, resolved from its stored grant.
 //!
 //! ## The narrowing is a DENY list of folder paths

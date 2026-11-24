@@ -21,7 +21,7 @@
 // forbids. In the best case it is dead code and the user sees nothing; in the
 // worst it is the app's own function being silently broken, and the user sees a
 // feature that does not work with no error anywhere. Neither is something to
-// discover from a report endpoint later. `agent-tooling/docs/self-host-web.md` calls a loose
+// discover from a report endpoint later. `docs/self-host-web.md` calls a loose
 // policy fatal; this makes a violated one fail the lane.
 //
 // Vault-count precondition: **0**. A first-run session contacts fewer origins

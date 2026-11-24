@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Fuzz target: `decode_search_index_blob` (`MYS1` vault.search, spec §9.6).
 //!
 //! `data` is the untrusted blob; key + account-number-hash are fixed dummies

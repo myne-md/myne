@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Pure classification of the CLI door's state (cli-thin-client task 3;
-//! MYND-490; `agent-tooling/design-notes.md` "CLI terminal access is a default-off,
+//! MYND-490; `decisions.md` "CLI terminal access is a default-off,
 //! unlock-gated local socket with a folder exclusion list (MYND-490)";
-//! `agent-tooling/docs/threat-model.md` §7).
+//! `docs/threat-model.md` §7).
 //!
 //! The command socket exists ONLY while `cli_enabled` is true AND the vault
 //! is unlocked — created the instant both hold, torn down the instant
@@ -11,7 +11,7 @@
 //! drives are unit-tested without a runtime.
 
 /// The CLI door's classified state, from the two gate conditions
-/// (`agent-tooling/design-notes.md`'s "three real controls" minus the exclusion list,
+/// (`decisions.md`'s "three real controls" minus the exclusion list,
 /// which task 5 owns).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DoorState {
@@ -36,7 +36,7 @@ pub fn classify(cli_enabled: bool, unlocked: bool) -> DoorState {
 }
 
 /// Whether the command socket should exist for this door state. [`DoorState::Open`]
-/// is the only state that opens it — `agent-tooling/docs/threat-model.md` §7's accepted
+/// is the only state that opens it — `docs/threat-model.md` §7's accepted
 /// residual ("any program running as the same user can drive the CLI and
 /// read everything in scope") applies exactly while this is true.
 pub fn socket_should_be_open(door: DoorState) -> bool {

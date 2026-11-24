@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! A short, renewable lease that DEFERS the idle auto-lock while an import runs.
 //!
 //! # Why a running import needs one

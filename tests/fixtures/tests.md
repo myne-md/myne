@@ -356,7 +356,7 @@ jobs:
 | **Encryption** | ✅ | XChaCha20-Poly1305 + SHA-256 commitment |
 | *Multi-device* | 🚧 | Landing in v005 |
 | `Plaintext` | ❌ | Never — anti-feature in `vision.md` |
-| [Spec link](https://myne.md) | ✅ | `agent-tooling/docs/spec/protocol.md` |
+| [Spec link](https://myne.md) | ✅ | `docs/spec/protocol.md` |
 
 ### Wide Table
 

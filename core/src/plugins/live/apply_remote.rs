@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Remote-change application (epic live-collab, `collab-editor-bridge` task 5).
 //!
 //! A received opaque Automerge change (the payload sealed by

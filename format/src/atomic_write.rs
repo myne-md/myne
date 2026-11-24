@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Atomic file-write helper.
 //!
 //! Writes `bytes` to a temp file alongside `path`, `fsync`s it, then
@@ -66,7 +66,7 @@
 //! fault-injection seam ([`Fault`]): the production [`atomic_write`]
 //! wrapper passes [`Fault::None`], so in non-test builds the seam
 //! collapses to the straight-line path with byte-identical behavior and
-//! zero runtime cost. See `agent-tooling/design-notes.md` 2026-06-08 "Interrupted-
+//! zero runtime cost. See `decisions.md` 2026-06-08 "Interrupted-
 //! write recovery test gate + atomic_write failure-path `.tmp` cleanup".
 //!
 //! ## `replace` parameter
@@ -87,11 +87,11 @@
 //!
 //! ## Anchors
 //!
-//! - `agent-tooling/design-notes.md` 2026-05-07 "atomic_write durability hardening +
+//! - `decisions.md` 2026-05-07 "atomic_write durability hardening +
 //!   replace:bool parameter" carries the full design rationale (write-
 //!   frequency pressure, dual-helper rejection, Windows primitive
 //!   choice, Phase 2 deferral) and the cross-reference list.
-//! - `agent-tooling/sessions/grill/2026-05-07-mynd-26-note-tauri-commands.md`
+//! - `private-companion/sessions/grill/2026-05-07-mynd-26-note-tauri-commands.md`
 //!   Q5 and Q6 sub-decision 1 are the grilling that produced this
 //!   design.
 //! - MYND-132 is the implementing work item; it blocks MYND-26.

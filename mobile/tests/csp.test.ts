@@ -7,7 +7,7 @@ import { mobileCspDirectives } from "../../tests/lib/_desktopCsp";
 // (editor/src/attachments/pdf-render.ts), which is governed by CSP `connect-src`;
 // the pdf.js worker needs `worker-src`. If a future edit drops either, PDF preview
 // silently fails-closed to the generic icon — exactly the bug fixed in
-// agent-tooling/design-notes.md 2026-07-12 "Mobile attachment preview parity". The packaged
+// decisions.md 2026-07-12 "Mobile attachment preview parity". The packaged
 // WebView is the only place the CSP is actually enforced, so the flow tier
 // (mock IPC, Vite dev server, no `attachment://`) cannot catch a regression here;
 // this asserts the config string directly, which is the only automated net.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Adversarial corpus for the custom-theme value allowlist — myne-md/myne#557,
 //! the `settings.block.custom-themes` bullet.
 //!
@@ -12,7 +12,7 @@
 //! observation on this surface: the production WebView CSP carries
 //! `style-src 'self' 'unsafe-inline'`, so a value that reaches the DOM
 //! **executes**, and a successful injection is not something a reviewer sees.
-//! This scanner is the PRIMARY security control (`agent-tooling/docs/threat-model.md`
+//! This scanner is the PRIMARY security control (`docs/threat-model.md`
 //! "Custom-theme CSS-value surface"), not CSP.
 //!
 //! # What an adversarial corpus adds over the module's own tests

@@ -22,7 +22,7 @@
 //
 // # What the projection is
 //
-// `agent-tooling/docs/dev/settings-parity.md` is GENERATED (`--emit`) and holds one row per
+// `dev-notes/settings-parity.md` is GENERATED (`--emit`) and holds one row per
 // Rust command: the §10.2 merge class, what each client does with it, and, for
 // every row that is not `both`, a written reason from `scripts/prefs-parity.json`.
 //
@@ -95,9 +95,9 @@
 // mechanised: a guard whose writer seeds a string its own reader accepts is
 // green over a record that says nothing.
 //
-// # Why the projection lives under agent-tooling/docs/dev/
+// # Why the projection lives under dev-notes/
 //
-// It is a `agent-tooling/docs/**` file a docs-only commit can hand-edit, which is why its CI
+// It is a `docs/**` file a docs-only commit can hand-edit, which is why its CI
 // gate carries no `code-paths` filter, exactly as `twin-inventory` does. See
 // `.woodpecker/main.yml`.
 //
@@ -137,7 +137,7 @@ if (!docsPresent() && !process.argv.includes("--emit")) {
  * (a test points the override at a scratch file, and a scratch absolute path in
  * the message would be noise).
  */
-const PROJECTION_LABEL = "agent-tooling/docs/dev/settings-parity.md";
+const PROJECTION_LABEL = "dev-notes/settings-parity.md";
 
 /**
  * The record's path, overridable so a test can drive the seed path and the
@@ -729,7 +729,7 @@ function writeRecord(existing, oneSided, states) {
 
 const SEED_COMMENT = [
   "One reason per vault.prefs command that is NOT surfaced on both clients, i.e.",
-  "every row of agent-tooling/docs/dev/settings-parity.md whose verdict is not `both`. Each",
+  "every row of dev-notes/settings-parity.md whose verdict is not `both`. Each",
   "reason says whether the gap is deliberate or a defect, and which remedy it",
   "needs. A reason whose command has converged fails as stale, and so does a",
   "one-sided command with no entry here: the record is compared BOTH ways.",
@@ -802,6 +802,12 @@ function measuredStates(measured, commands) {
 }
 
 function main() {
+  // The projection lives under docs/dev, which is internal and absent from a
+  // public checkout. Skip rather than fail on a file no reader can see.
+  if (!process.env.MYNE_PREFS_PARITY_PROJECTION && !existsSync(PROJECTION)) {
+    console.log("prefs-parity: skipped (private docs/dev/settings-parity.md is not present)");
+    return;
+  }
   const wantsRecord = process.argv.includes("--record");
   const wantsEmit = process.argv.includes("--emit");
 

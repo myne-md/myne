@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-repair Tauri plugin (MYND-159).
 //!
 //! In-app cleanup of orphan vault artefacts left under
@@ -28,8 +28,8 @@
 //! precondition and `RootDisposal::KeepRoot`.
 //!
 //! Design history:
-//! - Design session: `agent-tooling/sessions/design/2026-06-06-vault-repair.md`
-//! - PRD: `agent-tooling/features/vault-repair/prd.md`
+//! - Design session: `private-companion/sessions/design/2026-06-06-vault-repair.md`
+//! - PRD: `private-companion/features/vault-repair/prd.md`
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
 

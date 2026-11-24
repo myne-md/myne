@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Filesystem path resolution for vault data.
 //!
 //! Spec / decisions: see
-//! `agent-tooling/sessions/design/2026-04-28-vault-creation-flow.md` Q5 and
+//! `private-companion/sessions/design/2026-04-28-vault-creation-flow.md` Q5 and
 //! the superseding `vaults/<id>/` layout (SYNC-2, grill
 //! vault-registry-and-disk-layout, 2026-06-08).
 //!

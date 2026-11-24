@@ -6,7 +6,7 @@
 // serves the built files with its own defaults: no CSP, no COOP, no COEP. A
 // lane running against that would prove the app works in an environment the app
 // is never deployed into — and would go green on exactly the misconfiguration
-// `agent-tooling/docs/self-host-web.md` names as fatal, because without cross-origin
+// `docs/self-host-web.md` names as fatal, because without cross-origin
 // isolation `SharedArrayBuffer` is undefined and the sync backoff's blocking
 // waiter (`core/src/task.rs`) cannot exist.
 //
@@ -66,7 +66,7 @@ export interface BundleServerOptions {
    * aborted Worker's memory, which held the vault keys, stays resident until
    * the tab is reloaded.
    *
-   * That refusal is the mitigation `agent-tooling/docs/self-host-web.md` calls fatal to get
+   * That refusal is the mitigation `docs/self-host-web.md` calls fatal to get
    * wrong, and nothing exercised it: every scenario in this lane is served the
    * correct headers by construction. Making the header set a PARAMETER is what
    * lets a scenario be the misconfigured operator.

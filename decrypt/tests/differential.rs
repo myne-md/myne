@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Differential test: the app's export path and the CLI's export path are the
 //! SAME walk (`myne_format::export_walk`), so the only divergence is the mode
 //! parameters. This test runs the walk twice over one fixture. Once with the

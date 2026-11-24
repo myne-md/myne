@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The compiled tool surface, held to the three rules that make it safe to
 //! hand to a model: the set is exactly the thirteen verbs, every schema is
 //! internally consistent, and nothing in it names a capability outside the

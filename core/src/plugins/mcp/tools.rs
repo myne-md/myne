@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The four read tools, each clamped to a connection's resolved scope.
 //!
 //! ## The clamp is inseparable from the operation

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Decryption-free `.myn` `content_nonce` primitives — the shared staleness
 //! signal both the desktop search-index persistence (`MYS1`) and the
 //! vault-indices persistence (`MYI1`, `plugins::vault_indices::persist`) diff

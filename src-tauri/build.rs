@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Without `InlinedPlugin`, permissions under `permissions/vault-creation/`
 // silently flatten into `__app-acl__` and the ACL resolver registers the
 // `commands.allow` entries as bare names that never match the

@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! XChaCha20-Poly1305 with CTX commitment + AAD construction —
-//! see `agent-tooling/docs/spec/protocol.md` § 5.
+//! see `docs/spec/protocol.md` § 5.
 //!
 //! This module hosts:
 //!
@@ -85,7 +85,7 @@ const CHACHA20_BLOCK_SIZE: u64 = 64;
 const POLY1305_TAG_LEN: usize = 16;
 
 /// AAD prefix bound into every Myne v0.1 AEAD tag
-/// (`agent-tooling/docs/spec/protocol.md` § 5.2). 10 ASCII bytes ending in pipe `|`.
+/// (`docs/spec/protocol.md` § 5.2). 10 ASCII bytes ending in pipe `|`.
 /// `pub(crate)` so the attachment blob + catalog AAD builders bind the SAME
 /// load-bearing prefix (a major-version constant) from one definition site
 /// rather than re-declaring it.
@@ -97,7 +97,7 @@ pub(crate) const AAD_PREFIX_V0_1: &[u8] = b"myne.v0.1|";
 pub(crate) const PROTOCOL_VERSION_V0_1: u8 = 0x01;
 
 /// AAD prefix bound into every Myne **next-major (v0.2)** AEAD tag
-/// (`agent-tooling/docs/spec/protocol.md` § 10.5). 10 ASCII bytes ending in pipe `|`,
+/// (`docs/spec/protocol.md` § 10.5). 10 ASCII bytes ending in pipe `|`,
 /// mirroring [`AAD_PREFIX_V0_1`]'s shape but **domain-separating** the next
 /// major from v0.1: an `NC05` tag built under this prefix MUST NOT verify under
 /// v0.1's prefix, and vice versa — the § 10.5 forward-incompatibility contract,
@@ -336,7 +336,7 @@ pub fn aad_group_roster_blob(account_number_hash: &[u8; 16], group_key_epoch: u6
 }
 
 /// Build the AAD bound into the AEAD seal of the B2B member-names singleton
-/// (`vault.member-names`, `MYO5`; `agent-tooling/docs/spec/protocol.md` §9.29,
+/// (`vault.member-names`, `MYO5`; `docs/spec/protocol.md` §9.29,
 /// `decisions/protocol/0666`).
 ///
 /// Layout: `"myne.v0.2|" || 0x02 || u16_len("member-names-blob") ||
@@ -1338,7 +1338,7 @@ pub fn aad_note_content_encrypt(items_key_id: &[u8; 16], note_uuid: &[u8; 16]) -
 
 /// Build the AAD bound into the AEAD wrap of a per-note `item_key` under the
 /// vault `itemsKey` for the **next-major `NC05` CRDT note-type**
-/// (`agent-tooling/docs/spec/protocol.md` § 5.2 next-major row; automerge-sync-migration).
+/// (`docs/spec/protocol.md` § 5.2 next-major row; automerge-sync-migration).
 ///
 /// Byte-identical **layout** to [`aad_note_item_key_wrap`] (prefix · version ·
 /// items_key_id · note_uuid) but stamped with the next-major prefix

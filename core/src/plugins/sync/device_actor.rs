@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! This device's 16-byte device id, read in exactly ONE place (myne-md/myne#958).
 //!
 //! ## Why this module exists

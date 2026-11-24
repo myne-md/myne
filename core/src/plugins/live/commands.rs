@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The live co-editing session commands (epic live-collab, `collab-editor-bridge`
 //! task 3).
 //!

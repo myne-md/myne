@@ -721,7 +721,7 @@
   "stable_max_failures": 0,
   "_comment_382_to_381": [
     "LOWERED 382 -> 381 for the retirement of the MYR1 AI-embeddings family",
-    "(`agent-tooling/design-notes/ai/0703-*`). ONE scenario is removed with the code it",
+    "(`decisions/ai/0703-*`). ONE scenario is removed with the code it",
     "tested: `e2e/ai-embeddings-persistence.e2e.ts` carried exactly one test",
     "(`aep1`), which drove the on-unlock hydrate -> persist -> re-embed",
     "lifecycle of `vault.embeddings`. The family, the codec, the vector store",
@@ -911,7 +911,7 @@
     "",
     "MEASURED in the container rather than on the host, and this entry carries the",
     "stronger evidence of the two: the feature's own record",
-    "(agent-tooling/features/member-devices/progress.md) reports three consecutive",
+    "(private-companion/features/member-devices/progress.md) reports three consecutive",
     "green runs at MYNE_E2E_RETRIES=0 in one warm container.",
     "",
     "`stable_max_failures` stays 0."
@@ -1050,7 +1050,7 @@
   "ai_max_failures": 0,
   "_comment_380_to_379": [
     "LOWERED 380 -> 379 for myne-md/myne#956 (the device-admission ceremony",
-    "surface is withdrawn; `agent-tooling/design-notes/protocol/0764`). ONE scenario is",
+    "surface is withdrawn; `decisions/protocol/0764`). ONE scenario is",
     "removed with the surface it drove: `e2e/device-admission.e2e.ts` carried",
     "exactly one test (dm1), the two-sided exchange with a mismatched safety code",
     "followed by a matching one. The buttons it clicked no longer exist, so the",

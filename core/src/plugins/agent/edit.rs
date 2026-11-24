@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The anchored edit format: exact match, exactly once, or refused.
 //!
 //! An edit is a pair of (exact existing text, replacement text) against one

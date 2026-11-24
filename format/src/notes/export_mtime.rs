@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Export mtime fidelity (MYND-115 task 3, SYNC-13).
 //!
 //! After a successful export write, the exported file's modified time is

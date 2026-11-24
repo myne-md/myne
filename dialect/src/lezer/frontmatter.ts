@@ -1,4 +1,4 @@
-// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.6 (line-1-anchored detection).
+// Spec: docs/spec/markdown-dialect.md §3.6 (line-1-anchored detection).
 
 export const FRONTMATTER_DELIMITER = "---";
 export const NEWLINE = "\n";

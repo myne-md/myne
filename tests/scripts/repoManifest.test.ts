@@ -57,15 +57,18 @@ describe("manifestRepos", () => {
     expect(manifestRepos("# nothing but a comment\n\n")).toEqual([]);
   });
 
-  it("reads the real manifest and finds every private entry the tree declares", () => {
-    // The tree's own file, so the grammar and its use cannot drift apart: this is
-    // the assertion that fails if the marker is ever respelled. It is an exact
-    // list on purpose — adding a private companion is a change to what setup.sh
-    // will refuse to clone, so it should require a deliberate edit here too.
+  it("reads the published manifest and lists only public companions", () => {
     const listed = manifestRepos(readFileSync("workspace/manifest.txt", "utf8"));
-    const privates = listed.filter((e) => e.private).map((e) => e.name);
-    expect(privates).toEqual(["operations", "agent-tooling", "myne-pi-plugin"]);
-    expect(listed.length).toBeGreaterThan(5);
+    expect(listed.filter((e) => e.private)).toEqual([]);
+    expect(listed.map((e) => e.name)).toEqual([
+      "myne-test-vectors",
+      "myne-server",
+      "myne-website",
+      "myne-clipper",
+      "myne-themes",
+      "myne-branding",
+      "myne-pi-plugin",
+    ]);
     for (const entry of listed) expect(entry.name).not.toContain(" ");
   });
 });

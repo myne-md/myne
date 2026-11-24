@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Settings surface's two reads (external-mcp-connection, myne-md/myne#923).
 //!
 //! Everything the external-access section shows comes through here, and the

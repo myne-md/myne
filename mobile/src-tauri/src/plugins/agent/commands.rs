@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The mobile agent plugin's IPC surface (myne-md/myne#456).
 //!
 //! Nine `#[tauri::command]` wrappers and nothing else. The host-generic half:

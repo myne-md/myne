@@ -26,7 +26,7 @@ version = "0.1.0"
 description = "Myne mobile — in-repo local-notification scheduler for task reminders (MYND-619)"
 authors = ["Myne"]
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 # Mandatory for tauri-plugin build scripts (build fails without it) and must
 # equal the crate name exactly.
 links = "tauri-plugin-reminders"

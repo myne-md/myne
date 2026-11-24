@@ -1,6 +1,6 @@
 // Shared task-chip visual token (MYND-614). The ONE source of a task field's
 // chip look, so the editor's inline chips and the later task-panel rows cannot
-// drift. Values are design tokens (`agent-tooling/docs/design/colors_and_type.css`), never raw
+// drift. Values are design tokens (`design/colors_and_type.css`), never raw
 // hex - the `tagPillToken` twin.
 //
 // Visual direction, per the canon:

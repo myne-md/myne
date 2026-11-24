@@ -36,7 +36,7 @@ import { join } from "node:path";
 
 const REPO_ROOT = process.cwd();
 
-// The sheet the app actually loads. `agent-tooling/docs/design/colors_and_type.css` is a
+// The sheet the app actually loads. `design/colors_and_type.css` is a
 // SUBSET of it (src/AGENTS.md): it carries no `:root[data-theme="amoled"]`
 // block at all, so reading the canon copy here would silently drop a third of
 // the matrix — the third with a pure-black background, which is the one most
@@ -318,7 +318,7 @@ describe("every colour-group swatch is visible on every surface it lands on", ()
 // separate them. In the dark palette `fern` and `teal` sit 0.67 L* apart for the
 // same reason.
 //
-// That is a design-canon question — the palette lives in `agent-tooling/docs/design/` and
+// That is a design-canon question — the palette lives in `design/` and
 // `src/styles/tokens.css`, and changing it is a decision with a `decisions.md`
 // entry behind it, not a test edit. So this file does the one thing a test
 // honestly can: it RECORDS the measurement, both directions, so the numbers

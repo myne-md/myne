@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The B2B vault rekey (myne-md/myne#698 task 7): rotating the vault
 //! `itemsKey` when a member is removed.
 //!

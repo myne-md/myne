@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Round-trip test: build a real v0.2 vault fixture (vault.meta + notes +
 //! attachments), run the CLI's unlock + export walk, and assert the plaintext
 //! matches the source notes byte-exactly.

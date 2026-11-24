@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Auto-lock-on-idle protective envelope (MYND-121).
 //!
 //! **The protective ENVELOPE is not here any more** (myne-md/myne#479): the
@@ -17,8 +17,8 @@
 //! always-on flag and the `[MIN, CEILING]` bounds are *code constants*. A
 //! disk-level attacker (A4) who replays, deletes, or tampers `vault.prefs`
 //! can therefore only make auto-lock **stricter** — never disable it or push
-//! it past the ceiling. See `agent-tooling/docs/threat-model.md` §7 (two-class prefs
-//! taxonomy) and `agent-tooling/design-notes.md` 2026-05-30 "Auto-lock on idle".
+//! it past the ceiling. See `docs/threat-model.md` §7 (two-class prefs
+//! taxonomy) and `decisions.md` 2026-05-30 "Auto-lock on idle".
 //!
 //! The single entry point, [`effective_auto_lock_secs`], returns a plain
 //! `u32` (never an `Option`): there is **no disabled state**. Every possible

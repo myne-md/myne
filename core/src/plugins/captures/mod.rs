@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Pending-capture queue plugin core (Apple Watch voice quick-capture; § 9.18).
 //!
 //! A watch-dictated note arrives from the paired Apple Watch (via WatchConnectivity)

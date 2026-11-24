@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 #![forbid(unsafe_code)]
 //! The `myne-mcp` process entry point: wire stdio to [`myne_mcp::serve`].
 //!

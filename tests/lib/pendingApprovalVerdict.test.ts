@@ -5,7 +5,7 @@
 //
 // The question used to be asked at boot, from disk: identity present + token
 // absent = pending. On the web client that is not an answer, because
-// `agent-tooling/design-notes/clients/0363` makes the token session-scoped, so an approved
+// `decisions/clients/0363` makes the token session-scoped, so an approved
 // device reads exactly the same way one reload later. Routing on it produced a
 // deadlock: the wait screen asks for no password, and the only exit from pending
 // is a token claim that needs `root_key`.
@@ -94,7 +94,7 @@ describe("awaitingApprovalVerdict", () => {
   it("says no once a head has been adopted: the reload case", async () => {
     // The common path, and the one the old boot probe got wrong on every single
     // reload. A baseline means this device synced, so it was approved, and its
-    // vault holds what it pulled. `agent-tooling/design-notes/clients/0363`: the password is
+    // vault holds what it pulled. `decisions/clients/0363`: the password is
     // needed again and it is "not accompanied by a re-approval prompt".
     wire("AAAA-BBBB", "pending");
     const { awaitingApprovalVerdict } = await loadVerdict(WEB);

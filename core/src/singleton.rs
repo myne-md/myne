@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Opening a singleton vault file with crash recovery (phase3-web-client task 18).
 //!
 //! # One rule, one place

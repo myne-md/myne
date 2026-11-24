@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `prefs` plugin — shared core.
 //!
 //! Owns the `vault.prefs` read + the per-field setters. All commands are

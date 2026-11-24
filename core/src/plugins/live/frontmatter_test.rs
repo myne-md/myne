@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tests for the durable frontmatter `updated:` rule (`collab-editor-bridge`
 //! task 7).
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Shared export-naming vocabulary for the export suite (MYND-115 / MYND-211).
 //!
 //! The vocabulary lives in `myne-format` so the `myne-decrypt` CLI can reuse

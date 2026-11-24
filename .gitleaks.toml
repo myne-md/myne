@@ -1,0 +1,31 @@
+title = "Myne public release"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fixture-only generic-api-key matches: docs examples, e2e inputs and preview fixture. Scoped by path; a real key elsewhere still fails."
+paths = [
+  '''^preview/src/preview\.html$''',
+  '''^docs/spec/protocol\.md$''',
+  '''^docs/glossary\.md$''',
+  '''^protocol/src/prefs_tests\.rs$''',
+  '''^e2e/change-password\.e2e\.ts$''',
+  '''^e2e/vault-creation\.e2e\.ts$''',
+  '''^e2e/clipboard-copy\.e2e\.ts$''',
+  '''^e2e/vault-recovery\.e2e\.ts$''',
+  '''^e2e/plaintext-residue\.e2e\.ts$''',
+]
+
+[[allowlists]]
+description = "Rust test fixtures in prefs.rs: the JSON literal is the round-trip input, not a credential."
+regexTarget = "line"
+regexes = [
+  '''^\s*br#"\{"ai_excluded_folders":\["Private/"\],"ai_provider":"[^"]+","ai_provider_consent":"[^"]+","ai_provider_key":"[^"]+".*$''',
+]
+
+[[allowlists]]
+description = "vector_store.rs test variable named secret; the matched text is an identifier, not a key."
+regexTarget = "line"
+regexes = [
+  '''^\s*store\.set_folder\(secret, "Private/Journal/"\.into\(\)\);$''',
+]

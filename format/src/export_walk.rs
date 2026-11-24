@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The whole-vault plaintext markdown-tree export walk, host-free.
 //!
 //! Extracted from `myne-core`'s `plugins::export` so the `myne-decrypt` CLI can

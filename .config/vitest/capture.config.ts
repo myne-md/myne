@@ -7,7 +7,7 @@
 // (which globs `e2e/**/*.e2e.ts`) never picks it up.
 //
 // Run via `scripts/capture-userguide.sh` (Linux container — tauri-driver
-// has no macOS support, agent-tooling/docs/dev/e2e.md). Self-skips off-platform.
+// has no macOS support, dev-notes/e2e.md). Self-skips off-platform.
 
 import { defineConfig } from "vitest/config";
 

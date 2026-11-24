@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Mobile read-back of one attachment's cached `MYE1` extracted text, with a
 //! lazy re-extraction on a cache miss (myne-md/myne#926).
 //!

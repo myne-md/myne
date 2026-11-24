@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Apple-Keychain biometric wrap-key provider for quick-unlock (MYND-329,
 //! task 7; generalized macOS → macOS + iOS when it moved here from the desktop
 //! crate so the mobile client shares it — decisions.md 2026-07-12).
@@ -148,7 +148,7 @@ impl AppleBiometricProvider {
     /// any stale item before storing anyway. The teardown therefore destroys the
     /// item AFTER the directory removal, inside the same post-delete step as the
     /// sealed-label key. See
-    /// `agent-tooling/design-notes/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
+    /// `decisions/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
     fn retrieve_with_ops(
         &self,
         ops: &dyn KeychainOps,
@@ -167,7 +167,7 @@ impl AppleBiometricProvider {
                 // function cannot tell the two apart. What is left behind is one
                 // 32-byte secret per legacy enrolment, whose only consumer is the
                 // vault whose `MYQ1` blob it unwraps; it is a declared residue of
-                // the class rule in `agent-tooling/design-notes/security/0709` rather than a
+                // the class rule in `decisions/security/0709` rather than a
                 // leak. Retiring it safely needs the device's vault roster, which
                 // a provider with no IO does not have.
                 let _ = ops.store(&self.account, wrap_key.as_slice());
@@ -241,7 +241,7 @@ impl KeychainOps for RealKeychain {
         // taken from it later: this `Vec` holds the wrap key that unwraps
         // `vault.quickunlock`'s third `root_key` copy, and every caller arm —
         // including `wrap_key_from_item`'s wrong-length reject — must leave a
-        // wiped allocation behind. **Honest limit** (`agent-tooling/docs/threat-model.md` §7
+        // wiped allocation behind. **Honest limit** (`docs/threat-model.md` §7
         // defers forensic-grade scrubbing): `security_framework` builds this
         // `Vec` from a `CFData` it then releases without wiping, so a
         // CoreFoundation-side residue survives; reaching it would mean dropping

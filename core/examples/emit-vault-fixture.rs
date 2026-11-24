@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Emit a complete, unlockable vault as OPFS-ready container bytes
 //! (phase3-web-client tasks 87 + 105).
 //!

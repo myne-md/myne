@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `themes` Tauri plugin — desktop wiring of the shared `myne-core`
 //! vault-content custom-theme core (MYND-486).
 //!

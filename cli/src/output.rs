@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! CLI output: the stable `--json` envelope (PRD story 11 — "a scripter
 //! wants a structured envelope with a stable shape") and the
 //! human-readable rendering.
@@ -300,7 +300,7 @@ pub(crate) fn error_parts(err: &BackendError) -> (&'static str, String) {
         // switch that removes it. It must never call the limit a
         // protection, or its removal the disabling of one — the door has
         // no gatekeeper for a limit to stand in for
-        // (`agent-tooling/docs/threat-model.md` §7). `no_copy_calls_the_rate_limit_a_
+        // (`docs/threat-model.md` §7). `no_copy_calls_the_rate_limit_a_
         // protection` below is the machine-checked half of this rule.
         BackendError::RateLimited => (
             "rate_limited",
@@ -422,7 +422,7 @@ mod tests {
     /// Task 10's copy criterion, machine-checked: "No copy anywhere
     /// describes the limit as a protection or its removal as disabling
     /// one." The rate limit bounds a pace; the door it sits on has no
-    /// identity gatekeeper (`agent-tooling/docs/threat-model.md` §7), so language that
+    /// identity gatekeeper (`docs/threat-model.md` §7), so language that
     /// implies one is a claim in the wrong direction — the failure this
     /// test exists to catch is a well-meaning copy edit, not a bug.
     #[test]

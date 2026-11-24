@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The calendar's range read (myne-md/myne#1037).
 //!
 //! One query answers "what happens between these two instants", and every surface

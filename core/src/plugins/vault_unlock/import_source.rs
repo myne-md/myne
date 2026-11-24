@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Opening a SOURCE vault for reading, while a different vault stays unlocked.
 //!
 //! This is the key-lifetime half of vault import (myne-md/myne#464). The
@@ -867,7 +867,7 @@ mod import_source_read_tests {
     ///
     /// `set_import_source` refuses when nothing is unlocked, because the
     /// source's residency is bounded by the target vault's own session
-    /// (`agent-tooling/docs/threat-model.md` A6). These read tests care about what comes back
+    /// (`docs/threat-model.md` A6). These read tests care about what comes back
     /// through the slot, not about how it was created, so the target is set up
     /// here once rather than in each of them.
     ///

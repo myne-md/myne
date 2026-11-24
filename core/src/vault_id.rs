@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `VaultId` — host-side UUIDv7 wrapper naming a vault's on-disk directory.
 //!
 //! SYNC-2 (ratified, grill vault-registry-and-disk-layout Q1, 2026-06-08):

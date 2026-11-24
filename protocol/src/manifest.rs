@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-head manifest — the canonical `uuid → content_nonce` map the vault
-//! head commits as `manifest_hash` (`agent-tooling/docs/spec/sync-protocol.md` §4.2, MYND-414).
+//! head commits as `manifest_hash` (`docs/spec/sync-protocol.md` §4.2, MYND-414).
 //!
 //! The head keeps only `manifest_hash = SHA-256(manifest_canonical)` (§3.2), so
 //! the head stays O(1) in vault size. This module defines the **canonical byte

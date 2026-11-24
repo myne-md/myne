@@ -1,6 +1,6 @@
 // Fenced code-block card for the Phase 1 editor (MYND-154 task 4).
 //
-// Grill Q2/Q3 (agent-tooling/sessions/grill/2026-05-28-code-block-syntax-highlighting.md):
+// Grill Q2/Q3 (private-companion/sessions/grill/2026-05-28-code-block-syntax-highlighting.md):
 // the code block renders as an always-on CARD. The body is left as live
 // document text styled with `Decoration.line` (NOT a whole-block widget like
 // table.ts) so the task-3 nested parser colors it while typing.

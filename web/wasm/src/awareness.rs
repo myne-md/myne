@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The web Worker's live-awareness state (epic live-collab, sub-feature 4).
 //!
 //! The browser counterpart of `myne-core`'s `awareness_listener`, minus the

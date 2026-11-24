@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `workspace` plugin core — persistence of the editor's pane tree (the
 //! `vault.workspace` blob, `MYW1`, `protocol.md` § 9.7): `workspace_read`,
 //! `workspace_write` and the RAM-only `workspace_stage`.

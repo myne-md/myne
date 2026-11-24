@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // No WebView-facing commands — the empty list is deliberate (Rust-only
 // bridges; permission autogen is skipped for an empty command set). The
 // `setEventHandler` + `getOrCreateDeviceKey` Kotlin @Commands are reached ONLY

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Search casefolding does not move with the machine's locale — myne-md/myne#555,
 //! the `search.command-palette` bullet.
 //!

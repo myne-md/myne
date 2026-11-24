@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Voice-record Tauri commands (MYND-259): `voice_record_start` /
 //! `voice_record_stop` / `voice_record_cancel`.
 //!

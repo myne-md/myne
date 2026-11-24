@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `attachments` plugin — mobile host (MYND-169, the attachments epic).
 //!
 //! Owns the `MYA1` blob + `MYC1` catalog CRUD and the in-RAM reference graph

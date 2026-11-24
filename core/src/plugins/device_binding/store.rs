@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The device-binding store: the read-modify-write against `vault.device-bindings`,
 //! with no host and no session in sight.

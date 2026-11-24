@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one crash record the desktop leaves behind (myne-md/myne#860).
 //!
 //! # Why this exists while the log toggle is off
@@ -20,7 +20,7 @@
 //! reaches is one the user is invited to send on. The location is a
 //! **compiled-in source path** (`core/src/...`), which cannot contain the user's
 //! directory layout, and it is what a maintainer can act on. Same reasoning, and
-//! the same shape, as `agent-tooling/design-notes/ops/0366`'s panic hook for the web build.
+//! the same shape, as `decisions/ops/0366`'s panic hook for the web build.
 //!
 //! # Bounded, visible, and cleared when its purpose is served
 //!
@@ -118,7 +118,7 @@ fn workspace_relative(file: &str, line: u32) -> String {
     if !root.is_empty() {
         // The separator is part of the prefix, so a path under a SIBLING
         // directory whose name begins with the root's name cannot strip to a
-        // location that does not exist: `/Users/x/agent-tooling/…` against root
+        // location that does not exist: `/Users/x/private-companion/…` against root
         // `/Users/x/myne` used to come back as `-agents/…`, and this record's
         // whole purpose is to name a greppable location (myne#860 review).
         for separator in ['/', '\\'] {

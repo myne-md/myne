@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The agent loop's seam to the memory plugin (myne-md/myne#697).
 //!

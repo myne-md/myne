@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `validate` — the CI entry point for the Myne theme-value allowlist.
 //!
 //! The `myne-themes` marketplace CI runs THIS binary against every submitted

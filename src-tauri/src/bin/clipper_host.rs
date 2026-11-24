@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The browser clipper's native-messaging host, as its own executable.
 //!
 //! A browser launches the `path` in a native-messaging host manifest **with no

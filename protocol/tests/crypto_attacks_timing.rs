@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Offensive red-team — dudect-style statistical constant-time test of the
 //! note-decrypt failure path.
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The live-session registry (epic live-collab, `collab-editor-bridge` task 2).
 //!
 //! One [`LiveSession`] per `(vault_id, note_id)` **per device** (`SYNC-34`).

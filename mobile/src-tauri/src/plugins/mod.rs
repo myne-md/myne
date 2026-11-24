@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri 2 in-app plugins for vault flows (mobile).
 //!
 //! Mirror of the desktop `src-tauri/src/plugins/` set, trimmed to the

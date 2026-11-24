@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Android device-key store: the Keystore, over the Kotlin
 //! `tauri-plugin-device-key` bridge (`decisions/protocol/0760`,
 //! `identity-seat-portability` task 9).
@@ -10,7 +10,7 @@
 //! that this Rust half compiles and that `core`'s provider seam works (its own unit
 //! tests, on a fake provider). The Keystore behaviour (non-biometric, device-only,
 //! no prompt, surviving an app restart) needs a real device; the row to run is in
-//! `agent-tooling/docs/dev/device-matrix.md`.
+//! `dev-notes/device-matrix.md`.
 
 use myne_core::plugins::sync::device_identity::{
     from_item_bytes, install_host_provider, log_key_op, to_item_bytes, DeviceKeyProvider,

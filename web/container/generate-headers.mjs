@@ -44,7 +44,7 @@ to — scheme, host and optional port, nothing else:
 
 It is runtime configuration rather than a build-time constant on purpose: the
 bundle you run must be byte-identical to the published one so its hash can be
-verified (agent-tooling/docs/self-host-web.md). Baking your server's address into it would
+verified (docs/self-host-web.md). Baking your server's address into it would
 make every self-hoster's bundle unique and that verification impossible.
 `);
   process.exit(1);

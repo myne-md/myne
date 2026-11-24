@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! HTTP/1.1 request framing and response parsing — pure over `BufRead`/`Write`.
 //!
 //! Moved **whole and verbatim** out of the sync plugin's HTTP codec module

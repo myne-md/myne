@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `attachment://<id>` async custom-URI-scheme handler (MYND-169,
 //! SYNC-4) — the desktop Tauri glue.
 //!

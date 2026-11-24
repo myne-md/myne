@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The host-free decode half of the `NC05` CRDT note-type bridge.
 //!
 //! Split out of `myne-core`'s `plugins::notes::crdt` so the `format/` crate can

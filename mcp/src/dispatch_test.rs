@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The envelope one tool call travels in: which name it carries, and what it may
 //! not carry.
 //!

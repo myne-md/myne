@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Drawing-note text projection for the search index (drawing-notes SF5, MYND-502).
 //!
 //! A `kind: drawing` note body is a ```excalidraw fenced Excalidraw scene (JSON),

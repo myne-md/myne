@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! How many notes one external connection may read in one window
 //! (mcp external access rework, myne-md/myne#1052).
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The hide-vault-names command pair, and the keychain-availability probe
 //! beside it (myne-md/myne#411).
 //!
@@ -104,7 +104,7 @@ pub struct HideVaultNamesView {
 /// **`available: false` is not a licence to write the name in the clear.**
 /// Nothing anywhere reacts to it by falling back to plaintext; that combination
 /// would look identical on screen while voiding the erase guarantee and making
-/// the `agent-tooling/docs/threat-model.md` § 7 paragraph false (`decisions.md` 2026-08-15).
+/// the `docs/threat-model.md` § 7 paragraph false (`decisions.md` 2026-08-15).
 /// The only thing this state changes is what the UI says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct KeychainStatusView {

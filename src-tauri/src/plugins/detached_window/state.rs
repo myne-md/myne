@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Registry of open detached (pop-out) note windows (myne-md/myne#678, epic #173).
 //!
 //! One `manage()`-d state mapping a detached window's label (`note-<id>`, SYNC-1)

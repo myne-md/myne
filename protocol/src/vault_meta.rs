@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0
-//! `vault.meta` 345-byte serialization — see `agent-tooling/docs/spec/protocol.md` § 9.3.
+// SPDX-License-Identifier: AGPL-3.0-only
+//! `vault.meta` 345-byte serialization — see `docs/spec/protocol.md` § 9.3.
 //!
 //! `vault.meta` is the per-vault state file written once at vault
 //! creation and updated when the master password changes. Its layout

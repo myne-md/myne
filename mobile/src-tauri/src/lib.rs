@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Myne mobile — Tauri 2 host. Phase-1 vault + notes + prefs backend that
 // consumes the shared `myne-core` crate (the single source of truth for the
 // vault / notes / prefs plugin cores, extracted from the desktop crate) and the
@@ -107,7 +107,7 @@ pub fn run() {
     // without this nothing is printed (the shared cores + `screen_guard` emit
     // `tracing` but no subscriber was wired; desktop `lib.rs` parity). On iOS
     // stdout lands in the `tauri ios dev` terminal; on Android it surfaces via
-    // `adb logcat -s RustStdoutStderr` (`agent-tooling/docs/dev/device-matrix.md` §6.1).
+    // `adb logcat -s RustStdoutStderr` (`dev-notes/device-matrix.md` §6.1).
     // Honors the secret-handling logging discipline — bounded variant names /
     // stage tags only, never key material.
     let _ = tracing_subscriber::fmt()

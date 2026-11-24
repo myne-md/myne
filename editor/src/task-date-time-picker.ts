@@ -20,7 +20,7 @@
 // No new dependency: the grid is hand-rolled, per `AGENTS.md`'s minimal
 // direct-dependency commitment and the module header that first chose the
 // platform input for exactly that reason (a decision this change reverses, with
-// a `agent-tooling/design-notes/` entry naming what changed since that measurement).
+// a `decisions/` entry naming what changed since that measurement).
 //
 // Keyboard reachable from day one, because chips never open on caret entry and
 // this is the only editor for these values in live mode: day cells use a roving

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The compiled tool surface's one question: does this server offer a verb?
 //!
 //! The list itself lives in [`crate::tool_list`], as data and nothing else, so

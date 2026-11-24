@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `note_image_export` — write a WebView-rasterized selection card (PNG/JPEG)
 //! to a user-chosen path (MYND-361 note→image "share selection as image").
 //!

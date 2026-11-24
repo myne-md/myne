@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! In-repo local-notification scheduler for task reminders (MYND-619, task 1).
 //!
 //! **This crate is a transport, not a policy.** The decision about *which*

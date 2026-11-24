@@ -8,7 +8,7 @@
 // `pnpm test:e2e` by file extension (`*.capture.ts`, not `*.e2e.ts`).
 //
 // Why through the harness and not natively: tauri-driver has no macOS
-// support (agent-tooling/docs/dev/e2e.md), and there is no mock layer (src/AGENTS.md),
+// support (dev-notes/e2e.md), and there is no mock layer (src/AGENTS.md),
 // so a plain browser can't boot the app. The Linux/webkit2gtk + xvfb seat
 // is the only automated path — and it sidesteps the macOS/Windows
 // screen-capture protection that blocks the OS screenshot API, because

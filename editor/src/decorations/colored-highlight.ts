@@ -13,7 +13,7 @@
 // `<mark class="hl-*">` (this owns them); every other inline HTML — `<kbd>`,
 // `<sub>`, `<sup>`, `<abbr>`, a bare `<mark>` — stays on its path.
 //
-// Design: agent-tooling/sessions/design/2026-07-31-highlight-edit-behaviour.md.
+// Design: private-companion/sessions/design/2026-07-31-highlight-edit-behaviour.md.
 
 import { type Extension, type Range, RangeSetBuilder } from "@codemirror/state";
 import {

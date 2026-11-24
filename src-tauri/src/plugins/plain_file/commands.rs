@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! IPC surface of the `plain_file` plugin (myne-md/myne#788).
 //!
 //! The device-local gate, the handle IO, the in-app open/save dialogs and the

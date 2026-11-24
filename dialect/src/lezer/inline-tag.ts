@@ -1,5 +1,5 @@
-// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.7. Grammar is a deny-list character
-// class matching Obsidian's runtime regex (agent-tooling/researches/
+// Spec: docs/spec/markdown-dialect.md §3.7. Grammar is a deny-list character
+// class matching Obsidian's runtime regex (private-companion/researches/
 // 2026-05-09-obsidian-inline-tag-behavior.md), not the simpler positive
 // allow-list in Obsidian's user-facing docs.
 //

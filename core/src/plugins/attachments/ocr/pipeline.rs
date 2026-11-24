@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The OCR pipeline: decoded pixels in, confident text out (MYND-441).
 //!
 //! Three model passes, mirroring the reference implementation validated in the

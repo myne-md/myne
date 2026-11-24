@@ -35,7 +35,7 @@
     cannot launch at all (`Launchd job spawn failed`, NSPOSIXErrorDomain 163, while a
     `codesign` verification still passes), profile embedded and entitlement absent and every
     ACL write returns -34018 with the UI silently falling back. Procedure and the
-    profile's own generation steps: `operations/runbooks/local-multiplatform-build.md`.
+    profile's own generation steps: `runbook/runbooks/local-multiplatform-build.md`.
 
     Never write a double hyphen inside this comment: an XML comment may not contain one,
     `plutil -lint` accepts it anyway, and AMFI's parser does not, so `codesign` reports

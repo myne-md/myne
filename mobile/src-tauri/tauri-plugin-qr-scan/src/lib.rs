@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! iOS AVFoundation QR scanner plugin (device-join via QR, MYND-466).
 //!
 //! Exposes ONE WebView-facing command, `scan`, which the mobile JoinFlow invokes

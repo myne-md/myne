@@ -25,7 +25,7 @@ import WebKit
 /// The plaintext window that remains is the OS-written delivery file itself:
 /// WatchConnectivity places the chunk in the app's inbox in plaintext, protected
 /// only by OS Data Protection, and it exists from delivery until the seal
-/// consumes it. That window is enumerated in `agent-tooling/docs/threat-model.md`; it is NOT
+/// consumes it. That window is enumerated in `docs/threat-model.md`; it is NOT
 /// zero, and this comment exists because an earlier revision of the docs claimed
 /// it was.
 ///

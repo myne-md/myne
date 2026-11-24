@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The device-local switch for the diagnostic log (myne-md/myne#860).
 //!
 //! One JSON file under `<app_config_dir>`, sibling of `tor-routing.json` and
