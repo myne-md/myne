@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The named-pipe machinery every Windows local ingress shares.
 //!
 //! Two of them exist and both are trust boundaries: the CLI terminal door

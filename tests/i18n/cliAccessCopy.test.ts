@@ -13,7 +13,7 @@
 // the Settings affordance's strings live — the switch that removes the limit,
 // the helper that explains what terminal access opens, and the folder-exclusion
 // copy beside them. A single "keeps your notes secure" there is exactly the
-// claim `agent-tooling/docs/threat-model.md` §7 refuses: the door has no identity gatekeeper,
+// claim `docs/threat-model.md` §7 refuses: the door has no identity gatekeeper,
 // so a program running as the same OS user can invoke the legitimate CLI and
 // nothing decides who is allowed through.
 //

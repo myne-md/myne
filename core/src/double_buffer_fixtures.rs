@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Named crash states of a double-buffered singleton, as BYTES
 //! (phase3-web-client task 105).
 //!

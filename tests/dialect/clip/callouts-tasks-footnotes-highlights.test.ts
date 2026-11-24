@@ -1,7 +1,7 @@
 // Clip serializer — task 6 (capture-extraction): the remaining §5 emit set —
 // callouts, task lists, footnotes, highlights.
 //
-// Canonical forms (agent-tooling/docs/spec/markdown-dialect.md §5 + §3):
+// Canonical forms (docs/spec/markdown-dialect.md §5 + §3):
 //   - Callout: a `Blockquote` whose first line standardizes to `[!type]` emits
 //     as `> [!note] ` (and other recognized types), round-tripping as a callout
 //     blockquote. A plain blockquote stays a plain `> ` quote.

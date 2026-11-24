@@ -42,5 +42,5 @@ body:
       options:
         - label: I searched existing issues and this isn't a duplicate.
           required: true
-        - label: This doesn't conflict with Myne's anti-features (agent-tooling/docs/vision.md) or exceed the threat model (agent-tooling/docs/threat-model.md).
+        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
           required: true

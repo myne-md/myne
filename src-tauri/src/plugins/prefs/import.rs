@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `read_view_manifest` — read ONE `.myneview` file from a user-chosen path and
 //! validate it with the strict reader (view-manifests, myne-md/myne#922 task 9).
 //!

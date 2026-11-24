@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Test-only formatting helpers shared by the `#[ignore]`-gated
 //! `emit_*_vectors_for_paste` / `emit_*_parse_fail_vectors` vector generators
 //! across the crate's modules.

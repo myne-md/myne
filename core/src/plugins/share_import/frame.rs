@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Inner plaintext framing for a share-import staging blob (§ 9.20.3).
 //!
 //! The `MYF1` codec ([`protocol::share_import_blob`]) seals an **opaque**

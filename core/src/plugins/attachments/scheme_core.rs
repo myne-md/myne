@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Platform-agnostic core of the `attachment://<id>` URI-scheme handler
 //! (MYND-169, SYNC-4).
 //!

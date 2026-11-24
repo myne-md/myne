@@ -16,7 +16,7 @@
 // so the `prefs:allow-set-*` grant this used to cite is never consulted, and
 // `detached-note.json` does grant `agent:default` to `note-*` windows. What the
 // app guarantees is that its own UI never offers a change there; the host-side
-// window check is owed and recorded in `agent-tooling/docs/threat-model.md` §7.
+// window check is owed and recorded in `docs/threat-model.md` §7.
 //
 // `settingsOffered` takes both inputs as parameters so both arms are exercisable
 // without a detached window or a build that lacks the capability, and the last

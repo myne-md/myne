@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `myne-decrypt`: export a Myne vault to plain markdown without the app
 //! installed (myne-md/myne#166).
 //!

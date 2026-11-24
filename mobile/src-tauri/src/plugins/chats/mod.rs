@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `chats` Tauri plugin (mobile shim).
 //!
 //! Owns the six AI-conversation storage commands (the `vault.chats` `MYM1`

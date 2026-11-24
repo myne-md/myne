@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
-//! `vault.label` sealed-label-store codec (`MYL1`; `agent-tooling/docs/spec/protocol.md`
+//! `vault.label` sealed-label-store codec (`MYL1`; `docs/spec/protocol.md`
 //! § 9.22).
 //!
 //! A vault's human-readable **name** lives inside `vault.prefs` (§ 9.5), which

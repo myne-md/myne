@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Agent run state: the identity, the approved scope, the running total and the
 //! cancel flag.
 //!
@@ -12,7 +12,7 @@
 //! the scope nor the number of expansions is bounded. What bounds accumulation
 //! is that every expansion is separately approved and the running total is shown
 //! continuously, which is a *behavioural* bound rather than a structural one.
-//! That is stated in `agent-tooling/docs/threat-model.md` §7 in those words. A future reader
+//! That is stated in `docs/threat-model.md` §7 in those words. A future reader
 //! reaching for a cap here should read that section first: adding one is a
 //! design reversal, not a hardening tweak.
 //!

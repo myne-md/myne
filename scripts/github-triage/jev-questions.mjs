@@ -14,7 +14,7 @@
 // were never really judgment are computed here or in classify-jev.mjs rather than asked for:
 // milestone, roadmap label, issue type and status labels are derivations, not opinions.
 //
-// A note on where the rules live. `agent-tooling/reference/github-issues.md` is the normative
+// A note on where the rules live. `private-companion/reference/github-issues.md` is the normative
 // tracker rulebook and this file is its executable form. The prose and this file must agree; when
 // they disagree the prose is wrong and gets corrected in the same change, because a criteria file
 // that has quietly diverged from the rulebook is a bot nobody can audit.

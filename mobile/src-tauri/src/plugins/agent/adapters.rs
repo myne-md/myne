@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The mobile side of the agent seams (myne-md/myne#456).
 //!
 //! **Deliberately short.** Everything a Tauri client needs to run an agent and

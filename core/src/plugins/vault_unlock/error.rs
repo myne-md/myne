@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri-layer error type for the vault-unlock plugin.
 //!
 //! Mirrors `vault_creation::error::AppError` in spirit (no `String`
@@ -16,7 +16,7 @@
 //!   errors AND post-derivation `items_key` wrap failures — both
 //!   leak nothing about credential validity.
 //! - Grilling session
-//!   `agent-tooling/sessions/grill/2026-05-02-vault-unlock-password.md`
+//!   `private-companion/sessions/grill/2026-05-02-vault-unlock-password.md`
 //!   Q3 + Q4 + Final Summary.
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
@@ -190,7 +190,7 @@ impl From<std::io::Error> for VaultUnlockError {
 ///
 /// **`IoError` is the only failure surface.** `parse_vault_meta`
 /// rejects surface as `Ok(VaultStatus::Corrupted)` (β=i in
-/// `agent-tooling/sessions/grill/2026-05-02-app-state-machine.md` Q9):
+/// `private-companion/sessions/grill/2026-05-02-app-state-machine.md` Q9):
 /// IO failure ≠ corruption, and the frontend's fail-closed UI
 /// branches the same way for both, but the distinction matters for
 /// log triage.

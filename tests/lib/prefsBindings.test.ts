@@ -374,7 +374,7 @@ describe("the roster: every export that writes vault.prefs bumps the nonce", () 
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
     // old value is worse here than a stale font size. What §6 of
-    // `agent-tooling/docs/threat-model.md` actually covers on this client is narrower than
+    // `docs/threat-model.md` actually covers on this client is narrower than
     // "screen-capture exclusion": Windows 10 build 19041+ is the one platform
     // where the layer earns its place, macOS makes the call and claims nothing
     // (Apple documents `NSWindowSharingNone` as a legacy constant macOS no

@@ -22,7 +22,7 @@
 //
 // # The claim under test, and why it is a commitment rather than a preference
 //
-// `agent-tooling/design-notes.md` 2026-07-26 ("Web capability set") keeps the 24 words out
+// `decisions.md` 2026-07-26 ("Web capability set") keeps the 24 words out
 // of served code: a phrase typed into a page is a phrase typed into whatever
 // the page's delivery channel has become (A15/TB11), and the web client's whole
 // enrolment story is built to avoid needing one. A phrase surface appearing on

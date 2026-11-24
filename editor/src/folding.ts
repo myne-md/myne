@@ -48,7 +48,7 @@ import i18n from "@myne/editor/i18n";
 // E2E observability (SYNC-8). `<screen>.<element>` naming. Renamed from
 // `editor.fold-gutter-marker` in the same change that removed the gutter: the
 // old name described a placement that no longer exists, and every consumer
-// (e2e/heading-list-folding.e2e.ts, agent-tooling/docs/dev/userguide-screenshots.md) moved
+// (e2e/heading-list-folding.e2e.ts, dev-notes/userguide-screenshots.md) moved
 // with it.
 const MARKER_TESTID = "editor.fold-marker";
 const PLACEHOLDER_TESTID = "editor.fold-placeholder";

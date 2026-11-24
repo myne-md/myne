@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Refusing an agent write that moves a note between folders.
 //!
 //! The third member of the write-refusal family, beside [`super::edit::place`]
@@ -15,7 +15,7 @@
 //! So an anchored edit whose anchor spans the `folder:` line could move a note
 //! into an excluded folder, and no control saw it: the clamp had
 //! already run, and the removal roster carries five fields of which this is not
-//! one. `agent-tooling/docs/threat-model.md` TB13 names `ai_excluded_folders` as the
+//! one. `docs/threat-model.md` TB13 names `ai_excluded_folders` as the
 //! content-scoped control on a boundary that carries decrypted note plaintext
 //! off the device, and a control a write can relocate its way around is not one.
 //!

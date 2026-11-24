@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `device-binding` plugin: mobile shim over the shared
 //! [`myne_core::plugins::device_binding`] store.
 //!

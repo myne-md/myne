@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The anchored edit and the move, one refusal per named cause.
 //!
 //! The near-miss case is the one worth reading twice. There is no fuzzy matcher to

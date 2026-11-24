@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! **Who may sign this vault right now**, answered once (myne-md/myne#983).
 //!
 //! # The question, and why it has one home

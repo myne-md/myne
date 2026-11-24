@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri commands for the vault-recover plugin.
 //!
 //! - [`recover_with_phrase`] — read `vault.meta`, normalize the

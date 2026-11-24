@@ -22,7 +22,7 @@
 //      app's #8a2a23 / #d99086 nor any recorded reason. `STATE_INK.locked` in
 //      `src/lib/icon-svg.ts` carried the same invented #b54034, its own comment
 //      saying it mirrors `./tokens.css` "where one exists". Both aligned in
-//      `agent-tooling/design-notes/ui/0706` and both pinned here.
+//      `decisions/ui/0706` and both pinned here.
 //
 //   B7 `myne-website/src/lib/themeBuilder/tokens.mjs` is the theme builder's
 //      authorable roster. It modelled 5 of the app's 13 `--highlight*` tokens,

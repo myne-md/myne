@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Lock survival and the refusal taxonomy, driven through a real session.
 //!
 //! Every test here runs ONE stdio session (one [`crate::serve_with`] over a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Share-import staging-queue plugin core (`MYF1`; `protocol.md` § 9.20).
 //!
 //! A file shared into Myne via the OS share sheet (iOS Share Extension /

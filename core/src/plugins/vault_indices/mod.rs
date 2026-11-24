@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_indices` plugin core (MYND-31 / A11 — VaultIndices).
 //!
 //! Owns the in-RAM wikilink graph + backlinks + tag index + typed-property

@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri 2 in-app plugins for vault flows.
 //!
 //! Each plugin is a self-contained module under `plugins/` with its
 //! own commands, state, and error type. The plugin-pattern over
 //! flat-app-level commands is documented in
-//! `agent-tooling/sessions/design/2026-04-28-vault-creation-flow.md`
+//! `private-companion/sessions/design/2026-04-28-vault-creation-flow.md`
 //! Q8.3 — domain isolation enforced at compile time, future
 //! `vault-unlock` / `change-password` plugins follow the same shape.
 
@@ -19,7 +19,7 @@
 //
 // The gate is also what the spec already required. An agent run drives a
 // generation model over note plaintext, so it IS the AI path, and
-// `agent-tooling/design-notes/ai/0337` and `threat-model.md` both state that the
+// `decisions/ai/0337` and `threat-model.md` both state that the
 // `--no-default-features` build "never compiles the AI path". A build carrying
 // eight agent IPC commands that can never reach a backend would contradict that
 // while looking like it honoured it.
@@ -36,7 +36,7 @@ pub mod clipper_pairing;
 pub mod detached_window;
 // myne-md/myne#860: the opt-in device-local diagnostic log and the bug-report
 // surface's host side. Desktop-only: the web build installs no `tracing`
-// subscriber at all (`agent-tooling/design-notes/ops/0366`), so both other clients carry
+// subscriber at all (`decisions/ops/0366`), so both other clients carry
 // `Unsupported` verdicts for the whole plugin.
 pub mod diagnostics;
 // B2B device-to-person bindings (`vault.device-bindings`, `MYU5`; protocol.md §9.30,

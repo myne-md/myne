@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one canonical folder key + the one equal-or-nested folder test.
 //!
 //! Both lived in the desktop AI plugin's `vector_store.rs`, which is where the

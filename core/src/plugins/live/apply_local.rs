@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Local-edit splice application (epic live-collab, `collab-editor-bridge` task 4).
 //!
 //! A CodeMirror transaction reports its changed ranges in **UTF-16 code units**

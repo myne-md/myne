@@ -980,7 +980,7 @@ describe("the chat-history budget control", () => {
 // myne-md/myne#613 (pr-review): the excluded-folders editor must be able to
 // REMOVE.
 //
-// `ai_excluded_folders` is the control `agent-tooling/docs/threat-model.md` A17 rests its
+// `ai_excluded_folders` is the control `docs/threat-model.md` A17 rests its
 // remote-provider mitigation on. The panel seeded its draft and its diff
 // baseline from `usePrefs`, whose first render is `DEFAULT_PREFS`, so both
 // captured the empty list and `mutationFrom([], folders)` was add-only. Before

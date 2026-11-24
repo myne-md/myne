@@ -8,7 +8,7 @@
 // through `securityHeaders()` from `web/csp.ts` rather than a copy, and this is
 // the check that the wiring survived — a lane running against headers looser
 // than production would go green on precisely the misconfiguration
-// `agent-tooling/docs/self-host-web.md` calls fatal.
+// `docs/self-host-web.md` calls fatal.
 //
 // Vault-count precondition: **0** — a clean browser profile with no OPFS
 // container, which is the state the first-run flow is specified against.

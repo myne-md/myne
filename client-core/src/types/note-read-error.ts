@@ -46,7 +46,7 @@ export type NoteReadError =
    * does NOT distinguish** parse-level failure (magic / version /
    * reserved / `enc_item_key_len` / 16 MiB cap), `items_key_id`
    * mismatch, outer-AEAD failure (`enc_item_key` wrap), or inner-AEAD
-   * failure (content), see `agent-tooling/docs/spec/protocol.md` § 6.4. The codec's
+   * failure (content), see `docs/spec/protocol.md` § 6.4. The codec's
    * internal sub-cause is emitted to Rust-side `tracing::debug!` from
    * inside `decode_note` and does NOT cross the IPC boundary.
    *

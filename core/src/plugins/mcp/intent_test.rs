@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The write verbs, over fakes that record the ORDER they were called in.
 //!
 //! ## Why the fakes record order

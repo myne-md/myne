@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `snapshots` plugin (MYND-96, SYNC-9) — the read/management surface for
 //! encrypted per-note version history: `snapshot_list`, `snapshot_preview`,
 //! `snapshot_restore`, `snapshot_prune`.

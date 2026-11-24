@@ -1,6 +1,6 @@
 // GFM pipe-table rendering + in-place editing for the Phase 1 editor.
 //
-// PRD `editor-table-editing` (agent-tooling/features/editor-table-editing/prd.md,
+// PRD `editor-table-editing` (private-companion/features/editor-table-editing/prd.md,
 // MYND-162), grill 2026-06-13. Builds on `editor-mvp-tables` (MYND-139).
 //
 // A complete GFM `Table` node renders as a real `<table>` block widget —

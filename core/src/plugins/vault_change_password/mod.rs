@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-change-password plugin — shared core.
 //!
 //! Owns the standalone `change_password` password-rotation command core +

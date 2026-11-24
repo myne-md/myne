@@ -1,4 +1,4 @@
-// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.7. `tag` is verbatim source bytes
+// Spec: docs/spec/markdown-dialect.md §3.7. `tag` is verbatim source bytes
 // minus the leading `#`; NFC + case-fold are the index layer's job (B10.4)
 // per the 2026-05-09 grill addendum.
 

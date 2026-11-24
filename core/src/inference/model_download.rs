@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Streaming HTTPS GET for on-demand AI model downloads (myne-md/myne#805,
 //! `decisions/ai/0628`).
 //!

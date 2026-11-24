@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Native-host manifest generation (TB10).
 //!
 //! A native-messaging host is discovered by the browser through a small

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The write-scope resolver, held to the properties task 13's acceptance criteria
 //! name. Every case is written with the `mcp_write_scope` prefix so
 //! `cargo test -p myne-core mcp_write_scope` is the one command the feature's own

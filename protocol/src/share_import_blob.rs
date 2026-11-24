@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! `pending-shares/<share-id>` share-import staging blob codec (`MYF1`;
-//! `agent-tooling/docs/spec/protocol.md` § 9.20).
+//! `docs/spec/protocol.md` § 9.20).
 //!
 //! A **shared file** arrives from the OS share sheet (iOS Share Extension /
 //! Android `ACTION_SEND`) at a process that may not hold `root_key` (the iOS

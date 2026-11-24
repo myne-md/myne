@@ -9,7 +9,7 @@
 // Render-only, and the mechanism is what keeps that true: zoom and pan are a CSS
 // `transform` on the LIVE SVG node already in the DOM. Nothing is re-parsed,
 // nothing is re-serialised, and no second `innerHTML` sink is added, so
-// `agent-tooling/docs/threat-model.md` §7's "mermaid sanitizes its own output and that is what
+// `docs/threat-model.md` §7's "mermaid sanitizes its own output and that is what
 // is injected" stays literally true. The note's bytes are never touched.
 //
 // Chrome: the pan/zoom cluster is GitHub's (a 3x3 grid bottom-right: up and

@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! B2B device-to-person bindings (`vault.device-bindings`, magic `MYU5`;
-//! `agent-tooling/docs/spec/protocol.md` §9.30, the `member-devices` feature).
+//! `docs/spec/protocol.md` §9.30, the `member-devices` feature).
 //!
 //! One blob per vault holding `{device-id -> {person_fingerprint, version, tombstone}}`:
 //! which person each enrolled device acts for. A device that has been in a vault since

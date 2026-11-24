@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The read budget's arithmetic, driven by a supplied millisecond reading so no
 //! test sleeps and nothing here reads a clock: `core/` gets its time from the host.
 

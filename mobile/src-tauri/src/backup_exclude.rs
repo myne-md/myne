@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Keep Myne's mobile export directory out of the platform's automatic cloud
 //! backup (myne-md/myne#491).
 //!
@@ -70,7 +70,7 @@
 //! What is **not** proven: that the same call, made from the app on a real iOS
 //! device, lands on the directory the WebView writes to and is honoured by iOS's
 //! backup rather than macOS's. Like `share_file.rs` and `pdf_export.rs`, that is
-//! owed to `agent-tooling/docs/dev/device-matrix.md` §8 row 8.9, which has not been run. A
+//! owed to `dev-notes/device-matrix.md` §8 row 8.9, which has not been run. A
 //! green build is not that proof, and neither is a green
 //! `scripts/check-mobile-export-backup.mjs`: the guard proves the four files
 //! agree with each other.
@@ -120,7 +120,7 @@ impl ExportDir {
     /// a variant the enum does not declare, is E0599 and does not compile, so a
     /// guard arm for it was two messages for a defect `cargo build` already
     /// refuses. This doc said "both directions" for a round while
-    /// `agent-tooling/design-notes/security/0595` said one; the entry was the correct half.
+    /// `decisions/security/0595` said one; the entry was the correct half.
     #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
     pub const ALL: &'static [ExportDir] = &[ExportDir::Documents];
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! What a named external connection may WRITE, resolved from its stored grant.
 //!
 //! ## An ALLOW list, one record over from a deny list

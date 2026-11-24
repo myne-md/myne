@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The agent-memory storage core (`vault.agent-memory` catalog singleton,
 //! `MYN1` plus per-entry `memories/<id-hex>` files, `MYX1`, and the

@@ -1,5 +1,5 @@
 // The motion-canon guard (epic myne-md/myne#772; normatively PRODUCT.md
-// principle 4 + agent-tooling/design-notes/ui/0632).
+// principle 4 + decisions/ui/0632).
 //
 // Verifying a guard means BREAKING it. Each case writes a fixture into a
 // throwaway tree, points the guard at it with `MYNE_GUARD_ROOT`, runs the real

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Desktop-only vault-lifecycle side-effects, abstracted behind one
 //! object-safe trait so the shared command cores call them uniformly while
 //! mobile supplies a no-op.

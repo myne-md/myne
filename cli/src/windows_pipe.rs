@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Windows transport for the desktop's CLI command door: a **named-pipe**
 //! client, reached at a name derived from the same app-data directory the Unix
 //! arm turns into `cli.sock`.
 //!
 //! Why a pipe and not a socket: Windows has no filesystem socket, and its
-//! equivalent local rendezvous is `\\.\pipe\<name>`. `agent-tooling/docs/threat-model.md`'s
+//! equivalent local rendezvous is `\\.\pipe\<name>`. `docs/threat-model.md`'s
 //! CLI-door entry already says so ("over a local Unix domain socket
 //! (macOS/Linux) or named pipe (Windows)"), so this arm closes a spec/code gap
 //! rather than inventing a transport.

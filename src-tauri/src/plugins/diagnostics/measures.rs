@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The readings the diagnostic block cannot take in the WebView
 //! (myne-md/myne#991).
 //!

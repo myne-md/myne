@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Authoritative attachment-reference scan for cleanup (MYND-171).
 //!
 //! Extracted from the desktop `notes::desktop_commands` into `myne-core` so the

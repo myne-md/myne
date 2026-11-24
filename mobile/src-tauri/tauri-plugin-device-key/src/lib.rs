@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Android Keystore bridge for the **device signing key** (`decisions/protocol/0733`
 //! decision 4, rung 2 on Android; `identity-seat-portability` task 9).
 //!

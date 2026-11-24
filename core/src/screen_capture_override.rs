@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The device-local **screen-capture protection override** (myne-md/myne#482).
 //!
 //! One boolean, persisted at `<app_config_dir>/screen-capture.json`. With it on,

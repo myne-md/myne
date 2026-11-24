@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local wrap key for the share-import staging queue (`MYF1`,
 //! `protocol.md` § 9.20.2).
 //!
@@ -58,7 +58,7 @@ mod imp {
     /// allocation intact on every read — including the corrupt-length arm, which
     /// never reaches a `Zeroizing` copy at all.
     ///
-    /// **Honest limit** (`agent-tooling/docs/threat-model.md` §7 defers forensic-grade
+    /// **Honest limit** (`docs/threat-model.md` §7 defers forensic-grade
     /// scrubbing): `security_framework` builds that `Vec` from a `CFData` it then
     /// releases without wiping, so a CoreFoundation-side residue survives this.
     /// Reaching it would mean dropping to `SecItemCopyMatching` directly.

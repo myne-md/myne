@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Shared recursive directory-sweep pipeline for vault destruction and
 //! repair.
 //!

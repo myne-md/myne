@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The live vault behind an external MCP connection's reads, and the door's one
 //! call entry point (external-mcp-connection, myne-md/myne#923).
 //!

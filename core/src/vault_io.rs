@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The vault filesystem seam (phase3-web-client task 17).
 //!
 //! The trait and its supporting types live in `myne-format` so the

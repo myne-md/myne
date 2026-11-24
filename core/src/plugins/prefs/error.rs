@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `prefs` plugin IPC error enums (MYND-160 Task 9).
 //!
 //! Two closed taxonomies — one for read, one for write — both
@@ -10,7 +10,7 @@
 //! ## Read vs write asymmetry
 //!
 //! `prefs_read` returns `Ok(PrefsView::default())` on absent /
-//! AEAD-fail / parse-fail per `agent-tooling/docs/spec/protocol.md` § 9.5.5 — those
+//! AEAD-fail / parse-fail per `docs/spec/protocol.md` § 9.5.5 — those
 //! conditions do NOT surface as `PrefsReadError` variants. Only
 //! Slot precondition violations (vault not unlocked) and unrecoverable
 //! IO failures (e.g., permission denied on the vault dir entirely)

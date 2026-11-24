@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri commands for the `vault-change-password` plugin.
 //!
 //! [`change_password`] is the standalone password-rotation flow: user
@@ -7,7 +7,7 @@
 //! instead) lives in `vault_recover::complete_recovery` — different
 //! signature, different command.
 //!
-//! Design history: PRD + MYND-22 grilling Q1–Q9 in `agent-tooling/`.
+//! Design history: PRD + MYND-22 grilling Q1–Q9 in `private-companion/`.
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
 

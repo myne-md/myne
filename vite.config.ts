@@ -163,8 +163,8 @@ export default defineConfig(async () => ({
       // 2026-10-17 with a counting predicate in this position, Vite asked about
       // **84,379 distinct paths**, of which **70,217 were under `target/`**
       // (83%): a build-output directory that has never been an input to the
-      // client. The rest of the top of that list was `agent-tooling/` (2,672) and
-      // the other nested companion checkouts, then `mobile/`, `tests/`, `agent-tooling/docs/`,
+      // client. The rest of the top of that list was `private-companion/` (2,672) and
+      // the other nested companion checkouts, then `mobile/`, `tests/`, `docs/`,
       // `web/`, `e2e/` and `.opencode/` — none of them reachable from this app.
       // (One more top-level directory belongs on that list and is deliberately
       // not named here: a guard fails a plain string match on the story

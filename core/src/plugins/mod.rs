@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Shared, host-coupled-but-platform-agnostic Tauri plugin cores.
 //!
 //! Each plugin is a self-contained module with its own commands, state, and
 //! error type. The plugin-pattern over flat-app-level commands is documented
-//! in `agent-tooling/sessions/design/2026-04-28-vault-creation-flow.md` Q8.3 —
+//! in `private-companion/sessions/design/2026-04-28-vault-creation-flow.md` Q8.3 —
 //! domain isolation enforced at compile time.
 //!
 //! These cores are shared between the desktop (`myne-desktop`) and future

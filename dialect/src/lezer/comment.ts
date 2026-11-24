@@ -1,7 +1,7 @@
 // Comment extension (`%%…%%`) for the Myne markdown dialect (MYND-315,
 // editor-comments).
 //
-// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.2 (inline `%%…%%`) + §3.1 (block /
+// Spec: docs/spec/markdown-dialect.md §3.2 (inline `%%…%%`) + §3.1 (block /
 // multi-line `%%`…`%%`) + §3.7.5 (exclusion zones) + §6 (lossy-projection
 // strip) + §8 (this parser config). GFM ships no comment construct and
 // `@lezer/markdown` exports none, so this is a hand-rolled `MarkdownConfig`

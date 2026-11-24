@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The **device key**: the per-device signing pair that takes daily authority
 //! away from the person key (`decisions/protocol/0731`, sharpened by `0733`).
 //!

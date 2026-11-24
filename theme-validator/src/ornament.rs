@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Ornament + measure token **vocabulary** — which keys a theme may meaningfully
 //! supply, and which enumerated values each ornament primitive accepts
 //! (deep-customization, myne#394 task 2).

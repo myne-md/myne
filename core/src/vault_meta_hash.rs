@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! SHA-256 over `vault.meta` bytes — the CAS anchor for `Slot::Unlocked`'s
 //! `vault_meta_bytes_hash` field and the in-pipeline disk integrity check.
 //!

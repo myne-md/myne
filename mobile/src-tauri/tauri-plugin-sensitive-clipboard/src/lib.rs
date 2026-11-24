@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Clipboard transport for the mobile client, with OS-enforced sensitivity for
 //! secrets (myne-md/myne#390 + myne-md/myne#455).
 //!

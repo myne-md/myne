@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `NoteId` — host-side UUIDv7 wrapper for note identifiers.
 //!
 //! Backend always generates `NoteId` via [`NoteId::new_v7`] inside

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! **One verdict over the five facts that decide whether this device can sync**
 //! (myne-md/myne#1003).
 //!

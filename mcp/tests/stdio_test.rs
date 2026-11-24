@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The binary, as a client sees it: a real process, real pipes, no Myne running.
 //!
 //! This is the acceptance test for the slice. Every assertion here holds with

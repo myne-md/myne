@@ -3,7 +3,7 @@
 //
 // Fails the build on any transitive npm license outside the allowlist below,
 // which MIRRORS deny.toml's `[licenses].allow` set (the Rust gate;
-// agent-tooling/docs/dependency-policy.md) plus a few npm-ecosystem-permissive additions and
+// docs/dependency-policy.md) plus a few npm-ecosystem-permissive additions and
 // per-package exceptions, each documented inline. Closes the standing gap that
 // cargo-deny machine-checks CARGO licenses only — the npm half of the tree was
 // entirely ungated. Runs in CI (.woodpecker/main.yml `npm-licenses`) after install.
@@ -53,8 +53,8 @@ import { join } from "node:path";
 //                which ARE on the Rust allowlist). Dep: tslib.
 //   Python-2.0 — PSF license; permissive + GPL-compatible. Dep: argparse.
 //   BlueOak-1.0.0 — see its own note below.
-// AGPL-3.0 SPDX id variants are included for completeness (our own packages are
-// AGPL-3.0; they aren't listed by `pnpm licenses list`, but this is harmless).
+// AGPL-3.0-only SPDX id variants are included for completeness (our own packages are
+// AGPL-3.0-only; they aren't listed by `pnpm licenses list`, but this is harmless).
 //
 // The mirror itself is machine-checked by scripts/check-npm-license-mirror.mjs
 // (pre-commit): a license added to deny.toml but not here fails the commit by
@@ -64,7 +64,6 @@ import { join } from "node:path";
 // (myne-md/myne#527, which closed the gap and added both the entry and the
 // check).
 const ALLOW = new Set([
-  "AGPL-3.0",
   "AGPL-3.0-only",
   "AGPL-3.0-or-later",
   "Apache-2.0",

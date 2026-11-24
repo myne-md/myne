@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `cli-bridge` Tauri plugin: the WebView's read-only window onto the CLI
 //! door's *session* state (cli-thin-client task 12; MYND-490).
 //!

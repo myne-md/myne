@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `sync` plugin — mobile shim over the shared [`myne_core::plugins::sync`] core.
 //!
 //! The Phase-2 client sync engine (MYND-424–427) — commands, engine,
@@ -38,7 +38,7 @@
 //! debt — no "-PLUS" / "verified cert-trust" claim may be made until R3 lands.
 //!
 //! What the endpoint UX may and may not say is decided by
-//! `agent-tooling/design-notes/sync/0620`: the client verifies against bundled Mozilla
+//! `decisions/sync/0620`: the client verifies against bundled Mozilla
 //! public roots, so the honest phrasing is "the certificate chain and server
 //! name were checked" and NOT "verified" (the R3 clause above), and there is no
 //! pin to describe at all. The copy lives in `locales/en/common.json` under

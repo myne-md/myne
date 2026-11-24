@@ -34,7 +34,7 @@
 //     fallbacks, so it degrades sanely if a face fails to load.
 //
 // Class vocabulary styled here = the emitter's complete emitted set, pinned in
-// `agent-tooling/features/note-export-pdf/progress.md` (task 2 handoff) and
+// `private-companion/features/note-export-pdf/progress.md` (task 2 handoff) and
 // drift-guarded by `tests/dialect/html/print-stylesheet.test.ts`.
 
 // NOTE: the emitted string carries no product/tracker strings at all — the

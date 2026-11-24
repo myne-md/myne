@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The browser's Argon2id memory ceiling (phase3-web-client task 31).
 //!
 //! # Why this is its own module rather than a `const` in [`crate::host`]

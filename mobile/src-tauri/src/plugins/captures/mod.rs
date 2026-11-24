@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `captures` plugin (mobile) — the pending-capture queue for the Apple Watch
 //! voice-quick-capture companion.
 //!
@@ -19,7 +19,7 @@
 //! chunk into the vault library as an attachment on unlock; and
 //! `ack_meeting_session` removes a drained group once its note exists.
 //!
-//! See: main repo `agent-tooling/design-notes.md` 2026-07-12 (Apple Watch companion V1).
+//! See: main repo `decisions.md` 2026-07-12 (Apple Watch companion V1).
 
 // Re-exported so `crate::plugins::captures::{commands, error}::…` paths resolve.
 #[allow(unused_imports)]

@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `backup` plugin — whole-vault backup export (MYND-32; restore joins in
-//! MYND-218). Spec: `agent-tooling/docs/spec/protocol.md` §9.11; epic MYND-217.
+//! MYND-218). Spec: `docs/spec/protocol.md` §9.11; epic MYND-217.
 //!
 //! `vault_export_backup` writes a verified `.myne-backup` container at a
 //! user-chosen destination. The Rust core does ALL the IO (narrow-seam

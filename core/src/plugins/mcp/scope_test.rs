@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The scope resolver, held to the properties the approval screen and the read
 //! tools depend on under the DENY-list model: the whole vault is readable except
 //! the folders the user took away, an exclusion takes its subtree with it, the

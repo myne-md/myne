@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Mono mix of two capture sources (meeting notes, myne-md/myne#789).
 //!
 //! A meeting has two voices: the microphone hears the user, the system-audio

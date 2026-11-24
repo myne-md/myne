@@ -168,7 +168,7 @@ describe("the way back sits with the question it answers", () => {
 
   it("carries NO brand field: privacy is the default, not the topic", () => {
     // The `01` field went behind these screens for one commit
-    // and was withdrawn the same day by `agent-tooling/design-notes/ui/0639`. A
+    // and was withdrawn the same day by `decisions/ui/0639`. A
     // vault-unlock screen is the one moment the user is being asked for a
     // credential, and a field of ones and zeroes behind a password box is
     // "encryption as theme" arriving as texture instead of as a padlock —

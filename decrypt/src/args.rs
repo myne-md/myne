@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Argument parsing for `myne-decrypt`.
 //!
 //! Deliberately hand-rolled rather than `clap`: the surface is four flags and

@@ -80,7 +80,7 @@
 //      on a migrated vault. It stops, silently, because a magic mismatch
 //      returns `None` and `None` reads as "not this family, nothing to do".
 //
-//      This shipped (myne-md/myne#638); `agent-tooling/design-notes/protocol/0567` carries
+//      This shipped (myne-md/myne#638); `decisions/protocol/0567` carries
 //      the incident and the measurements. The short version: one hand-written
 //      comparison in `core/src/attachment_nonce.rs` named `MYA1` and not
 //      `MYA5`, so no attachment body moved in either direction on any migrated

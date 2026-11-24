@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The member-names store: the read-modify-write against `vault.member-names`, with
 //! no host and no session in sight.

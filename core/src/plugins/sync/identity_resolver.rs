@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The client-side identity resolver (`collab-provenance` task 2; durable attribution,
 //! `member-devices` task 4).
 //!

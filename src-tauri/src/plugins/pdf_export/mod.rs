@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `pdf-export` plugin — hidden-window native print-to-PDF capture for
 //! the per-note PDF export (MYND-255 task 4, epic export-suite).
 //!

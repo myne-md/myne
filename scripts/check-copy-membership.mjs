@@ -6,7 +6,7 @@
 //
 // `copy/src/index.ts`'s header claimed the literals were "byte-identical across
 // clients by construction — cross-client paraphrase is impossible", and
-// `agent-tooling/docs/dev/twin-inventory.md` recorded the desktop/mobile pair as "RESOLVED …
+// `dev-notes/twin-inventory.md` recorded the desktop/mobile pair as "RESOLVED …
 // both sides now re-export the shared family". Both sentences were true of the
 // sync/enroll family and FALSE of eighteen per-note-export, clip-notice and
 // settings literals, which `src/lib/load-bearing-copy.ts` and
@@ -19,7 +19,7 @@
 // `recovery-flow.md` §3.4/§7.3 pin and the E2E suite asserts by full-literal
 // equality. It was LATENT: the two copies happened to be byte-identical that day,
 // so nothing misrendered. What was missing was the mechanism, and that is the
-// whole point — a `agent-tooling/design-notes.md` event had to be two copy edits in two files
+// whole point — a `decisions.md` event had to be two copy edits in two files
 // with nothing failing if only one was made.
 //
 // The three guards that could have noticed, and why each did not:

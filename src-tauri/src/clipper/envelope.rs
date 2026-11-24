@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Versioned ext→host handoff envelope + the tiny host→ext reply (TB10, task 5).
 //!
 //! The browser extension hands one **versioned JSON envelope** to the host

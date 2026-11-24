@@ -28,7 +28,7 @@
 // changes, no production edits. The page is read through `session.execute` only.
 //
 // Run via `scripts/capture-theme-preview.sh` (Linux container — tauri-driver has
-// no macOS support, `agent-tooling/docs/dev/e2e.md`). Self-skips off-platform.
+// no macOS support, `dev-notes/e2e.md`). Self-skips off-platform.
 
 import { it } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";

@@ -1,7 +1,7 @@
 // Guards the coloring regression (MYND-154): the code HighlightStyle colors
 // tokens via `var(--syntax-*)`, but those resolve only if the RUNTIME stylesheet
 // the app actually loads defines them. The palette first landed only in the
-// canonical source (agent-tooling/docs/design/colors_and_type.css), so code rendered
+// canonical source (design/colors_and_type.css), so code rendered
 // monochrome. This test fails if the runtime tokens go missing again, in either
 // theme.
 //

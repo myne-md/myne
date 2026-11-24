@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Quick-unlock plugin (MYND-329) — desktop host.
 //!
 //! Quick-unlock stores a third wrapped copy of `root_key` in the device-local

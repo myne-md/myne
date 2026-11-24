@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The write-through: the ONE path every event that changes a vault's name
 //! takes into the sealed label store (myne-md/myne#411).
 //!

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0
-//! The sealed label store (`MYL1`, `agent-tooling/docs/spec/protocol.md` § 9.22): what lets
+// SPDX-License-Identifier: AGPL-3.0-only
+//! The sealed label store (`MYL1`, `docs/spec/protocol.md` § 9.22): what lets
 //! the LOCKED vault picker show a vault's real name.
 //!
 //! A vault's name lives in `vault.prefs`, sealed under a `root_key`-derived KEK,
@@ -60,7 +60,7 @@
 //! Still outside this module: the picker's own rendering and the Privacy row
 //! that renders the keychain-unavailable state this module now reports. Each
 //! lands in its own change; see
-//! `agent-tooling/features/locked-picker-vault-names/`.
+//! `private-companion/features/locked-picker-vault-names/`.
 
 pub mod commands;
 pub mod erase_all;

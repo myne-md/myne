@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Argon2id timing in the browser, at the v0.1 baseline (phase3-web-client
 //! task 63).
 //!

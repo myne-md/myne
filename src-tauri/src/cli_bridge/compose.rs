@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Plaintext composition for `myne new` (cli-thin-client task 8; MYND-490).
 //!
 //! `note_create` is dialect-blind (`src/notes/duplicateNote.ts`'s own doc

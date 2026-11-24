@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Reading a SOURCE vault's added dictionary words during a vault import.
 //!
 //! Desktop-side because the personal dictionary is: the `MYD1` framing is in

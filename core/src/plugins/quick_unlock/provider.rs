@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Wrap-key providers for quick-unlock (MYND-329).
 //!
 //! The `vault.quickunlock` blob (`protocol::quick_unlock_blob`, `MYQ1`) is

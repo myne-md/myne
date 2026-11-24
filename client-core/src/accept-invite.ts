@@ -5,7 +5,7 @@
 // `sync_person_accept_invite` earns.
 //
 // **Why it is here rather than in the desktop screen it came from.** The form
-// that collects an accept is per-client by design (`agent-tooling/design-notes/clients/0488`
+// that collects an accept is per-client by design (`decisions/clients/0488`
 // is explicit that the screens differ: desktop opens an inline form inside the
 // invite row, mobile is a full-screen step), but the QUESTION a failure answers
 // is not per-client. It came from one place for a reason worth keeping: every

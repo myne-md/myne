@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Which keys may have signed this vault's OWNER ROSTER (`decisions/protocol/0731`
 //! stage 2, `0733`).
 //!

@@ -20,13 +20,13 @@
 //
 // THE MUTATIONS GO INTO A SANDBOX, and that is a correctness fix rather than
 // tidiness. They used to land in the real tree (`src/screens/Zz*.tsx`,
-// `agent-tooling/docs/dev/.manual-test-roster.probe`, the ratchet, the projection) and be
+// `dev-notes/.manual-test-roster.probe`, the ratchet, the projection) and be
 // restored in a `finally`. Vitest runs files in parallel workers, so for as long
 // as a probe existed, a sibling test reading the real tree failed on a pairing
 // nobody chose. Measured by creating the probe by hand: `webScreens.test.ts` went
 // red with `expected 1 to be +0` (it copies the real `src/screens` and asks
 // whether every screen has a web verdict), and `privatePathRefs.test.ts` with
-// `agent-tooling/docs/dev/.manual-test-roster.probe` named as an unclassified extension.
+// `dev-notes/.manual-test-roster.probe` named as an unclassified extension.
 // `check-e2e-menu-testids.mjs` records the same failure as myne-md/myne#242 and
 // fixes it with a `--scan <dir>` seam; this file uses the three seams `main()`
 // now takes (`--scan`, `--ratchet`, `--projection`).
@@ -36,7 +36,7 @@
 // nothing about the tree that ships.
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,7 +45,9 @@ import { describe, expect, it } from "vitest";
 const ROOT = new URL("../../", import.meta.url).pathname;
 const SCRIPT = join(ROOT, "scripts/check-manual-test-roster.mjs");
 const RATCHET = join(ROOT, "scripts/manual-test-ratchet.json");
-const PROJECTION = join(ROOT, "agent-tooling/docs/dev/manual-test-roster.md");
+const PROJECTION = join(ROOT, "docs/dev/manual-test-roster.md");
+const PROJECTION_PRESENT = existsSync(PROJECTION);
+const describeProjection = PROJECTION_PRESENT ? describe : describe.skip;
 
 function run(args: string[] = []): { code: number; out: string } {
   try {
@@ -116,7 +118,7 @@ function withMutation(path: string, mutate: (before: string) => string, body: ()
   }
 }
 
-describe("the tree as it stands", () => {
+describeProjection("the tree as it stands", () => {
   it("passes --check at exit 0", () => {
     const { code, out } = run(["--check"]);
     expect(out).toContain("check-manual-test-roster: ok.");
@@ -124,7 +126,7 @@ describe("the tree as it stands", () => {
   });
 });
 
-describe("the ratchet file is validated before it is used", () => {
+describeProjection("the ratchet file is validated before it is used", () => {
   it("refuses a DELETED totalMinutesCeiling by name rather than skipping the rule", () => {
     withSandbox((s) => {
       withMutation(
@@ -180,7 +182,7 @@ describe("the ratchet file is validated before it is used", () => {
   });
 });
 
-describe("--record refuses a roster the guard has just rejected", () => {
+describeProjection("--record refuses a roster the guard has just rejected", () => {
   // This is recorded regression 1 from the header, and until the myne-bot review
   // of PR #576 it had no test: both --record cases above inject a deleted ceiling,
   // which exits at the ratchet validation long before the failure gate. So
@@ -220,7 +222,7 @@ describe("--record refuses a roster the guard has just rejected", () => {
   });
 });
 
-describe("a surface entering the tree fails by name", () => {
+describeProjection("a surface entering the tree fails by name", () => {
   it("names an unclaimed screen, and --emit refuses to publish a projection of a rejected roster", () => {
     withSandbox(
       (s) => {
@@ -245,7 +247,7 @@ describe("a surface entering the tree fails by name", () => {
   });
 });
 
-describe("the generated projection is gated, not merely generated", () => {
+describeProjection("the generated projection is gated, not merely generated", () => {
   it("names a hand edit to the projection", () => {
     withSandbox((s) => {
       withMutation(

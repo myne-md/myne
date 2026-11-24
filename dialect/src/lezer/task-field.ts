@@ -1,6 +1,6 @@
 // Inline task-field recognizer for the Myne markdown dialect (MYND-611).
 //
-// Spec: agent-tooling/docs/spec/markdown-dialect.md — the inline task-field grammar (normative
+// Spec: docs/spec/markdown-dialect.md — the inline task-field grammar (normative
 // text lands with task 5 of this feature).
 //
 // Two recognized forms, one node shape. Myne READS three dialects and WRITES one

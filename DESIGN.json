@@ -4,8 +4,8 @@
   "title": "Design System: Myne",
   "canonicalSource": {
     "kind": "repo",
-    "path": "agent-tooling/docs/design/",
-    "note": "The design canon lives in this repository at agent-tooling/docs/design/. Token values in DESIGN.md and DESIGN.json are extracted from agent-tooling/docs/design/colors_and_type.css, which is the CSS-variable source and therefore the binding value. When that file and these values disagree, the CSS wins and this projection gets corrected."
+    "path": "design/",
+    "note": "The design canon lives in this repository at design/. Token values in DESIGN.md and DESIGN.json are extracted from design/colors_and_type.css, which is the CSS-variable source and therefore the binding value. When that file and these values disagree, the CSS wins and this projection gets corrected."
   },
   "extensions": {
     "colorMeta": {
@@ -102,7 +102,7 @@
       }
     },
     "categoricalPalette": {
-      "purpose": "Eight decorative node-dot colors for the graph pane's color-group feature (graph-connection-ux-polish). Read side by side at small node radius, so legibility is a property of the set: hues stay clear of the three state roles above (never confusable with an error/warning/success color) and alternate lightness band per hue so adjacent colors stay distinguishable under red-green color-vision deficiency, not by hue alone. Source of truth is client-core/src/tokens.css (light + dark + amoled, the amoled twin reusing the dark value verbatim); agent-tooling/docs/design/colors_and_type.css mirrors light + dark.",
+      "purpose": "Eight decorative node-dot colors for the graph pane's color-group feature (graph-connection-ux-polish). Read side by side at small node radius, so legibility is a property of the set: hues stay clear of the three state roles above (never confusable with an error/warning/success color) and alternate lightness band per hue so adjacent colors stay distinguishable under red-green color-vision deficiency, not by hue alone. Source of truth is client-core/src/tokens.css (light + dark + amoled, the amoled twin reusing the dark value verbatim); design/colors_and_type.css mirrors light + dark.",
       "colors": [
         {
           "name": "group-olive",
@@ -193,7 +193,7 @@
       },
       "account-number": {
         "displayName": "Account Number",
-        "purpose": "Signature treatment for MY-XXXX-XXXX-XXXX-XXXX-XXXX — 27 characters, the MY- prefix plus five 4-char Crockford groups (agent-tooling/docs/spec/account-number.md §2). Always non-breaking hyphens, user-select all, slashed zero on."
+        "purpose": "Signature treatment for MY-XXXX-XXXX-XXXX-XXXX-XXXX — 27 characters, the MY- prefix plus five 4-char Crockford groups (docs/spec/account-number.md §2). Always non-breaking hyphens, user-select all, slashed zero on."
       }
     },
     "shadows": [
@@ -457,7 +457,7 @@
       }
     ],
     "dos": [
-      "Do treat agent-tooling/docs/design/ as the canonical design source, and bind every component to the CSS variables in agent-tooling/docs/design/colors_and_type.css rather than to a literal. When a shipped screen and the canon disagree, fix whichever side is actually wrong, and update agent-tooling/docs/design/ in the same change when it is the canon that has fallen behind.",
+      "Do treat design/ as the canonical design source, and bind every component to the CSS variables in design/colors_and_type.css rather than to a literal. When a shipped screen and the canon disagree, fix whichever side is actually wrong, and update design/ in the same change when it is the canon that has fallen behind.",
       "Do use OKLCH-style descriptive names in token discussions ('warm paper', 'iron blue', 'brick danger') rather than hex-code references in copy. The hex values are normative; the names are what humans use.",
       "Do render every cryptographic identifier (account numbers, recovery-phrase words, key fingerprints, hash prefixes) in JetBrains Mono with ss02 and zero features on.",
       "Do use the standard 2px iron-blue ring with a 1px paper offset for :focus-visible on every interactive element. The ring is always visible; never removed.",

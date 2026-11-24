@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The door's status marker, as this binary reads it.
 //!
 //! `cli-status` lives beside the command socket in the app-data dir and carries

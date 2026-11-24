@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The desktop self-update plugin: the two host-side commands the UI calls.
 //!
 //! # Why these are host-side and not the updater's own commands

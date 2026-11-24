@@ -1,7 +1,7 @@
 # Licensing
 
 This repository is **multi-licensed by subtree**. The repo-root [`LICENSE`](LICENSE)
-file carries the default (AGPL-3.0); subtrees with a different license carry their
+file carries the default (AGPL-3.0-only); subtrees with a different license carry their
 own `LICENSE` file, which governs that subtree.
 
 The table is the **whole** repository, not the crates that happened to exist when it was
@@ -11,22 +11,22 @@ housekeeping one.
 
 | Subtree | License | License file |
 |---|---|---|
-| `src/`, `src-tauri/` (desktop client) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `web/` (Phase 3 browser client: bundle, seam implementation, self-host container) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `mobile/` (Phase 3 iOS + Android client: a second Tauri app, and a pnpm workspace member) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `core/` (myne-core shared backend crate) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `format/` (myne-format on-disk-format crate) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `decrypt/` (myne-decrypt CLI) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `cli/` (myne-cli terminal client, shipped as a desktop sidecar) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `tor-sidecar/` (the arti-based `myne-tor` sidecar) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `theme-validator/` (the shared custom-theme CSS-value allowlist) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `protocol/` (cryptographic crate) | **AGPL-3.0** | [`protocol/LICENSE`](protocol/LICENSE) |
-| `client-core/`, `dialect/`, `editor/`, `copy/`, `ornaments/`, `preview/` (shared frontend source packages) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `stories/` (the story catalogue, a separate Vite target) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `locales/` (i18n catalogues) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `scripts/`, `tests/`, `e2e/`, `e2e-web/` (repo guards, specs, the E2E lanes) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `packaging/` (Arch PKGBUILDs and the `.desktop` entry) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| the specification tree (specifications, threat model, design canon) | **CC-BY-4.0** | not redistributed from this repository: it lives in the private `agent-tooling` companion, and CC-BY-4.0 is the licence it carries there |
+| `src/`, `src-tauri/` (desktop client) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `web/` (Phase 3 browser client: bundle, seam implementation, self-host container) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `mobile/` (Phase 3 iOS + Android client: a second Tauri app, and a pnpm workspace member) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `core/` (myne-core shared backend crate) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `format/` (myne-format on-disk-format crate) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `decrypt/` (myne-decrypt CLI) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `cli/` (myne-cli terminal client, shipped as a desktop sidecar) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `tor-sidecar/` (the arti-based `myne-tor` sidecar) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `theme-validator/` (the shared custom-theme CSS-value allowlist) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `protocol/` (cryptographic crate) | **AGPL-3.0-only** | [`protocol/LICENSE`](protocol/LICENSE) |
+| `client-core/`, `dialect/`, `editor/`, `copy/`, `ornaments/`, `preview/` (shared frontend source packages) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `stories/` (the story catalogue, a separate Vite target) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `locales/` (i18n catalogues) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `scripts/`, `tests/`, `e2e/`, `e2e-web/` (repo guards, specs, the E2E lanes) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `packaging/` (Arch PKGBUILDs and the `.desktop` entry) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| `docs/` (specifications, threat model, glossary, bundle-hash record) | **CC-BY-4.0** | [`docs/LICENSE`](docs/LICENSE) |
 | `public/fonts/` (the two bundled webfonts) | **SIL OFL-1.1** | [`public/fonts/LICENSE.txt`](public/fonts/LICENSE.txt) |
 | `src-tauri/resources/dictionaries/**`, `src-tauri/resources/models/**` (bundled third-party data) | **per asset** | each dictionary's own `<lang>/license`; the models are listed under "Bundled third-party assets" below |
 
@@ -35,11 +35,11 @@ trademark rather than code or content. [`TRADEMARK.md`](TRADEMARK.md) is the poi
 policy lives in [`myne-branding`](https://github.com/myne-md/myne-branding).
 
 Application code is licensed under the **GNU Affero General Public License,
-version 3** (AGPL-3.0, not "or-later").
+version 3 only** (SPDX: `AGPL-3.0-only`).
 
 **SPDX headers.** Every tracked Rust source file carries
-`// SPDX-License-Identifier: AGPL-3.0` on line 1, and every crate manifest
-declares `license = "AGPL-3.0"` (the workspace root is a virtual manifest with
+`// SPDX-License-Identifier: AGPL-3.0-only` on line 1, and every crate manifest
+declares `license = "AGPL-3.0-only"` (the workspace root is a virtual manifest with
 no `[package]` table, so the only `Cargo.toml` without the field is the one that
 is not a crate). `scripts/check-spdx-headers.mjs` holds that over the whole
 tracked Rust tree: the pre-commit hook passes it the staged paths, and
@@ -48,16 +48,15 @@ around it either. There is no SPDX header form for Markdown, JSON or CSS; a
 non-Rust file takes its licence from its subtree, which is what the table above
 is for.
 
-The specification tree is licensed under the **Creative Commons Attribution 4.0 International**
-license (CC-BY-4.0) so that independent implementations may reuse the protocol and on-disk format,
-provided Myne is credited. It is no longer published from this repository: the specifications, the
-threat model, the design canon and the decision log moved into the private `agent-tooling` companion,
-and every path in this repository that names one of them (`docs/spec/protocol.md`,
-`docs/threat-model.md`, `decisions/protocol/0763`) is an identifier rather than a path here. The
-licence still governs what those documents say; nothing in it depended on their being public.
+The specification tree in [`docs/`](docs/) is licensed under the **Creative Commons Attribution 4.0
+International** license (CC-BY-4.0) so that independent implementations may reuse the protocol and
+on-disk format, provided Myne is credited. [`docs/LICENSE`](docs/LICENSE) is the licence text and
+[`LICENSING.md`](LICENSING.md) is the scope table. The decision log, the design canon and the
+internal development notes stay private; a path such as `decisions/protocol/0763` is an identifier,
+not a link from this repository.
 
-`web/` is AGPL-3.0 for a reason worth stating: the web client is served rather
-than installed, and the [threat model](agent-tooling/docs/threat-model.md)'s only mitigation
+`web/` is AGPL-3.0-only for a reason worth stating: the web client is served rather
+than installed, and the [threat model](docs/threat-model.md)'s only mitigation
 for that (A15 / TB11) is that a user can build and serve their **own** bundle
 and stop being downstream of anyone else's. That is a licence promise as much as
 a technical one. Self-hostable "in practice and not just in principle" requires
@@ -72,13 +71,12 @@ licensed (each carries its own `LICENSE`):
 
 | Repo | License |
 |---|---|
-| `myne-server`, `myne-clipper` | AGPL-3.0 |
-| `myne-web` | AGPL-3.0: **archived**; the web client is the in-repo `web/` subtree above (`agent-tooling/design-notes.md` 2026-07-26) |
+| `myne-server`, `myne-clipper`, `myne-pi-plugin` | AGPL-3.0-only |
+| `myne-web` | AGPL-3.0: **archived**; the web client is the in-repo `web/` subtree above (`decisions.md` 2026-07-26) |
 | `myne-test-vectors` | CC-BY-4.0 |
 | `myne-website` | MIT |
-| `myne-themes` | by subtree: CC-BY-4.0 (themes) / AGPL-3.0 (tooling) |
+| `myne-themes` | by subtree: CC-BY-4.0 (themes) / AGPL-3.0-only (tooling) |
 | `myne-branding` | by subtree: reserved marks (trademark) / CC-BY-4.0 (token exports) / SIL OFL (fonts) |
-| `agent-tooling`, `operations` | Proprietary: All Rights Reserved (internal) |
 
 ## Bundled third-party assets
 
@@ -160,7 +158,7 @@ Because the modification is Myne's, **Apache-2.0 §4 attaches to it**, and is
 discharged the same way as before: the Apache-2.0 text ships beside the model as
 `MODEL-LICENSE`, attribution to the Qwen2.5 upstream is retained, and the
 modification is stated here, in the model's `README.md`, and in
-`agent-tooling/design-notes.md`. (The previous wording described redistributing Qwen's
+`decisions.md`. (The previous wording described redistributing Qwen's
 unmodified first-party file, which stopped being true when the tensor was
 dropped.) Unlike transcription, this model has
 **no user-override picker**, so no third-party file can take its place and there
@@ -179,7 +177,7 @@ the tag and whisper weights even though nothing in its binary can load them. Thi
 pre-existing drift, not something the 2026-08-09 provider work introduced; the
 resource-gating mechanism that would make the original sentence true is owed by
 myne-md/myne#190.
-(`agent-tooling/design-notes.md` 2026-07-31.)
+(`decisions.md` 2026-07-31.)
 
 ## Store listing graphics
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Meeting-session menubar indicator (myne-md/myne#789).
 //!
 //! During a meeting the user is in another application for the whole session,

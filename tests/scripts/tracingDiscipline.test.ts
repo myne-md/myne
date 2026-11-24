@@ -13,7 +13,7 @@
 //     (`src-tauri/src/logging`), so a `debug!` `%` cannot reach disk, and the
 //     rule is scoped to what the file records rather than to a general dislike
 //     of `%`. **One module is the exception and it is tested as one**: the run
-//     loop's target is recorded at `debug` (`agent-tooling/design-notes/ops/0768`), so a `%`
+//     loop's target is recorded at `debug` (`decisions/ops/0768`), so a `%`
 //     there IS a finding, and the same record one directory over is not. A rule
 //     that reads one global level list would be exactly backwards on the only
 //     module whose `debug` persists.

@@ -57,7 +57,7 @@ const CAPABILITY_BACKING = {
   // fact (`tauri-plugin-updater` has no browser target).
   selfUpdate: ["update"],
   // myne-md/myne#860. The whole `diagnostics` plugin: the web build installs
-  // no `tracing` subscriber at all (`agent-tooling/design-notes/ops/0366`), so every one
+  // no `tracing` subscriber at all (`decisions/ops/0366`), so every one
   // of its commands presupposes a log that cannot exist there.
   diagnosticLog: ["diagnostics"],
   // No ported command surface: the watch queue is drained by native code, and
@@ -268,7 +268,7 @@ const CAPABILITY_BACKING = {
   // everything still named here needs a group key and a signed roster.
   // They are refused because the person identity's carrier is a device-local
   // sealed file outside the browser's storage and the panel asks for the
-  // recovery phrase to unlock it, which `agent-tooling/docs/vision.md` keeps out of served
+  // recovery phrase to unlock it, which `docs/vision.md` keeps out of served
   // code by build-time substitution. The identity setup/status/invite commands
   // (myne-md/myne#711) join them for the same reason; the invite/decode pair
   // needs the held identity to wrap the group key.

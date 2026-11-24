@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 pub use myne_core::atomic_write;
 pub mod audio_rate;
 mod auto_lock;
@@ -414,7 +414,7 @@ pub fn run() {
         // client (`reqwest`); it is reached only from host-side Rust (the
         // `update` plugin's commands), never granted to the WebView. Its
         // signature check cannot be disabled. See `src-tauri/src/update/`,
-        // `src-tauri/src/no_egress.rs` and `agent-tooling/docs/dependency-policy.md`.
+        // `src-tauri/src/no_egress.rs` and `docs/dependency-policy.md`.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(plugins::update::init())
         .plugin(plugins::backup::init())

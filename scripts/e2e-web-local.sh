@@ -42,7 +42,7 @@ case "$BROWSER" in
     DRIVER_BIN=safaridriver
     if [ "$(uname -s)" != "Darwin" ]; then
       echo "the Safari seat needs a macOS host — it is a manual per-release gate," >&2
-      echo "never a CI lane (agent-tooling/design-notes.md 2026-07-27: the runner is Linux-only)." >&2
+      echo "never a CI lane (decisions.md 2026-07-27: the runner is Linux-only)." >&2
       exit 2
     fi
     ;;

@@ -810,7 +810,7 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
 
     // The three figures the review screen reports, one click away
     // (myne-md/myne#848). The third is the one the remote arm's compensating
-    // control rests on (agent-tooling/design-notes/ai/0515), so "the run stayed local" must
+    // control rests on (decisions/ai/0515), so "the run stayed local" must
     // not render as a zero character count, and it must still be REACHABLE,
     // which is why this expands rather than looking for it on the line.
     fireEvent.click(screen.getByTestId("agentFootprint.disclosure"));
@@ -1234,7 +1234,7 @@ describe("AiChatTab: the live run's controls", () => {
     // **This is the mount path nothing covered.** The gate used to render
     // inside the agent turn, i.e. inside the scrolling transcript at 92% of a
     // 280px sidebar; deleting its mount left the whole suite green.
-    // `agent-tooling/design-notes/ai/0515` makes this dialog the entire bound on
+    // `decisions/ai/0515` makes this dialog the entire bound on
     // model-originated scope growth, so its reachability is the feature.
     parkOnScopeQuestion();
     render(<AiChatTab />);

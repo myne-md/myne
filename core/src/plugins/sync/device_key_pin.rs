@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device signing key, **rung 3** of the storage ladder: a `0600` file sealed by a
 //! user PIN (`decisions/protocol/0733` decision 4).
 //!

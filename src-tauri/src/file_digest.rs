@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! One streamed SHA-256 over a file.
 //!
 //! Two callers in this crate hash a file they did not write: the model store

@@ -127,7 +127,7 @@ FEATURE="local-inference"
 #   rustls / rustls-pki-types / rustls-webpki: TLS transport primitives.
 #   reqwest / hyper / hyper-util / socket2: the update check's HTTP client and
 #   its socket layer, reached only through tauri-plugin-updater
-#   (agent-tooling/docs/dependency-policy.md, decisions entry).
+#   (docs/dependency-policy.md, decisions entry).
 ALLOWED_NETWORK_CRATES=$(cat <<'EOF'
 rustls
 rustls-pki-types

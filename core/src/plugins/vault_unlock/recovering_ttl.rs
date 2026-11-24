@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `Slot::Recovering` absolute TTL. This module owns the deadline and the
 //! driver each client runs to enforce it (myne-md/myne#758, security-audit lead
 //! NV09).
@@ -34,7 +34,7 @@ use super::state::{Slot, VaultRuntimeState};
 /// there is no value a disk-level attacker can write to widen it.
 ///
 /// Moved here from `src-tauri/src/auto_lock.rs` by myne-md/myne#758 without a
-/// change of value; `agent-tooling/design-notes/storage/0180` names it as unchanged policy.
+/// change of value; `decisions/storage/0180` names it as unchanged policy.
 pub const RECOVERING_TTL: core::time::Duration = core::time::Duration::from_secs(600);
 
 /// How often a client's timer should call [`bail_if_expired`].
@@ -100,7 +100,7 @@ pub async fn bail_if_expired(
 ///
 /// Desktop does NOT need this: its idle-lock tick already runs every five
 /// seconds and calls [`bail_if_expired`] directly, which keeps it a single
-/// global loop (`agent-tooling/design-notes/storage/0180`). Mobile has no such loop, so this
+/// global loop (`decisions/storage/0180`). Mobile has no such loop, so this
 /// is where it gets one, and the shape is the one `spawn_sync_loop` uses.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub fn spawn_recovering_ttl_timer<R: tauri::Runtime>(app: tauri::AppHandle<R>) {

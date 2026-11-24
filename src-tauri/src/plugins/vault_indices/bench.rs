@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! VaultIndices benchmark harness (MYND-31 / A11, Task 7).
 //!
 //! Gates the two deferred follow-ups: the `MYI1` encrypted-persistence

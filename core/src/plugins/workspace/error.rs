@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `workspace` plugin IPC error enums (MYND-166).
 //!
 //! Two closed taxonomies — read + write — both DENY-list clean per
@@ -8,7 +8,7 @@
 //!
 //! `workspace_read` returns `Ok(None)` (→ default single empty pane) on
 //! absent / AEAD-fail / unsupported-format / parse-fail per
-//! `agent-tooling/docs/spec/protocol.md` § 9.7.4 — those do NOT surface as errors. Only
+//! `docs/spec/protocol.md` § 9.7.4 — those do NOT surface as errors. Only
 //! a Slot precondition violation or an unrecoverable `vault.meta` IO/parse
 //! failure becomes a read error. `workspace_write` surfaces real failures
 //! so the frontend knows the descriptor did not commit.

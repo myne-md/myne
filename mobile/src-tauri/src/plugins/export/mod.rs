@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `export` plugin — mobile host (MYND-211, epic export-suite).
 //!
 //! Owns the whole-vault plaintext markdown-tree export for the open vault. The

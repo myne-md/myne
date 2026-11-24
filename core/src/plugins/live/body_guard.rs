@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: AGPL-3.0
-//! Body-span guard for live co-editing (agent-tooling/docs/spec/markdown-dialect.md §3.6,
-//! agent-tooling/docs/spec/sync-protocol.md §11.1).
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Body-span guard for live co-editing (docs/spec/markdown-dialect.md §3.6,
+//! docs/spec/sync-protocol.md §11.1).
 //!
 //! The frontmatter block is part of the one Automerge `Text`
-//! (agent-tooling/docs/spec/protocol.md §10.7), but it is a **reserved region**: a live splice
+//! (docs/spec/protocol.md §10.7), but it is a **reserved region**: a live splice
 //! may never touch it, and the managed keys (`title:`, `folder:`, `updated:`,
 //! `deleted:`, `trashed:`, `archived:`, `template:`) are re-derived at durable
 //! boundaries, never carried through a live frame. This clamps every splice

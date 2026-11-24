@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The typed inner payload of `vault.dictionary` (`protocol.md` §9.13.2) and its
 //! `sync-protocol.md` §10.2.1 merge (myne-md/myne#640).
 //!

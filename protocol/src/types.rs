@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Shared value types and on-disk encodings used across the crate.
 //!
 //! This module currently hosts:
-//! - [`KdfParams`] — the Argon2id parameter set (`agent-tooling/docs/spec/protocol.md` § 4).
+//! - [`KdfParams`] — the Argon2id parameter set (`docs/spec/protocol.md` § 4).
 //! - [`DEFAULT_V0_1_KDF_PARAMS`] — the v0.1 baseline, calibrated for
-//!   desktop ≈ 1 s (`agent-tooling/design-notes.md` 2026-04-26 KDF entry).
+//!   desktop ≈ 1 s (`decisions.md` 2026-04-26 KDF entry).
 //! - [`serialize_kdf_params`] / [`parse_kdf_params`] — the canonical
 //!   11-byte encoding bound into both wrap AADs (`protocol.md` § 4.3).
 //!
@@ -45,14 +45,14 @@ pub fn generate_root_key() -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
 
 /// `kdf_id` magic byte selecting Argon2id.
 ///
-/// `agent-tooling/docs/spec/protocol.md` § 9.3: *"0x01 = Argon2id (only value accepted
+/// `docs/spec/protocol.md` § 9.3: *"0x01 = Argon2id (only value accepted
 /// in v0.1)."* Any other value at offset 0 of the canonical block makes
 /// the vault unparseable on this version.
 const KDF_ID_ARGON2ID: u8 = 0x01;
 
 /// Argon2 algorithm version 1.3.
 ///
-/// `agent-tooling/docs/spec/protocol.md` § 9.3: the only `argon2_version` value v0.1
+/// `docs/spec/protocol.md` § 9.3: the only `argon2_version` value v0.1
 /// vaults may carry. v1.0 (`0x10`) is rejected.
 const ARGON2_VERSION_V13: u8 = 0x13;
 
@@ -66,7 +66,7 @@ pub const KDF_PARAMS_CANONICAL_LEN: usize = 11;
 /// Argon2id parameter set persisted in `vault.meta` and bound into the
 /// wrap AADs.
 ///
-/// Implements `agent-tooling/docs/spec/protocol.md` § 4.3 (canonical encoding) and
+/// Implements `docs/spec/protocol.md` § 4.3 (canonical encoding) and
 /// § 9.3 (on-disk layout, offsets 22..33). Wire-format byte widths:
 ///
 /// | Field            | On-disk size | Encoding |
@@ -96,7 +96,7 @@ pub struct KdfParams {
 }
 
 /// v0.1 baseline parameters, calibrated for ≈ 1 s on a 2024-class
-/// desktop laptop. See `agent-tooling/design-notes.md` 2026-04-26 "KDF parameters
+/// desktop laptop. See `decisions.md` 2026-04-26 "KDF parameters
 /// resolved" for the rationale (256 MiB chosen as the SN004-vs-research
 /// middle ground; bound into AADs to defeat parameter-downgrade).
 pub const DEFAULT_V0_1_KDF_PARAMS: KdfParams = KdfParams {
@@ -146,7 +146,7 @@ pub const MAX_KDF_P: u8 = 16;
 /// Returns [`ProtocolError::InvalidVaultMeta`] (a structural, non-credential
 /// failure) when any parameter is out of range. The default v0.1 params pass.
 ///
-/// Normative source: `agent-tooling/docs/spec/protocol.md` § 4.2.1 (accepted cost range).
+/// Normative source: `docs/spec/protocol.md` § 4.2.1 (accepted cost range).
 /// That clause states the floor as a `m_kib × t` area and lets a client enforce
 /// a tighter range than the spec minimum; these per-axis bounds are that
 /// tighter range, and they sit strictly inside it.
@@ -162,7 +162,7 @@ pub fn validate_kdf_params(params: &KdfParams) -> Result<(), ProtocolError> {
 }
 
 /// Encode `params` to its 11-byte canonical form per
-/// `agent-tooling/docs/spec/protocol.md` § 4.3.
+/// `docs/spec/protocol.md` § 4.3.
 ///
 /// The output is appended to both `AAD_password_wrap` and
 /// `AAD_recovery_wrap` (built in a later task) and persisted at offset

@@ -1,4 +1,4 @@
-// Spec: agent-tooling/docs/spec/markdown-dialect.md §3 (recognized syntax),
+// Spec: docs/spec/markdown-dialect.md §3 (recognized syntax),
 // §3.5 (wikilink display alias-vs-target rule), §3.6 (frontmatter).
 
 import type { SyntaxNode, Tree } from "@lezer/common";

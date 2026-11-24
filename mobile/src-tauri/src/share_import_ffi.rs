@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! iOS App-Group container seam for the share-import staging queue (SF2,
 //! MYND-510). iOS-only.
 //!

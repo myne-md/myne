@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `graph_layout` plugin IPC error enums.
 //!
 //! Two closed taxonomies — read + write — both DENY-list clean per
@@ -9,7 +9,7 @@
 //!
 //! `graph_layout_read` returns `Ok(None)` (→ frontend recomputes the layout)
 //! on absent / AEAD-fail / unsupported-format / parse-fail per
-//! `agent-tooling/docs/spec/protocol.md` § 9.19.4 — those do NOT surface as errors (a
+//! `docs/spec/protocol.md` § 9.19.4 — those do NOT surface as errors (a
 //! rebuildable cache). Only a Slot precondition violation or an unrecoverable
 //! `vault.meta` IO/parse failure becomes a read error. `graph_layout_write`
 //! surfaces real failures so the frontend knows the layout did not persist.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Strict lowercase-hyphenated UUID shape check for on-disk filenames.
 //!
 //! Lives in its own ungated module rather than inside [`backup_container`] so

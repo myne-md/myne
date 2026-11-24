@@ -144,17 +144,17 @@
 //
 // Zero dependencies, node built-ins only. Run by hand:
 //   node scripts/check-twin-inventory.mjs
-//   node scripts/check-twin-inventory.mjs --emit    (regenerate agent-tooling/docs/dev/twin-inventory.md)
+//   node scripts/check-twin-inventory.mjs --emit    (regenerate dev-notes/twin-inventory.md)
 //   node scripts/check-twin-inventory.mjs --roots <desktopDir> <mobileDir>
 //
 // # The prose projection
 //
-// `--emit` regenerates `agent-tooling/docs/dev/twin-inventory.md` from this roster. The
+// `--emit` regenerates `dev-notes/twin-inventory.md` from this roster. The
 // document is a PROJECTION, never a second source: hand-editing it is undone by
 // the next `--emit`, and CI never passes the flag, so the check half runs
 // whether or not anyone regenerates the prose.
 //
-// It lives in `agent-tooling/docs/` rather than in the private agents companion because the
+// It lives in `docs/` rather than in the private agents companion because the
 // deliverable includes a rubric two people have to reach the same answer with,
 // and an outside contributor to this AGPL repository cannot read that companion.
 // The content is paths and verdicts about public code, so there is nothing to
@@ -295,7 +295,7 @@ const CURATED_TWINS = [
   // surface one client ships alone. This list exists to name two files that BOTH
   // exist and cannot be paired by path, so a pair with one half deleted cannot
   // live here and cannot be re-verdicted either: the removal is recorded in
-  // `agent-tooling/design-notes/ui/0790`, not as a roster row.
+  // `decisions/ui/0790`, not as a roster row.
   {
     a: "src/notes/dailyNote.ts",
     b: "mobile/src/lib/daily.ts",
@@ -609,7 +609,7 @@ const ROSTER = [
   // naming it is a verdict about nothing: `absent` cannot stand in for it either,
   // because this guard resolves BOTH paths and rejects an entry whose file is
   // gone. What the removal changed is recorded where it belongs, in
-  // `agent-tooling/design-notes/ui/0790-*.md`, and the surviving divergence is a one-line
+  // `decisions/ui/0790-*.md`, and the surviving divergence is a one-line
   // note there: memory on the desktop is Settings-only now, while the phone keeps
   // its in-flow sheet.
   {
@@ -666,7 +666,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Presentation-only input mask mirroring the display form in agent-tooling/docs/spec/account-number.md 2. The code is identical today and only the comment prose differs; mobile's own header says it 'Ports the desktop src/lib/account-number-format.ts verbatim', which is this epic's subject stated by the copy itself.",
+      "Presentation-only input mask mirroring the display form in docs/spec/account-number.md 2. The code is identical today and only the comment prose differs; mobile's own header says it 'Ports the desktop src/lib/account-number-format.ts verbatim', which is this epic's subject stated by the copy itself.",
   },
   {
     a: "src/lib/app-window.ts",
@@ -754,7 +754,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The vault.prefs write surface. protocol.md 9.5.2 enumerates the field roster normatively, so both clients are answering one specified question. Both clients route every write through their own `writePref` chokepoint that bumps the prefs nonce: mobile's landed in myne-md/myne#486, and `scripts/check-prefs-nonce.mjs` names both trees in PREFS_MODULES. The earlier claim here that mobile has 47 write literals and no chokepoint described a defect that no longer exists, which is why myne-md/myne#477 is closed. What remains is two homes for one roster rather than a divergence in how a write is made: the two files bind different command counts, and which commands each client surfaces is the settings-parity question `scripts/check-prefs-parity.mjs` measures into agent-tooling/docs/dev/settings-parity.md.",
+      "The vault.prefs write surface. protocol.md 9.5.2 enumerates the field roster normatively, so both clients are answering one specified question. Both clients route every write through their own `writePref` chokepoint that bumps the prefs nonce: mobile's landed in myne-md/myne#486, and `scripts/check-prefs-nonce.mjs` names both trees in PREFS_MODULES. The earlier claim here that mobile has 47 write literals and no chokepoint described a defect that no longer exists, which is why myne-md/myne#477 is closed. What remains is two homes for one roster rather than a divergence in how a write is made: the two files bind different command counts, and which commands each client surfaces is the settings-parity question `scripts/check-prefs-parity.mjs` measures into dev-notes/settings-parity.md.",
   },
   {
     a: "src/lib/quick-unlock.ts",
@@ -1550,7 +1550,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The inference state machine, 1644 lines against 41 (the +140 is `remote_refusal`, which the capability report needs so a named-but-inactive provider reports the gate's own cause rather than the local arm's `NoModel`, together with the per-state table test the review of myne-md/myne#867 asked for: the function was a unit no test could fail, since answering `None` unconditionally left the whole local_inference suite green). Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. The 1647 figure this line carried until the AI embedding index was retired (`agent-tooling/design-notes/ai/0703-*`) counted the `embedding_engine` accessor and its docs, which that removal deleted. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
+      "The inference state machine, 1644 lines against 41 (the +140 is `remote_refusal`, which the capability report needs so a named-but-inactive provider reports the gate's own cause rather than the local arm's `NoModel`, together with the per-state table test the review of myne-md/myne#867 asked for: the function was a unit no test could fail, since answering `None` unconditionally left the whole local_inference suite green). Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. The 1647 figure this line carried until the AI embedding index was retired (`decisions/ai/0703-*`) counted the `embedding_engine` accessor and its docs, which that removal deleted. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
   },
   {
     a: "src-tauri/src/plugins/member_names/mod.rs",
@@ -1590,7 +1590,7 @@ const ROSTER = [
     verdict: "delegated",
     destination: "@myne/client-core",
     reason:
-      "The per-client HOST WIRING for the shared live-note policy: the five transport bindings and the two capability answers, over a POLICY that is one module in `@myne/client-core` (`live-note.ts`) consumed by both clients with their own host injected (myne-md/myne#849, `agent-tooling/design-notes/clients/0716`). Cross-path, so the sweep cannot see it. `delegated` because neither file holds an answer: one wires `./live` and `../lib/live`, the other `../platform/capabilities`. Worth knowing when reading this pair: the review that produced it found the funnel in the WRONG PLACE on mobile (one call site in the editor screen rather than in the note primitive every writer inherits), which is a property of the policy's CONSUMERS rather than of either host, so a future reader looking for that class of defect should not look here.",
+      "The per-client HOST WIRING for the shared live-note policy: the five transport bindings and the two capability answers, over a POLICY that is one module in `@myne/client-core` (`live-note.ts`) consumed by both clients with their own host injected (myne-md/myne#849, `decisions/clients/0716`). Cross-path, so the sweep cannot see it. `delegated` because neither file holds an answer: one wires `./live` and `../lib/live`, the other `../platform/capabilities`. Worth knowing when reading this pair: the review that produced it found the funnel in the WRONG PLACE on mobile (one call site in the editor screen rather than in the note primitive every writer inherits), which is a property of the policy's CONSUMERS rather than of either host, so a future reader looking for that class of defect should not look here.",
   },
   {
     a: "src-tauri/src/plugins/live/mod.rs",
@@ -1606,7 +1606,7 @@ const ROSTER = [
     verdict: "delegated",
     destination: "myne-core",
     reason:
-      "The per-client TRANSPORT BINDING for the same six shared-core live-session commands, so this pair is the `memberNames` shape one layer down: the command bodies, the session registry and the `SYNC-33` writer refusal are all `myne-core`, and what each file holds is an `invoke` wrapper and nothing else. It is the two names `scripts/check-platform-seam.mjs` requires each tree to reach through its own seam. Both carry `liveSessionRead` for the sixth command. The files differ in two import specifiers and one export: `invoke` comes from each tree's own `platform/core`; desktop re-exports the splice type (`export type { LocalSplice } from the shared module`) where mobile names it inline in the return type, so the two export surfaces are not identical even though both resolve the same shared type. That third difference is what the sibling ratchet entry's comment used to call only-import-specifiers, corrected here. `delegated` rather than `decision` for the same reason as its sibling: neither file holds an answer. The POLICY that decides when a session is opened is NOT in either file and is not a twin at all: it is one module in `@myne/client-core` (`live-note.ts`) that both clients consume with their own host injected, which is what makes this pair a transport rather than a second copy of a rule (myne-md/myne#849, `agent-tooling/design-notes/clients/0716`).",
+      "The per-client TRANSPORT BINDING for the same six shared-core live-session commands, so this pair is the `memberNames` shape one layer down: the command bodies, the session registry and the `SYNC-33` writer refusal are all `myne-core`, and what each file holds is an `invoke` wrapper and nothing else. It is the two names `scripts/check-platform-seam.mjs` requires each tree to reach through its own seam. Both carry `liveSessionRead` for the sixth command. The files differ in two import specifiers and one export: `invoke` comes from each tree's own `platform/core`; desktop re-exports the splice type (`export type { LocalSplice } from the shared module`) where mobile names it inline in the return type, so the two export surfaces are not identical even though both resolve the same shared type. That third difference is what the sibling ratchet entry's comment used to call only-import-specifiers, corrected here. `delegated` rather than `decision` for the same reason as its sibling: neither file holds an answer. The POLICY that decides when a session is opened is NOT in either file and is not a twin at all: it is one module in `@myne/client-core` (`live-note.ts`) that both clients consume with their own host injected, which is what makes this pair a transport rather than a second copy of a rule (myne-md/myne#849, `decisions/clients/0716`).",
   },
   {
     a: "src/lib/identity.ts",
@@ -2311,7 +2311,7 @@ function main() {
     console.error(
       `twin-inventory: ${staleCounts.length} line-count claim(s) in a reason no longer describe the files:\n` +
         staleCounts.join("\n") +
-        `\n  These are republished into agent-tooling/docs/dev/twin-inventory.md, so a stale one is a` +
+        `\n  These are republished into dev-notes/twin-inventory.md, so a stale one is a` +
         `\n  published false claim rather than a private note. Update the reason.`,
     );
     failed = true;

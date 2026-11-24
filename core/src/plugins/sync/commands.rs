@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `sync` plugin command handlers (MYND-424 task 3).
 //!
 //! v0.1 surface is the **endpoint-config** pair (SYNC-14) — the only commands

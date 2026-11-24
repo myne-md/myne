@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Mobile implementation of [`myne_core::hooks::VaultLifecycleHooks`].
 //!
 //! Mobile carries none of the desktop-only side-effect subsystems (spell,

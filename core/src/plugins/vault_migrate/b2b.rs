@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit NTV5 to NTV6 owner migration with durable roll-forward recovery.
 
 use crate::io_failure_kind::IoFailureKind;

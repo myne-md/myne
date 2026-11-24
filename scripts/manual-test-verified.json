@@ -10,7 +10,7 @@
     "history is git log, which answers 'what did we verify at v0.5, and did the",
     "thing that failed there pass here' by reading a diff rather than by hunting",
     "for last release's file. Day-of ticking still happens in the release issue,",
-    "per `operations/runbooks/release-checklist.md`.",
+    "per `runbook/runbooks/release-checklist.md`.",
     "",
     "An entry is as verified as its WORST row: one failed observation on one client",
     "records `fail` for the entry, whatever its siblings did.",

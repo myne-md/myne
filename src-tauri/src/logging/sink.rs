@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The rotating file writer behind the diagnostic log (myne-md/myne#860).
 //!
 //! # Why this is hand-rolled rather than `tracing-appender`
@@ -7,7 +7,7 @@
 //! is bounded by SIZE: the threat model carries one number for the whole
 //! footprint, and a time-based rotation turns that number into a function of how
 //! long the user left the toggle on. A size-based rotation with a retained-file
-//! count gives a constant ceiling, so `agent-tooling/docs/threat-model.md` §7 can state a
+//! count gives a constant ceiling, so `docs/threat-model.md` §7 can state a
 //! figure instead of a proportionality argument.
 //!
 //! # The three things this module must guarantee
@@ -54,7 +54,7 @@ pub const LOG_FILE_NAME: &str = "myne.log";
 ///
 /// A ROTATION THRESHOLD, not a hard per-file cap: the test is taken before a
 /// record is written, so one record larger than this lands whole in a freshly
-/// rotated file and that file exceeds the figure. `agent-tooling/docs/threat-model.md` §7 says
+/// rotated file and that file exceeds the figure. `docs/threat-model.md` §7 says
 /// "threshold" for the same reason, because the published number has to be the
 /// one the code enforces.
 ///

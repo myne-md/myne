@@ -21,9 +21,9 @@
    sheet, loaded after this one, `mobile/src/styles/tokens.css` does exactly
    that for two AMOLED greys, with its reason stated there.
 
-   Source of the values: `agent-tooling/docs/design/colors_and_type.css` is the canon
+   Source of the values: `design/colors_and_type.css` is the canon
    (`AGENTS.md`, "Design context"); this file is its implementation, and where
-   the two disagree the CSS in `agent-tooling/docs/design/` is the value.
+   the two disagree the CSS in `design/` is the value.
    ========================================================================= */
 
 /* -- Fonts ----------------------------------------------------------------
@@ -174,7 +174,7 @@
      amoled twins below that. Closed vocabulary, see sanitize.ts.
 
      EVERY member needs a value in all four theme blocks of THIS file. It is the
-     sheet the app loads (`src/main.tsx`); `agent-tooling/docs/design/colors_and_type.css` is a
+     sheet the app loads (`src/main.tsx`); `design/colors_and_type.css` is a
      non-loaded projection, so adding a token only there ships a `var()` that
      resolves to nothing and the wash falls back to `theme.ts`'s literal. */
   --highlight-green:  #d8e9cf;
@@ -193,7 +193,7 @@
   /* -- Color -- Label slots (MYND-184; sidebar color labels) ---------- */
   /* Six muted, hue-named DECORATIVE slots for note/folder color dots, NOT a
      repurpose of the semantic state colors. Solid-fill dots, no `-soft`
-     variant. Mirrors agent-tooling/docs/design/colors_and_type.css. decisions.md 2026-06-07. */
+     variant. Mirrors design/colors_and_type.css. decisions.md 2026-06-07. */
   --label-clay:   #b0543f;   /* warm brick-red  */
   --label-ochre:  #94701c;   /* amber / gold    */
   --label-moss:   #4d7a55;   /* forest green    */
@@ -210,7 +210,7 @@
      read as an error/warning/success state, and to alternate lightness
      (34%/44% in light, mirrored in dark) so two adjacent hues stay
      distinguishable under red-green color-vision deficiency, not just by
-     hue. Mirrors agent-tooling/docs/design/colors_and_type.css (light + dark only, the
+     hue. Mirrors design/colors_and_type.css (light + dark only, the
      amoled twins below reuse the dark values verbatim, like label/syntax/
      highlight do, since these hues don't need to change for pure black). */
   --group-olive:   #5d7b32;
@@ -223,7 +223,7 @@
   --group-rose:    #9f4182;
 
   /* -- Color -- Code syntax highlighting (MYND-154) ------------------- */
-  /* Mirrors agent-tooling/docs/design/colors_and_type.css. Each hue clears WCAG AA
+  /* Mirrors design/colors_and_type.css. Each hue clears WCAG AA
      (>=4.5:1) vs --paper-2 in both themes (grill Q15). */
   --syntax-keyword:  #7a3b8c;
   --syntax-string:   #3f6a4a;
@@ -406,7 +406,7 @@
 
   /* -- Motion --------------------------------------------------------- */
   /* Two tiers, and the split is the whole point (myne-md/myne#772; the
-     `PRODUCT.md` principle-4 amendment and `agent-tooling/design-notes/ui/` entry are the
+     `PRODUCT.md` principle-4 amendment and `decisions/ui/` entry are the
      normative statement, this is its value layer).
 
      The RESTRAINED tier below is the default and covers almost everything: a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The unlock path for `myne-decrypt`: derive `root_key` and `items_key` from
 //! the master password or recovery phrase, for both on-disk generations.
 //!

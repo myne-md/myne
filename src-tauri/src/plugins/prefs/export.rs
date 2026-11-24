@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `export_view_manifest` — write ONE saved view as a `.myneview` manifest to a
 //! user-chosen path (view-manifests, myne-md/myne#922 task 8).
 //!

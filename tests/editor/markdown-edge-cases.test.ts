@@ -1,7 +1,7 @@
 // Comprehensive markdown editor edge-case test suite.
 //
 // Per the 2026-05-17 deep-research catalog
-// (`agent-tooling/researches/2026-05-17-markdown-toggle-edge-cases.md`),
+// (`private-companion/researches/2026-05-17-markdown-toggle-edge-cases.md`),
 // this file pins ~60 cases across 15 categories that a CommonMark-compliant
 // editor must handle correctly under toggle / wrap / cursor-aware reveal
 // pressure. Each test maps to a (category, case-id) tuple from the catalog

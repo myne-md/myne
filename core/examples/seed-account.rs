@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Create a real account on a real sync server, from source, without a GUI
 // (phase3-web-client task 105 — the fixture seeder).
 //

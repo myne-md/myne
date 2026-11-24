@@ -4,7 +4,7 @@
 //
 // PRD `editor-mvp-baseline` stories 47-49, 67. No hardcoded color values;
 // OS `prefers-color-scheme` switching happens at the CSS variable layer
-// (`agent-tooling/docs/design/colors_and_type.css`) — the editor extension inherits
+// (`design/colors_and_type.css`) — the editor extension inherits
 // automatically. No JS-side light/dark mode tracking.
 
 import { EditorView } from "@codemirror/view";

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 use super::*;
 use crate::subkey::{derive_subkey, SubkeyRole};
 use crate::test_vector_fmt::{hex_lower, json_escape};
@@ -7139,7 +7139,7 @@ fn emit_opencode_provider_prefs_vectors() {
 /// Generator for the `device_names` vector pair (appended to the companion
 /// repo's `vault-prefs` family; per-feature generator, keeps the originals
 /// byte-stable) — pins the MYND-459 / SYNC-41 `device_names` additive field
-/// (`agent-tooling/docs/spec/protocol.md` §9.5). Golden AEAD bytes cannot be hand-authored,
+/// (`docs/spec/protocol.md` §9.5). Golden AEAD bytes cannot be hand-authored,
 /// so this `#[ignore]` emitter is the mechanism even though the companion
 /// vectors are the deliverable — it emits, it is not a runtime test.
 ///
@@ -7201,7 +7201,7 @@ fn emit_device_names_prefs_vectors() {
 /// `cargo test -p protocol --lib emit_paired_extensions_prefs_vectors -- --ignored`
 ///
 /// Pins the MYND-443 browser-clipper pairing-token persistence + the
-/// MYND-442 `paired_at` additive field (`agent-tooling/design-notes.md` 2026-06-21):
+/// MYND-442 `paired_at` additive field (`decisions.md` 2026-06-21):
 ///
 /// - `encrypt-paired-extensions`: a `PrefsView` carrying a two-record
 ///   `paired_extensions` array — one record WITHOUT `paired_at` (the
@@ -8616,7 +8616,7 @@ fn emit_field_clocks_prefs_vectors() {
 /// named `agent_history_budget` it would have landed inside the
 /// prefix-matched run that ends at `auto_lock_seconds`, where an
 /// unrecognised key blinds every field behind it in a client that predates
-/// it (`agent-tooling/docs/spec/protocol.md` §9.5.2, schema-evolution paragraph). A port
+/// it (`docs/spec/protocol.md` §9.5.2, schema-evolution paragraph). A port
 /// that emits the right value in the wrong slot produces a blob this crate
 /// cannot decode, and until these cases existed no vector said so: the
 /// companion repo carried a schema property with the claim written in prose
@@ -10240,7 +10240,7 @@ fn emit_periodic_notes_prefs_vectors() {
 /// spliced by hand into the companion repo's existing `cases` array.
 ///
 /// **Two halves, and the ABSENT half is the load-bearing one.**
-/// `agent-tooling/docs/spec/protocol.md` §9.5.2 says the map is omitted when empty, so a
+/// `docs/spec/protocol.md` §9.5.2 says the map is omitted when empty, so a
 /// vault that has approved nothing encodes byte-identically to a
 /// pre-feature blob, and a freshly enrolled device's approval state cannot
 /// be manufactured by re-writing the prefs. A suite that pinned only the

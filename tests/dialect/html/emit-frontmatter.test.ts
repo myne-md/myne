@@ -1,6 +1,6 @@
 // HTML projection emitter — frontmatter projection (MYND-255 task 1).
 //
-// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.6 + PRD story 13 — `title:` projects
+// Spec: docs/spec/markdown-dialect.md §3.6 + PRD story 13 — `title:` projects
 // as the document heading and every other FM field is dropped, with the FM
 // block itself never rendering. Plus the round-trip byte-stability guard.
 //

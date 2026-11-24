@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `secret-export` command core.
 //!
 //! The narrow-seam replacement for the removed WebView `fs:allow-write-text-file`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `export` plugin — whole-vault plaintext markdown tree export
 //! (MYND-211, epic export-suite; the importer's mirror).
 //!

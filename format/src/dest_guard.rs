@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The ONE destination-containment predicate shared by every user-chosen write
 //! destination in the app.
 //!

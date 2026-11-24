@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one lowercase-hex contract (myne-md/myne audit T6.10(c)).
 //!
 //! Hex rendering and its predicate were re-derived by hand in a dozen blob

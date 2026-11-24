@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The agent loop.
 //!
 //! Named `run_loop` rather than `loop` because `loop` is a Rust keyword and
@@ -17,7 +17,7 @@
 //! **The ceiling is a liveness stop, not a policy.** A model that loops forever
 //! calling `list_scope` has to be stopped by something, and this is that
 //! something. It is not a cap on scope growth and it is not a spend cap: both of
-//! those were considered and declined (`agent-tooling/design-notes/ai/` entry for
+//! those were considered and declined (`decisions/ai/` entry for
 //! myne-md/myne#529). Do not repurpose it as one without reopening that.
 
 use super::edit::{EditKind, ProposedEdit};
@@ -519,7 +519,7 @@ pub struct LoopDeps<'a> {
     /// (myne-md/myne#456).
     ///
     /// **Why the loop reports at all, rather than the caller reading the
-    /// outcome.** `agent-tooling/design-notes/ai/0515` rests the remote arm's lack of a
+    /// outcome.** `decisions/ai/0515` rests the remote arm's lack of a
     /// volume bound on disclosure: a finished run reports the requests it made,
     /// the notes it read, and how much text left the device. But `drive`
     /// returns only when the loop has STOPPED, which on a remote provider is
@@ -1399,7 +1399,7 @@ async fn drive_inner(
                         //
                         // Nothing fuzzy-matches the mistyped id onto a real one.
                         // That is the anchor rule's own failure mode in another
-                        // costume, and `agent-tooling/design-notes/ai/0515` rules it out
+                        // costume, and `decisions/ai/0515` rules it out
                         // there for the same reason: a near-miss that writes to
                         // the wrong note is worse than a refusal.
                         let scope = runs.scope(run_id)?;
@@ -3796,7 +3796,7 @@ mod tests {
     /// **Why the second half is the load-bearing one.** A live counter that
     /// drifts from the outcome is worse than no live counter: the surface would
     /// show one figure while the run was going and swap it for a different one
-    /// the moment it stopped, and `agent-tooling/design-notes/ai/0515` names the off-device
+    /// the moment it stopped, and `decisions/ai/0515` names the off-device
     /// figure as the compensating control for an arm with no volume bound. A
     /// control that visibly disagrees with itself is not one.
     ///
@@ -4174,7 +4174,7 @@ mod tests {
     /// governs the scope-approval pause. Neither covers a run that is executing,
     /// and that is up to 24 iterations, measured at 12m49s on a remote provider.
     /// Until this the seed was fixed for the whole of it while
-    /// `agent-tooling/design-notes/ai/0553` and `threat-model.md` TB13 both cited SYNC-14 as
+    /// `decisions/ai/0553` and `threat-model.md` TB13 both cited SYNC-14 as
     /// the bound.
     ///
     /// Asserted on what reaches the REQUEST, since that is the value that leaves

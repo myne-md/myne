@@ -5,7 +5,7 @@
 // riding the same real-IPC harness. It exists because a UI branch's review
 // evidence is pixels, and the only automated seat that can produce them is
 // the Linux/webkit2gtk container: tauri-driver has no macOS support
-// (`agent-tooling/docs/dev/e2e.md`), and capturing on the developer's own machine would
+// (`dev-notes/e2e.md`), and capturing on the developer's own machine would
 // photograph their real vault.
 //
 // Scope: the surfaces THIS branch changed, one frame each, in the order a
@@ -342,7 +342,7 @@ runner(
       // Developer mode, from INSIDE the open modal: `enableDeveloperMode`
       // reaches About by the gear, and clicking the gear again on an open
       // modal is a close rather than an open. The agent tab is behind this
-      // switch by decision (`agent-tooling/design-notes/ai/0636`).
+      // switch by decision (`decisions/ai/0636`).
       await safe("developer mode", async () => {
         await enableDeveloperModeInSettings(s);
         await sleep(400);

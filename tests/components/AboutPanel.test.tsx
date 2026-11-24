@@ -157,7 +157,7 @@ describe("AboutPanel — legal document links (operations#15)", () => {
   it("offers the privacy policy and nothing about the closed offering", () => {
     // One document. Terms, the DSA notice route and the law-enforcement page
     // described a service Myne was offering publicly, and it offers none
-    // (`agent-tooling/design-notes/sync/0696`). The absence assertions are the half that
+    // (`decisions/sync/0696`). The absence assertions are the half that
     // fails if a row is added back without a decision.
     render(<AboutPanel />);
     expect(screen.getByTestId("about.legal-privacy")).toBeTruthy();

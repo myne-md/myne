@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! WCAG contrast gate — the readability check the value allowlist **cannot** do
 //! (deep-customization, myne#394 task 4).
 //!

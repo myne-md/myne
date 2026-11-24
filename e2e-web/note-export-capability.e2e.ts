@@ -10,7 +10,7 @@
 // (`web/src/platform/capabilities.ts` lists `pdfExport` and `vaultExport` as
 // absent), so the desktop suite drives the branch where every format is
 // offered and CANNOT drive the branch where one is withheld. That asymmetry is
-// exactly the case `agent-tooling/design-notes.md` 2026-07-26 keeps in `e2e-web/`: shared
+// exactly the case `decisions.md` 2026-07-26 keeps in `e2e-web/`: shared
 // behaviour is tested once on desktop, and what differs by seam is tested here.
 //
 // # Absence, not disablement

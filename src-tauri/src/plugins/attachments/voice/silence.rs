@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Rolling per-source silence detection for a meeting session
 //! (myne-md/myne#789).
 //!

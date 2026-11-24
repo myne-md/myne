@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The device-local Tor-routing toggle — command surface + startup restore
 //! (MYND-650 task 6).
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The beta-terms acceptance gate — command surface (operations#15).
 //!
 //! Two commands over the device-local record in

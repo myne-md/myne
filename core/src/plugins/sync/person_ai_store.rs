@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The person-private AI state store (myne-md/myne#711 tasks 26 to 28).
 //!
 //! In a shared (`NTV6`) vault a **member** keeps their own AI material (their

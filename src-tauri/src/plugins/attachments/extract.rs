@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! On-device attachment text extraction for search (MYND-328; `protocol.md`
 //! § 9.15). Pulls searchable text out of an attachment's decrypted plaintext so
 //! a note becomes findable by the contents of the files embedded in it.

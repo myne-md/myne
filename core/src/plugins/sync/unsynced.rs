@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Which local note edits are **not yet on the server** (phase3-web-client
 //! task 23).
 //!

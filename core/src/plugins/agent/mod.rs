@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `agent` plugin core: agentic note editing (myne-md/myne#529).
 //!
 //! An agent run proposes changes to note bodies inside a scope the user
@@ -42,9 +42,9 @@
 //! would require rewriting every note that links to the renamed one, and those
 //! notes are not in scope, so rename and the scope model are mutually exclusive.
 //!
-//! Spec: `agent-tooling/docs/threat-model.md` §7 (the prompt-injection bullet this feature
-//! amends, and the restated SYNC-17), `agent-tooling/design-notes/ai/0461` (the provider
-//! posture this inherits unchanged) and `agent-tooling/design-notes/ai/0462` (the request
+//! Spec: `docs/threat-model.md` §7 (the prompt-injection bullet this feature
+//! amends, and the restated SYNC-17), `decisions/ai/0461` (the provider
+//! posture this inherits unchanged) and `decisions/ai/0462` (the request
 //! class and the described-backend registry).
 //!
 //! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".

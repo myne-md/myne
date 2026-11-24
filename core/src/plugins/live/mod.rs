@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The live co-editing session core (epic live-collab, `collab-editor-bridge`).
 //!
 //! This is the Rust-core side of the collaborative editor bridge: the

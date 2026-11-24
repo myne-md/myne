@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The desktop reminder delivery seam: three commands, one per method of the
 //! `ReminderNotifier` interface the scheduling core already speaks
 //! (myne-md/myne#1076, task 23 of the 0.19 block).

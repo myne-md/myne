@@ -3,7 +3,7 @@
 // Component tests for `src/components/settings/AccountPanel.tsx` — the
 // account-level panel, and only that: the device-local grouping of vaults, the
 // person account number that now opens it, and the vaults in it. An account has
-// no name to rename (`agent-tooling/design-notes/ui/0728`). The vault's own controls (label, icon, change
+// no name to rename (`decisions/ui/0728`). The vault's own controls (label, icon, change
 // password, danger zone) live in `settings/VaultPanel.tsx` and are tested in
 // `tests/components/vaultPanel.test.tsx`.
 //
@@ -115,7 +115,7 @@ describe("AccountPanel — the account this vault belongs to", () => {
   /**
    * The browser clipper used to sit here as the panel's last section, on the
    * argument that a pairing token is account-scoped. The scope was right and the
-   * panel was wrong (`agent-tooling/design-notes/ui/0778`, myne-md/myne#960): Account answers
+   * panel was wrong (`decisions/ui/0778`, myne-md/myne#960): Account answers
    * "who am I on this device", and a browser the user connected is software. The
    * panel owns that surface now (`browserExtensionsPanel.test.tsx`), so what this
    * suite holds is the ABSENCE, which is the half a move can silently undo.
@@ -127,7 +127,7 @@ describe("AccountPanel — the account this vault belongs to", () => {
   });
 });
 
-// `agent-tooling/design-notes/ui/0728`: the account name is gone, and the person account
+// `decisions/ui/0728`: the account name is gone, and the person account
 // number took the block it used to open the panel with. Both halves are pinned
 // here, because "the number moved up" is a layout claim that no type can make.
 describe("AccountPanel — the number took the name's place", () => {

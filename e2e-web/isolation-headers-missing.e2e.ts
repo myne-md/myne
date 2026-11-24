@@ -22,7 +22,7 @@
 //
 // So the failure this prevents is not "a feature is missing". It is a vault
 // that opens, accepts typing, silently stops saving, and cannot be locked,
-// while the keys sit in a Worker nobody can reach. `agent-tooling/docs/self-host-web.md`
+// while the keys sit in a Worker nobody can reach. `docs/self-host-web.md`
 // calls this misconfiguration fatal.
 //
 // # Why nothing was exercising it

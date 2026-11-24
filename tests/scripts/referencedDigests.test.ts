@@ -3,7 +3,7 @@
 // WHAT THIS FILE DOES NOT COVER, and why: the half that talks to ghcr.io. A unit test that
 // needs a public registry is a test that goes red when GitHub is slow, and the resolution
 // half is exercised end-to-end by running the guard (and, at release time, by
-// `operations/scripts/check-image-multiarch.sh`). What IS covered here is every branch that
+// `runbook/scripts/check-image-multiarch.sh`). What IS covered here is every branch that
 // does not need the network — the absent-companion skip, its `--require-companion` form, the
 // non-vacuity floor, and the unreachable-registry path (driven through the guard's
 // `MYNE_REGISTRY_BASE` seam, which is what that seam exists for).

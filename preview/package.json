@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "//": "The theme-preview snapshot (myne#394) — the real editor's DOM and the real stylesheet, captured FROM the running desktop app by e2e/capture/theme-preview.capture.ts, plus the ONE implementation of applying a palette to it. Consumed as SOURCE by the website's theme builder and by the myne-themes gallery renderer, so a person deciding whether they like a theme is looking at Myne rather than at three separately hand-written imitations of it. `apply.mjs` is plain ESM rather than TypeScript because the gallery renderer is a Node CLI that can import neither .ts nor @myne/ornaments; it takes its vocabulary from the captured stylesheet instead. src/preview.{html,css} are ARTEFACTS: never hand-edit them, re-run the capture.",
   "exports": {
     ".": "./src/apply.mjs",

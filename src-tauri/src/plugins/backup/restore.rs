@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_restore_backup` — recreate a vault from a `.myne-backup` file
 //! (MYND-218, spec §9.11; SYNC-5 placement mechanics, SYNC-6 permit split).
 //!

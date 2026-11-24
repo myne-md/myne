@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `agent` Tauri plugin: agentic note editing (myne-md/myne#529).
 //!
 //! The command **cores** live in `myne-core` (`myne_core::plugins::agent`), so

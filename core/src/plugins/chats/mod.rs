@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The AI conversations storage core (`vault.chats` catalog singleton, `MYM1`
 //! plus per-conversation `chats/<id-hex>` files, `MYJ1`; myne-md/myne#675,

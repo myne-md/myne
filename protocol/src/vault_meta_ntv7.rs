@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `NTV7`: the person-wrapped `vault.meta` generation (myne-md/myne#911).
 //!
 //! `NTV6` made the vault B2B: an owner-wrapped group key, a group-key epoch and
