@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `export-dir` plugin: the mobile host (myne-md/myne#517).
 //!
 //! One command, `export_path`. It resolves the export directory, creates it,
@@ -35,7 +35,7 @@
 //! only way to obtain an export directory that is guaranteed to exist and to be
 //! excluded from platform backup, and the only destination the four export flows
 //! compose. Containment stays with the writers, and
-//! `myne-agents/epics/mobile-icebox-pair/sync-ledger.md` ACCEPT-1 records
+//! `private-companion/epics/mobile-icebox-pair/sync-ledger.md` ACCEPT-1 records
 //! resolving each destination inside its own export command as the larger,
 //! separate piece of work that would change that.
 //!
@@ -310,7 +310,7 @@ fn is_direct_child(path: &Path, dir: &Path, name: &str) -> bool {
 /// creates and names a directory the platform already gives this app.
 ///
 /// **What it is NOT**, because the first draft of this doc claimed otherwise and
-/// the claim reached `myne-agents/docs/threat-model.md`: this is not the only way the WebView
+/// the claim reached `docs/threat-model.md`: this is not the only way the WebView
 /// can name a destination. The module header carries the enumeration, and it is
 /// the copy to keep current. It is not asserted to be exhaustive, and the
 /// sentence this replaced asserted exactly that over a list that was short by

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The anchored edit and the move: the two write verbs that change text that is
 //! already there (external-mcp-connection task 15).
 //!

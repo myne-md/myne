@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Ingest-time image compression (`ingest-image-compression`).
 //!
 //! A pure transform over freshly imported attachment bytes: downscale and

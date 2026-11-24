@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `screen_capture` Tauri plugin: the device-local escape hatch from
 //! screen-capture protection (myne-md/myne#482) and the WebView half of the
 //! re-assert-on-show fix (myne-md/myne#483).

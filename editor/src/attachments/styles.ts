@@ -4,7 +4,7 @@
 // once on first use is how they get their tokens (CM6 theme classes are scoped
 // to `.cm-editor`, which these escape).
 //
-// All values use `var(--*)` tokens from `myne-agents/docs/design/colors_and_type.css` with
+// All values use `var(--*)` tokens from `design/colors_and_type.css` with
 // hex fallbacks, so live tokens win and fallbacks only apply if the variable
 // layer fails to load.
 
@@ -469,7 +469,7 @@ const CSS = `
 }
 .cm-attachment-file-card-menuitem-checked::before {
   /* The Lucide check glyph as a mask, not the U+2713 character. The design
-     canon (myne-agents/docs/design/README.md, Iconography) bans unicode symbols as icons
+     canon (design/README.md, Iconography) bans unicode symbols as icons
      and names this exact replacement, with keyboard-shortcut glyphs its only
      exception. This same feature quotes that rule one file over to justify
      drawing its alert marker from Lucide, so a unicode tick here contradicted
@@ -523,7 +523,7 @@ const CSS = `
 /* A STATIC red dot. It used to pulse (cm-voice-rec-pulse, 1.2s ease-in-out
    infinite), which PRODUCT.md principle 4 forbids in both motion tiers and
    which scripts/check-motion-canon.mjs now fails on
-   (myne-agents/docs/decisions/ui/0632).
+   (decisions/ui/0632).
 
    Removing it costs nothing, and that is the point: the recording bar already
    carries .cm-voice-rec-time, a monospace elapsed timer ticking once a
@@ -640,7 +640,7 @@ const CSS = `
    in the global sheet (the CM theme's StyleModule doesn't emit @keyframes); the
    bar's static box + colour come from the scoped theme. */
 /* This one STAYS looping, and the distinction from the dot above is the whole
-   of myne-agents/docs/decisions/ui/0632: a transcription busy meter reports that work is
+   of decisions/ui/0632: a transcription busy meter reports that work is
    in flight, which is information the user asked for, so it is an indeterminate
    progress indicator rather than decoration.
 

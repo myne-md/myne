@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! IPC surface of the `diagnostics` plugin (myne-md/myne#860).
 //!
 //! Desktop-only. Every command resolves its path host-side and delegates to a

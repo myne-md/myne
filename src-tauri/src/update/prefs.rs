@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local update preferences: `<app_config_dir>/update-prefs.json`.
 //!
 //! One field today: whether this device checks for updates automatically. It is
@@ -10,7 +10,7 @@
 //! check is what carries security patches, so the safe direction is on. This is
 //! the opposite of a privacy-preserving default only in appearance; what leaves
 //! the device is a version and a platform to a no-log origin, recorded in
-//! `myne-agents/docs/threat-model.md`, and the user turns it off here if that is their
+//! `docs/threat-model.md`, and the user turns it off here if that is their
 //! choice.
 
 use serde::{Deserialize, Serialize};

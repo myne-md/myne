@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one place a note blob is turned back into markdown, whatever its format
 //! (myne-md/myne#432, #442).
 //!

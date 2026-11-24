@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `myne` and `myne-mcp` PATH shims — how the bundled sidecars become
 //! commands the user can type (cli-thin-client task 11; MYND-490, extended by
 //! external-mcp-connection task 1; myne-md/myne#923).

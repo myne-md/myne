@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Approve every pending device on an account, from source, without a GUI
 // (phase3-web-client task 105 — the other half of the fixture seeder).
 //

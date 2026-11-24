@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `attachment_read_text` — decrypt one attachment's plaintext as TEXT for a
 //! Tier-1 inline preview (MYND-268). The decode core is
 //! [`crate::plugins::attachments::scheme_core::read_attachment_text`]; this host

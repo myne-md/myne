@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-unlock plugin — shared core.
 //!
 //! The platform-agnostic pieces live here in `myne-core`:

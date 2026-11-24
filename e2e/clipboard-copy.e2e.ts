@@ -21,7 +21,7 @@
 // Anything about the system clipboard's contents. tauri-driver cannot read the
 // OS pasteboard, and the properties that matter most on mobile (device
 // confinement, OS-enforced expiry) have no CI-observable form at all, those are
-// `myne-agents/docs/dev/clipboard-sensitivity-verification.md`, manual and honestly labelled.
+// `dev-notes/clipboard-sensitivity-verification.md`, manual and honestly labelled.
 // A scenario here that claimed to check them would be worse than none.
 
 import fs from "node:fs";

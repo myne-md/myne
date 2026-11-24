@@ -35,7 +35,7 @@ describe("accountIdForVault", () => {
   });
 });
 
-// `myne-agents/docs/decisions/ui/0728`: an account has no name, so a surface identifies a
+// `decisions/ui/0728`: an account has no name, so a surface identifies a
 // group by the vaults inside it. One implementation, three callers (desktop
 // picker, recover picker, mobile picker).
 describe("accountHeading", () => {

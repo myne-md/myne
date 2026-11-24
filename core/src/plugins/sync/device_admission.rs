@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The two-sided device admission ceremony (`decisions/protocol/0735`; myne-md/myne#938
 //! task 11).
 //!

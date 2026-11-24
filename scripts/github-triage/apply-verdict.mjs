@@ -101,7 +101,7 @@ else action = 'triage';
 
 // --- milestone -------------------------------------------------------------
 // "A milestone is never left empty" is the tracker's rule
-// (myne-agents/reference/github-issues.md), so the milestone is DERIVED here
+// (private-companion/reference/github-issues.md), so the milestone is DERIVED here
 // rather than read off the verdict, and a repo with open milestones always
 // gets one. Highest OPEN version wins by numeric compare, not string order:
 // v0.10 is above v0.5, and a shipped release is routinely left open, so the

@@ -2,9 +2,9 @@
 // Every feature surface carries a pre-release manual-test verdict, and no verdict
 // outlives the files it describes.
 //
-// HAND-RUNNABLE ONLY since myne-md/myne#996 (`myne-agents/docs/decisions/process/0780`): it
+// HAND-RUNNABLE ONLY since myne-md/myne#996 (`decisions/process/0780`): it
 // left `pre-commit` and CI, so nothing fails a change for a missing or stale entry.
-// It still checks the roster and still regenerates `myne-agents/docs/dev/manual-test-roster.md`,
+// It still checks the roster and still regenerates `dev-notes/manual-test-roster.md`,
 // and `/release` still generates the manual half from it. An entry is worth writing
 // for the release it gates, not for a commit.
 //
@@ -19,12 +19,12 @@
 // So macOS desktop, Windows desktop, Safari, iOS and
 // Android have ZERO automated UI coverage, and until this roster existed nothing
 // in the tree stated that. Seven manual procedure documents did exist
-// (`myne-agents/docs/dev/accessibility-checklist.md`, `myne-agents/docs/dev/tor-verification.md`,
-// `myne-agents/docs/dev/clipboard-sensitivity-verification.md`, `myne-agents/docs/dev/clipper-testing.md`,
+// (`dev-notes/accessibility-checklist.md`, `dev-notes/tor-verification.md`,
+// `dev-notes/clipboard-sensitivity-verification.md`, `dev-notes/clipper-testing.md`,
 // `mobile/docs/dev/device-matrix.md`, `mobile/docs/dev/reminders-device-checklist.md`,
 // `mobile/docs/dev/sync-test-confidence.md`) and only THREE were reachable from
 // the release flow at all. Measured rather than assumed, against every reference
-// in `myne-ops/runbooks/release-checklist.md`: it names the accessibility, Tor and
+// in `runbook/runbooks/release-checklist.md`: it names the accessibility, Tor and
 // clipboard-sensitivity documents, and none of the other four, so
 // `clipper-testing.md`, `device-matrix.md`, `reminders-device-checklist.md` and
 // `sync-test-confidence.md` were orphans nobody opens.
@@ -37,7 +37,7 @@
 // WHY A ROSTER AND NOT A CHECKLIST DOCUMENT. A hand-written "every feature" list
 // is a second copy of the feature roster. It is right on the day it is written
 // and wrong two releases later, and nothing reports the drift, which is exactly
-// what `myne-ops/runbooks/release-checklist.md` refuses in its own opening
+// what `runbook/runbooks/release-checklist.md` refuses in its own opening
 // ("It links rather than restates"). This file reads the directories instead and
 // requires every file in them to be accounted for, the same argument
 // `scripts/check-web-screens.mjs` and `scripts/check-twin-inventory.mjs` make.
@@ -853,7 +853,7 @@ export function analyse(io) {
 // ---------------------------------------------------------------------------
 // The projection.
 //
-// `myne-agents/docs/dev/manual-test-roster.md` is generated from the roster and gated by
+// `dev-notes/manual-test-roster.md` is generated from the roster and gated by
 // `--check`, the same arrangement `scripts/check-twin-inventory.mjs` uses. The
 // reason it is generated rather than written is that a hand-kept second copy of
 // a roster is the exact drift this whole file exists to stop.
@@ -1094,6 +1094,13 @@ async function main() {
   // exactly as it did before these flags existed.
   const ratchetLabel = ratchetOverride ?? join("scripts", "manual-test-ratchet.json");
   const projectionLabel = projectionOverride ?? PROJECTION;
+
+  // The roster is an internal document. A public checkout has no docs/dev tree,
+  // so the gate has nothing to check rather than a broken checkout.
+  if (!projectionOverride && !existsSync(projectionPath)) {
+    console.log("check-manual-test-roster: skipped (private docs/dev/manual-test-roster.md is not present)");
+    return;
+  }
 
   const { ROSTER } = await import("./manual-test-roster.mjs");
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Shared 34-byte-header AEAD envelope for the five vault-singleton
 //! "opaque inner plaintext" blob codecs: `vault.search` (`MYS1`, §9.6),

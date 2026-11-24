@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Worker's session state (phase3-web-client task 12).
 //!
 //! # What changed, and why it took until now

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `notes` plugin — shared core.
 //!
 //! Owns the platform-agnostic per-note CRUD + listing commands

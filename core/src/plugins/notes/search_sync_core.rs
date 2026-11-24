@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `MYS1` search-index lifecycle, shared by every client
 //! (phase3-web-client tasks 14 + 83).
 //!

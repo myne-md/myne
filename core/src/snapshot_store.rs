@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! On-disk storage layer for encrypted per-note snapshots (MYND-96 — the
 //! write-path / storage side of the encrypted-snapshots epic). Shared by the
 //! notes-plugin creation hook (snapshot-write-path) and the snapshots plugin's

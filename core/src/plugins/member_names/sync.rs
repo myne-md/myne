@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The sync-facing surface of the member-names family: the group-tier keyspace
 //! resolver, the family's 16-byte sync discriminator, and the decryption-free

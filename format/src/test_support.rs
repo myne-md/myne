@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Test-only scratch directory for the `format/` crate's own tests.
 //!
 //! A minimal `ScopedTempDir` (the `myne-core` shape, without the vault-meta

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Magic-less, wire-only **awareness frame** for live collaboration
 //! (`protocol.md` §5.1/§5.2/§5.3; SYNC-1/SYNC-2/SYNC-9; epic `live-collab`).
 //!

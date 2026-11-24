@@ -294,7 +294,7 @@ describeE2E("AK-4 the skip link is the second stop and lands in main (myne#728)"
         // real WebKitGTK window activates a focused button on Enter, and this
         // is the Actions API's synthesis of it that does not. A user pressing
         // Enter on the skip link is therefore covered by the MANUAL keyboard
-        // pass (myne-agents/docs/dev/accessibility-checklist.md section 1), not by this.
+        // pass (dev-notes/accessibility-checklist.md section 1), not by this.
         await pressKey(app.session, KEY.SPACE);
         await app.session.waitUntil(
           async () => ((await focusedRegion(app.session)) === "editor" ? true : null),

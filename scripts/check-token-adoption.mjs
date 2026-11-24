@@ -26,7 +26,7 @@
 // at zero, which means new code is held to the standard the tree is still moving
 // toward rather than to the tree's current average.
 //
-// Out of SCOPE (not scanned at all): `myne-agents/docs/design/colors_and_type.css`, which
+// Out of SCOPE (not scanned at all): `design/colors_and_type.css`, which
 // defines tokens rather than consuming them. (`ornaments/src/ornaments.css` used
 // to be listed here too, but `ornaments/src` is on the shared-roots roster and
 // so IS scanned — it is excused in EXEMPT below, where the reason can be read.)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Tauri-host adapters an agent run needs: reading a note, taking its
 //! restore point, and writing the approved batch (myne-md/myne#456).
 //!

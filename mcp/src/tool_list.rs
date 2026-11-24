@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The compiled-in tool surface: thirteen verbs, declared as data.
 //!
 //! **This file is the list, and it is the ONLY file a guard reads to answer

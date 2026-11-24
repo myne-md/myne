@@ -1,22 +1,23 @@
 // Static WCAG AA contrast verification of the primary design tokens (MYND-93,
 // task 8). The E2E-axe tier (task 7) checks contrast on the live render; this is
 // the fast, deterministic guard at the token SOURCE — it parses the canonical
-// hex values from `myne-agents/docs/design/colors_and_type.css` and asserts every primary
+// hex values from `design/colors_and_type.css` and asserts every primary
 // text/control pair clears WCAG 2.1 AA (>=4.5:1) in BOTH light and dark.
 //
 // Per the MYND-93 decision, a contrast failure on a primary token is a design-
-// canon bug fixed at the token source — `myne-agents/docs/design/colors_and_type.css`, with
+// canon bug fixed at the token source — `design/colors_and_type.css`, with
 // `DESIGN.md`/`DESIGN.json` corrected in the same change — never a per-component
 // override. This test makes such a regression fail loudly.
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const css = readFileSync(
-  fileURLToPath(new URL("../../myne-agents/docs/design/colors_and_type.css", import.meta.url)),
-  "utf8",
-);
+const CANON = fileURLToPath(new URL("../../design/colors_and_type.css", import.meta.url));
+// The design canon is private; a public checkout keeps the extracted values in
+// DESIGN.md but not the CSS source, so this token-source guard has nothing to read.
+const css = existsSync(CANON) ? readFileSync(CANON, "utf8") : "";
+const describeCanon = css ? describe : describe.skip;
 
 /** Resolve a token's literal 6-digit hex from the canon CSS. */
 function hex(token: string): string {
@@ -44,7 +45,7 @@ function contrast(a: string, b: string): number {
 
 const AA = 4.5; // normal-text threshold
 
-describe("primary token contrast meets WCAG AA", () => {
+describeCanon("primary token contrast meets WCAG AA", () => {
   // Light mode: foreground inks + accent over the paper background.
   it.each([
     ["fg-1 (ink-1)", "ink-1", "paper"],

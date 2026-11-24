@@ -3,7 +3,7 @@
 // ⚠️ DEVICE-VERIFY-PENDING — this Swift cannot be compiled in the mobile repo
 // (no Xcode project is generated here; `src-tauri/gen/` holds only `schemas`).
 // It is committed source at the `tauri-plugin-qr-scan` bar and is verified on a
-// real device via `myne-agents/docs/dev/device-matrix.md`, NOT in the change that adds it.
+// real device via `dev-notes/device-matrix.md`, NOT in the change that adds it.
 //
 // iOS half of the task-reminder scheduler (MYND-619, task 2).
 //

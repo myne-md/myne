@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-change-password Tauri plugin.
 //!
 //! Owns the standalone `vault_change_password::commit` command —
 //! user-knows-current-password password rotation flow. NOT for
 //! post-recovery password reset (that's `vault_recover::complete_recovery`,
 //! A8f). The two are split because their signatures differ — see
-//! `myne-agents/features/vault-change-password/prd.md` Problem
+//! `private-companion/features/vault-change-password/prd.md` Problem
 //! Statement.
 //!
 //! Sibling to `vault_unlock` and `vault_recover`. All three share
@@ -14,12 +14,12 @@
 //! `Tauri::State<VaultRuntimeState>`.
 //!
 //! Design history:
-//! - PRD: `myne-agents/features/vault-change-password/prd.md`
-//! - Grilling: `myne-agents/sessions/grill/2026-05-06-mynd-22-vault-change-password.md`
+//! - PRD: `private-companion/features/vault-change-password/prd.md`
+//! - Grilling: `private-companion/sessions/grill/2026-05-06-mynd-22-vault-change-password.md`
 //!   Q1–Q9 (CAS posture, AEAD-tag-verify proof, force-relock,
 //!   post-Argon2id slot peek, PR shape, naming discipline, strength
 //!   gating, tracing pattern, test posture)
-//! - Tasks: `myne-agents/features/vault-change-password/tasks.md`
+//! - Tasks: `private-companion/features/vault-change-password/tasks.md`
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tests for the drawing-note exclusion from the live bridge (`collab-editor-bridge`
 //! task 9).
 

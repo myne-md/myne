@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tests for the body-span guard (`collab-editor-bridge` task 6).
 
 use super::apply_local::{apply_local_splices, LocalSplice};

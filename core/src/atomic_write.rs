@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Atomic file-write helper.
 //!
 //! The durability mechanics live in `myne-format` so the `myne-decrypt` CLI

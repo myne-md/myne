@@ -21,7 +21,7 @@
 # WHY CI DOES NOT BUILD OR PUBLISH THIS. The pipelines verify and never publish
 # (myne-md/myne#<A>). A step that published this image would also be the one
 # case where CI rewrites its own input, which is worse than the general rule it
-# would break. The procedure is `myne-ops/runbooks/ci-base-image.md`, run by
+# would break. The procedure is `runbook/runbooks/ci-base-image.md`, run by
 # hand, and the workflows pin the result BY DIGEST rather than by tag so a
 # republished tag cannot silently change what a gate ran on.
 #
@@ -67,7 +67,7 @@ RUN rustup component add rustfmt clippy llvm-tools \
 
 # Node, from the same first-party origin and the same pinned version the steps
 # fetched by hand. Pinned to `.nvmrc`.
-ARG NODE_VERSION=25.9.0
+ARG NODE_VERSION=24.22.3
 RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     | tar -xJ -C /usr/local --strip-components=1
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `myne-web-wasm` — the web client's wasm entry surface.
 //!
 //! # What this crate is

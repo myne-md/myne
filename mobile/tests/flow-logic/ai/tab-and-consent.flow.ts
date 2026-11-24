@@ -15,7 +15,7 @@
 //      vault another device configured inherits the provider, the model and the
 //      KEY, because those are vault content and sync. It does not inherit the
 //      approval, because `ai_provider_consent` is device-local
-//      (`myne-agents/docs/spec/sync-protocol.md` §10.2). So this phone must still see the
+//      (`docs/spec/sync-protocol.md` §10.2). So this phone must still see the
 //      consent screen, and must send nothing until somebody accepts it HERE.
 //   3. The consent write, when it happens, names the PROVIDER rather than
 //      setting a flag. An approval recorded as a boolean would carry over to a

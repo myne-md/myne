@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Native Argon2id reference for the web benchmark (phase3-web-client task 63).
 //!
 //!   cargo run --release --example bench-kdf -p protocol [runs]

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Integration proof of the lowest-priority compute policy (MYND-651 task 11).
 //!
 //! [`super::compute_priority`]'s own tests cover the register in isolation, and

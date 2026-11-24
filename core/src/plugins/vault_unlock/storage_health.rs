@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Did the local copy go away underneath a live session?
 //! (phase3-web-client task 22)
 //!

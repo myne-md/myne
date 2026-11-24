@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri-layer error types for the `notes` plugin.
 //!
 //! Mirrors the `vault_unlock::error::VaultUnlockError` discipline (no
@@ -523,7 +523,7 @@ impl From<std::io::Error> for NoteDeleteError {
 /// [`super::commands::note_list`].
 ///
 /// Hand-mirrored on the TS side at `src/types/note-list-error.ts` (Task
-/// 5 of `myne-agents/features/mynd-28-note-list/tasks.md` — lock-step
+/// 5 of `private-companion/features/mynd-28-note-list/tasks.md` — lock-step
 /// with the structural plumbing changes; intentionally NOT in this task).
 ///
 /// Asymmetry vs the other four notes-error enums: list operates on **no
@@ -543,7 +543,7 @@ impl From<std::io::Error> for NoteDeleteError {
 ///   feeds `JoinFailure`. `note_list` joins the pattern even though it
 ///   does no AEAD (Q4e of the MYND-28 grilling: NFS / FUSE / AV-overlay
 ///   topology violates the laboratuvar "`read_dir` ucuz" assumption).
-/// - `myne-agents/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4d —
+/// - `private-companion/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4d —
 ///   variant set rationale + naming mirror.
 ///
 /// See: ../../AGENTS.md "Secret-handling logging discipline".
@@ -663,7 +663,7 @@ impl From<std::io::Error> for NoteTitleError {
 /// - `decisions.md` 2026-05-15 "Note title write target" (companion
 ///   entry; this batch command serves the read side of the same FM
 ///   `title:` ↳ first `# H1` ↳ None precedence chain).
-/// - `myne-agents/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
+/// - `private-companion/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
 ///   Q4 (per-item Result vs fail-whole-batch decision) + Q5 (hard cap
 ///   100 to prevent Tokio blocking-pool saturation).
 #[derive(Debug, Error, Serialize)]

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Command bodies for the AI conversations plugin (myne-md/myne#675).
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `themes` plugin — shared core (MYND-486).
 //!
 //! Owns the vault-content custom-theme store: the encrypted `vault.themes`

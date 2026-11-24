@@ -6,7 +6,7 @@
 //
 // # What this replaces
 //
-// The Phase 0 spike (`myne-agents/features/phase3-web-client/spike-phase0.md`)
+// The Phase 0 spike (`private-companion/features/phase3-web-client/spike-phase0.md`)
 // measured Argon2id and OPFS once, from a scratchpad harness that no longer
 // exists. Its own conclusion is that **the ratio is the transferable number** —
 // 1.13–1.65× wasm-over-native — because absolute milliseconds belong to the

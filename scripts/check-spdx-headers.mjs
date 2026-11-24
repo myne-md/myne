@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Every tracked Rust source file carries `// SPDX-License-Identifier: AGPL-3.0`
+// Every tracked Rust source file carries `// SPDX-License-Identifier: AGPL-3.0-only`
 // on line 1.
 //
 // **Why this is a script and not a shell loop in the hook.** It lived as an
@@ -15,7 +15,7 @@
 //
 // **Why the whole tree rather than a directory roster.** The scope used to be
 // `protocol/` because that is where the file-level claim started. The claim is
-// actually about every AGPL-3.0 crate, so a roster of directories is a second
+// actually about every AGPL-3.0-only crate, so a roster of directories is a second
 // thing to keep in step with `Cargo.toml`, and the failure it produces is the
 // one this repo records twice already: a guard blind to a whole client. Scoping
 // to every tracked `.rs` means a new crate is covered by being Rust.
@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** The exact first line every Rust source file must carry. */
-export const SPDX_HEADER = "// SPDX-License-Identifier: AGPL-3.0";
+export const SPDX_HEADER = "// SPDX-License-Identifier: AGPL-3.0-only";
 
 /** Paths from `paths` whose first line is not [`SPDX_HEADER`].
  *
@@ -97,7 +97,7 @@ function main() {
 
   console.log(
     `spdx-header: ok (${candidates.length} Rust file(s)` +
-      `${wholeTree ? " across the tracked tree" : " staged"} carry the AGPL-3.0 header)`,
+      `${wholeTree ? " across the tracked tree" : " staged"} carry the AGPL-3.0-only header)`,
   );
 }
 

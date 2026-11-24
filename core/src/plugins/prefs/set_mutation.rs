@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Add/remove verbs for the `vault.prefs` set-union fields (myne-md/myne#613).
 //!
 //! Every set field used to be written by replacing the whole set with a snapshot

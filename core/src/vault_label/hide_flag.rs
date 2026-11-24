@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The device-local **hide vault names** flag (myne-md/myne#411).
 //!
 //! One boolean, persisted at `<app_config_dir>/vault-names.json`. With it on,

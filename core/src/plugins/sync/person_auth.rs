@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Device-scoped person account credential store (myne-md/myne#711).
 //!
@@ -11,7 +11,7 @@
 //! it is protected like the rest of the device-local config (filesystem
 //! permissions), not wrapped under a keychain key. That choice is recorded as
 //! `[person-token-storage] A` in
-//! `myne-agents/features/b2b-member-sync/progress.md`.
+//! `private-companion/features/b2b-member-sync/progress.md`.
 
 use std::path::{Path, PathBuf};
 

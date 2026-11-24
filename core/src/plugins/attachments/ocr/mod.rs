@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! On-device OCR for image + scanned-PDF attachments (MYND-441).
 //!
 //! This module owns model **resolution and loading**; the detection →

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The vault invite envelope (B2B identity substrate, myne-md/myne#698
 //! tasks 5-6).
 //!

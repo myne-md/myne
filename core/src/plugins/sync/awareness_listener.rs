@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `/sync/awareness` SSE listener (epic live-collab, sub-feature 4).
 //!
 //! A **sibling** of the poke supervisor (`poke_listener.rs`, `SYNC-32`): both

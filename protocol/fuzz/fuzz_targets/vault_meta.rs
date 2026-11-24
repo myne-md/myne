@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Fuzz target: `parse_vault_meta` (`MYV1` vault.meta, spec §9.3).
 //!
 //! `data` is the untrusted `vault.meta` file. Single-arg parser (no keys) —

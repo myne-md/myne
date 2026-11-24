@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Error type for the `importer` read-seam plugin (MYND-53, SYNC-1).
 //!
 //! Secret-logging discipline: no path string and no `io::Error::Display` (which

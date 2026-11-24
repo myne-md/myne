@@ -2,7 +2,7 @@
 name = "myne-tor-sidecar"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 publish = false
 description = "The `myne-tor` sidecar: arti (the Rust Tor implementation) run as a standalone loopback SOCKS5 proxy, spawned by the desktop host when the device-local Tor routing option is on (MYND-650). Never linked into `myne-desktop`, never sees vault plaintext or a key."
 

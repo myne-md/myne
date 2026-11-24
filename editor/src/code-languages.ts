@@ -2,7 +2,7 @@
 // (MYND-154, feature editor-mvp-codeblocks).
 //
 // Hand-curated, NOT `@codemirror/language-data` — per TB9 (minimal dependency
-// tree, `myne-agents/docs/threat-model.md`) the language-data registry would drag ~21
+// tree, `docs/threat-model.md`) the language-data registry would drag ~21
 // unused lang packs into the lockfile. We pin only the eight packs the ten
 // baseline languages need, all under the codemirror / lezer-parser
 // concentrated-trust org.

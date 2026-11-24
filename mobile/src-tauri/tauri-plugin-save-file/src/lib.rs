@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Android "hand the user the file" bridge (myne-md/myne#505), the OUTBOUND peer
 //! of `tauri-plugin-share-intent`.
 //!
@@ -43,7 +43,7 @@
 //! ## Verification status
 //!
 //! The committed Kotlin compiles against the generated gradle project, and its
-//! effect is device-verified through `myne-agents/docs/dev/device-matrix.md` §8 row 8.8, not
+//! effect is device-verified through `dev-notes/device-matrix.md` §8 row 8.8, not
 //! in this change, the same bar `pdf_export.rs`, `screen_guard.rs` and
 //! `ShareIntentPlugin.kt` are held to, because no CI lane in this repo runs an
 //! Android device.

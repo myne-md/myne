@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Does this device hold the whole vault? (phase3-web-client task 89)
 //!
 //! # The destructive operation this exists to gate

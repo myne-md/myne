@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-creation Tauri plugin.
 //!
 //! Owns the three-command flow (`begin` / `commit` / `cancel`) and the
 //! in-flight `VaultCreationSession` state. Secret material
 //! (`root_key`, wrap keys, recovery phrase, account number) lives in
 //! [`state::VaultCreationState`] and never crosses the IPC boundary —
-//! see `myne-agents/sessions/design/2026-04-28-vault-creation-flow.md`
+//! see `private-companion/sessions/design/2026-04-28-vault-creation-flow.md`
 //! Q3 (backend session) and `backend-vault-creation/rfc.md` § Technical
 //! Architecture.
 //!

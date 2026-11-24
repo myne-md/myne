@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Search doc-id scheme (MYND-448a): the index holds two doc KINDS — a note's
 //! body (id = the note_id) and an attachment's extracted text as its OWN doc
 //! linking back to the note it is embedded in. A structured, unambiguous id lets

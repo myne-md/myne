@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! In-memory stand-in for the OS keychain, for this module's own tests.
 //!
 //! It exists because the property worth asserting here is **which account each

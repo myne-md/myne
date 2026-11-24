@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The view manifest (`.myneview`): one [`SavedView`] as a canonical JSON
 //! object, read **strictly** because the bytes are a file somebody handed the
-//! app (`view-manifests`; `myne-agents/docs/spec/protocol.md` §9.5.2).
+//! app (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
 //!
 //! ## Two readers, two postures, and the split is the point
 //!

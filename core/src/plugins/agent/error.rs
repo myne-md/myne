@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `agent` plugin core error taxonomy.
 //!
 //! Two closed, `serde::Serialize` enums, DENY-list clean per

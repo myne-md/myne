@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Meeting-session Tauri commands (myne-md/myne#789):
 //! `meeting_session_start` / `meeting_session_stop` / `meeting_session_cancel`.
 //!

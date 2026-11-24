@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Identity-only setup: a vault-less person identity and its server account
 //! (myne-md/myne#711, decisions/protocol/0603).
@@ -160,7 +160,7 @@ pub fn register_and_enroll_person(
 /// place the person plane does have an approver. The distinction is a posture,
 /// not an enforcement, and saying so matters: the server cannot verify the
 /// declaration (a person id and a vault id are both 16 opaque bytes), so a client
-/// that declares `recovery` is believed. That is why `myne-agents/docs/threat-model.md` §5
+/// that declares `recovery` is believed. That is why `docs/threat-model.md` §5
 /// states the phrase as account takeover rather than the phrase plus a click.
 ///
 /// The declaration adds no authority the account did not already have, and this
@@ -3317,7 +3317,7 @@ async fn write_member_attempts(
 /// the store file leaves that item with no consumer, exactly as disabling the
 /// owner's quick unlock would, and the owner path already destroys it there
 /// (`quick_unlock::commands::cleanup_os_credential`). This is the member half of
-/// the same rule (`myne-agents/docs/decisions/security/0709`).
+/// the same rule (`decisions/security/0709`).
 async fn wipe_member_unlock(
     io: &dyn VaultIo,
     vault_dir: &std::path::Path,
@@ -4006,7 +4006,7 @@ pub fn retire_namespace_request(
 }
 
 /// The vault-scoped delivery route for one member's rotation package
-/// (`collab-b2b-sessions` task 1, `myne-agents/docs/spec/server-protocol.md` §3.4).
+/// (`collab-b2b-sessions` task 1, `docs/spec/server-protocol.md` §3.4).
 fn group_package_path(account_hash_hex: &str, person_id_hex: &str) -> String {
     format!("/b2b/vaults/{account_hash_hex}/group-packages/{person_id_hex}")
 }

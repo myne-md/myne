@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-delete Tauri plugin (MYND-105).
 //!
 //! Owns the standalone `vault_delete::vault_delete` IPC command —
@@ -20,12 +20,12 @@
 //! auth-ops allow-list.
 //!
 //! Design history:
-//! - PRD: `myne-agents/features/backend-vault-delete/prd.md`
-//! - Grilling: `myne-agents/sessions/grill/2026-05-26-mynd-105-vault-delete.md`
+//! - PRD: `private-companion/features/backend-vault-delete/prd.md`
+//! - Grilling: `private-companion/sessions/grill/2026-05-26-mynd-105-vault-delete.md`
 //!   Q1–Q9 (cryptographic-erase claim, slot precondition matrix,
 //!   R3 escape, partial-fail posture, artefact taxonomy, plugin
 //!   layout, test surface)
-//! - Tasks: `myne-agents/features/backend-vault-delete/tasks.md`
+//! - Tasks: `private-companion/features/backend-vault-delete/tasks.md`
 //! - decisions.md: 2026-05-26 entries (a) crypto-erase claim, (b) Slot precondition matrix + R3, (c) partial-fail posture + v0.2 vault_repair (Plane MYND-159), (d) VaultArtifactsPresent rename
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".

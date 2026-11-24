@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `NTV8`: the password-only `vault.meta` generation (myne-md/myne#938).
 //!
 //! `NTV7` gave an owner two credentials: the master password, and the identity

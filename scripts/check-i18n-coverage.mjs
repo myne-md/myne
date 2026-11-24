@@ -9,7 +9,7 @@
 // meantime. The cost of that design is that translation coverage can fall for
 // weeks with every gate in the tree green. It did: myne-md/myne#589 found the
 // same 215 keys missing from all 31 catalogs, while `PRODUCT.md` said the
-// locale set was "all of them complete" and `myne-agents/docs/dev/i18n.md` said "All 31
+// locale set was "all of them complete" and `dev-notes/i18n.md` said "All 31
 // non-English catalogs are at 100%". Nothing contradicted either sentence,
 // because nothing measured it.
 //
@@ -27,7 +27,7 @@
 //      `SUPPORTED_LANGUAGES` (`src/i18n/config.ts`) is what the picker offers,
 //      `locales/<code>/common.json` is what the bundler can load, and
 //      `i18next.config.js` is what `pnpm i18n:extract` writes new keys into.
-//      `myne-agents/docs/dev/i18n.md` documents adding a language as an edit to all three,
+//      `dev-notes/i18n.md` documents adding a language as an edit to all three,
 //      by hand, and each omission fails silently in its own way: a picker entry
 //      with no catalog renders a fully English UI (the glob loads by PATH, so
 //      nothing throws); a catalog nobody offers is a chunk no user can reach;
@@ -280,7 +280,7 @@ export function analyse(io) {
     //
     // Deliberately NOT caught: a category BEYOND CLDR that some groups carry
     // and others do not. The six locales `id ja ko th vi zh` carry English's
-    // `one` where CLDR gives them only `other` (myne-agents/docs/decisions/storage/0411).
+    // `one` where CLDR gives them only `other` (decisions/storage/0411).
     // That is dead weight rather than a defect, because `Intl.PluralRules("ja")`
     // never returns `one`, so no user reaches the missing slot.
     const required = cldrCategories(code);
@@ -445,7 +445,7 @@ function renderRecord({ rows, enKeyCount, overall, complete, totalPossible }) {
     "# Translation coverage",
     "",
     "How much of the English source each shipped catalog actually answers, measured",
-    "rather than asserted. `PRODUCT.md` and `myne-agents/docs/dev/i18n.md` point here instead of",
+    "rather than asserted. `PRODUCT.md` and `dev-notes/i18n.md` point here instead of",
     "carrying a figure of their own, because a number written into prose is a number",
     "that stops being true without anything reporting it (myne-md/myne#589).",
     "",
@@ -459,7 +459,7 @@ function renderRecord({ rows, enKeyCount, overall, complete, totalPossible }) {
     "incident found had drifted were non-empty, placeholder-clean and simply old,",
     "and every one of them counts as translated here. That half is",
     "`scripts/check-i18n-stale.mjs`, hand-run before a release",
-    "(`myne-ops/runbooks/release-checklist.md`), because detecting it means walking",
+    "(`runbook/runbooks/release-checklist.md`), because detecting it means walking",
     "the git history of all 32 catalogs per key. A 100% row is not a claim that the",
     "locale is current.",
     "",
@@ -482,7 +482,7 @@ function renderRecord({ rows, enKeyCount, overall, complete, totalPossible }) {
     "mid-sentence. A category beyond CLDR is carried but never required, since no",
     "count can select it" +
       (beyondCldr.length
-        ? ` (${beyondCldr.join(" ")} carry English's \`one\` that way, the shipped convention recorded in \`myne-agents/docs/decisions/storage/0411\`).`
+        ? ` (${beyondCldr.join(" ")} carry English's \`one\` that way, the shipped convention recorded in \`decisions/storage/0411\`).`
         : "."),
     "",
   ].join("\n");

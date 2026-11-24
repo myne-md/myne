@@ -104,7 +104,7 @@ which arrives late or not at all is never trusted again.
   identifier the platform holds is opaque and the map back to a task is
   memory-only by design, so a session that did not register the reminder cannot
   name it. Where such a tap should land is an open decision recorded in
-  `myne-agents/features/task-notifications-mobile/progress.md`.
+  `private-companion/features/task-notifications-mobile/progress.md`.
 - **Manufacturer battery managers** can delay or drop alarms on some devices.
   This is documented rather than fought: the app does not detect it, does not
   prompt about battery optimisation, and says so in the help documentation.

@@ -4,7 +4,7 @@
 //
 // Vault-count precondition: 1 (SYNC-6). Runs at m=256 MiB, t=3, p=2 by
 // ratified decision (SYNC-9 / harness grill Q4). That decision also said
-// "on every pipeline", and `myne-agents/docs/decisions/ops/0529` retired that half:
+// "on every pipeline", and `decisions/ops/0529` retired that half:
 // since myne-md/myne#579 the suite runs only on the manual pre-release
 // workflow, so this drill is a release gate rather than a push one. The
 // parameters are untouched. Fixture generation pays Argon2id twice and

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Encrypted persistence + Build-B reconcile-delta for the VaultIndices
 //! (`vault.indices` / `MYI1`, MYND-271 Task 8; design MYND-31).
 //!
@@ -327,8 +327,8 @@ mod tests {
     ///
     /// That is the ONLY reason `index_format_version` could stay at `0x02` when
     /// myne#216 added `headings`: the serializer already forces the rebuild a
-    /// version bump would have forced. `myne-agents/docs/spec/protocol.md` §9.8.2 and
-    /// `myne-agents/docs/decisions/protocol/0594` both rest on it, and §9.8.2 says in as
+    /// version bump would have forced. `docs/spec/protocol.md` §9.8.2 and
+    /// `decisions/protocol/0594` both rest on it, and §9.8.2 says in as
     /// many words that this is an implementation property of the serializer
     /// rather than a guarantee of the format. So it is pinned here rather than
     /// believed: if a postcard or serde-derive change ever makes `next_element`
@@ -371,7 +371,7 @@ mod tests {
     ///
     /// One record is the easy case, and it fails to decode at end of input, which
     /// is why the field can be trailing at all. Two records is the case
-    /// `myne-agents/docs/spec/protocol.md` §9.8.2 warns about: the reader consumes the next
+    /// `docs/spec/protocol.md` §9.8.2 warns about: the reader consumes the next
     /// record's bytes as the missing field, and `from_bytes` has no trailing-byte
     /// check, so a read whose remaining bytes satisfy the UTF-8 and discriminant
     /// checks can terminate successfully with a WRONG map. This test pins which

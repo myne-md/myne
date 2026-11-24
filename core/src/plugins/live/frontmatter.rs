@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The durable frontmatter entry point for a live session (`collab-editor-bridge`
 //! task 7).
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! In-RAM payload stash + readiness rendezvous for the PDF export
 //! pipeline (MYND-255 task 4).
 //!

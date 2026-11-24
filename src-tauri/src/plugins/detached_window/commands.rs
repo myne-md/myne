@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Detached (pop-out) note window spawn command (myne-md/myne#678, epic #173).
 //!
 //! `detached_window_open` is a MAIN-window command (granted by

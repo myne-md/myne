@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `mcp` Tauri plugin: the Settings surface of external MCP access
 //! (external-mcp-connection, myne-md/myne#923).
 //!

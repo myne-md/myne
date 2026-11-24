@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! One orchestrated sync cycle: gathering its inputs, running it, and the side
 //! effects that follow (MYND-424).
 //!

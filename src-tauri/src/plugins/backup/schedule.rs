@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local backup-schedule config commands (MYND-351, feature task 1).
 //!
 //! Thin IPC seam over the pure [`crate::backup_schedule`] store: the WebView

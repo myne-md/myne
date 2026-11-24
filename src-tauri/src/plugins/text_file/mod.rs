@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `text_file` plugin: one plaintext file in, one plaintext file out.
 //!
 //! The calendar's `.ics` exchange needs a way to write text the WebView produced

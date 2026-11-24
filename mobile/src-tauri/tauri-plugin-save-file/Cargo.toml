@@ -22,7 +22,7 @@ version = "0.1.0"
 description = "Myne mobile: Android Storage Access Framework save picker for exports (Rust-only WebView surface)"
 authors = ["Myne"]
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 # Mandatory for tauri-plugin build scripts (build fails without it) and must
 # equal the crate name exactly.
 links = "tauri-plugin-save-file"

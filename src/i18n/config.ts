@@ -19,7 +19,7 @@
 // setting). {@link RTL_LANGUAGES} is the single machine-readable source of that
 // truth, consumed by the desktop chrome (`src/i18n/index.ts` sets
 // `documentElement.dir`), the editor's neutral-note fallback, and the mobile
-// client (which imports this same module). See `myne-agents/epics/rtl-support`.
+// client (which imports this same module). See `private-companion/epics/rtl-support`.
 
 export const SUPPORTED_LANGUAGES = [
   { code: "en", label: "English" },
@@ -77,7 +77,7 @@ export const SUPPORTED_CODES: readonly string[] = SUPPORTED_LANGUAGES.map(
 
 /**
  * Locales whose script is right-to-left. The one source of truth for direction
- * across both clients (SYNC-1, `myne-agents/epics/rtl-support`).
+ * across both clients (SYNC-1, `private-companion/epics/rtl-support`).
  *
  * Membership is by SCRIPT, not by whether the locale ships yet: Arabic, Urdu and
  * Persian (Perso-Arabic script) are RTL. Note the two easy mistakes this set is

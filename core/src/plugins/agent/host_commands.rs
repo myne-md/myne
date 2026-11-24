@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The host-generic half of the agent command surface (myne-md/myne#456).
 //!
 //! **Why this is here and the `#[tauri::command]` wrappers are not.** Both Tauri
@@ -184,7 +184,7 @@ struct Session {
     /// `step` re-reads the live prefs on every leg and drops `history` when
     /// these no longer match — an exclusion added mid-run, or a provider
     /// changed or cleared while the run waited on a scope approval, stops the
-    /// seed without stopping the run (`myne-agents/docs/decisions/ai/0553`, myne-md/myne#648).
+    /// seed without stopping the run (`decisions/ai/0553`, myne-md/myne#648).
     /// A drop rather than a filter, because a turn carries text and no note
     /// provenance. The run's own transcript is deliberately untouched: those
     /// are this run's reads, and the tools clamp them against the live
@@ -291,7 +291,7 @@ impl AgentSessionState {
     /// and `agent_apply` takes the approved settings. Without this check a caller
     /// could name any of the twelve intent ids in its own start call and then write
     /// them, which made the offer whatever the caller said it was rather than a
-    /// bound. That is what the detached-window arm of `myne-agents/docs/threat-model.md` §7's
+    /// bound. That is what the detached-window arm of `docs/threat-model.md` §7's
     /// first bound had been describing, and why the bullet needed correcting.
     ///
     /// **Compared by value, like the edit half, and the ORIGINAL index rides
@@ -873,7 +873,7 @@ pub async fn step<R: Runtime>(
         )
     };
 
-    // **The resume-path half of the seed bound** (`myne-agents/docs/decisions/ai/0553`,
+    // **The resume-path half of the seed bound** (`decisions/ai/0553`,
     // myne-md/myne#648). The seed was built under snapshotted egress controls;
     // a run paused for a scope approval is a user-length window in which the
     // exclusion set or the provider can move, so every leg re-reads the live
@@ -913,7 +913,7 @@ pub async fn step<R: Runtime>(
     //
     // `drive` returns only when the loop has stopped, which on a remote provider
     // is minutes, so everything this command returns is disclosure after the
-    // fact. `myne-agents/docs/decisions/ai/0515` rests the remote arm's lack of a volume
+    // fact. `decisions/ai/0515` rests the remote arm's lack of a volume
     // bound on that disclosure, and a run that is cancelled, or that dies with
     // the foreground on a phone, which myne-md/myne#456 makes an ordinary case
     // rather than an exotic one, discloses nothing at all while having paid for

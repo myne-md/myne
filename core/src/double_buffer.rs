@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The double-buffered OPFS container (phase3-web-client task 18).
 //!
 //! # The problem this exists for

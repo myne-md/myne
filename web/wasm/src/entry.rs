@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The exported wasm surface — everything the Worker can call.
 //!
 //! Three exports and no more. The Worker is the only caller (`web/src/worker/`),

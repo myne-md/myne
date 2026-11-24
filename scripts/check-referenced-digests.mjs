@@ -19,7 +19,7 @@
 //
 // It is the one guard here that needs the network, and a network dependency in a pipeline
 // gate makes a red pipeline mean "GitHub was slow". The release-time gate is
-// `myne-ops/scripts/check-image-multiarch.sh` (run by the publish script and by the release
+// `runbook/scripts/check-image-multiarch.sh` (run by the publish script and by the release
 // checklist); this is the local net that catches a pin edited by hand, and it says out loud
 // when it could not reach the registry rather than reporting a pass.
 //
@@ -95,7 +95,7 @@ const REF_FLOOR = 2;
 
 /** The server image must be a manifest list carrying both of these. The WEB image is
  * deliberately exempt: it is amd64-only today (a documented gap with its own decision to
- * make, `myne-ops/runbooks/release.md` FAZ 5), and a guard that is permanently red is a
+ * make, `runbook/runbooks/release.md` FAZ 5), and a guard that is permanently red is a
  * guard people learn to ignore. This one asserts the claim the project makes; that claim
  * is about the server image. */
 const REQUIRED_ARCHES = ["amd64", "arm64"];
@@ -244,7 +244,7 @@ for (const [key, entry] of [...refs].sort()) {
         `${key}${pinned}\n` +
           `           resolves to a SINGLE-platform manifest, not a manifest list. On an arm64\n` +
           `           host that is 'exec format error', with nothing on the amd64 path to notice.\n` +
-          `           Publish with myne-ops/scripts/publish-server-image.sh, which builds both\n` +
+          `           Publish with runbook/scripts/publish-server-image.sh, which builds both\n` +
           `           platforms as one list and verifies the result.`,
       );
       continue;

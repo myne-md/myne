@@ -16,7 +16,7 @@
 // screen in six, and nothing in either tree could report it: both draws return four
 // distinct in-range positions, both are sorted, and both gate on four answered fields,
 // so every assertion a client can write about its own draw passes either way.
-// `myne-agents/docs/spec/protocol.md` section 7.1.3's "demonstrate the phrase, not memorize" is a
+// `docs/spec/protocol.md` section 7.1.3's "demonstrate the phrase, not memorize" is a
 // property of the secret, not of which ceremony produced it, so the identity phrase
 // (myne-md/myne#855) takes the same rule as the vault phrase.
 //

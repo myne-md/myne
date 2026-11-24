@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Failure modes of the member-names store. Closed and typed, following the
 //! `ThemesError` precedent: no `String` reaches the WebView, and each arm is

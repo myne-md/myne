@@ -110,7 +110,7 @@ esac
 # graceful close is a real `WM_DELETE_WINDOW` ClientMessage sent by
 # `e2e/support/wm-delete-window.py` (myne-md/myne#577). They belong in
 # `ghcr.io/myne-md/myne-ci` beside the rest of this set, and that is a
-# by-hand republish (`myne-ops/runbooks/ci-base-image.md`) which
+# by-hand republish (`runbook/runbooks/ci-base-image.md`) which
 # `check-ci-image.mjs` refuses to let a source edit anticipate: editing
 # `ci/Dockerfile` without republishing makes its recorded digest describe
 # an image the file no longer produces. Installed here until that lands,
@@ -139,7 +139,7 @@ esac
 # machine check and the comment above is the record.
 # **Every install below is GUARDED, so this lane runs on either image.** The
 # intended home for these packages is `ci/e2e/Dockerfile` (a dedicated image,
-# published by hand per `myne-ops/runbooks/ci-base-image.md`'s procedure), and on
+# published by hand per `runbook/runbooks/ci-base-image.md`'s procedure), and on
 # that image all four commands are no-ops. Until it is published — and after, on
 # any runner still pointed at the old one — they install what is missing.
 # `command -v` / `dpkg -s` rather than a version probe: the question is "is this

@@ -354,7 +354,7 @@ describe("reload + cross-surface nonce subscription", () => {
 // myne-md/myne#613: the two EGRESS controls must not read as fail-open.
 //
 // `ai_excluded_folders` and `cli_excluded_folders` are named in
-// `myne-agents/docs/threat-model.md` A17 and promised absolutely by the shipped interface.
+// `docs/threat-model.md` A17 and promised absolutely by the shipped interface.
 // The setters patch the cache optimistically, so a budget refusal would leave
 // the user looking at a folder marked excluded from the AI or the CLI that is
 // not excluded on disk. Written after the guard was verified by BREAKING it:

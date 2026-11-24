@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The process-host seam (`phase3-web-client` task 79).
 //!
 //! Everything a command core needs from its host that is **not already an
@@ -11,7 +11,7 @@
 //! 22 commands that take no `AppHandle` at all.
 //!
 //! Counted against `core/src` on 2026-07-26 (the numbers this design rests on;
-//! `myne-agents/features/phase3-web-client/core-tauri-inventory.json` carries
+//! `private-companion/features/phase3-web-client/core-tauri-inventory.json` carries
 //! the per-command detail):
 //!
 //! | Fact | Value |

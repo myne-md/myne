@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri-layer error type for the `vault-change-password` plugin.
 //!
 //! Closed set; no `String` field reaches the frontend. TS hand-mirror

@@ -325,7 +325,7 @@ commands.allow = ["set_archive_disabled"]
 # DateTimeSettings.tsx, core's set_timezone_from_host,
 # prefs_classification.rs's own DeviceLocal comment, protocol/src/prefs.rs
 # (the two field docs plus a published vector description),
-# myne-agents/docs/spec/protocol.md 9.5.2, and a user-guide article. The count is stated
+# docs/spec/protocol.md 9.5.2, and a user-guide article. The count is stated
 # as the grep rather than as a memory of the sweep, because a completeness
 # claim taken from memory is what let this sentence spread in the first
 # place.
@@ -639,9 +639,9 @@ description = "Allow invoking prefs:set_chat_history_budget (Slot::Unlocked-gate
 commands.allow = ["set_chat_history_budget"]
 
 # myne-cli epic (MYND-490; cli-thin-client task 2): three write setters for the
-# CLI terminal-access door prefs (myne-agents/docs/decisions.md "CLI terminal access is a
+# CLI terminal-access door prefs (decisions.md "CLI terminal access is a
 # default-off, unlock-gated local socket with a folder exclusion list
-# (MYND-490)"; myne-agents/docs/threat-model.md §7). All three inherit the same
+# (MYND-490)"; docs/threat-model.md §7). All three inherit the same
 # main-window-only invariant as the other allow-set-* permissions — v0.2
 # multi-window MUST NOT grant these to any non-main window. All three
 # atomic-write vault.prefs with no native side-effect; opening/closing the

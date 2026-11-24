@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Model side-load + device-local storage-path layer (local-ai epic,
 //! MYND-406, task 2).
 //!

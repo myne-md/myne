@@ -94,7 +94,7 @@ describe("markdown attachment token", () => {
 
   // myne-md/myne#518. The alias was parsed and then thrown away: the token kept
   // only `label`, so `AttachmentInline` passed `alt={label}` and an authored alt
-  // was not the accessible name on a phone. `myne-agents/docs/spec/wikilink.md` §5.1 is
+  // was not the accessible name on a phone. `docs/spec/wikilink.md` §5.1 is
   // normative on both halves of this.
   it.each([
     ["an authored alt", "cat.png|alt=A cat asleep", "A cat asleep"],

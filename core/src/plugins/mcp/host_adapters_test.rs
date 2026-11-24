@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The live-vault source, and the door's call pipeline over it.
 //!
 //! Two properties are asserted here that the tool tests cannot reach, because

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The inference seam: the [`engine::Engine`] trait, the backend registry that
 //! decides which backend answers a request, and the remote-provider arm.
 //!

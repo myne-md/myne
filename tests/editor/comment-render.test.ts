@@ -4,7 +4,7 @@
 // Comments are DIMMED in the editor — always VISIBLE via the `.cm-comment` mark,
 // never hidden (a hidden comment is invisible-and-confusing; the strip happens on
 // export/output, not in the editor). Recognize-and-render-only — bytes survive a
-// focus cycle (§6 C1). Spec: myne-agents/docs/spec/markdown-dialect.md §3.1 / §3.2 / §6.
+// focus cycle (§6 C1). Spec: docs/spec/markdown-dialect.md §3.1 / §3.2 / §6.
 
 import { afterEach, describe, expect, it } from "vitest";
 import {

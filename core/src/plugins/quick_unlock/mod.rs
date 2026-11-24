@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Quick-unlock plugin core (MYND-329) — the shared PIN + biometric paths.
 //!
 //! Extracted from the desktop crate (shared desktop↔mobile). Holds the wrap-key

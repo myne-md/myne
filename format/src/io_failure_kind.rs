@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Repo-wide canonical IO error categorization for Tauri-layer error
 //! types.
 //!

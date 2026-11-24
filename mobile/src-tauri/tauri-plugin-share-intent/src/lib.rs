@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Android OS-share-sheet receiver for the share-import feature (SF3,
 //! MYND-511).
 //!

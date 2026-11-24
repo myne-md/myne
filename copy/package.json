@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "//": "Shared LOAD-BEARING user-facing copy (SYNC-42) — privacy-property strings whose exact English wording is a security property (non-distinguishing failure banners, honest revocation / integrity / enrollment notices, the export and reminder egress sentences, the clip notice, the connected-extensions section, the AI consent clauses). Consumed as SOURCE by the desktop client (src/), the mobile client (mobile/src/) and the web build (web/src/), so the literals are byte-identical across clients BY CONSTRUCTION — E2E asserts them by full-literal equality; changing any is a decisions.md event, never a paraphrase. NOT i18n'd (src/AGENTS.md). Membership is enforced, not promised: scripts/check-copy-membership.mjs fails when a client tree declares a name this package exports, which is the defect that left eighteen literals hand-copied in both clients while this field said otherwise (audit R0.1, 2026-10-19).",
   "exports": {
     ".": "./src/index.ts",

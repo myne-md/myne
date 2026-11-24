@@ -8,7 +8,7 @@
 // element is outside `.cm-editor`. Hence: global CSS via a `<style>` tag
 // appended to `document.head` once on first import.
 //
-// All values use `var(--*)` tokens from `myne-agents/docs/design/colors_and_type.css`
+// All values use `var(--*)` tokens from `design/colors_and_type.css`
 // with hex fallbacks. Live tokens always win — fallbacks only kick in if
 // the CSS variable layer fails to load.
 

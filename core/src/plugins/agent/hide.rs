@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Recognising the edits that are a removal in disguise.
 //!
 //! The verb set has no delete in it, and it does not need one: every way Myne
@@ -162,7 +162,7 @@ mod tests {
     ///
     /// The module doc above claims a field joining `isLiveNote` fails here
     /// rather than silently becoming the sixth thing an approve-all can do, and
-    /// `myne-agents/docs/decisions/ai/0515` repeats that as the reason the roster is derived
+    /// `decisions/ai/0515` repeats that as the reason the roster is derived
     /// instead of hand-picked. The version that shipped did not check it: it
     /// asserted `markers("").len() == MARKER_LINES.len()` and then
     /// `MARKER_LINES.len() == 5`, and BOTH sides are fixed at five by their own

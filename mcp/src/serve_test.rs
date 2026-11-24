@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The stdio loop's refusals, driven through in-memory streams.
 //!
 //! These are the branches a subprocess test cannot reach cheaply: an oversized

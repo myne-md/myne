@@ -5,7 +5,7 @@
 //
 // Two things are worth a test here, and neither is "does the switch flip".
 //
-// 1. **The copy's BOUNDS.** `myne-agents/docs/threat-model.md` §7's entry for this door is
+// 1. **The copy's BOUNDS.** `docs/threat-model.md` §7's entry for this door is
 //    normative: the enable copy must state the access consequence plainly and
 //    must not claim a gatekeeper, and the rate limit must not be described as a
 //    protection nor its removal as disabling one. The Rust side already pins its

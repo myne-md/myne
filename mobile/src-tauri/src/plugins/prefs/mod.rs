@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `prefs` Tauri plugin (MYND-160 Task 9).
 //!
 //! Owns the `prefs_read` + `set_screen_capture_protection` IPC
@@ -14,11 +14,11 @@
 //!
 //! ## Design history
 //!
-//! - PRD: `myne-agents/features/vault-prefs-blob/prd.md`
-//! - Grilling: `myne-agents/sessions/grill/2026-05-27-mynd-160-encrypted-prefs-blob.md`
+//! - PRD: `private-companion/features/vault-prefs-blob/prd.md`
+//! - Grilling: `private-companion/sessions/grill/2026-05-27-mynd-160-encrypted-prefs-blob.md`
 //!   Q1 (subkey source), Q3 (storage layer + fall-back-to-defaults),
 //!   Q4 (file format + AAD), Q5 (runtime control flow), Q6 (loose ends)
-//! - Tasks: `myne-agents/features/vault-prefs-blob/tasks.md`
+//! - Tasks: `private-companion/features/vault-prefs-blob/tasks.md`
 //! - decisions.md: 2026-05-27 entries — "Vault preferences blob
 //!   (vault.prefs): root_key-derived prefs_key, MYP1 magic, JSON
 //!   inner, account_number_hash AAD" + "Lock-on-default-ON" +
@@ -223,7 +223,7 @@ mod acl_registration_guard {
     ///
     /// The MOBILE twin of `src-tauri/src/plugins/prefs/mod.rs`'s guard of the
     /// same name, mirrored here by myne-md/myne#609. Until then only the desktop
-    /// side had it, while `myne-agents/docs/dev/twin-inventory.md` recorded in its own words
+    /// side had it, while `dev-notes/twin-inventory.md` recorded in its own words
     /// that the two capability grants were "NOT measured, and deliberately not
     /// claimed", while this file's own comments assert the lockstep obligation
     /// three times without anything checking it. It reads all three sources out

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Automerge document construction + commit seam for the `NC05` CRDT note-type
 //! (`automerge-sync-migration` epic, myne-md/myne#417 task 2; ASM-3).
 //!

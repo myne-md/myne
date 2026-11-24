@@ -14,7 +14,7 @@
 //          raw source in source mode carries the accepted tag.
 //
 // Runs against the **`local-inference-stub` build variant** (gated on
-// `MYNE_E2E_AI=1`, see `myne-agents/docs/dev/e2e.md`): the StubEngine's `infer_tags` answers
+// `MYNE_E2E_AI=1`, see `dev-notes/e2e.md`): the StubEngine's `infer_tags` answers
 // the fixed `"stub-tag, meeting, notes"`, which is what makes a suggestion set
 // assertable at all. The production tag model is a bundled GGUF whose weights
 // are an LFS blob, and its output would not be deterministic even with them.

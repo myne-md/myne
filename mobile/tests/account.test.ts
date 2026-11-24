@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const read = (p: string) => readFileSync(sib(p), "utf8");
 
-// One since `myne-agents/docs/decisions/ui/0728` removed `account_rename` (an account has no
+// One since `decisions/ui/0728` removed `account_rename` (an account has no
 // name) and myne-md/myne#937 removed the move/split pair (the grouping is
 // single-account, so there is nothing to move a vault into). A command that no
 // longer exists is gone from every site rather than left authorized with

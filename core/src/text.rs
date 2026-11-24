@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Shared text tokenization + casefolding (SYNC-2, spell-checker epic).
 //!
 //! Extracted from the search index (MYND-29, `search::mod`) so the search

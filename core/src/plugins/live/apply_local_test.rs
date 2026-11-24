@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tests for the local-edit splice application (`collab-editor-bridge` task 4).
 
 use super::apply_local::{apply_local_splices, ApplyLocalError, LocalSplice};

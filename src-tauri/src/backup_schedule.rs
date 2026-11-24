@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local backup-schedule config store (MYND-351).
 //!
 //! ## What this is
@@ -13,7 +13,7 @@
 //! The target folder is inherently device-specific — a filesystem path on
 //! machine X is meaningless on machine Y — so the schedule cannot live in the
 //! encrypted, Phase-2-syncing `vault.prefs`. Per the design session
-//! (`myne-agents/sessions/design/2026-06-17-scheduled-local-backup.md`,
+//! (`private-companion/sessions/design/2026-06-17-scheduled-local-backup.md`,
 //! Model A) all schedule fields are bound together device-locally: binding the
 //! "enabled + interval + N" intent to the device-local target avoids a
 //! half-configured split-storage state.
@@ -24,7 +24,7 @@
 //! Backups are ciphertext (the MYB1 container copies encrypted blobs), so a
 //! known location does not break confidentiality, and a plaintext path on disk
 //! is consistent with the already-out-of-scope A7 (local malware) posture. The
-//! `myne-agents/docs/decisions.md` entry (feature task 7) records this so it is not later
+//! `decisions.md` entry (feature task 7) records this so it is not later
 //! mistaken for a SYNC-3 violation.
 //!
 //! ## Field roles

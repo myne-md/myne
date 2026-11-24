@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Singleton write barrier (myne-md/myne#711 task 15).
 //!
 //! The `NTV5` to `NTV6` migration and the group-rotation reseal re-seal every

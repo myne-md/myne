@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `importer` plugin: the import command namespace (MYND-53, SYNC-1;
 //! myne-md/myne#464).
 //!
@@ -18,7 +18,7 @@
 //! ONLY path by which the WebView reads an external (Obsidian vault) directory.
 //! No general `fs:allow-read-text-file` / `fs:read-dir` / read `fs:scope` is
 //! granted — this path-validating seam replaces them (least-privilege, TB6; the
-//! rationale is recorded in `myne-agents/docs/decisions.md`). These two hold no state and
+//! rationale is recorded in `decisions.md`). These two hold no state and
 //! touch no vault crypto; the TS engine assembles plaintext and calls the
 //! slot-gated `note_create` for ingest.
 //!

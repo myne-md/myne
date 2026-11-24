@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The browser's sync tick driver (phase3-web-client task 84).
 //!
 //! # What this is, and what it deliberately is not

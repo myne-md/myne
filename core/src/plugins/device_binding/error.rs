@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! Failure modes of the device-binding store. Closed and typed, following the
 //! `MemberNamesError` / `ThemesError` precedent: no `String` reaches the WebView,

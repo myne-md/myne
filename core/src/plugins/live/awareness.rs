@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Client-side awareness frame routing (epic live-collab, `collab-editor-bridge`
 //! task 7 and the base of `collab-presence-ui`).
 //!

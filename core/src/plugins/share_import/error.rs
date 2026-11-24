@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri-layer error type for the `share_import` (share-import staging queue)
 //! plugin.
 //!

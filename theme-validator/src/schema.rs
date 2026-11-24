@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Theme schema: the required-core token set, the parsed-theme type, and the
 //! JSON parse + required-key validation pass (custom-themes epic, MYND-111,
 //! task 1).
@@ -30,7 +30,7 @@ use crate::error::ThemeError;
 
 /// The minimal required-core CSS-variable tokens a custom theme MUST define
 /// (grill 2026-06-16, SYNC-1: minimal core). These are the **raw ramp** tokens
-/// from `myne-agents/docs/design/colors_and_type.css`; the semantic aliases resolve off
+/// from `design/colors_and_type.css`; the semantic aliases resolve off
 /// them automatically, so a theme that supplies these gets full coverage.
 ///
 /// The optional `--syntax-*` / `--label-*` / `--highlight-*` token families are

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Plaintext destination care for `myne-decrypt`.
 //!
 //! The export writes plaintext to a user-chosen directory, which is the

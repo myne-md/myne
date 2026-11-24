@@ -4,7 +4,7 @@
 # only — upstream WebKitWebDriver gap), the dev machine is macOS, and the
 # CI runner is Linux (decisions.md 2026-05-01, Woodpecker). This image is
 # the shared "Linux seat": locally via `scripts/e2e-local.sh`, in CI as the
-# E2E step's environment. See myne-agents/docs/dev/e2e.md.
+# E2E step's environment. See dev-notes/e2e.md.
 #
 # Base matches CI (`rust:1.90.0-slim` — rust-toolchain.toml pin); Node
 # matches .nvmrc (25.9.0). tauri-driver is exact-pinned (2.0.6). The image
@@ -58,7 +58,7 @@ RUN ARCH="$(uname -m)" \
     && npm install -g pnpm@9
 
 # tauri-driver — exact pin (a new version is a deliberate bump here +
-# myne-agents/docs/dev/e2e.md note, not a drive-by).
+# dev-notes/e2e.md note, not a drive-by).
 RUN cargo install tauri-driver --locked --version 2.0.6
 
 # xdotool + python3 — the only way this seat can drive the TOPLEVEL window.

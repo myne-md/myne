@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one decryption-free `content_nonce` reader, shared by every blob family
 //! that has one (myne-md/myne#638).
 //!
@@ -26,7 +26,7 @@
 //! it answered `None` for every body, the sync manifest scan came back empty,
 //! and no attachment was uploaded or accepted in either direction, with the
 //! catalog still syncing so other devices listed names and sizes over nothing.
-//! `myne-agents/docs/decisions/protocol/0567` carries the incident and the measurements.
+//! `decisions/protocol/0567` carries the incident and the measurements.
 //!
 //! A reader that answers `None` never errors: the caller reads it as "not this
 //! family, nothing to do". That is why the mistake is silent, and why the fix

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Emit the six double-buffer crash fixtures as JSON for the browser seeder
 //! (phase3-web-client task 105).
 //!

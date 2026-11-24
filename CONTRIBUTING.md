@@ -17,13 +17,13 @@ that outlives the diff.
 **Large, contested or unclear work gets a design pass first**: an issue, then a stress-test
 interview, then a PRD and a task list, then implementation. Work that touches cryptography, the
 on-disk format, sync, a capability ACL or the egress allowlist is never small, however short the
-diff, because [`myne-agents/docs/threat-model.md`](myne-agents/docs/threat-model.md) has to change in the same commit.
+diff, because [`docs/threat-model.md`](docs/threat-model.md) has to change in the same commit.
 
 **A change to `protocol/` ships with its vectors** in
 [`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors). That obligation is not advice:
 it is what makes a protocol change verifiable by someone who does not trust this repository. A change
 a user can notice does not owe a user-guide page in the same session; the guide is brought up to date
-on its own pass (`myne-agents/docs/decisions/process/0780`).
+on its own pass (`decisions/process/0780`).
 
 ## Developer Certificate of Origin
 
@@ -66,7 +66,7 @@ says what each one blocks and, more usefully, what it catches that no compiler w
 
 ## What your contribution is licensed under
 
-Inbound equals outbound. Code is **AGPL-3.0**; the `myne-agents/docs/` subtree is **CC-BY-4.0** so that the
+Inbound equals outbound. Code is **AGPL-3.0**; the `docs/` subtree is **CC-BY-4.0** so that the
 specification stays reusable by independent implementations. The full map, including the bundled
 third-party assets and the trademark carve-out, is [`LICENSING.md`](LICENSING.md). By opening a
 pull request you agree to license your contribution under the licence of the subtree it lands in.

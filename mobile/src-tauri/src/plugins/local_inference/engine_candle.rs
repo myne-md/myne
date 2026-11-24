@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Candle-backed Whisper transcription engine — the mobile port of the desktop
 //! local_inference engine (MYND-563), **transcription ONLY**. The desktop engine
 //! also carries a generation (Qwen2) role; that is out of

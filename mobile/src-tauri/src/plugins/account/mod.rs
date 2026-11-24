@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `account` Tauri plugin (mobile shim): the account-record command surface
 //! (the account/vault split, myne-md/myne#684).
 //!

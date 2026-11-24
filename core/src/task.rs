@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The async-execution seam (`phase3-web-client` task 80).
 //!
 //! Every command core in this crate runs its filesystem and crypto work inside
@@ -142,7 +142,7 @@ pub async fn sleep(duration: std::time::Duration) {
 // `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)`. That needs
 // `SharedArrayBuffer`, which needs cross-origin isolation — already a hard
 // requirement of the web client (`web/csp.ts` sets COOP `same-origin` + COEP;
-// `myne-agents/docs/self-host-web.md` lists dropping either as a misconfiguration), so this
+// `docs/self-host-web.md` lists dropping either as a misconfiguration), so this
 // adds no new deployment constraint.
 //
 /// Block the current thread for `duration`.

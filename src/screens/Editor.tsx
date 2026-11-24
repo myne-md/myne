@@ -21,8 +21,8 @@
 // body words, frontmatter excluded, on a short debounce.
 //
 // References:
-//   - PRD: myne-agents/features/empty-editor-shell/prd.md
-//   - Design session: myne-agents/sessions/design/2026-04-28-empty-editor-shell.md
+//   - PRD: private-companion/features/empty-editor-shell/prd.md
+//   - Design session: private-companion/sessions/design/2026-04-28-empty-editor-shell.md
 //   - Mockup (structural reference only, NOT copied):
 //     docs/design/ui_kits/desktop/Editor.jsx
 

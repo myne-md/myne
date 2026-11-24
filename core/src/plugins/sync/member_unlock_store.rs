@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local member vault-unlock credential store (`vault.member-unlock`).
 //!
 //! A B2B member holds no vault password: their access is the group key delivered

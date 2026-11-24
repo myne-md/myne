@@ -3,7 +3,7 @@
 //
 // # The claim, and why review alone was not enough
 //
-// `myne-agents/docs/threat-model.md` §7 states that the opt-in diagnostic log holds usage
+// `docs/threat-model.md` §7 states that the opt-in diagnostic log holds usage
 // metadata and never note content, a note id, a path, an account hash, key
 // material, a salt or a nonce. A claim in that document that no test holds can
 // rot silently, and the DENY list in `src-tauri/AGENTS.md` says about itself
@@ -26,7 +26,7 @@
 //
 //       **The level set is per path, because the FILE's is.**
 //       `src-tauri/src/logging` records one target below `info`
-//       (`DEBUG_FILE_TARGETS`, `myne_core::agent`, `myne-agents/docs/decisions/ops/0768`),
+//       (`DEBUG_FILE_TARGETS`, `myne_core::agent`, `decisions/ops/0768`),
 //       so `debug` is a recorded level for the module that target belongs to and
 //       for nothing else. Reading the levels from a single global list would
 //       leave the one module whose `debug` reaches disk as the one module R1 does

@@ -3,7 +3,7 @@
 // The mobile AI destination (myne-md/myne#456, myne-md/myne#457).
 //
 // **What is under test is the cost disclosure and the run lifecycle**, not the
-// layout. `myne-agents/docs/decisions/ai/0515` rests the remote arm's lack of a volume
+// layout. `decisions/ai/0515` rests the remote arm's lack of a volume
 // bound on the run reporting what it cost, and `agentStart` returns only when
 // the loop has STOPPED, so a surface that renders the figures from the reply
 // alone discloses nothing at all for a run that is cancelled or that dies with
@@ -118,7 +118,7 @@ describe("AiChatFlow", () => {
   it("has one composer and one mode, with no Ask/Edit control", () => {
     mount();
 
-    // `myne-agents/docs/decisions/ai/0524` collapsed the two modes into one, so a mode
+    // `decisions/ai/0524` collapsed the two modes into one, so a mode
     // switch here would offer a choice the host does not have. Asserted as an
     // ABSENCE, which is the only way to pin "we did not add one back".
     expect(screen.getByTestId("ai.composer-input")).toBeTruthy();

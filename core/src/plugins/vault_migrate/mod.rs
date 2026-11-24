@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-generation helpers that still have a live caller.
 //!
 //! This module used to carry the whole-vault v0.1 -> v0.2 migration

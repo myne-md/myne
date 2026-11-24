@@ -240,7 +240,7 @@ describe("the roster a resolved presence produces", () => {
     //
     // The fixture INJECTS a catalog carrying the key, and that is deliberate rather
     // than convenient: `notes.snapshots.deviceFallback` exists in the English catalog
-    // and in none of the 31 shipped translations (myne-agents/docs/dev/i18n-coverage.md), so every
+    // and in none of the 31 shipped translations (dev-notes/i18n-coverage.md), so every
     // real locale renders the English fallback and a switch to one of them would
     // produce the SAME string, leaving this assertion passing whether or not the
     // freeze was fixed. Injecting the bundle is exactly what shipping a translation

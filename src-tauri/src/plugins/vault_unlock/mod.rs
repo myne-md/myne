@@ -1,13 +1,13 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-unlock Tauri plugin.
 //!
 //! Owns the singleton `UnlockedVault` slot and the `unlock` + `lock`
 //! commands. Secret material (`root_key`, `items_key`) lives in
 //! [`state::VaultRuntimeState`] and never crosses the IPC boundary —
 //! see grilling session
-//! `myne-agents/sessions/grill/2026-05-02-vault-unlock-password.md`
+//! `private-companion/sessions/grill/2026-05-02-vault-unlock-password.md`
 //! Q1 (single-slot RwLock + Semaphore design) and the feature PRD
-//! at `myne-agents/features/vault-unlock-password/prd.md`.
+//! at `private-companion/features/vault-unlock-password/prd.md`.
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
 

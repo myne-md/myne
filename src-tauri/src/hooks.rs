@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Desktop implementation of [`myne_core::hooks::VaultLifecycleHooks`].
 //!
 //! Holds the `AppHandle<R>` so the core trait methods stay AppHandle-free

@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `graph_layout` Tauri command handlers.
 //!
 //! - [`graph_layout_read`] — Slot::Unlocked-gated read of the `vault.graph`
 //!   blob; returns the opaque layout payload string, or `None` (→ frontend
 //!   recomputes the force layout) on absent / AEAD-fail / unsupported-format /
-//!   parse-fail per `myne-agents/docs/spec/protocol.md` § 9.19.4.
+//!   parse-fail per `docs/spec/protocol.md` § 9.19.4.
 //! - [`graph_layout_write`] — Slot::Unlocked-gated write of the payload,
 //!   serialized opaque by the codec, under a per-plugin write mutex.
 //!

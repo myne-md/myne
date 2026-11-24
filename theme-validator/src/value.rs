@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Value-shape allowlist injection guard (custom-themes epic, MYND-111, task 2).
 //!
 //! Because the production WebView CSP carries `style-src 'self' 'unsafe-inline'`,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Mobile `attachment_import` command wrapper (MYND-441).
 //!
 //! The platform-agnostic import core

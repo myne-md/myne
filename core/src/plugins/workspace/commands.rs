@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `workspace` command cores (MYND-166; ported to `myne-core` by
 //! phase3-web-client task 65).
 //!
 //! - [`workspace_read_from_host`] — Slot::Unlocked-gated read of the
 //!   `vault.workspace` blob; returns the opaque descriptor string, or
 //!   `None` (→ frontend default single empty pane) on absent / AEAD-fail /
-//!   unsupported-format / parse-fail per `myne-agents/docs/spec/protocol.md` § 9.7.4.
+//!   unsupported-format / parse-fail per `docs/spec/protocol.md` § 9.7.4.
 //! - [`workspace_write_from_host`] — Slot::Unlocked-gated write of the
 //!   descriptor, serialized opaque by the codec, under a per-plugin write mutex.
 //! - [`workspace_stage`] — RAM-only staging; see the module doc on why the file

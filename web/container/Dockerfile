@@ -18,7 +18,7 @@
 # that happens to have run `scripts/build-wasm.sh` and fail on every clean
 # checkout, CI included. Building it here is also what makes `docker build`
 # alone reproduce the whole client from source, which is the self-host claim
-# (`myne-agents/docs/self-host-web.md`, threat-model A15/TB11).
+# (`docs/self-host-web.md`, threat-model A15/TB11).
 FROM rust:1.96-bookworm AS wasm
 # `build-wasm.sh` reads cargo's JSON artefact records with node rather than
 # guessing a target path (shared-target dirs make a guessed path pick up a stale

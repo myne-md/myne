@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The desktop agent plugin's IPC surface.
 //!
 //! Eight `#[tauri::command]` wrappers and nothing else. Since myne-md/myne#456
@@ -85,7 +85,7 @@ pub async fn agent_start<R: Runtime>(
     // than a variant on `on_open`, because the two say different things at
     // different times: `on_open` fires once and makes the run addressable,
     // while this fires per model round-trip and is the disclosure control
-    // `myne-agents/docs/decisions/ai/0515` rests on.
+    // `decisions/ai/0515` rests on.
     on_progress: Channel<RunProgress>,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
@@ -131,7 +131,7 @@ pub async fn agent_start<R: Runtime>(
     // A v7 carries a millisecond timestamp, and this one does not leave the
     // device: the run id is RAM-only, absent from the vault, and never reaches the
     // model (nothing in `prompt.rs` or `engine.rs` reads it), so it does not widen
-    // what crosses TB13. Since `myne-agents/docs/decisions/ops/0768` it IS a field on the run's
+    // what crosses TB13. Since `decisions/ops/0768` it IS a field on the run's
     // own diagnostic-log records, which is what the id is for: a persisted record
     // of what a leg did is unreadable when two runs are interleaved. That artefact
     // is the device-local log, not the vault, and it is erased when the toggle goes

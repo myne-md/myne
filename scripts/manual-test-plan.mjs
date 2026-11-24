@@ -21,7 +21,7 @@
 // history is git log. A per-release run document would be a second copy of the
 // roster with ticks on it, which is the drift `check-manual-test-roster.mjs`
 // exists to stop, one file over. Day-of ticking still happens in the release
-// issue, per `myne-ops/runbooks/release-checklist.md`.
+// issue, per `runbook/runbooks/release-checklist.md`.
 //
 // THAT RUNBOOK IS THE ONLY CALLER, and it is in another repository. Nothing in
 // this repo invokes this script: not lefthook, not `.woodpecker/`, not a release
@@ -207,7 +207,7 @@ export function buildPlan({ roster, changed, verified, version, since, ratchet }
   // the separator appear is twelve chances to drop one and produce a document
   // that renders subtly wrong with nothing checking it.
   const blocks = [
-    // No dash in the separator. `myne-agents/reference/writing-rules.md` bans em
+    // No dash in the separator. `private-companion/reference/writing-rules.md` bans em
     // and en dashes outright, and its one structural exception is a dash a format
     // someone else defined requires: "a format you are inventing right now does
     // not get to require a dash". This heading is that format, and `planVersion`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Normative shared/device-local classification of `vault.prefs` fields
 //! (MYND-478; `sync-protocol.md` §10.2).
 //!

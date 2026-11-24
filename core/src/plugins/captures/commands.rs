@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `captures` plugin commands — the pending-capture queue for the Apple Watch
 //! voice-quick-capture companion (`protocol.md` § 9.18), plus the watch
 //! meeting-capture lane (myne-md/myne#812).

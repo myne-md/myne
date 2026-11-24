@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Repo-wide canonical mapping from `protocol::ProtocolError` variants
 //! to `'static` string tags for structured tracing.
 //!

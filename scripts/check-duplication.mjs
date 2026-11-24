@@ -2,7 +2,7 @@
 //
 // # The failure this prevents
 //
-// `least-code` (`myne-agents/skills/pr-review/reviewers/least-code.md`, #984)
+// `least-code` (`private-companion/skills/pr-review/reviewers/least-code.md`, #984)
 // asks "could this branch have been smaller", which is the right question, and
 // it reads the branch DIFF. Duplication is a property of the TREE: the eleven
 // existing `FieldLabel` copies under `mobile/src` are invisible to a review
@@ -971,7 +971,7 @@ if (isMain) {
       reportStale = true;
     }
     }
-    if (reportStale) failures.push("myne-agents/docs/dev/duplication.md is stale. Run `node scripts/check-duplication.mjs --emit`.");
+    if (reportStale) failures.push("dev-notes/duplication.md is stale. Run `node scripts/check-duplication.mjs --emit`.");
     if (failures.length > 0) {
       console.log("duplication: FAILED");
       for (const failure of failures) console.log(`  - ${failure}`);

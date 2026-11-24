@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The per-vault device-local secrets that live in the OS keychain, and the one
 //! address they share.
 //!
-//! **The class rule** (normative: `myne-agents/docs/decisions/security/0709`). Every secret
+//! **The class rule** (normative: `decisions/security/0709`). Every secret
 //! scoped to ONE vault that this device keeps outside the vault directory is
 //! either destroyed when that vault is erased, or is declared independent of the
 //! vault's lifetime with the reason. Two members exist in the keychain today, and
@@ -37,7 +37,7 @@
 //! there is nothing to erase. The delete copy says so instead of implying a
 //! cleanup that cannot happen (`settings.deleteVault.keychainNote`).
 //!
-//! See: `myne-agents/docs/decisions/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
+//! See: `decisions/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
 
 use crate::vault_id::VaultId;
 
@@ -102,7 +102,7 @@ pub fn account_component(account_number_hash: &[u8; 16], vault_id: VaultId) -> S
 /// read under the vault-scoped name and leaves this item alone, because on a
 /// twin install it may be the SIBLING's live credential. The item therefore
 /// survives as a second copy of the same wrap key and is a declared residue of
-/// the class rule (`myne-agents/docs/decisions/security/0709`).
+/// the class rule (`decisions/security/0709`).
 pub fn legacy_account_component(account_number_hash: &[u8; 16]) -> String {
     protocol::hex::encode_lower(account_number_hash)
 }

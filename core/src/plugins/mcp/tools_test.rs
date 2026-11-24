@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The four read tools, clamped per tool.
 //!
 //! One clamping test per tool rather than one for the family, because four

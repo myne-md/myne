@@ -1,5 +1,5 @@
 // The save-outcome policy for a shown-once credential (myne-md/myne#522,
-// `myne-agents/docs/spec/recovery-flow.md` §2.2, decision 0530).
+// `docs/spec/recovery-flow.md` §2.2, decision 0530).
 //
 // Three sentences, and the one that had no test is the one the spec singles out
 // as the clause implementers get wrong. A native save dialog returns after the

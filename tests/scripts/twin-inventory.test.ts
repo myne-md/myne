@@ -35,7 +35,7 @@ import {
 
 const ROOT = new URL("../../", import.meta.url).pathname;
 const SCRIPT = `${ROOT}scripts/check-twin-inventory.mjs`;
-const PROJECTION = `${ROOT}myne-agents/docs/dev/twin-inventory.md`;
+const PROJECTION = `${ROOT}docs/dev/twin-inventory.md`;
 
 function run(args: string[] = []): { code: number; out: string } {
   try {
@@ -731,7 +731,7 @@ describe("check-twin-inventory", () => {
 
   // These four run against a THROWAWAY tree, like every other failure case in
   // this file and for the reason its header gives. An earlier version pointed
-  // them at the repository's tracked `myne-agents/docs/dev/twin-inventory.md`: one emitted
+  // them at the repository's tracked `dev-notes/twin-inventory.md`: one emitted
   // into it twice with no restore at all, three restored in `finally`, which
   // narrows the window without closing it. Both halves of the guard now accept
   // an injected target under `--roots`, so there is no reason left to touch the
@@ -793,7 +793,7 @@ describe("check-twin-inventory", () => {
     expect(readFileSync(target, "utf8")).toContain("# Twin inventory");
   });
 
-  it("carries the rubric, not only the table", () => {
+  it.skipIf(!existsSync(PROJECTION))("carries the rubric, not only the table", () => {
     // The deliverable includes a rubric two people must reach the same answer
     // with. A table of verdicts without it is a list nobody can check.
     // The tracked document, read only. Nothing here writes.

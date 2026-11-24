@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Rich, structured validation error for custom themes.
 //!
 //! Unlike the closed `kind`-only taxonomies elsewhere, the theme validator

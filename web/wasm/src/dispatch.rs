@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The command router: one IPC name in, one [`Outcome`] out.
 //!
 //! This is the wasm counterpart of `generate_handler!`. It exists as a `match`

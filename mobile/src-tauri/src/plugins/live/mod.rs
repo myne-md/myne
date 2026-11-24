@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `live` plugin: mobile shim over the shared [`myne_core::plugins::live`] core.
 //!
 //! The collaborative-editor live-session commands (epic live-collab,

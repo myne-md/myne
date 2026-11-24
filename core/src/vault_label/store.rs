@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! On-disk half of the sealed label store: `<vault-root>/vault.label`
 //! (`protocol.md` § 9.22).
 //!

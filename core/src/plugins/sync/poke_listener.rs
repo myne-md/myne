@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `/sync/poke` SSE listener (MYND-423 client half).
 //!
 //! Keeps ONE long-lived SSE stream open per unlocked, enrolled vault so a push

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The desktop side of the agent seams.
 //!
 //! `myne-core`'s agent plugin is engine-free by design: it depends on narrow

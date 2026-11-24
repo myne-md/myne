@@ -4,7 +4,7 @@
 // environment variables anywhere except the comments in its own source.** Every other
 // copy was hand-maintained, and they drifted in both directions at once:
 //
-//   - `myne-ops/bundle/bundle.env.example` shipped 8 real knobs it never mentioned,
+//   - `runbook/bundle/bundle.env.example` shipped 8 real knobs it never mentioned,
 //     including `MYNE_EXTENDED_RETENTION`, the one `self-host-policy.md` warns hardest
 //     about because turning it on keeps deleted ciphertext past the horizon. The knob
 //     an operator is most warned about was the one an operator could not find.
@@ -312,6 +312,9 @@ const MANIFEST = join(ROOT, "workspace", "manifest.txt");
 if (existsSync(MANIFEST)) {
   const listed = new Set(manifestRepos(readFileSync(MANIFEST, "utf8")).map((e) => e.name));
   for (const name of ["myne-server", "myne-ops"]) {
+    // The public tree has no myne-ops checkout, and a test supplies one through
+    // MYNE_OPS_DIR. Neither is a missing entry in the public companion list.
+    if (name === "myne-ops" && (process.env.MYNE_OPS_DIR || !existsSync(join(ROOT, "myne-ops")))) continue;
     if (!listed.has(name)) {
       fail(
         `${name} is read by this guard but is not in workspace/manifest.txt. Either the\n` +

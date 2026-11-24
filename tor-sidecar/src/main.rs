@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `myne-tor` — arti packaged as a standalone loopback SOCKS5 proxy sidecar
 //! (desktop Tor routing, MYND-650, task 1).
 //!

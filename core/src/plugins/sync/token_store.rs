@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Per-device token storage (MYND-425 task 4, SYNC-16) behind a provider seam.
 //!
 //! The per-device sync token is a credential: it authenticates push/pull/device

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-delete plugin — shared core.
 //!
 //! Owns the one-shot `vault_delete` command core + `error`. The auth-flow

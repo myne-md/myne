@@ -1,6 +1,6 @@
 // The Myne-managed canonical frontmatter field set (MYND-613, task 1).
 //
-// Spec: `myne-agents/docs/spec/markdown-dialect.md` §3.6.1 — the fields the application owns
+// Spec: `docs/spec/markdown-dialect.md` §3.6.1 — the fields the application owns
 // and writes. Everything else in a note's frontmatter is the user's.
 //
 // This constant exists because the importer's reject list had drifted: it named

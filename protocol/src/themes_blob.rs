@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! `vault.themes` 34-byte-header encrypted custom-themes codec
-//! (MYND-486; `myne-agents/docs/spec/protocol.md` § 9.21).
+//! (MYND-486; `docs/spec/protocol.md` § 9.21).
 //!
 //! `vault.themes` is a vault-level singleton artifact holding the user's
 //! custom-theme palettes — the `{theme_name → palette_map}` store that was,

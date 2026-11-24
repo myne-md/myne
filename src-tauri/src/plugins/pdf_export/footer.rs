@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Per-page footer stamper for the exported PDF (MYND-255 hotfix,
 //! owner-requested).
 //!
@@ -8,7 +8,7 @@
 //! both in 9 pt base-14 Helvetica, muted gray. The footer carries
 //! **user content only** (the note's own title + page numbers) — it is
 //! explicitly NOT branding; the no-watermark posture
-//! (`myne-agents/docs/decisions.md` 2026-06-11 PDF-pipeline entry) is about
+//! (`decisions.md` 2026-06-11 PDF-pipeline entry) is about
 //! Myne-identifying marks, and none appear here (resource names are
 //! neutral `FtrN`).
 //!

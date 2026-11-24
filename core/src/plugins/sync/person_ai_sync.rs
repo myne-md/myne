@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The person-private AI store's sync plane (myne-md/myne#711 task 29).
 //!
 //! The local half of the store ([`super::person_ai_store`]) keeps the sealed

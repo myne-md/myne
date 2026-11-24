@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Two notes whose titles differ only in case or in Unicode normalization must
 //! land on two files — myne-md/myne#555, the `export.vault-markdown` (unit)
 //! bullet.

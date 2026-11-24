@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The stdio loop, factored out of `main` so its refusals are testable without
 //! a subprocess.
 //!

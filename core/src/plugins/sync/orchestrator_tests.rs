@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 /// The enrollment seed withholds the consent and the AI switch, and nothing
 /// else.
 ///

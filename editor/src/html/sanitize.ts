@@ -37,7 +37,7 @@ export interface Purifier {
 // (decisions.md 2026-06-15), and the request for arbitrary hex would have
 // breached it, so the answer is more tokens, not a different mechanism. Every
 // entry needs a matching `--highlight-*` pair (light + dark) in
-// `myne-agents/docs/design/colors_and_type.css` and a toolbar entry, or it renders unstyled.
+// `design/colors_and_type.css` and a toolbar entry, or it renders unstyled.
 export const HIGHLIGHT_CLASSES = [
   "hl-yellow",
   "hl-green",

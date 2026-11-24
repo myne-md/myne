@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The **no-bypass guard**: in Tor mode, the tunnel is total (MYND-650 task 4).
 //!
 //! `proxy::ProxyGate` makes the fail-closed decision and `rustls_transport`

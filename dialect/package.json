@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "//": "Shared markdown-dialect PARSER CORE — the frontend counterpart to the shared `core`/`protocol` Rust crates. Consumed as SOURCE (exports map → .ts) by the desktop client (`src/`) and the mobile client (`mobile/src/`), so a Vite build in either compiles it and there is no drift. The export-renderer layer (html/clip/text) stays with the editor package; this package is the platform-agnostic parser only.",
   "exports": {
     ".": "./src/index.ts",
@@ -12,6 +12,6 @@
   "dependencies": {
     "@lezer/common": "1.5.2",
     "@lezer/markdown": "1.6.4",
-    "js-yaml": "4.2.0"
+    "js-yaml": "4.3.2"
   }
 }

@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Windows command door: a **named-pipe server**, the counterpart of
 //! `socket.rs`'s Unix domain socket.
 //!
-//! `myne-agents/docs/threat-model.md`'s CLI-door entry has promised "a local Unix domain
+//! `docs/threat-model.md`'s CLI-door entry has promised "a local Unix domain
 //! socket (macOS/Linux) or named pipe (Windows)" since MYND-490. This is the
 //! server half of that sentence; the client half is `cli/src/windows_pipe.rs`,
 //! and the machinery (DACL, close-once handle, instance loop, write watchdog) is
