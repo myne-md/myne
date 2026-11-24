@@ -66,6 +66,7 @@ export function Checkbox({
   className,
   children,
   ref,
+  onClick,
   ...rest
 }: CheckboxProps) {
   const interactive = onChange !== undefined && !disabled;
@@ -94,7 +95,13 @@ export function Checkbox({
       aria-describedby={ariaDescribedBy}
       data-testid={testId}
       disabled={!interactive}
-      onClick={interactive ? () => onChange(!checked) : undefined}
+      // COMPOSED: `SelectToggle`'s `stopPropagation` was discarded when this
+      // was written after `{...rest}` (myne-md/myne#1099).
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented || !interactive) return;
+        onChange(!checked);
+      }}
     >
       <span aria-hidden="true" className="myne-checkbox__box">
         {checked ? <Icon name="check" size={12} /> : null}
