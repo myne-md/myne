@@ -45,7 +45,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // carry the guard without being on that manifest, so the sweep in setup.sh
 // walks disk rather than the manifest. Both facts matter to the floor below.
 const MANIFEST = join(REPO_ROOT, "workspace", "manifest.txt");
-const manifestEntries = manifestRepos(readFileSync(MANIFEST, "utf8"));
+const manifestEntries = existsSync(MANIFEST) ? manifestRepos(readFileSync(MANIFEST, "utf8")) : [];
 const OFF_MANIFEST = ["internal-service", "homebrew-tap"];
 const COMPANIONS = [...manifestEntries.map((e) => e.name), ...OFF_MANIFEST];
 
@@ -191,7 +191,9 @@ const setLocal = (v: string | null) => {
   }
 };
 
-describe("protected-branch pre-push guard", () => {
+const describeGuard = existsSync(MANIFEST) ? describe : describe.skip;
+
+describeGuard("protected-branch pre-push guard", () => {
   it("is present in the main repo's lefthook.yml", () => {
     expect(guard).not.toBeNull();
   });

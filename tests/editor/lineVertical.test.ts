@@ -20,6 +20,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState, RangeSet } from "@codemirror/state";
 import { Decoration, BlockType, EditorView, keymap } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   lineVerticalExtension,
@@ -181,6 +182,9 @@ function jumpyStubView(): EditorView {
     doc: DOC,
     extensions: [markdown({ base: markdownLanguage })],
   });
+  // Prime the lazy Lezer tree; without it `listContentStart` can see the
+  // pre-parse document and the task marker reads as prose.
+  syntaxTree(state);
   const view = {
     state,
     moveToLineBoundary: (range: { head: number }, forward: boolean) => {
