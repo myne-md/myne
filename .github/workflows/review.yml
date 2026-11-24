@@ -90,6 +90,9 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           REVIEW_MODEL: ${{ vars.REVIEW_MODEL }}
+          # A full review took 26m on myne#1118. The 30m default is too close to that,
+          # so give a quality model room to finish; the cap is a safety net, not a target.
+          REVIEW_TIMEOUT_MS: 3600000
           REVIEW_PACKET: ${{ runner.temp }}/review/packet.json
           REVIEW_SKILL: ${{ runner.temp }}/myne-agents/skills/pr-review-bot/SKILL.md
           REVIEW_OUT: ${{ runner.temp }}/review/verdict.json
