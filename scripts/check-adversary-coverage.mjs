@@ -40,6 +40,10 @@ import { DOCS_ABSENT, docsPath, docsPresent } from "./lib/docs-tree.mjs";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const THREAT_MODEL = docsPath("threat-model.md");
 const PROJECTION = docsPath("dev", "adversary-coverage.md");
+if (!existsSync(PROJECTION) && !process.argv.includes("--emit")) {
+  console.log("adversary-coverage: skipped (private docs/dev/adversary-coverage.md is not present)");
+  process.exit(0);
+}
 if (!docsPresent()) {
   console.log(`note: ${DOCS_ABSENT}`);
   process.exit(0);
