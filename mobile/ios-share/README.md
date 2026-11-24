@@ -4,7 +4,7 @@
 > saved into Myne's encrypted attachment library. Committed here, **outside** the
 > git-ignored `src-tauri/gen/apple/` tree, so the sources survive `tauri ios init`
 > (same discipline as `ios-widgets/` and `ios-watch/`). Feature: SF2 / MYND-510.
-> Spec: `myne-agents/docs/spec/protocol.md` §9.20 (`MYF1`).
+> Spec: `docs/spec/protocol.md` §9.20 (`MYF1`).
 
 ## Design: PLAINTEXT-STAGING (not in-extension seal)
 

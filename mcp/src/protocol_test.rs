@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The revision sniff and the JSON-RPC envelope, as pure functions.
 
 use serde_json::{json, Value};

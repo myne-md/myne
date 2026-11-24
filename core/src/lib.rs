@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `myne-core` — shared backend logic for the Myne desktop and mobile clients.
 //!
 //! Extracted from the desktop `myne_desktop_lib` so the vault / notes / prefs
 //! plugin cores live in a single source of truth instead of being copied per
-//! client (see `myne-agents/docs/decisions.md` and the `myne-core` extraction plan).
+//! client (see `decisions.md` and the `myne-core` extraction plan).
 //!
 //! Scope:
 //! - **Lives here:** host-coupled-but-platform-agnostic plugin cores
@@ -90,7 +90,7 @@ const _: () = assert!(DEFAULT_AUTO_LOCK_SECS <= AUTO_LOCK_CEILING_SECS);
 /// this path: it was a trap for the next Rust-side reader rather than a live
 /// exposure. The exposure that WAS live sat one language over, in the web
 /// client's `useIdleAutoLock` call sites, which took the raw pref and treated
-/// `null` as "disabled"; `myne-agents/docs/decisions/security/0572` carries both halves.
+/// `null` as "disabled"; `decisions/security/0572` carries both halves.
 pub fn effective_auto_lock_secs(prefs_value: Option<u32>) -> u32 {
     prefs_value
         .unwrap_or(DEFAULT_AUTO_LOCK_SECS)

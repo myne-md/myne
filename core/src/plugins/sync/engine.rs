@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The sync engine's pull/push state machine (MYND-424 tasks 5/6).
 //!
 //! This is pure logic over the [`SyncTransport`] seam + the `protocol`

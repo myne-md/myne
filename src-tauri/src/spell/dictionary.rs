@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Host-side personal-dictionary payload (MYND-266 tasks 4-5; myne-md/myne#640).
 //!
 //! The typed `vault.dictionary` inner payload and its §10.2.1 merge live in

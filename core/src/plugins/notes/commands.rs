@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri commands for the `notes` plugin.
 //!
 //! `note_create` mints a backend-side [`NoteId::new_v7`], AEAD-encrypts
@@ -2672,7 +2672,7 @@ pub async fn note_delete_with_dir(
 /// determinism guarantee (POSIX `readdir` order is unspecified —
 /// ext4 / APFS / tmpfs / FAT all differ).
 ///
-/// **Tracing level split** (per `myne-agents/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4b):
+/// **Tracing level split** (per `private-companion/sessions/grill/2026-05-07-mynd-28-note-list.md` Q4b):
 /// - non-`.myn` files (`.DS_Store`, `.tmp`, accidental drops) +
 ///   non-UTF-8 filenames → `tracing::debug!(stage = "skip_orphan")`,
 ///   benign noise.
@@ -2973,7 +2973,7 @@ pub struct TitleSlice {
 ///
 /// - `decisions.md` 2026-05-15 "Note title write target" (companion
 ///   entry; the precedence chain this batch read serves).
-/// - `myne-agents/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
+/// - `private-companion/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
 ///   Q3 (hybrid byte-range), Q4 (per-item Result), Q5 (cap 100),
 ///   Q6 (parallel decrypt — implemented here as concurrent spawn-then-
 ///   sequential-await; ordering preserved by await order).

@@ -906,7 +906,7 @@ describe("the horizon can actually be set (myne#508): source-text drift locks, b
   });
 
   it("keeps `remindersReachTheOs` and the unwired-pass record in agreement", async () => {
-    // This is the machine half of a claim `myne-agents/docs/threat-model.md` §7 now makes:
+    // This is the machine half of a claim `docs/threat-model.md` §7 now makes:
     // "None of the exposure below currently applies to any build." Nothing tied
     // that sentence to reality except a hardcoded `return false` and a prose
     // pointer, and the change that makes the exposure real is the sanctioned

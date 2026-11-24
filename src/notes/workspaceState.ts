@@ -16,7 +16,7 @@
 // Note-only workspaces behave exactly as before.
 //
 // Invariants enforced by every transition (grill 2026-06-01,
-// `myne-agents/sessions/grill/2026-06-01-editor-multi-tab-split-pane.md`):
+// `private-companion/sessions/grill/2026-06-01-editor-multi-tab-split-pane.md`):
 //
 //  - **≥1 leaf pane, always.** The last leaf can never be removed:
 //    `closePane` is a no-op on the only leaf, and closing the last tab of

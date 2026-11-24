@@ -1,15 +1,5 @@
 {
   "$comment": "Recorded private-path references, by class. The classes and the reason each carries live in scripts/check-private-path-refs.mjs, which is what a reader should read; this file is the roster. The SET may shrink and may never grow: `node scripts/check-private-path-refs.mjs --record` refuses a grown set, so a new file is admitted by hand into a class whose reason has to be true of it.",
   "append-only-record": [],
-  "living-document": [
-    "src/dialect/html/print-stylesheet.ts",
-    "src/i18n/config.ts",
-    "src/lib/vault-creation-errors.ts",
-    "src/notes/meetingSession.ts",
-    "src/notes/workspaceState.ts",
-    "src/screens/Editor.tsx",
-    "src/screens/vault-creation/KitStep.tsx",
-    "src/screens/vault-creation/ReadyStep.tsx",
-    "src/screens/vault-creation/reducer.ts"
-  ]
+  "living-document": []
 }

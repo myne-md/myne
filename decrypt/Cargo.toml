@@ -1,9 +1,9 @@
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: AGPL-3.0-only
 [package]
 name = "myne-decrypt"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 publish = false
 description = "myne-decrypt: export a Myne vault to plain markdown without the app installed"
 

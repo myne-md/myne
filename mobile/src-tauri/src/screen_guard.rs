@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Mobile screen-capture protection — the native side-effect the shared
 //! `myne-core` `apply_screen_capture` lifecycle hook drives (called from
 //! `vault_unlock` with the persisted toggle, from `vault_lock`/unlock-fail
@@ -46,7 +46,7 @@
 //!    `objc2::exception::catch`, so a UIKit `NSException` degrades to a traced
 //!    no-op. Honest limit: a CoreAnimation *abort* (assertion → `abort()`)
 //!    during a later render commit is NOT catchable; startup timing is the
-//!    real mitigation and the device checklist (`myne-agents/docs/dev/device-matrix.md`
+//!    real mitigation and the device checklist (`dev-notes/device-matrix.md`
 //!    §7) is the gate. If the soak row fails, revert [`ios::apply`]'s call in
 //!    [`apply`] to a no-op (one line) — do not ship a crashing guard.
 //! 3. **iOS-17 sublayer branch** — the secure container is

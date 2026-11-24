@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The narrow generation seam the agent loop depends on.
 //!
 //! This is why the loop can live in a crate that has no AI engine in it. The
@@ -17,7 +17,7 @@
 //! untrusted spans with special-token parsing disabled. That defence lives where
 //! tokenization happens, which is not here, and this module must not claim
 //! otherwise: on a remote backend the far side tokenizes and the guarantee
-//! degrades from structural to behavioural (`myne-agents/docs/decisions/ai/0461`,
+//! degrades from structural to behavioural (`decisions/ai/0461`,
 //! `threat-model.md` §7). Marking provenance is what core can honestly do.
 //!
 //! **The request class is a constant, not a parameter.** [`AGENT_REQUEST_CLASS`]

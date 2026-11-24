@@ -120,7 +120,7 @@ describe("one indicator for the wait", () => {
 
   it("claims no motion exemption anywhere on the row", () => {
     // A sweeping rule under the field used to report the same wait
-    // (`myne-agents/docs/decisions/ui/0639` withdrew it). Nothing here carries state
+    // (`decisions/ui/0639` withdrew it). Nothing here carries state
     // through motion now, so a reduced-motion exemption would be an exemption
     // for nothing — and `check-motion-canon.mjs` no longer knows this file.
     const { container } = render(<Field value="hunter2" busy />);

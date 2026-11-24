@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! `vault.prefs` 34-byte-header encrypted-prefs codec — see
-//! `myne-agents/docs/spec/protocol.md` § 9.5.
+//! `docs/spec/protocol.md` § 9.5.
 //!
 //! `vault.prefs` is a vault-level singleton artifact holding
 //! user-configurable preferences (v0.1: the screen-capture-protection
@@ -925,7 +925,7 @@ pub struct PrefsView {
     ///
     /// Unlike `attachment_ocr_enabled`, this switch's effect is **content-fidelity**,
     /// not compute-budget, and is classified **shared** rather than
-    /// device-local in the sync merge (`myne-agents/docs/spec/sync-protocol.md` §10.2) —
+    /// device-local in the sync merge (`docs/spec/sync-protocol.md` §10.2) —
     /// see that classification for the rationale. The codec here is
     /// classification-agnostic; it only carries the bit.
     #[serde(default = "default_true")]
@@ -1274,7 +1274,7 @@ pub struct PrefsView {
     /// **A bound rather than a feature toggle.** `build_request` re-sends every message on every
     /// iteration, up to the loop's 24-iteration ceiling, so this number is multiplied by the
     /// iteration count, and on the remote arm it is multiplied into characters that leave the
-    /// device. TB13 and `myne-agents/docs/decisions/ai/0515` both record that no per-run volume cap exists
+    /// device. TB13 and `decisions/ai/0515` both record that no per-run volume cap exists
     /// anywhere else, which is why the host clamps it.
     ///
     /// **The clamp is WRITE-side, which is a weaker class than `auto_lock_seconds`, and saying
@@ -1303,7 +1303,7 @@ pub struct PrefsView {
     /// `update_prefs_with_dir` refuses to write over a read that ERRORED, and this degrades without
     /// erroring. Named for what is budgeted instead, the key lands in the cursor-scanned region,
     /// where `find_top_level_marker` scans forward and an unknown key between two known ones is
-    /// skipped. `myne-agents/docs/spec/protocol.md` §9.5.2's forward-compat clause is only true of that region,
+    /// skipped. `docs/spec/protocol.md` §9.5.2's forward-compat clause is only true of that region,
     /// and an additive field belongs there.
     #[serde(default)]
     pub chat_history_budget: Option<u32>,
@@ -1314,9 +1314,9 @@ pub struct PrefsView {
     /// (precedent: `ai_enabled`). Class `DeviceLocal` (see
     /// `core/src/plugins/sync/prefs_classification.rs`): the CLI door is a per-machine decision, so
     /// this value never travels in a merge — a laptop and a desktop each carry their own. Rationale
-    /// for the no-identity-gatekeeper design this toggle is one leg of: `myne-agents/docs/decisions.md` "CLI
+    /// for the no-identity-gatekeeper design this toggle is one leg of: `decisions.md` "CLI
     /// terminal access is a default-off, unlock-gated local socket with a folder exclusion list
-    /// (MYND-490)" and `myne-agents/docs/threat-model.md` §7. **Non-load-bearing / AS-low** — no
+    /// (MYND-490)" and `docs/threat-model.md` §7. **Non-load-bearing / AS-low** — no
     /// protective-envelope clamp; the host treats a tampered/replayed value as a cosmetic toggle,
     /// same as `ai_enabled`. Canonical key `cli_enabled` — sorts after `bar_items_order` (`b` <
     /// `c`), before `cli_excluded_folders` (`cli_en` < `cli_ex`) and `custom_theme` (`cli` < `cu`).
@@ -4179,7 +4179,7 @@ fn parse_optional_bool_field(
 /// The trailing `,` is REQUIRED rather than optional, exactly as in the bool
 /// sibling: `screen_capture_protection` is mandatory and canonically last, so a
 /// further field always follows, and a value that runs to `}` is malformed. A
-/// trailing `.` (a float, FORBIDDEN per `myne-agents/docs/spec/protocol.md` §9.5.2)
+/// trailing `.` (a float, FORBIDDEN per `docs/spec/protocol.md` §9.5.2)
 /// therefore rejects here rather than truncating.
 fn parse_optional_uint_field(
     rest: &[u8],

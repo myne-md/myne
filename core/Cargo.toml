@@ -1,10 +1,10 @@
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: AGPL-3.0-only
 [package]
 name = "myne-core"
 version = "0.1.0"
 description = "Myne — shared backend logic (vault/notes/prefs plugin cores) for the desktop and mobile clients"
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 repository = "https://github.com/myne-md/myne"
 publish = false
 
@@ -91,7 +91,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # reproducible build (no C/CMake toolchain → cross-compiles for iOS/Android).
 # NOTE: the TLS trust path + tls-exporter wiring are R3-gated, so a
 # primitive-level security review + live interop test are still owed before
-# production trust. Recorded in `myne-agents/docs/dependency-policy.md`. Apache-2.0/ISC/MIT.
+# production trust. Recorded in `docs/dependency-policy.md`. Apache-2.0/ISC/MIT.
 base64 = "0.22"
 # `#[async_trait]` for the `VaultIo` filesystem seam (phase3-web-client task 17).
 # The seam MUST be `dyn`-compatible — core holds `&dyn VaultIo` exactly as it
@@ -301,7 +301,7 @@ security-framework-sys = "2"
 # (`org.freedesktop.secrets`); it opens no TCP connection and has no URL concept,
 # which is why it does not belong in `src-tauri/scripts/ai-no-network-check.sh`'s
 # AI-delta denylist. The dependency is a supply-chain decision recorded in
-# `myne-agents/docs/decisions/protocol/0733`, not a line-item here.
+# `decisions/protocol/0733`, not a line-item here.
 secret-service = { version = "5.2", default-features = false, features = [
   "rt-async-io-crypto-rust",
 ] }

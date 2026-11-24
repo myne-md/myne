@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri commands for the vault-unlock plugin.
 //!
 //! - [`unlock`] — read `vault.meta`, derive `password_wrap_key`
@@ -8,7 +8,7 @@
 //! - [`lock`] — companion: drop the slot, zeroize the keys, return
 //!   `Ok(())`. Param-less, idempotent.
 //!
-//! Design history: `myne-agents/features/vault-unlock-password/`
+//! Design history: `private-companion/features/vault-unlock-password/`
 //! (PRD + task log) and the grilling session referenced from
 //! `super::mod.rs`.
 //!
@@ -2125,8 +2125,8 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
 // Unlocked`) lives behind [`vault_slot_kind`] for the recovery-flow
 // routing path.
 //
-// Design context: `myne-agents/sessions/grill/2026-05-02-app-state-machine.md`
-// Q9 (vault_status imzası) + PRD `myne-agents/features/app-state-machine/prd.md`.
+// Design context: `private-companion/sessions/grill/2026-05-02-app-state-machine.md`
+// Q9 (vault_status imzası) + PRD `private-companion/features/app-state-machine/prd.md`.
 
 /// Result of [`vault_status`] — boot-time probe of `vault.meta`.
 ///
@@ -2479,9 +2479,9 @@ pub async fn vault_is_person_wrapped<R: Runtime>(
 // `vault_list` enumerates every `vaults/<id>/` directory the disk-scan finds
 // and projects each into a DENY-list-clean [`VaultSummary`].
 //
-// Design context: `myne-agents/features/vault-registry-and-disk-layout/`
+// Design context: `private-companion/features/vault-registry-and-disk-layout/`
 // (sub-feature 1 of the multi-vault epic, MYND-202) + SYNC-4 in
-// `myne-agents/epics/multi-vault/sync-ledger.md`.
+// `private-companion/epics/multi-vault/sync-ledger.md`.
 
 /// Coarse on-disk health of a discovered vault directory — the IPC-facing
 /// twin of [`crate::vault_registry::DiscoveredVault::well_formed`].
@@ -6490,7 +6490,7 @@ mod tests {
         // The forbidden fallback, asserted directly rather than assumed absent.
         // A plaintext write on either path would look identical on screen (the
         // row shows the name) while voiding the cryptographic-erase guarantee
-        // and making the `myne-agents/docs/threat-model.md` § 7 paragraph false. The walk
+        // and making the `docs/threat-model.md` § 7 paragraph false. The walk
         // covers the whole scratch device rather than the one file we expected
         // to be wrong.
         rt().block_on(async {

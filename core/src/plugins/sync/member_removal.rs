@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Member removal (B2B identity substrate, myne-md/myne#698 tasks 4 and 7):
 //! the caller that ties the roster merge, the rekey pipeline, and the
 //! `vault.meta` re-seal together.

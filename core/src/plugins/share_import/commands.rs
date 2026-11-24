@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `share_import` plugin commands — the share-import staging queue
 //! (`protocol.md` § 9.20).
 //!

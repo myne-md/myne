@@ -7,7 +7,7 @@
 // `![[…]]` is real markdown in the host note, and the drawing note round-trips).
 //
 // Scaffold note (CI): drives the real tauri-driver harness (Linux/CI,
-// `myne-agents/docs/dev/e2e.md`) — NOT runnable headless on macOS (Excalidraw rasterises on a
+// `dev-notes/e2e.md`) — NOT runnable headless on macOS (Excalidraw rasterises on a
 // real canvas). The load-bearing seams are stable testids shipped WITH the flow:
 // `editor.drawing-embed` (+ its `data-drawing-embed-state`),
 // `editor.drawing-embed.thumbnail`, `editor.drawing-embed.collapse`, and the

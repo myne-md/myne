@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! [`VaultIo`] over OPFS (phase3-web-client task 17).
 //!
 //! # Where the two halves live, and why

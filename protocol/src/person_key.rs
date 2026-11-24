@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Person keypair. the B2B identity substrate's per-member cryptographic
 //! identity (`myne-md/myne#698`, b2b-identity-substrate).
 //!

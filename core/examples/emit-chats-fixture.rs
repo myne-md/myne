@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Emit an unlockable vault carrying one AI conversation as OPFS-ready
 //! container bytes (myne-md/myne#675, task 12).
 //!

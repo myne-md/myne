@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The origin string the browser transport sends to (phase3-web-client tasks
 //! 35 + 84).
 //!

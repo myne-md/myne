@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `prefs` Tauri command handlers (MYND-160 Task 9).
 //!
 //! - [`prefs_read`] — Slot::Unlocked-gated read of the `vault.prefs`
 //!   blob; fall-back-to-defaults on absent / AEAD-fail / parse-fail
-//!   per `myne-agents/docs/spec/protocol.md` § 9.5.5.
+//!   per `docs/spec/protocol.md` § 9.5.5.
 //! - [`set_screen_capture_protection`] — per-field setter under a
 //!   per-plugin `tokio::sync::Mutex` so concurrent setter calls
 //!   commit FIFO; **critical ordering: disk write FIRST, native
@@ -3438,7 +3438,7 @@ pub(crate) async fn delete_saved_view_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for THIS DEVICE's approval of one saved view
-/// (`view-manifests`; `myne-agents/docs/spec/protocol.md` §9.5). Read-modify-write under the
+/// (`view-manifests`; `docs/spec/protocol.md` §9.5). Read-modify-write under the
 /// per-plugin write mutex; **no native side-effect**. The field is device-local
 /// per `sync-protocol.md` §10.2, so `update_prefs_with_dir` stamps no clock for it
 /// and the merge keeps the local map. Pass `version: None` to clear an approval.
@@ -5267,7 +5267,7 @@ pub async fn set_time_format<R: Runtime>(
 /// It DOES enter a blob, and this comment said otherwise until myne-md/myne#609:
 /// the body below writes the zone into `vault.prefs`, which the sync layer
 /// pushes and pulls verbatim. `PrefClass::DeviceLocal` is a MERGE
-/// classification (`myne-agents/docs/spec/sync-protocol.md` 10.2) meaning the local value
+/// classification (`docs/spec/sync-protocol.md` 10.2) meaning the local value
 /// survives the merge, not a statement that the value stays on the device, and
 /// 10.2.1 has a newly enrolled device adopt it as a starting default.
 pub async fn set_timezone_from_host(
@@ -6485,7 +6485,7 @@ pub(crate) async fn vault_set_icon_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for the `color_groups` list (graph-connection-
-/// ux-polish, myne-agents/docs/spec/protocol.md §9.5.2) — the ordered color-group rule list
+/// ux-polish, docs/spec/protocol.md §9.5.2) — the ordered color-group rule list
 /// the graph pane's color-group editor authors. Read-modify-write under the
 /// per-plugin write mutex; **no native side-effect**. The caller passes the
 /// FULL desired list; the codec preserves element order VERBATIM (order IS

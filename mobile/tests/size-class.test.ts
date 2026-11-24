@@ -223,7 +223,7 @@ describe("every other device class keeps the class it has today", () => {
     // 600px wide on a phone-class screen is the band by construction, and the
     // class cannot tell this device from an unfolded foldable: both are a tall
     // 600pt window over a screen under 700. The arrangement is the better one
-    // at that width, and myne-agents/docs/decisions records it as accepted.
+    // at that width, and docs/decisions records it as accepted.
     device(600, 960, 600);
     expect(computeSizeClass()).toBe("compactWide");
   });

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local sync state (SYNC-12, MYND-424 task 4).
 //!
 //! Three things persist **device-local, never synced** (AS6/A13 — sync state
@@ -45,7 +45,7 @@ pub const VAULT_META_DIRTY_FILE: &str = "vault.meta-dirty";
 
 /// The device-local files this module owns — NONE may ever enter the sync
 /// taxonomy. The normative taxonomy (what syncs / what is device-local /
-/// what is a rebuildable cache) lives in the spec (`myne-agents/docs/spec/sync-protocol.md`
+/// what is a rebuildable cache) lives in the spec (`docs/spec/sync-protocol.md`
 /// §9); runtime enforcement is the path-scoped scan (the orchestrator only
 /// walks `notes/` + `attachments/`), so nothing here is ever offered to the
 /// server. Asserted by the test below.

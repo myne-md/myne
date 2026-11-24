@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The **device signing key** at rest, and the storage ladder it is allowed to use
 //! (`decisions/protocol/0731`, `0733` decision 4).
 //!

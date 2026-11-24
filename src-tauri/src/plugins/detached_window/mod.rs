@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `detached-window` plugin: host-spawned pop-out note windows (myne-md/myne#678,
 //! epic #173).
 //!

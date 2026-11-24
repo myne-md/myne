@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Single concrete error enum for the protocol crate.
 //!
 //! All variants are unit — there are no `String` payloads, by design.
@@ -8,7 +8,7 @@
 //! prevents path leakage, parameter leakage, and i18n ambiguity at the
 //! type level rather than relying on reviewer attention.
 //!
-//! Implements `myne-agents/docs/spec/protocol.md` § 7.3 (AEAD failure indistinguishability)
+//! Implements `docs/spec/protocol.md` § 7.3 (AEAD failure indistinguishability)
 //! and the no-`String`-in-errors discipline from the
 //! `backend-vault-creation` PRD § Implementation Decisions.
 
@@ -42,7 +42,7 @@ pub enum ProtocolError {
     ///
     /// **By design this single variant does NOT distinguish** "wrong
     /// password/phrase" from "tampered vault" — see
-    /// `myne-agents/docs/spec/protocol.md` § 7.3:
+    /// `docs/spec/protocol.md` § 7.3:
     ///
     /// > Tag-verification failure means either the phrase was entered
     /// > wrong or the `vault.meta` was tampered. The client MUST NOT
@@ -70,7 +70,7 @@ pub enum ProtocolError {
 
     /// Note plaintext exceeds the per-note ciphertext_len cap pinned at
     /// `MAX_PLAINTEXT_LEN = 16 MiB` (see `crate::MAX_PLAINTEXT_LEN` and
-    /// `myne-agents/docs/decisions.md` 2026-05-06 entry). Returned by the encoder
+    /// `decisions.md` 2026-05-06 entry). Returned by the encoder
     /// boundary check before any allocation; symmetric with the
     /// decoder's parse-level reject of `ciphertext_len > MAX + 32`.
     /// Larger payloads belong to the §11 attachment subsystem

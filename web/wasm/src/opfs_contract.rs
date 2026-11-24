@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The OPFS bridge's cross-language constants, and the test that keeps them true.
 //!
 //! `web/src/worker/opfs.ts` classifies every storage failure into a small

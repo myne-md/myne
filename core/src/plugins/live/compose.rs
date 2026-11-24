@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Splice-list composition (epic live-collab, myne-md/myne#849).
 //!
 //! The registry queues the body splices a merge moved into an open session until

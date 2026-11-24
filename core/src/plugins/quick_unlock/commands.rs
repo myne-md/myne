@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Quick-unlock plugin commands (MYND-329, task 6).
 //!
 //! Extracted into `myne-core` (shared desktop↔mobile). This module carries the
@@ -226,7 +226,7 @@ fn cleanup_os_credential(dir: &Path) {
 /// itself (`vault_delete`'s `run_post_delete_teardown`, via
 /// `super::device_secret::erase_for_vault`), on the delete-proceeded path and
 /// after the directory removal. The class rule and the ordering argument are in
-/// `myne-agents/docs/decisions/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
+/// `decisions/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
 ///
 /// Best-effort, but no longer silent: a removal that fails is logged with its
 /// bounded `IoFailureKind`, because a credential that outlived the rotation is
@@ -379,7 +379,7 @@ fn compute_available(
 /// aggressively that in practice EVERY launch is a cold start. A user who
 /// enrolled Face ID was offered it almost never.
 ///
-/// Decided 2026-07-30; `myne-agents/docs/decisions.md` carries the entry and the
+/// Decided 2026-07-30; `decisions.md` carries the entry and the
 /// `threat-model.md` A6 row records the changed post-restart window for this one
 /// credential class. This narrows MYND-329's gate rather than removing it.
 fn requires_full_unlock_first(provider_kind: u8) -> bool {

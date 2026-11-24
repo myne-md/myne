@@ -19,7 +19,7 @@
 // type-checks.
 //
 // Two clients ask it (desktop's `IdentityHome`, the phone's second-device flow),
-// and `myne-agents/docs/decisions/clients/0488` is explicit that the SURFACES differ while the
+// and `decisions/clients/0488` is explicit that the SURFACES differ while the
 // question does not.
 //
 // ## Entry criterion (`@myne/client-core/package.json` `"//"`)

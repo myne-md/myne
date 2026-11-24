@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! One change gate for the sync engine's diagnostic edges (myne-md/myne#1033).
 //!

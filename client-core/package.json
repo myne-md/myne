@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "//": "The cross-client DECISION layer (myne-md/myne#242): the questions the desktop and mobile clients both answer, where a divergence is a bug by definition rather than a per-client choice. Consumed as SOURCE by every client, so the answer is one implementation instead of two agreeing. Entry criterion, and it is narrow on purpose: a module belongs here only if BOTH clients answer the same question AND it touches no host at all. That second half is what `scripts/check-platform-seam.mjs` enforces as `seam: null` (zero `@tauri-apps/*`, and not even the string `__TAURI…__` in a comment), and it is why the `src/lib/vault-*.ts` family is NOT here: seven of those nine call `invoke` at module scope, and their shared answer lives in `myne-core` behind an IPC command instead. What IS here: the TypeScript mirrors of the Rust error enums whose source sits in `core/` or `protocol/` (so both clients mirror one enum from one place), and the token layer a custom theme can set, which must exist on every client or a theme paints one and not the other. Both clients keep one-line re-export shims at their old paths so importers stay unchanged, which is the `@myne/dialect` shape.",
   "exports": {
     ".": "./src/index.ts",

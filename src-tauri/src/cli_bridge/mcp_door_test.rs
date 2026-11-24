@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The desktop door arm, end to end: the REAL `myne-mcp` binary, a real 0600
 //! Unix socket, a real encrypted vault (external-mcp-connection,
 //! myne-md/myne#923).

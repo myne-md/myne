@@ -1,4 +1,4 @@
-// Spec: myne-agents/docs/spec/markdown-dialect.md §3.2. Markdown `![alt](src)` form ONLY
+// Spec: docs/spec/markdown-dialect.md §3.2. Markdown `![alt](src)` form ONLY
 // — the `![[image.png]]` wikilink-embed form is consumed first by the
 // wikilink lezer extension (registered `before: "Link"`) and lives under
 // the wikilinks visitor with `embed: true`.

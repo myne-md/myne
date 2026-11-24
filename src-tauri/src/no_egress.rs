@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! App-global no-egress invariant: the single source of truth + pure
 //! predicates + static scanners (local-ai epic, ai-egress-guardrail MYND-407,
 //! tasks 1–3).
@@ -40,7 +40,7 @@
 //!
 //! `reqwest`, `hyper` and `tauri-plugin-updater` left this denylist when the
 //! desktop self-update shipped: they are the one deliberate HTTP-client
-//! exception, admitted in `myne-agents/docs/dependency-policy.md` and a decisions entry,
+//! exception, admitted in `docs/dependency-policy.md` and a decisions entry,
 //! and reached only by the host-side update check. The WebView still may not be
 //! granted the updater's commands (`updater` stays in
 //! [`NETWORK_PERMISSION_PREFIXES`]), so the capability-layer half of this guard
@@ -71,7 +71,7 @@ pub const CSP_CONNECT_SRC_ALLOWLIST: &[&str] = &[
 /// gained an outbound-request or telemetry capability it was not meant to have.
 /// HTTP clients + crash/analytics SDKs, MINUS the one deliberate exception:
 /// `reqwest`/`hyper` arrive through `tauri-plugin-updater` for the host-side
-/// update check (see module docs and `myne-agents/docs/dependency-policy.md`), so none of
+/// update check (see module docs and `docs/dependency-policy.md`), so none of
 /// the three is listed here. NOT TLS primitives (see module docs on `rustls`).
 pub const DENYLISTED_CRATES: &[&str] = &[
     // HTTP clients (`reqwest`/`hyper` are the admitted update exception, above)

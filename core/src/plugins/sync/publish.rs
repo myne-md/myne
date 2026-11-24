@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Publishing a vault to the server (myne-md/myne#911 task 8).
 //!
 //! # What publishing is, and what it is not

@@ -3,7 +3,7 @@
 // ⚠️ DEVICE-VERIFY-PENDING — this Kotlin cannot be gradle-built in the mobile
 // repo (gradle is not installed here, and `src-tauri/gen/` holds only `schemas`);
 // it is committed source at the `tauri-plugin-screen-guard` bar and is verified
-// on a real Android device via `myne-agents/docs/dev/device-matrix.md`, NOT in the change
+// on a real Android device via `dev-notes/device-matrix.md`, NOT in the change
 // that adds it.
 //
 // Android half of the task-reminder scheduler (MYND-619, tasks 3 and 4).

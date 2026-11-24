@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The cross-repo sync window, checked without a server checkout.
 //!
 //! `scripts/check-stream-timeout-drift.mjs` compares these four numbers by

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Byte-level integration tests against the `myne-test-vectors/` companion
 // repository (expected at `../myne-test-vectors/` per `workspace/setup.sh`).

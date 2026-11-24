@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The client side of the local door: one dial per call, one frame each way.
 //!
 //! ## The connection that survives a lock is THIS one (the stdio session)

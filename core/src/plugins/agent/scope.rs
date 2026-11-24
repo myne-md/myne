@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Scope grants and how they resolve.
 //!
 //! A grant is what the user approved. Resolving it turns that approval into a

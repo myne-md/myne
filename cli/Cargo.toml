@@ -2,7 +2,7 @@
 name = "myne-cli"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 publish = false
 description = "The `myne` sidecar CLI: talks to the running, unlocked desktop over its local command socket (cli-thin-client, MYND-490). Never opens the vault, never holds a key."
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local on-disk layout for the share-import staging queue.
 //!
 //! Directories under `<app_data_dir>/pending-shares/` (on iOS, under the shared

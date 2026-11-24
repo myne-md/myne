@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Error type for the sealed label store (`MYL1`, `protocol.md` § 9.22).
 //!
 //! Closed, `serde`-tagged set, following the `captures` / `share_import`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Markdown ↔ single-`Text` Automerge bridge for the `NC05` CRDT note-type
 //! (`automerge-sync-migration` epic, myne-md/myne#418 task 3; ASM-7).
 //!

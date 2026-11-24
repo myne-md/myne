@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded image decode — the decompression-bomb rail every untrusted
 //! attachment-image decode in this plugin goes through.
 //!

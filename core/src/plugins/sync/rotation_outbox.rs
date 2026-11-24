@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The owner-side **rotation outbox** (myne-md/myne#797).
 //!
 //! A member removal commits locally before it can reach the network: the group

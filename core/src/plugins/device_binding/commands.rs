@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The host surface of the device-binding store: the session-facing cores, the
 //! best-effort unlock hook, and their Tauri wrappers.

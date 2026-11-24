@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The CLI bridge's device-local status marker (cli-thin-client task 3).
 //!
 //! `cli-status` lives beside the command socket in the app-data dir and

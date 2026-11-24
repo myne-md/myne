@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // No WebView-facing commands. The empty list is deliberate (a Rust-only bridge;
 // permission autogen is skipped for an empty command set). The Kotlin `saveFile`
 // @Command is reached ONLY from the Rust backend via `run_mobile_plugin` (the

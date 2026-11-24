@@ -1,7 +1,7 @@
 // Clip serializer — task 7 (capture-extraction): safe-degrade for
 // un-representable structure + drop constructs that have no Myne emit form.
 //
-// The never-broken-markdown guarantee (myne-agents/docs/spec/markdown-dialect.md §3 / §5 /
+// The never-broken-markdown guarantee (docs/spec/markdown-dialect.md §3 / §5 /
 // §6). Two distinct behaviors, both folded into the walker's default /
 // fallthrough arms:
 //

@@ -3,7 +3,7 @@
 //
 // This replaces two consecutive steps (`PhraseStep` then `AccountStep`), and the
 // merge is the research finding rather than a tidy-up: no product surveyed in
-// `myne-agents/features/onboarding/research.md` asks a user to absorb two
+// `private-companion/features/onboarding/research.md` asks a user to absorb two
 // back-to-back "keep this forever" moments, and the account step arrived AFTER
 // the phrase challenge had already been passed, so it read as an epilogue to a
 // ceremony that was over. One screen, one save, one acknowledgement.

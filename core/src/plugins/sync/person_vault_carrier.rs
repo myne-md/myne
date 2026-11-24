@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local, vault-bound person-identity carrier (myne-md/myne#792).
 //!
 //! An `NTV6` vault's sync head must be signed by the holder's person keypair

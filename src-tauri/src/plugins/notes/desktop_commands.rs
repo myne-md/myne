@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Desktop-only `notes` plugin commands.
 //!
 //! These commands reach into desktop-only subsystems that do NOT live in

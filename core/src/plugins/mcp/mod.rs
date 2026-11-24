@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Host-side policy for an external MCP connection (external-mcp-connection,
 //! myne-md/myne#923).
 //!

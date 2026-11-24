@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Object URLs for decrypted attachments (phase3-web-client task 44).
 //!
 //! # Why the bytes stop here

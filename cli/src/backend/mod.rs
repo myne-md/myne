@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `MyneBackend` seam (cli-thin-client task 4; MYND-490).
 //!
 //! **Load-bearing from the first commit**: the command/output layer above

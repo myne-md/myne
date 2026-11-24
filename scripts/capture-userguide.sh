@@ -3,7 +3,7 @@
 # MYND-252 gate #7). Mirrors scripts/e2e-local.sh's container plumbing
 # but runs the CAPTURE config (e2e/capture/*.capture.ts) instead of the
 # E2E suite. tauri-driver has no macOS support, so this container IS the
-# Linux seat (myne-agents/docs/dev/e2e.md). PNGs land in e2e/artifacts/userguide/
+# Linux seat (dev-notes/e2e.md). PNGs land in e2e/artifacts/userguide/
 # (bind-mounted to the host repo; gitignored).
 #
 #   ./scripts/capture-userguide.sh                # build app + capture

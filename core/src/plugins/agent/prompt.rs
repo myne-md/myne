@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Building the agent's request, and parsing what comes back.
 //!
 //! The action vocabulary is deliberately tiny and closed: read tools, note
@@ -573,7 +573,7 @@ pub struct Document {
 /// the model does not have to agree with us: twenty thousand characters is
 /// roughly five thousand tokens, which is a readable report or a lecture
 /// handout and not a book. The budget exists because an unbounded document is an
-/// unbounded request, and the remote arm `myne-agents/docs/decisions/ai/0515` describes has
+/// unbounded request, and the remote arm `decisions/ai/0515` describes has
 /// no volume bound of its own.
 pub const MAX_DOCUMENT_CHARS: usize = 20_000;
 

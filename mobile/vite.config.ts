@@ -279,7 +279,7 @@ export default defineConfig(async () => ({
       { find: /^@myne\/agent-store$/, replacement: sib("../src/notes/agent/agentStore.ts") },
       { find: /^@myne\/agent-run-core$/, replacement: sib("../src/lib/agent-run-core.ts") },
       // The three-figure cost line, shared rather than re-worded. Its own module
-      // comment is the reason: `myne-agents/docs/decisions/ai/0515` records this sentence as
+      // comment is the reason: `decisions/ai/0515` records this sentence as
       // the compensating control for the remote arm having no volume bound, and
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
@@ -293,7 +293,7 @@ export default defineConfig(async () => ({
       // reason the copies existed at all.
       { find: /^@myne\/field-label$/, replacement: sib("../src/components/primitives/FieldLabel.tsx") },
       // The run indicator, shared for the reason the cost line is: it is a
-      // NAMED motion-canon exemption (`myne-agents/docs/decisions/ai/0635`), and every one
+      // NAMED motion-canon exemption (`decisions/ai/0635`), and every one
       // of the conditions that exemption rests on — bounded by the run, paused
       // when hidden or off-screen, one static frame under reduced motion,
       // budgeted, `aria-hidden` — is a property of the implementation rather

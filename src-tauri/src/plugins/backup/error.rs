@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `backup` plugin IPC error enum (MYND-32 / MYND-218).
 //!
 //! Closed taxonomy mirroring `SnapshotError` — DENY-list clean (no path

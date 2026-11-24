@@ -11,7 +11,7 @@
 // five-minute IPC loop against a plugin the web dispatcher refuses.
 //
 // `--emit` regenerates the checked-in assessment
-// (`myne-agents/features/phase3-web-client/web-surface-assessment.md`) from this
+// (`private-companion/features/phase3-web-client/web-surface-assessment.md`) from this
 // table, so the document cannot drift from the gate: there is one roster, and
 // the prose is its projection.
 
@@ -668,7 +668,7 @@ const V = {
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
   "src/hooks/useDiagnostics.ts": [
     "adapted",
-    "The hook reads the device-local log switch and the one crash record through `plugin:diagnostics`. It runs as written, but the whole `diagnostics` plugin is `Unsupported` on web (the web build installs no `tracing` subscriber at all, `myne-agents/docs/decisions/ops/0366`), so the `diagnosticLog` capability is absent and the effect short-circuits to off and no record. The About rows that render it are omitted rather than greyed; a failed read is deliberately indistinguishable from off, because off is the state in which nothing is written.",
+    "The hook reads the device-local log switch and the one crash record through `plugin:diagnostics`. It runs as written, but the whole `diagnostics` plugin is `Unsupported` on web (the web build installs no `tracing` subscriber at all, `decisions/ops/0366`), so the `diagnosticLog` capability is absent and the effect short-circuits to off and no record. The About rows that render it are omitted rather than greyed; a failed read is deliberately indistinguishable from off, because off is the state in which nothing is written.",
   ],
   "src/hooks/useReminderScheduler.ts": [
     "adapted",

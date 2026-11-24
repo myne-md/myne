@@ -184,7 +184,7 @@ export function createTranscriptSection(opts: {
       const bar = document.createElement("span");
       bar.className = "cm-attachment-audio-transcript-bar";
       // State-carrying motion, so it opts IN to the reduced-motion exemption
-      // (MYND-630, reaffirmed by `myne-agents/docs/decisions/ui/0632`): the blanket
+      // (MYND-630, reaffirmed by `decisions/ui/0632`): the blanket
       // `animation-duration: 0ms` would freeze a busy meter mid-cycle, which
       // reads as hung rather than as calm. The exemption slows it to half speed
       // instead. The default for any new animation stays suppressed — this is

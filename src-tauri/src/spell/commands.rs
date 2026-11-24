@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Spell-check Tauri commands + bundled-dictionary loader (MYND-262 t5,
 //! MYND-263 t3-4, MYND-266 t5).
 //!
@@ -27,7 +27,7 @@ use tauri::{AppHandle, Manager, Runtime, State};
 /// Every wooorm/dictionaries Hunspell pair here is verified to load in spellbook
 /// 0.4.2 (real-dictionary tests) and to carry an AGPL-3.0-compatible license
 /// (permissive — MIT/BSD/Apache-2.0; or GPL-3.0 / LGPL-2.1+ / LGPL-3.0 / MPL-2.0;
-/// or AGPL-3.0 native for he). Excluded: TR (`MalformedFlag(ZeroFlag)`), da + gl
+/// or AGPL-3.0-only native for he). Excluded: TR (`MalformedFlag(ZeroFlag)`), da + gl
 /// (spellbook parse failure), uk (over-accepts arbitrary tokens), el (Greek —
 /// loads, but the 19 MB dict is held back on bundle-size grounds), hr (the
 /// OpenOffice Croatian dict is LGPL/SISSL 2003; SISSL is FSF- and OSI-approved

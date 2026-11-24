@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Active meeting-session state (myne-md/myne#789).
 //!
 //! Deliberately the same shape as the voice-record session next door: only

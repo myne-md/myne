@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `secret-export` plugin IPC error enum.
 //!
 //! Closed taxonomy — DENY-list clean (no path strings, no secret material, no

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! How far through materialising a vault is this device? (phase3-web-client
 //! task 39)
 //!

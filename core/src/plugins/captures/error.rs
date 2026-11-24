@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tauri-layer error type for the `captures` (pending-capture queue) plugin.
 //!
 //! Closed, `serde`-tagged set hand-mirrored on the TS side. No `String` field

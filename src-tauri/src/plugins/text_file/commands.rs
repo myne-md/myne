@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! One plaintext file in, one plaintext file out (myne-md/myne#1037).
 //!
 //! Its own plugin rather than a member of `export`: `export` is a desktop/mobile TWIN

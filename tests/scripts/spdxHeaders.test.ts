@@ -51,15 +51,15 @@ describe("missingHeader", () => {
   });
 
   it("names a near-miss licence identifier", () => {
-    // `AGPL-3.0-only` is a different SPDX identifier, and so is any other
-    // licence. A rule that accepted a prefix would let the app's own licence be
-    // swapped for another AGPL variant without a word.
+    // `AGPL-3.0` is the deprecated identifier and `AGPL-3.0-or-later` is a
+    // different licence. A rule that accepted a prefix would let the app's own
+    // licence be swapped for another AGPL variant without a word.
     const read = readerFor({
       "a.rs": "// SPDX-License-Identifier: AGPL-3.0-only\n",
       "b.rs": "// SPDX-License-Identifier: MIT\n",
       "c.rs": "//SPDX-License-Identifier: AGPL-3.0\n",
     });
-    expect(missingHeader(["a.rs", "b.rs", "c.rs"], read)).toEqual(["a.rs", "b.rs", "c.rs"]);
+    expect(missingHeader(["a.rs", "b.rs", "c.rs"], read)).toEqual(["b.rs", "c.rs"]);
   });
 
   it("fails closed when a path cannot be read", () => {
@@ -90,6 +90,6 @@ describe("the wired guard", () => {
       cwd: ROOT,
       encoding: "utf8",
     });
-    expect(out).toContain("ok (0 Rust file(s) staged carry the AGPL-3.0 header)");
+    expect(out).toContain("ok (0 Rust file(s) staged carry the AGPL-3.0-only header)");
   });
 });

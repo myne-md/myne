@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The single value that crosses back out of wasm.
 //!
 //! # Why a tagged envelope and not `Result<JsValue, JsValue>`

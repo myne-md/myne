@@ -4,9 +4,9 @@
 // ceremony that owns it (myne-md/myne#869). Before #855 the identity dialog's
 // Done was the ONLY signal that the user had saved the phrase, so a user who
 // never wrote it down had none until the day they lost the device, and an
-// identity cannot be recovered without it. `myne-agents/docs/spec/protocol.md` section 7.1.3
+// identity cannot be recovered without it. `docs/spec/protocol.md` section 7.1.3
 // requires the demonstration for the vault phrase; this gives the identity
-// phrase the same one (`myne-agents/docs/decisions/ui/0665`, superseding that clause of
+// phrase the same one (`decisions/ui/0665`, superseding that clause of
 // 0615).
 //
 // #869 is the part these tests exist for now: the phrase and the challenge are

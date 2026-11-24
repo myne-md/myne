@@ -2,7 +2,7 @@
 name = "myne-mcp"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 publish = false
 description = "The `myne-mcp` sidecar: speaks MCP over stdio and forwards a fixed vault tool surface to the running, unlocked desktop (external-mcp-connection, myne-md/myne#923). Holds no key, opens no listener."
 

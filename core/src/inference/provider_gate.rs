@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The consent gate: whether a remote request may be constructed at all
 //! (ai-remote-providers task 9, SYNC-13/SYNC-18).
 //!
@@ -24,7 +24,7 @@
 //! went.** SYNC-18 put the whole surface behind Developer mode, and that rule
 //! is superseded rather than relaxed by accident. Two things forced the
 //! question. Developer mode is defined as *where the user leaves the path Myne
-//! vouches for* (`myne-agents/docs/decisions/ai/0278`), and per-provider consent is a
+//! vouches for* (`decisions/ai/0278`), and per-provider consent is a
 //! sharper instrument for exactly that: it names the recipient, it is compared
 //! for equality so a stale approval is unusable, and it cannot be satisfied by
 //! a switch the user flipped for an unrelated reason, the same flag also

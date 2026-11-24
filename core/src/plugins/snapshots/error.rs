@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `snapshots` plugin IPC error enum (MYND-96).
 //!
 //! Closed taxonomy mirroring `NoteUpdateError` / `NoteReadError` — DENY-list

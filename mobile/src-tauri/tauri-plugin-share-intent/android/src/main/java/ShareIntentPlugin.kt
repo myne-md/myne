@@ -3,7 +3,7 @@
 // ⚠️ DEVICE-VERIFY-PENDING — this Kotlin cannot be gradle-built in the mobile
 // repo (no gradle here); it is committed source at the `tauri-plugin-screen-
 // guard` bar and is verified on a real Android device via
-// `myne-agents/docs/dev/device-matrix.md`, NOT in the change that adds it.
+// `dev-notes/device-matrix.md`, NOT in the change that adds it.
 //
 // Android inbound OS-share-sheet receiver for the share-import feature (SF3,
 // MYND-511). The `ACTION_SEND` / `ACTION_SEND_MULTIPLE` intent-filters that make

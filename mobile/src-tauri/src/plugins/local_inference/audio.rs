@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! WAV decode + 16 kHz-mono resample for the transcription front end
 //! (voice-to-text, MYND-550; SYNC-V3).
 //!
@@ -460,7 +460,7 @@ fn resample_linear(input: Vec<f32>, from_rate: u32, to_rate: u32) -> Result<Vec<
 /// picked 8 hours (460.8 M samples), which the § 9.9 cap and the 4x clamp
 /// together put permanently out of reach, so its ceiling refused nothing and its
 /// own test asserted around the branch. myne-md/myne#510 derived it from the
-/// same cap this constant uses; `myne-agents/docs/decisions/ai/0542` supersedes the clause
+/// same cap this constant uses; `decisions/ai/0542` supersedes the clause
 /// of `0503` that recorded the divergence as deliberate.
 const MAX_PCM_SAMPLES: usize = protocol::MAX_ATTACHMENT_LEN / 2;
 

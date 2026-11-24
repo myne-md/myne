@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The desktop diagnostic log's runtime (myne-md/myne#860).
 //!
 //! # The one subscriber, and why the switch cannot be a second `try_init`
@@ -18,7 +18,7 @@
 //!   user's disk, and the one call site whose own doc comment admits its detail
 //!   "may include the path" is precisely the `RUST_LOG`-gated one. Debug and
 //!   trace are also where the records that name stages, counts and ids live
-//!   (`myne-agents/docs/decisions/ops/0366`).
+//!   (`decisions/ops/0366`).
 //!
 //! # Startup ordering is the whole reason the flag is device-local
 //!
@@ -196,7 +196,7 @@ pub const FILE_TARGETS: &[&str] = &[
 /// record by any configuration. Promoting the trail to `info` site by site was rejected
 /// (a level decision at every future call site inside a loop whose volume grows with the
 /// run); a target-wide floor states the rule once, in the sink, and covers call sites
-/// that do not exist yet. `myne-agents/docs/decisions/ops/0768` carries the argument.
+/// that do not exist yet. `decisions/ops/0768` carries the argument.
 ///
 /// What bounds it is the loop's own caps rather than the user's behaviour, and what keeps
 /// the content claim true is that `scripts/check-tracing-discipline.mjs` holds its `%`
@@ -350,7 +350,7 @@ mod tests {
     }
 
     /// The one target recorded below `info`, plus the boundary that keeps the exception
-    /// from spreading past it (`myne-agents/docs/decisions/ops/0768`).
+    /// from spreading past it (`decisions/ops/0768`).
     ///
     /// Both halves are load-bearing and they fail in opposite directions. The admit half
     /// is what makes the widening real: a prefix typo in `DEBUG_FILE_TARGETS` silently

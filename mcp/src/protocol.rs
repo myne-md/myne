@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! JSON-RPC 2.0 on the wire, and the two MCP revisions this binary speaks.
 //!
 //! The two revision strings are a **wire contract**, not a Myne identifier: no

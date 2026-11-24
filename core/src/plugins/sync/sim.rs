@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Multi-device sync **simulation harness** (Phase 1 of the sync test-env work).
 //!
 //! **KNOWN GAP, whole-harness: every scenario here is a v0.1 vault.** Not just

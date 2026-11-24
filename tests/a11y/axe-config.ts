@@ -9,7 +9,7 @@
 //     contrast, importing `WCAG_AA_TAGS` so the rule scope matches.
 //
 // Bar: WCAG level **2.2** AA (myne-md/myne#728, task 17; raised from 2.1,
-// which is what `myne-agents/docs/decisions/ui/0263` gated and what `PRODUCT.md` had
+// which is what `decisions/ui/0263` gated and what `PRODUCT.md` had
 // already been promising past). The tag set is the whole of the difference:
 // adding `wcag22aa` turns on the 2.2 rules axe HAS, which in practice means
 // `target-size` (SC 2.5.8). The other five 2.2 additions have no axe rule at

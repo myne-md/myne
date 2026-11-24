@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_indices` Tauri plugin (MYND-31 / A11 — VaultIndices).
 //!
 //! Owns the in-RAM wikilink graph + backlinks + tag index for the open
@@ -15,8 +15,8 @@
 //!
 //! ## Design
 //!
-//! - PRD: `myne-agents/features/vault-indices/prd.md`
-//! - Design session: `myne-agents/sessions/design/2026-06-07-vault-indices.md`
+//! - PRD: `private-companion/features/vault-indices/prd.md`
+//! - Design session: `private-companion/sessions/design/2026-06-07-vault-indices.md`
 //! - Architecture: Build-B (TS extraction, Rust struct/query/persistence),
 //!   Model-2 (title-keyed edges = source of truth), plain-B resolution
 //!   (single TS resolver). See the design session for full rationale.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Value-strict frontmatter readers + the daily-note "which note is today's
 //! note?" match rule (cli-thin-client task 9; MYND-490).
 //!

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "//": "Shared CodeMirror editor ENGINE — the frontend `core` to `@myne/dialect`'s `protocol`. ALL platform coupling (i18n, tag index, prefs, attachment import/catalog/picker/export/rename/ref-resolution, voice capture, open-URL, AI, spell) is injected through the `EditorHost` in ./src/host.ts. Phase B closed with phase3-web-client task 76: the six files that still imported `@tauri-apps/*` at module scope now call `getHost()`, and the two `@tauri-apps/*` peerDependencies are gone — this package has NO host dependency of any kind, which is what lets a third, non-Tauri client (the browser) compile it. `scripts/check-platform-seam.mjs` enforces that in pre-commit and in CI. Consumed as SOURCE by every client (Vite compiles it); the desktop keeps re-export shims in `src/editor/*` so its importers stay unchanged.",
   "exports": {
     ".": "./src/index.ts",
@@ -15,8 +15,6 @@
     "./*": "./src/*.ts"
   },
   "dependencies": {
-    "@myne/dialect": "workspace:*",
-    "@excalidraw/excalidraw": "0.18.1",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.10.3",
     "@codemirror/lang-css": "6.3.1",
@@ -32,13 +30,15 @@
     "@codemirror/search": "6.7.0",
     "@codemirror/state": "6.6.0",
     "@codemirror/view": "6.43.1",
+    "@excalidraw/excalidraw": "0.18.1",
     "@lezer/common": "1.5.2",
     "@lezer/highlight": "1.2.3",
     "@lezer/markdown": "1.6.4",
+    "@myne/dialect": "workspace:*",
     "@replit/codemirror-vim": "6.3.0",
     "d3-force": "3.0.0",
     "dompurify": "3.4.10",
-    "js-yaml": "4.2.0",
+    "js-yaml": "4.3.2",
     "katex": "0.17.0",
     "mermaid": "11.15.0"
   },

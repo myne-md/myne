@@ -6,7 +6,7 @@
 // was a 16 ms window that opened when React ran the arming effect, and this harness's own
 // press sequence is 10 to 14 ms long, so under load the first press was refused on a
 // dialog whose ring sat on the confirm button with every other guard reading correct
-// (myne-md/myne#683, `myne-agents/docs/decisions/ui/0685`). The retry is gone and the helper now lets
+// (myne-md/myne#683, `decisions/ui/0685`). The retry is gone and the helper now lets
 // a refused press FAIL.
 //
 // Nothing in the container lane can hold that: the scenario only fails when the race

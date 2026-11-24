@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! App-global WebView navigation policy (myne#383).
 //!
 //! **The one exfiltration channel the CSP cannot see.** `connect-src` governs
@@ -9,7 +9,7 @@
 //! `tauri.conf.json` CSP now carries `form-action 'none'` for the form case;
 //! this module is the missing directive for the scripted case.
 //!
-//! Its precondition is a residual `myne-agents/docs/threat-model.md` §7 already accepts —
+//! Its precondition is a residual `docs/threat-model.md` §7 already accepts —
 //! script running in the WebView after a DOMPurify bypass (`:167` embedded
 //! HTML, `:168` importer markup, `:169` mermaid). It contains nothing else
 //! about such a script: every vault command the ACL grants stays reachable.

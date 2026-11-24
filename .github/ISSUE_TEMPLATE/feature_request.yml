@@ -42,5 +42,5 @@ body:
       options:
         - label: I searched existing issues and this isn't a duplicate.
           required: true
-        - label: This doesn't conflict with Myne's anti-features (myne-agents/docs/vision.md) or exceed the threat model (myne-agents/docs/threat-model.md).
+        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
           required: true

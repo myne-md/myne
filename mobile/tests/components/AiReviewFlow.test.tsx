@@ -11,7 +11,7 @@
 //   3. a refused edit is shown with its cause;
 //   4. the BACK GESTURE does not discard an unapplied proposal.
 //
-// The fourth is the phone's version of `myne-agents/docs/decisions/ai/0521`'s rule about
+// The fourth is the phone's version of `decisions/ai/0521`'s rule about
 // the backdrop and Escape. Android's hardware back and iOS's edge-swipe both
 // arrive as a history pop, which is why that is what this file drives.
 
@@ -201,7 +201,7 @@ describe("AiReviewFlow", () => {
   });
 
   it("absorbs the back gesture instead of letting it leave the screen", async () => {
-    // `myne-agents/docs/decisions/ai/0521` on a phone. Android's hardware back and iOS's
+    // `decisions/ai/0521` on a phone. Android's hardware back and iOS's
     // edge-swipe both arrive as a `popstate`, and a stray one that threw the
     // model's work away would be a worse surface than no back at all.
     //

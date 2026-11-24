@@ -25,7 +25,7 @@
 # Exit non-zero on the first failing assertion so the pipeline stops with the
 # reason on stdout. A failing smoke leaves the PREVIOUS container running —
 # nothing here rolls anything back, because `docker compose up -d` has already
-# replaced it by the time this runs; see `myne-ops/runbooks/web-client-deploy.md`
+# replaced it by the time this runs; see `runbook/runbooks/web-client-deploy.md`
 # §3 for the rollback the operator performs when this goes red.
 set -eu
 

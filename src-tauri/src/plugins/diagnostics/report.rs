@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one report file the bug-report surface can save (myne-md/myne#860).
 //!
 //! # What it is, and why one file rather than an archive
@@ -14,7 +14,7 @@
 //!
 //! # This is a plaintext egress, and it is the user's own act
 //!
-//! `myne-agents/docs/threat-model.md` TB3 already carries the exception: a user-initiated
+//! `docs/threat-model.md` TB3 already carries the exception: a user-initiated
 //! export to a destination the user chose. The bundle is exactly that, so it
 //! goes through the OS save dialog and the unclobbered writer (a fixed
 //! `<target>.tmp` name is only safe INSIDE the vault), and the surface shows

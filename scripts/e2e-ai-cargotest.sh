@@ -3,7 +3,7 @@
 #
 # Why this exists rather than `cargo test` on the host: `src-tauri`'s build.rs
 # needs both `externalBin` sidecars staged, which a fresh worktree does not have
-# (`myne-agents/reference/worktrees.md`), so a host run costs two sidecar builds
+# (`private-companion/reference/worktrees.md`), so a host run costs two sidecar builds
 # before it compiles a line. The container already has the target volume the E2E
 # runners warmed, so a filtered test here is minutes rather than a rebuild.
 #

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local sync endpoint configuration (SYNC-14, MYND-424 task 3).
 //!
 //! The endpoint config is the **real product surface** for pointing a client

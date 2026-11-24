@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The `NC05` CRDT note-type decode path, host-free.
 
 pub mod crdt_decode;

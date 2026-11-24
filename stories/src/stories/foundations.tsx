@@ -469,7 +469,7 @@ function MotionRow({ name }: { name: string }) {
  * The motion rows above replay durations; this shows the OTHER half of the same
  * system, which is what a press looks like and where the value comes from. Two
  * steps exist: `--accent-press` on an accent call to action, and the
- * theme-independent neutral mix on everything else (`myne-agents/docs/decisions/ui/0683`
+ * theme-independent neutral mix on everything else (`decisions/ui/0683`
  * records why the neutral one is a mix rather than the `--line-1` rung).
  *
  * The three controls deliberately come from two different mechanisms, because

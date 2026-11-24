@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The wasm CSPRNG: `getrandom`'s `custom` backend, bound to
 //! `crypto.getRandomValues` (phase3-web-client task 81).
 //!
@@ -88,7 +88,7 @@ const MAX_BYTES_PER_CALL: usize = 65_536;
 /// `Zeroizing`. So the buffer is overwritten before it is dropped.
 ///
 /// **What this is not.** It is defence-in-depth hygiene against process-memory /
-/// forensic capture — the residual `myne-agents/docs/threat-model.md` §7 already defers — and
+/// forensic capture — the residual `docs/threat-model.md` §7 already defers — and
 /// not a spec requirement; no normative text asks for it. It does **not** restore
 /// parity with the wasm-side `Zeroizing` discipline: a GC that already moved the
 /// typed array's backing store leaves a copy `fill` cannot reach. It is also not

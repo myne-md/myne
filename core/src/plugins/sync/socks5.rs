@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! A minimal SOCKS5 client for the sync transport (desktop Tor routing,
 //! MYND-650 task 3).
 //!
@@ -63,7 +63,7 @@ const VER: u8 = 0x05;
 /// offers no SOCKS authentication at all — it consumes RFC 1929's
 /// username/password field as a **stream-isolation token**, never as a
 /// credential — so there is nothing else to send and nothing would check it.
-/// The residual that leaves is recorded in `myne-agents/docs/threat-model.md` §7 under Tor
+/// The residual that leaves is recorded in `docs/threat-model.md` §7 under Tor
 /// routing mode.
 const METHOD_NO_AUTH: u8 = 0x00;
 /// The method the proxy returns when it accepts none of the ones offered.

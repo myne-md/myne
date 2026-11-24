@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `graph_layout` plugin core — persistence of the knowledge-graph view's
 //! laid-out node positions (the `vault.graph` rebuildable cache, `MYG1`,
 //! `protocol.md` § 9.19): `graph_layout_read` + `graph_layout_write`.

@@ -43,7 +43,7 @@
 // # What this does NOT check, and why each is somebody else's
 //
 //  - **That the eight release version fields agree.** That roster lives in
-//    `myne-ops/runbooks/release-checklist.md` and spans the desktop, web and
+//    `runbook/runbooks/release-checklist.md` and spans the desktop, web and
 //    mobile clients; this guard reads the one file the Android build consumes.
 //    A mismatch with `mobile/package.json` is reported as a WARNING for that
 //    reason, not as a failure.

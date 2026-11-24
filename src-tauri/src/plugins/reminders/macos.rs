@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The macOS arm of the reminder seam: `UNUserNotificationCenter` through
 //! `objc2-user-notifications`, already in `Cargo.lock` as a transitive dependency
 //! of tauri/wry, so promoting it to a direct dependency adds no crate.

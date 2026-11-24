@@ -127,7 +127,7 @@ targets:
         # `mobile/scripts/ios-link.sh` globalizes them and stages the result at
         # this stable path (the tauri-<hash> build dir is not addressable from
         # the pbxproj). `-force_load` then pulls the globalized definitions in.
-        # See myne-ops/runbooks/ios-app-store-release.md §4b.
+        # See runbook/runbooks/ios-app-store-release.md §4b.
         OTHER_LDFLAGS: ["$(inherited)", "-Wl,-u,_OBJC_CLASS_$_WCCaptureReceiver"]
         # PER PLATFORM, and that is the fix for a real failure: a device build and a
         # simulator build are both arm64 and both write `Externals/arm64/<cfg>/`, so

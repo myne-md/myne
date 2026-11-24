@@ -149,7 +149,7 @@ describe("ChatComposer", () => {
     // open the menu. Two clicks and a layout shift to reach a control that
     // already IS a disclosure (myne-md/myne#771).
     //
-    // `myne-agents/docs/decisions/ai/0518` point 1 is what may not break: a
+    // `decisions/ai/0518` point 1 is what may not break: a
     // user-originated scope control must be ON the composer, because removing
     // it routes every folder-scale run through the model-originated expansion,
     // which is the injection-reachable path. One click instead of two is a
@@ -163,7 +163,7 @@ describe("ChatComposer", () => {
 
   it("keeps the size beside the picker once a folder is chosen", async () => {
     // The property issue A may not break: the count before sending is part of
-    // the mitigation `myne-agents/docs/decisions/ai/0515` names, not a nicety, so changing
+    // the mitigation `decisions/ai/0515` names, not a nicety, so changing
     // how the picker is reached must not take the number with it.
     mount();
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
@@ -331,7 +331,7 @@ describe("ChatComposer", () => {
     fireEvent.click(option!);
     await waitFor(() => expect(screen.getByTestId("ai.composer-scope-count")).toBeTruthy());
     // The size before sending, and what the excluded-folder clamp removed.
-    // "Projects" is not a size (myne-agents/docs/decisions/ai/0515).
+    // "Projects" is not a size (decisions/ai/0515).
     expect(screen.getByTestId("ai.composer-scope-count").textContent).toContain("12");
     expect(screen.getByTestId("ai.composer-scope-excluded").textContent).toContain("2");
     type("rename the concept");
@@ -829,7 +829,7 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
 
   it("sends the vault grant, and shows what it excludes, including zero", async () => {
     // The count is the reason the scope control exists
-    // (`myne-agents/docs/decisions/ai/0515`): a number the user did not expect has to be
+    // (`decisions/ai/0515`): a number the user did not expect has to be
     // explainable in place. Rendering the excluded line at ZERO is the other
     // half, an absent line cannot be told apart from "we did not check".
     agentPreviewGrant.mockResolvedValue({
@@ -865,7 +865,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
   // conversation, because nothing remounts this composer when the transcript
   // is swapped under it — so the grant a user chose for ONE question silently
   // became the standing grant for every question after it, which is the
-  // opposite of the user-originated scope `myne-agents/docs/decisions/ai/0518` point 1
+  // opposite of the user-originated scope `decisions/ai/0518` point 1
   // requires.
 
   function attachProjects(): void {
@@ -981,7 +981,7 @@ describe("ChatComposer, a session anchored to a note pins its scope (myne-md/myn
     expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
     expect(screen.queryByTestId("ai.composer-scope-wrap")).toBeNull();
     // The DISCLOSURE is untouched: the count and the excluded figure are what
-    // `myne-agents/docs/decisions/ai/0515` names as the mitigation, and they are not the
+    // `decisions/ai/0515` names as the mitigation, and they are not the
     // picker.
     expect(screen.getByTestId("ai.composer-permission")).toBeTruthy();
   });

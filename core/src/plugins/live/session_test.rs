@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Integration tests for the live-session core (`collab-editor-bridge` task 2).
 
 use super::session::LiveSession;

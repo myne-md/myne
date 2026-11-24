@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! `vault.search` 34-byte-header encrypted search-index codec
-//! (MYND-29; `myne-agents/docs/spec/protocol.md` § 9.6).
+//! (MYND-29; `docs/spec/protocol.md` § 9.6).
 //!
 //! `vault.search` is a vault-level singleton artifact holding the
 //! serialized full-text search index. It lives next to `vault.meta` /

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The write verbs, as host-validated intents with a restore point
 //! (external-mcp-connection tasks 14 to 16; `decisions/ai/0752`).
 //!

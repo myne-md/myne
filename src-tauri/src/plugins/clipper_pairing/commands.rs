@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! WebView IPC commands for the pairing dialog (TB10, task 4).
 //!
 //! These are the NARROW Tauri `#[command]`s the in-app pairing dialog drives.

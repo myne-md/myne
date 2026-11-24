@@ -1,7 +1,7 @@
 // Cursor-aware reveal helper shared by all line-scoped Decoration.mark
 // extensions in `src/editor/decorations/`.
 //
-// Per `editor-mvp-baseline` PRD (myne-agents/features/editor-mvp-baseline/prd.md):
+// Per `editor-mvp-baseline` PRD (private-companion/features/editor-mvp-baseline/prd.md):
 // when the cursor's line equals the decoration's line, the decoration must
 // LIFT so the user can see + edit the raw markdown syntax. When the cursor
 // moves off the line, the decoration reapplies.

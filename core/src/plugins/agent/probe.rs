@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Whether a backend can hold the edit format at all.
 //!
 //! The anchored format asks the model to copy existing text **exactly**, and a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! In-memory full-text search index core (`search-index` feature, MYND-29,
 //! Task 1).
 //!
@@ -15,7 +15,7 @@
 //!
 //! The custom-vs-tantivy choice is a PRE-SHIP decision (the Task-9
 //! benchmark); this trait is what keeps the engine swappable. See
-//! `myne-agents/features/search-index/prd.md`.
+//! `private-companion/features/search-index/prd.md`.
 //!
 //! The engine is intentionally decoupled from the notes plugin — documents
 //! carry their id as a plain `String` (the note's UUID). The Tauri search

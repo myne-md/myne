@@ -1,6 +1,6 @@
 // Myne editor's CodeMirror 6 extension array.
 //
-// Per `editor-mvp-baseline` PRD (myne-agents/features/editor-mvp-baseline/prd.md)
+// Per `editor-mvp-baseline` PRD (private-companion/features/editor-mvp-baseline/prd.md)
 // + grill 2026-05-16: the markdown parser reuses the lezer MarkdownConfig
 // blobs from `src/dialect/lezer/` (Wikilink, InlineTag) that landed via
 // MYND-42. Do NOT duplicate the parser inside `src/editor/` — the dialect

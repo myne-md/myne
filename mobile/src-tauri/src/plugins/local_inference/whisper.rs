@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! On-device Whisper decode loop (voice-to-text, MYND-550; asr-engine task 3).
 //!
 //! The pure-compute + decode half of [`super::engine_candle`]'s `transcribe`:

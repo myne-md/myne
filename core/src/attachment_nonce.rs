@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Decryption-free attachment `content_nonce` primitives, the attachment twin
 //! of [`crate::note_nonce`] (MYND-468).
 //!
@@ -33,7 +33,7 @@ const MYA1_MAGIC: [u8; 4] = *protocol::attachment_blob::ATTACHMENT_BLOB_MAGIC;
 /// Accepting only one is a silent stop rather than a degradation: the reader
 /// answers `None`, which every caller reads as "not this family, nothing to
 /// do". It shipped that way and stopped attachment sync in both directions on
-/// every migrated vault; `myne-agents/docs/decisions/protocol/0567` carries the incident,
+/// every migrated vault; `decisions/protocol/0567` carries the incident,
 /// the measurements and why the pair is now a required argument to
 /// [`crate::content_nonce::content_nonce_at`] (myne-md/myne#638).
 const MYA5_MAGIC: [u8; 4] = *protocol::attachment_blob::ATTACHMENT_BLOB_V0_2_MAGIC;

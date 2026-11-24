@@ -1,6 +1,6 @@
 // Footnote extension for the Myne markdown dialect.
 //
-// Spec: myne-agents/docs/spec/markdown-dialect.md §3.4 (the two footnote constructs) + §8
+// Spec: docs/spec/markdown-dialect.md §3.4 (the two footnote constructs) + §8
 // (informative parser config). GFM does NOT parse footnotes — the @lezer/markdown
 // `GFM` bundle is `[Table, TaskList, Strikethrough, Autolink]` and the package
 // exports no `Footnote` config — so there is no AST node to decorate without this
@@ -9,7 +9,7 @@
 // A minimal CUSTOM config (not the community example) keeps the dependency
 // surface flat (no vendored file) and matches the pinned-subset discipline the
 // sibling `definition-list.ts` established. Decision recorded in
-// myne-agents/docs/decisions.md (2026-05-31, MYND-153).
+// decisions.md (2026-05-31, MYND-153).
 //
 // Two constructs, two hooks:
 //   - Inline REFERENCE `[^id]` → `FootnoteReference` node, registered

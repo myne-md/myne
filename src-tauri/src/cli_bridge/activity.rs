@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! "When did the CLI door last serve a command?" — session memory only
 //! (cli-thin-client task 12; MYND-490).
 //!

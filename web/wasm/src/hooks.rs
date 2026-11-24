@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `WebHooks` — the browser's [`VaultLifecycleHooks`] (phase3-web-client task 83).
 //!
 //! # Why inheriting `NoopHooks` was a silent bug, not a placeholder

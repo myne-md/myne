@@ -1,4 +1,4 @@
-// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6 (frontmatter), §3 (body).
+// Spec: docs/spec/markdown-dialect.md §3.6 (frontmatter), §3 (body).
 
 import { parser } from "./lezer/parser";
 import {

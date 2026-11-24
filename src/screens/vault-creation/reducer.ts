@@ -1,7 +1,7 @@
 // Vault-creation orchestrator state machine.
 //
 // Implements the design session decisions in
-// myne-agents/sessions/design/2026-04-28-vault-creation-frontend.md
+// private-companion/sessions/design/2026-04-28-vault-creation-frontend.md
 // (Q2 state machine, Q3 phrase confirmation, Q7 error UX, Q8 cleanup).
 //
 // Secret material (phrase, accountNumber, sessionToken) lives only in
@@ -43,7 +43,7 @@ export type Step =
    * a preview of the file being saved (myne-md/myne#468 K11/K13).
    *
    * They were two consecutive steps, and the merge is the finding rather than a
-   * tidy-up: no product surveyed in `myne-agents/features/onboarding/research.md`
+   * tidy-up: no product surveyed in `private-companion/features/onboarding/research.md`
    * asks a user to absorb two back-to-back "keep this forever" moments, and the
    * second one arrived after the phrase challenge had already been passed, which
    * reads as an epilogue. One screen, one save, one acknowledgement.

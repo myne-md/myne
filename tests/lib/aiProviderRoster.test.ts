@@ -1,7 +1,7 @@
 // The closed set of remote AI provider wire values, held together across the
 // four places that write it out by hand (myne-md/myne#970 review, D8).
 //
-// `ai_provider` is a CLOSED enum in `myne-agents/docs/spec/protocol.md` §9.5.2, and growing
+// `ai_provider` is a CLOSED enum in `docs/spec/protocol.md` §9.5.2, and growing
 // it means editing the same four names in four files:
 //
 //   1. `core/src/plugins/prefs/commands.rs`: `KNOWN_AI_PROVIDERS`, the only

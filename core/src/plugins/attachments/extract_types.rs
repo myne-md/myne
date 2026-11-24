@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Platform-agnostic attachment-text-extraction payload types (MYND-328;
 //! `protocol.md` § 9.15).
 //!

@@ -36,7 +36,7 @@ import { runTool } from "./lib/run-tool.mjs";
 import { DOCS_ABSENT, docsPath, docsPresent } from "./lib/docs-tree.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const RECORD_REL = "myne-agents/docs/web-bundle-hashes.md";
+const RECORD_REL = "docs/web-bundle-hashes.md";
 const RECORD = docsPath("web-bundle-hashes.md");
 if (!docsPresent()) {
   console.log(`note: ${DOCS_ABSENT}`);

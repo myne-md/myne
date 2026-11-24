@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The one frontmatter single-key splice: read a field's value, replace it with
 //! a string scalar, and leave every other byte alone.
 //!

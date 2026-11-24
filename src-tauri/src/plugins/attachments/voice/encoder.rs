@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! WAV/PCM encoder for voice notes (MYND-259).
 //!
 //! A hand-rolled canonical 44-byte-header PCM WAV writer — no `hound`/codec

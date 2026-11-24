@@ -18,7 +18,7 @@ by the launcher — so here the same rule is enforced as *policy*: everything in
 this module is a static layout bound to a `myne://` PendingIntent, nothing
 touches vault state, and nothing refreshes on a timeline (`updatePeriodMillis`
 is 0 everywhere). Keep it that way; recorded in the main repo
-`myne-agents/docs/decisions.md` (2026-07-12, Android widget surfaces).
+`decisions.md` (2026-07-12, Android widget surfaces).
 
 ## Surface mapping (iOS → Android)
 

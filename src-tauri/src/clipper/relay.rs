@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Host↔app local IPC relay (TB10, task 6 — the deferred prerequisite).
 //!
 //! The native-messaging host runs as a SEPARATE OS process from the running

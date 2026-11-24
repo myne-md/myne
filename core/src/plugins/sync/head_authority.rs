@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Head authority selection by vault generation and, now, by **who signs**
 //! (myne-md/myne#711 decisions 0603; `decisions/protocol/0731` + `0733`).
 //!

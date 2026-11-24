@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-recover plugin — shared core.
 //!
 //! Owns `recover_with_phrase`, `complete_recovery`, and the optional

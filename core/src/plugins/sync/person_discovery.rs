@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Person-scoped vault discovery and listing (myne-md/myne#911 task 9).
 //!
 //! A device admitted to a person's account knows one thing after its claim

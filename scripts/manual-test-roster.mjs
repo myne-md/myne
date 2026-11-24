@@ -2,7 +2,7 @@
 // and why a machine cannot verify it instead.
 //
 // THIS FILE IS DATA. It is read by `scripts/check-manual-test-roster.mjs`, which
-// is both the gate over it and the generator of `myne-agents/docs/dev/manual-test-roster.md`,
+// is both the gate over it and the generator of `dev-notes/manual-test-roster.md`,
 // and by `scripts/manual-test-plan.mjs`, which turns it into a per-release plan
 // for one client. Nothing here executes anything. Editing the projection instead
 // of this file is the one edit that is never right: the projection is generated
@@ -241,7 +241,7 @@ export const ROSTER = Object.freeze([
       },
       {
         see: "On a DISPOSABLE vault, apply an agent run on a real phone and confirm the one-tap undo appears, then use it and confirm every note it names is actually back to its earlier text. Read the sentence under the offer and confirm it says the undo lasts only until you lock or close the app, and that it points at a note's version history; follow that pointer and confirm it lands on a note the run wrote, with the run's snapshot present in the list. Then apply a SECOND run, switch to another app and leave the phone alone for long enough that the OS reclaims Myne (lock the screen and wait, or open several heavy apps), come back, and confirm the one-tap undo is GONE while the snapshots for those notes are still there. Repeat the disappearance check by locking the vault instead.",
-        whyNotAutomated: "The disappearance is the point, and what makes it happen is the OS deciding to reclaim a backgrounded process, which is a memory-pressure judgement about a real device that no simulator, container or flow tier reproduces. The record is deliberately not persisted: it holds verbatim note plaintext and writing it to disk would reverse the argument myne-agents/docs/decisions/ai/0515 rests on, and snapshot metadata records no origin so it cannot be rebuilt afterwards either. So what a person is checking is that the offer really is gone AND the durable path really is populated, on the same device, in that order.",
+        whyNotAutomated: "The disappearance is the point, and what makes it happen is the OS deciding to reclaim a backgrounded process, which is a memory-pressure judgement about a real device that no simulator, container or flow tier reproduces. The record is deliberately not persisted: it holds verbatim note plaintext and writing it to disk would reverse the argument decisions/ai/0515 rests on, and snapshot metadata records no origin so it cannot be rebuilt afterwards either. So what a person is checking is that the offer really is gone AND the durable path really is populated, on the same device, in that order.",
         clients: ["ios", "android"],
         estimateMin: 10,
         tier: "core",
@@ -611,7 +611,7 @@ export const ROSTER = Object.freeze([
     manual: [
       {
         see: "On the weakest machine you support, install this release and REBOOT, or drop the page cache (`sudo purge` on macOS, `echo 3 | sudo tee /proc/sys/vm/drop_caches` on Linux), so nothing of the app is cached. Launch Myne from the launcher and start a stopwatch on the click. Record two numbers: seconds until any window is on screen, and seconds until the unlock screen accepts a keystroke. The main window is declared \"visible\": false in src-tauri/tauri.conf.json and is only shown after screen-capture protection has been applied, so during that gap the user sees NOTHING. Confirm the gap is short enough that it does not read as a failed launch, and that double-clicking the icon again during it does not open a second window or a second process. Then quit and relaunch immediately, warm, and record the difference between the two.",
-        whyNotAutomated: "The harness launches a binary the build step has just written and the OS still holds in page cache, on a CI runner under xvfb with software rendering, and it reads DOM state rather than wall-clock time; it never reboots and never drops caches. The first launch of a freshly installed build is also the one occasion macOS makes its Gatekeeper assessment against a per-machine record, which today is the unsigned-artefact warning rather than a notarization check, because myne-agents/docs/threat-model.md TB7 records (corrected 2026-08-15, entry 0496) that no Apple Developer ID exists and nothing is notarized; and it is the one occasion Windows Defender scans a bundle of several hundred megabytes. Those are one-shot, per-machine OS events a container that has already run the binary a hundred times cannot produce.",
+        whyNotAutomated: "The harness launches a binary the build step has just written and the OS still holds in page cache, on a CI runner under xvfb with software rendering, and it reads DOM state rather than wall-clock time; it never reboots and never drops caches. The first launch of a freshly installed build is also the one occasion macOS makes its Gatekeeper assessment against a per-machine record, which today is the unsigned-artefact warning rather than a notarization check, because docs/threat-model.md TB7 records (corrected 2026-08-15, entry 0496) that no Apple Developer ID exists and nothing is notarized; and it is the one occasion Windows Defender scans a bundle of several hundred megabytes. Those are one-shot, per-machine OS events a container that has already run the binary a hundred times cannot produce.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 12,
         tier: "standard",
@@ -666,7 +666,7 @@ export const ROSTER = Object.freeze([
       "editor/src/host/lib/roving-focus.ts",
       "editor/src/accessible-name.ts",
       "editor/src/fold-announce.ts",
-      "myne-agents/docs/dev/accessibility-checklist.md",
+      "dev-notes/accessibility-checklist.md",
       // The forced-colors repair (myne-md/myne#775). Two sheets, because each
       // client owns its own copy of the focus rule being repaired.
       "src/styles/tokens.css",
@@ -702,7 +702,7 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "Under VoiceOver on macOS, enter the note editor and confirm it is announced as a text area named for the note you opened. Then move through a note containing headings, a rendered formula and a Mermaid diagram, and WRITE DOWN what the reader says at each: the formula should read its LaTeX source, the diagram should announce as one image named for its kind, and the headings will read as styled text rather than a heading tree. Correct the recorded limitations in myne-agents/docs/dev/accessibility-checklist.md if any answer has changed.",
+        see: "Under VoiceOver on macOS, enter the note editor and confirm it is announced as a text area named for the note you opened. Then move through a note containing headings, a rendered formula and a Mermaid diagram, and WRITE DOWN what the reader says at each: the formula should read its LaTeX source, the diagram should announce as one image named for its kind, and the headings will read as styled text rather than a heading tree. Correct the recorded limitations in dev-notes/accessibility-checklist.md if any answer has changed.",
         whyNotAutomated: "The subject is what a screen reader SAYS, and no screen reader runs in either lane: the desktop suite is a Linux container against WebKitGTK driven by WebDriver, which exposes the DOM and the accessibility tree but not VoiceOver's spoken output, and macOS has no tauri-driver support at all (SYNC-1). The heading limitation in particular is a property of CodeMirror's single contenteditable, which the DOM shows as correct markup.",
         clients: ["desktop-macos"],
         estimateMin: 12,
@@ -1396,7 +1396,7 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/hooks.rs",
       "src-tauri/src/auto_lock.rs",
       "src/platform/capabilities.ts",
-      "myne-agents/docs/dev/ai-no-egress.md",
+      "dev-notes/ai-no-egress.md",
       ".woodpecker/main.yml",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
@@ -1625,7 +1625,7 @@ export const ROSTER = Object.freeze([
       "src/clip/assembleClip.ts",
       "src/clip/ingestClipImages.ts",
       "src/clip/buildClipNotice.ts",
-      "myne-agents/docs/dev/clipper-testing.md",
+      "dev-notes/clipper-testing.md",
       "src/clip/",
     ],
     clients: ["clipper", "desktop-macos", "desktop-linux"],
@@ -1661,7 +1661,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src-tauri/src/clipper/ingest.rs",
       "src/clip/ClipDispatchListener.tsx",
-      "myne-agents/docs/dev/clipper-testing.md",
+      "dev-notes/clipper-testing.md",
       "src-tauri/src/clipper/relay_app.rs",
       "src/clip/composeBookmarkPlaintext.ts",
     ],
@@ -1724,7 +1724,7 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/clipper/manifest.rs",
       "e2e/clipper-install.e2e.ts",
       "scripts/clipper-dev-install.sh",
-      "myne-agents/docs/dev/clipper-testing.md",
+      "dev-notes/clipper-testing.md",
       "src-tauri/src/plugins/clipper_pairing/",
       "src/lib/clipper-pairing.ts",
       "src/components/settings/ConnectedExtensions.tsx",
@@ -1757,7 +1757,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src-tauri/src/clipper/envelope.rs",
       "src-tauri/src/clipper/relay_app.rs",
-      "myne-agents/docs/dev/clipper-testing.md",
+      "dev-notes/clipper-testing.md",
       "src-tauri/src/clipper/host.rs",
       "src-tauri/src/clipper/relay.rs",
     ],
@@ -2930,7 +2930,7 @@ export const ROSTER = Object.freeze([
     manual: [
       {
         see: "On a real iPhone, export the recovery phrase to a file. From a Mac with the device connected, download the app container (Xcode → Window → Devices and Simulators → Download Container) and run `xattr -l` on the export directory inside it: `com.apple.metadata:com_apple_backup_excludeItem` must be present on the directory itself. Confirm the exported file is inside that directory and not somewhere else in the container. Then observe the BACKUP rather than the flag, which is the half nothing else covers: take an encrypted local backup of the device in Finder, and confirm the export directory and the exported file are absent from it, either by restoring the backup to a spare device or by inspecting the backup's file manifest. The xattr read is the precondition; the backup is the observation. Since myne-md/myne#517 there is a cheaper precondition available BEFORE the export, and it is worth doing first because it separates the two halves of the mechanism: launch the app and read the xattr with nothing exported yet, which exercises the startup call alone (this is device-matrix row 8.9); then export and read it again, which exercises the command. If the first read is clean and the second is not, the startup hook is the half that broke.",
-        whyNotAutomated: "backupd runs on the device and decides for itself what it copies. The automated proof is two unit tests that between them establish the shipped Foundation call works and that the exclusion is applied to the directory before any caller holds a path to it, and neither says anything about iOS honouring the flag, and myne-agents/docs/threat-model.md TB3 splits exactly there: it records the second half as unestablished and points at mobile/docs/dev/device-matrix.md rows 8.9 and 8.10, neither of which has been run. What rides on the unobserved half is a plaintext recovery phrase going to iCloud, and that phrase alone reconstructs the vault.",
+        whyNotAutomated: "backupd runs on the device and decides for itself what it copies. The automated proof is two unit tests that between them establish the shipped Foundation call works and that the exclusion is applied to the directory before any caller holds a path to it, and neither says anything about iOS honouring the flag, and docs/threat-model.md TB3 splits exactly there: it records the second half as unestablished and points at mobile/docs/dev/device-matrix.md rows 8.9 and 8.10, neither of which has been run. What rides on the unobserved half is a plaintext recovery phrase going to iCloud, and that phrase alone reconstructs the vault.",
         clients: ["ios"],
         estimateMin: 8,
         tier: "core",
@@ -3465,7 +3465,7 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "Before anything is published, from a machine that is not the one that staged the release: fetch SHA256SUMS and SHA256SUMS.minisig from downloads.myne.md/releases/<tag>/, then get the public key from TWO independent published locations rather than from this file: the key page on myne.md and `myne-ops/runbooks/` key custody, which are a different box, a different repository and a different publishing chain. Confirm the two agree character for character, and only then run `minisign -Vm SHA256SUMS -P <that key>` and confirm it prints `Signature and comment signature verified`. The expected value is `RWSzhweIGbX53vxsmyZ218e3pqUU8/zKiqHMarzXv3Ddx4rcyvDQOT5k`, recorded here so a disagreement is visible, never as the source you verify against: a key that travelled with the instruction verifies the release against itself, which is the same defect the next sentence names one level down. Only then hash the artefacts: `sha256sum -c SHA256SUMS --ignore-missing`, and confirm every file you intend to publish is listed and matches. The order is the check: hashes compared against a list you have not authenticated verify a file against itself.",
+        see: "Before anything is published, from a machine that is not the one that staged the release: fetch SHA256SUMS and SHA256SUMS.minisig from downloads.myne.md/releases/<tag>/, then get the public key from TWO independent published locations rather than from this file: the key page on myne.md and `runbook/runbooks/` key custody, which are a different box, a different repository and a different publishing chain. Confirm the two agree character for character, and only then run `minisign -Vm SHA256SUMS -P <that key>` and confirm it prints `Signature and comment signature verified`. The expected value is `RWSzhweIGbX53vxsmyZ218e3pqUU8/zKiqHMarzXv3Ddx4rcyvDQOT5k`, recorded here so a disagreement is visible, never as the source you verify against: a key that travelled with the instruction verifies the release against itself, which is the same defect the next sentence names one level down. Only then hash the artefacts: `sha256sum -c SHA256SUMS --ignore-missing`, and confirm every file you intend to publish is listed and matches. The order is the check: hashes compared against a list you have not authenticated verify a file against itself.",
         whyNotAutomated: "The offline minisign key signs the hash list rather than the installers, and it is held on one machine outside every repository and both servers, so no runner has it and no runner can stand in for the person who holds it. The verification is also the one control TB7 names as actually holding this boundary today, alongside the second origin below, and TB7 states its own gap as the verification being manual and opt-in. A manual, opt-in control is exactly what a release gate is for.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "android"],
         estimateMin: 10,
@@ -3487,7 +3487,7 @@ export const ROSTER = Object.freeze([
       },
       {
         see: "On a Mac that has never seen this build (a second machine, a fresh user account, or a VM), download the artefact over the network (do not copy it from a shared folder, which carries no quarantine flag), then run `codesign --verify --deep --strict --verbose=2 /Applications/Myne.app`, `spctl -a -vv /Applications/Myne.app` and `xcrun stapler validate` on the .dmg. All three must pass and spctl must name the Developer ID you intended. Then double-click the app and confirm the first-launch quarantine prompt appears, names Myne and that publisher, and that accepting it opens the app rather than showing \"Myne is damaged and can't be opened\", which is what an unstapled or re-signed-after-notarization artefact produces. Confirm the second launch raises no prompt at all.",
-        whyNotAutomated: "The quarantine flag is set by the downloading application through an extended attribute no lane produces, Gatekeeper's assessment is made by macOS against a per-machine first-launch record, and stapling can only be validated against Apple's notary service, none of which exists on a Linux runner that builds `--no-bundle` and never signs anything. This is the desktop half of the distribution-integrity boundary: an artefact whose signature or notarization ticket is missing is one macOS cannot tell apart from a tampered one. This item gates a posture that is not in place yet: myne-agents/docs/threat-model.md TB7 records, corrected 2026-08-15 (entry 0496), that no Apple Developer ID and no Authenticode certificate exists and that desktop builds are not reproducible, so today the artefact is unsigned and Gatekeeper warns on every install. Until the Developer ID is purchased this item is expected to FAIL, and passing it takes an override naming that purchase as the blocker. Recording it that way keeps the override a named, dated precondition rather than a habit.",
+        whyNotAutomated: "The quarantine flag is set by the downloading application through an extended attribute no lane produces, Gatekeeper's assessment is made by macOS against a per-machine first-launch record, and stapling can only be validated against Apple's notary service, none of which exists on a Linux runner that builds `--no-bundle` and never signs anything. This is the desktop half of the distribution-integrity boundary: an artefact whose signature or notarization ticket is missing is one macOS cannot tell apart from a tampered one. This item gates a posture that is not in place yet: docs/threat-model.md TB7 records, corrected 2026-08-15 (entry 0496), that no Apple Developer ID and no Authenticode certificate exists and that desktop builds are not reproducible, so today the artefact is unsigned and Gatekeeper warns on every install. Until the Developer ID is purchased this item is expected to FAIL, and passing it takes an override naming that purchase as the blocker. Recording it that way keeps the override a named, dated precondition rather than a habit.",
         clients: ["desktop-macos"],
         estimateMin: 12,
         tier: "core",
@@ -3885,7 +3885,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src-tauri/scripts/ai-no-network-check.sh",
       "src-tauri/src/no_egress.rs",
-      "myne-agents/docs/dev/ai-no-egress.md",
+      "dev-notes/ai-no-egress.md",
       "e2e/no-egress.e2e.ts",
       "src-tauri/src/plugins/local_inference/",
     ],
@@ -3950,7 +3950,7 @@ export const ROSTER = Object.freeze([
       "core/src/plugins/sync/socks5.rs",
       "core/src/plugins/sync/rustls_transport.rs",
       "core/src/plugins/sync/no_bypass.rs",
-      "myne-agents/docs/dev/tor-verification.md",
+      "dev-notes/tor-verification.md",
       "src-tauri/src/tor_sidecar/",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
@@ -3962,7 +3962,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Run myne-agents/docs/dev/tor-verification.md end to end on Linux or macOS. Do not restate or abbreviate it, follow its nine numbered steps in order, and write the run into that document's own results log with the date, machine and result. Both control arms are mandatory: the DNS capture needs a control lookup proving the interface would show a query, and the fail-closed capture needs the toggle-off arm proving the endpoint would otherwise be contacted.",
+        see: "Run dev-notes/tor-verification.md end to end on Linux or macOS. Do not restate or abbreviate it, follow its nine numbered steps in order, and write the run into that document's own results log with the date, machine and result. Both control arms are mandatory: the DNS capture needs a control lookup proving the interface would show a query, and the fail-closed capture needs the toggle-off arm proving the endpoint would otherwise be contacted.",
         whyNotAutomated: "The document argues its own case: steps 5 and 6 need root packet capture against the live Tor network, and a CI job doing that would route a build runner's traffic through volunteer relays while still only proving that runner could reach Tor. Everything automated about this mode is verified against a FAKE SOCKS5 proxy.",
         clients: ["desktop-linux", "desktop-macos"],
         estimateMin: 60,
@@ -3977,14 +3977,14 @@ export const ROSTER = Object.freeze([
       },
       {
         see: "On Windows, turn Developer mode on and look for the Network panel and the Tor toggle. Record what is there. If the toggle is present, turn it on and observe what happens to sync; if Tor routing is not supported on Windows, confirm the UI says so rather than offering a control that cannot deliver.",
-        whyNotAutomated: "myne-agents/docs/dev/tor-verification.md has no Windows arm at all and nothing runs on Windows; a toggle that appears to route traffic through Tor while it does not is a privacy claim the user acts on.",
+        whyNotAutomated: "dev-notes/tor-verification.md has no Windows arm at all and nothing runs on Windows; a toggle that appears to route traffic through Tor while it does not is a privacy claim the user acts on.",
         clients: ["desktop-windows"],
         estimateMin: 12,
         tier: "core",
       },
       {
         see: "On Windows with Defender and the firewall at defaults, turn the toggle on. Confirm no firewall or SmartScreen prompt blocks the sidecar silently, that the posture reaches active, and that a sync completes afterwards.",
-        whyNotAutomated: "Windows has no tauri-driver support and the packet-capture half of myne-agents/docs/dev/tor-verification.md assumes ss and tcpdump; nothing automated or documented has ever run this toggle on Windows.",
+        whyNotAutomated: "Windows has no tauri-driver support and the packet-capture half of dev-notes/tor-verification.md assumes ss and tcpdump; nothing automated or documented has ever run this toggle on Windows.",
         clients: ["desktop-windows"],
         estimateMin: 6,
         tier: "standard",
@@ -4252,7 +4252,7 @@ export const ROSTER = Object.freeze([
     id: "procedures.accessibility",
     title: "Accessibility release checklist (existing procedure)",
     paths: [
-      "myne-agents/docs/dev/accessibility-checklist.md",
+      "dev-notes/accessibility-checklist.md",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
     automatedBy: [
@@ -4264,21 +4264,21 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Run myne-agents/docs/dev/accessibility-checklist.md in full on macOS with VoiceOver: all eight flows, the mouse-unplugged keyboard-only spot-check, the VoiceOver coherence section, the contrast eyeball and the reduced-motion pass. Fill in the results log at the bottom of that document with the screen-reader version and each pass or recorded limitation. Do not restate its items anywhere else. That document is the roster.",
+        see: "Run dev-notes/accessibility-checklist.md in full on macOS with VoiceOver: all eight flows, the mouse-unplugged keyboard-only spot-check, the VoiceOver coherence section, the contrast eyeball and the reduced-motion pass. Fill in the results log at the bottom of that document with the screen-reader version and each pass or recorded limitation. Do not restate its items anywhere else. That document is the roster.",
         whyNotAutomated: "axe-core rule checks inside the WebView are already run by e2e/a11y-axe.e2e.ts; VoiceOver's announcement order and wording come out of the macOS accessibility tree, which the Linux container has no equivalent of and which no driver reads.",
         clients: ["desktop-macos"],
         estimateMin: 60,
         tier: "standard",
       },
       {
-        see: "Run the same myne-agents/docs/dev/accessibility-checklist.md on Windows with NVDA, completing its NVDA section and the keyboard-only spot-check across all eight flows, and append the results to that document's log.",
+        see: "Run the same dev-notes/accessibility-checklist.md on Windows with NVDA, completing its NVDA section and the keyboard-only spot-check across all eight flows, and append the results to that document's log.",
         whyNotAutomated: "NVDA reads the Windows UI Automation tree exposed by WebView2; Windows has no tauri-driver support at all, so no automated tier has ever run a single assertion on that platform.",
         clients: ["desktop-windows"],
         estimateMin: 60,
         tier: "standard",
       },
       {
-        see: "Run the Orca smoke pass from myne-agents/docs/dev/accessibility-checklist.md on Linux and record the failures, marking any that trace to the WebKitGTK toolkit as known limitations rather than release blockers, exactly as the procedure specifies.",
+        see: "Run the Orca smoke pass from dev-notes/accessibility-checklist.md on Linux and record the failures, marking any that trace to the WebKitGTK toolkit as known limitations rather than release blockers, exactly as the procedure specifies.",
         whyNotAutomated: "Orca reads the AT-SPI tree; the E2E container runs under xvfb with no accessibility bus and no screen reader, and classifying a failure as a toolkit limitation versus our own ARIA is a judgement the procedure assigns to a person.",
         clients: ["desktop-linux"],
         estimateMin: 25,
@@ -4291,7 +4291,7 @@ export const ROSTER = Object.freeze([
     id: "procedures.clipboard-sensitivity",
     title: "Mobile clipboard OS-enforced sensitivity (existing procedure)",
     paths: [
-      "myne-agents/docs/dev/clipboard-sensitivity-verification.md",
+      "dev-notes/clipboard-sensitivity-verification.md",
       "src/lib/clipboard.ts",
       "mobile/src/lib/clipboardTransport.ts",
       "mobile/src-tauri/tauri-plugin-sensitive-clipboard",
@@ -4305,7 +4305,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Run myne-agents/docs/dev/clipboard-sensitivity-verification.md in full: the four iOS checks and the Android per-API-band table (33+, 28 to 32, 24 to 27), one device per band. Record the OS versions as the document's own rule requires. Do not restate or paraphrase its rows; it is the authority. Note its recorded dead end so it is not retried: a standalone Swift binary in the Simulator hangs on UIPasteboard.general, so checks 2 and 3 need a real app process.",
+        see: "Run dev-notes/clipboard-sensitivity-verification.md in full: the four iOS checks and the Android per-API-band table (33+, 28 to 32, 24 to 27), one device per band. Record the OS versions as the document's own rule requires. Do not restate or paraphrase its rows; it is the authority. Note its recorded dead end so it is not retried: a standalone Swift binary in the Simulator hangs on UIPasteboard.general, so checks 2 and 3 need a real app process.",
         whyNotAutomated: "No CI runner has a second device signed into the same Apple account to prove Universal Clipboard did NOT receive the phrase, and none can observe a pasteboard item expiring after the process that wrote it is gone; clipboard-copy.e2e.ts states outright that tauri-driver cannot read the OS pasteboard.",
         clients: ["ios", "android"],
         estimateMin: 60,
@@ -4325,7 +4325,7 @@ export const ROSTER = Object.freeze([
     id: "procedures.clipper-testing",
     title: "Browser clipper end-to-end (existing procedure)",
     paths: [
-      "myne-agents/docs/dev/clipper-testing.md",
+      "dev-notes/clipper-testing.md",
       "scripts/clipper-dev-install.sh",
       "src-tauri/src/clipper/",
       "src-tauri/src/plugins/clipper_pairing/",
@@ -4337,7 +4337,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Run myne-agents/docs/dev/clipper-testing.md Level 1 end to end on macOS and on Linux, in Firefox and in Chrome/Edge, following its five numbered steps exactly: production bundle rather than a dev build (step 0), build and load the extension (step 1), install the native-messaging host with scripts/clipper-dev-install.sh (step 2), pair (step 3), then clip an article, a selection, a bookmark and confirm a locked desktop refuses (step 4). Record the outcome of each numbered step per browser family and note every point where the troubleshooting table was needed.",
+        see: "Run dev-notes/clipper-testing.md Level 1 end to end on macOS and on Linux, in Firefox and in Chrome/Edge, following its five numbered steps exactly: production bundle rather than a dev build (step 0), build and load the extension (step 1), install the native-messaging host with scripts/clipper-dev-install.sh (step 2), pair (step 3), then clip an article, a selection, a bookmark and confirm a locked desktop refuses (step 4). Record the outcome of each numbered step per browser family and note every point where the troubleshooting table was needed.",
         whyNotAutomated: "The browser-to-native-host-to-relay round trip needs a real browser launching the host process, which no lane in this repo does, on two OSes one of which has no lane at all.",
         clients: ["clipper", "desktop-macos", "desktop-linux"],
         estimateMin: 45,
@@ -4648,7 +4648,7 @@ export const ROSTER = Object.freeze([
     automatedBy: [],
     manual: [
       {
-        see: "On an iPhone with a vault enrolled, quick-unlock configured via Face ID, at least one item in the share-import queue, a cached vault label and an active sync token: take a full encrypted iCloud or Finder backup, then restore that backup onto a SECOND iPhone. On the second device confirm the THREE keychain-sealed secrets fail closed: quick unlock is not configured (password required), the share-import queue reports its sealed entries as unreadable rather than showing an empty queue, and the locked picker shows no vault name. Then record separately what the SYNC TOKEN did, because it is a different storage class with a different expected answer: myne-agents/docs/threat-model.md §7 states the v1 mobile token is an app-sandbox FILE rather than a keychain item, and that OS-keychain thisDeviceOnly hardening is DEFERRED (MYND-464) as defense in depth rather than a confidentiality prerequisite, so a restored device syncing without re-enrolment is the recorded posture and not a defect. What this item owes is which of the two happened, written down. It FAILS on anything worse than that posture: the token readable outside the app sandbox, or any of the three sealed secrets opening.",
+        see: "On an iPhone with a vault enrolled, quick-unlock configured via Face ID, at least one item in the share-import queue, a cached vault label and an active sync token: take a full encrypted iCloud or Finder backup, then restore that backup onto a SECOND iPhone. On the second device confirm the THREE keychain-sealed secrets fail closed: quick unlock is not configured (password required), the share-import queue reports its sealed entries as unreadable rather than showing an empty queue, and the locked picker shows no vault name. Then record separately what the SYNC TOKEN did, because it is a different storage class with a different expected answer: docs/threat-model.md §7 states the v1 mobile token is an app-sandbox FILE rather than a keychain item, and that OS-keychain thisDeviceOnly hardening is DEFERRED (MYND-464) as defense in depth rather than a confidentiality prerequisite, so a restored device syncing without re-enrolment is the recorded posture and not a defect. What this item owes is which of the two happened, written down. It FAILS on anything worse than that posture: the token readable outside the app sandbox, or any of the three sealed secrets opening.",
         whyNotAutomated: "The three sealed secrets rest on Apple Keychain accessibility classes (AfterFirstUnlockThisDeviceOnly, no iCloud Keychain sync) and no test in this repo can perform an OS-level backup restore; device_key.rs states outright that the accessibility behaviour cannot be confirmed without real hardware, and the Linux harness has no keychain at all. The sync token sits in a different storage class again, and a real restore is the only place what a backup actually carried is observable at all.",
         clients: ["ios"],
         estimateMin: 40,
@@ -5393,7 +5393,7 @@ export const ROSTER = Object.freeze([
       },
       {
         see: "myne-md/myne#483's own acceptance, which no lane can run: on Windows 10 build 19041 or later, with the vault UNLOCKED and protection on, call GetWindowDisplayAffinity on the Myne main window and record the value. Let idle auto-lock fire (or lock manually), which hides the window; bring it back through each of the four re-show paths in turn (relaunch into the single-instance callback, the macOS dock arm's Windows equivalent where one exists, a clipper pair request, and the unlock screen's own reveal) and read the affinity back after each. WDA_EXCLUDEFROMCAPTURE after every one is the pass. Then take a screenshot on each path and confirm it comes back blank. If the affinity is intact on all four WITHOUT the fix as well, record that negative result on the issue so the next person does not re-investigate tauri-apps/tauri#14189.",
-        whyNotAutomated: "myne-agents/docs/decisions/security/0378 records that the native side is not E2E-observable: set_content_protected is window state WebDriver cannot read, and the tao Windows arm discards SetWindowDisplayAffinity's return BOOL so the process cannot read it back either without a windows-sys dependency that myne-agents/docs/decisions/clients/0133 deliberately does not take. There is no Windows anywhere in CI, and the tauri-driver harness runs on Linux where the call is a compile-time no-op.",
+        whyNotAutomated: "decisions/security/0378 records that the native side is not E2E-observable: set_content_protected is window state WebDriver cannot read, and the tao Windows arm discards SetWindowDisplayAffinity's return BOOL so the process cannot read it back either without a windows-sys dependency that decisions/clients/0133 deliberately does not take. There is no Windows anywhere in CI, and the tauri-driver harness runs on Linux where the call is a compile-time no-op.",
         clients: ["desktop-windows"],
         estimateMin: 18,
         tier: "core",
@@ -5419,7 +5419,7 @@ export const ROSTER = Object.freeze([
     manual: [
       {
         see: "On Windows 10 build 19041 or later, join the machine over Chrome Remote Desktop or AnyDesk from a second device so the Myne window shows as a black rectangle to the remote viewer. WITHOUT touching the local keyboard, confirm the remote operator can still reach the escape: press Tab once from a cold launch, confirm a screen reader announces the control (or that it becomes visible on focus), take it, confirm the dialog, and confirm the window becomes visible to the remote viewer. Then quit, relaunch, and confirm it is STILL visible: an escape that lapses at the next launch is not one. Repeat the whole thing with a magnifier (ZoomText or Windows Magnifier) instead of remote desktop. Finally, relaunch with --disable-screen-capture-protection and confirm the Privacy row reports the flag rather than offering to turn protection back on.",
-        whyNotAutomated: "Whether the window actually clears is a property of SetWindowDisplayAffinity under a live DWM composition, which the tao Windows arm cannot report (it discards the API return BOOL) and which no driver can read back. myne-agents/docs/decisions/security/0378 records that the native side is not E2E-observable. There is no Windows anywhere in CI, and the harness runs on Linux, where the call is a compile-time no-op. The automated scenarios prove the file, the consent gate and the keyboard reachability; this proves the black rectangle goes away.",
+        whyNotAutomated: "Whether the window actually clears is a property of SetWindowDisplayAffinity under a live DWM composition, which the tao Windows arm cannot report (it discards the API return BOOL) and which no driver can read back. decisions/security/0378 records that the native side is not E2E-observable. There is no Windows anywhere in CI, and the harness runs on Linux, where the call is a compile-time no-op. The automated scenarios prove the file, the consent gate and the keyboard reachability; this proves the black rectangle goes away.",
         clients: ["desktop-windows"],
         estimateMin: 16,
         tier: "core",
@@ -5616,7 +5616,7 @@ export const ROSTER = Object.freeze([
       {
         see: "On macOS, the Linux AppImage and Windows, open an existing vault that still carries its own recovery phrase, run the upgrade from the Vault panel, and read the confirmation before pressing it. Confirm both consequences are stated where the button is: that the saved vault phrase stops opening this vault, and that an older version of the app cannot open it once the upgrade syncs. Then attempt the retired vault phrase once and confirm it is REFUSED, confirm the password still opens the vault, and confirm the identity phrase opens it from the lock screen. Finally open the same vault on a second device still running the previous released build, let the upgrade sync, and confirm that build REFUSES the vault rather than opening it.",
         whyNotAutomated:
-          "The one automated lane that could reach this is a Linux container against WebKitGTK, and the scenario written for it (`e2e/vault-format-upgrade.e2e.ts`) is WRITTEN AND HAS NEVER EXECUTED on this branch: four container builds died at `myne_desktop_lib` with signal 9 (the OOM recorded in `myne-agents/features/person-account/progress.md`), and the decision was to run the suite once at the end of the feature, so no run has touched even the Linux half. Until a green run is recorded here, this item carries the walkthrough on all three desktop clients, including the Linux one the container would otherwise cover. macOS and Windows have no automated UI lane at all, so the two sentences a user must read before an irreversible credential change are verified on the platforms that ship them and nowhere else, and a second build is a second install rather than a filter. `e2e/vault-format-upgrade.e2e.ts` stays in automatedBy because the guard requires every scenario file to be credited somewhere; what it must not do is tell the manual half that CI already covers this.",
+          "The one automated lane that could reach this is a Linux container against WebKitGTK, and the scenario written for it (`e2e/vault-format-upgrade.e2e.ts`) is WRITTEN AND HAS NEVER EXECUTED on this branch: four container builds died at `myne_desktop_lib` with signal 9 (the OOM recorded in `private-companion/features/person-account/progress.md`), and the decision was to run the suite once at the end of the feature, so no run has touched even the Linux half. Until a green run is recorded here, this item carries the walkthrough on all three desktop clients, including the Linux one the container would otherwise cover. macOS and Windows have no automated UI lane at all, so the two sentences a user must read before an irreversible credential change are verified on the platforms that ship them and nowhere else, and a second build is a second install rather than a filter. `e2e/vault-format-upgrade.e2e.ts` stays in automatedBy because the guard requires every scenario file to be credited somewhere; what it must not do is tell the manual half that CI already covers this.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 15,
         tier: "standard",
@@ -5781,7 +5781,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Preparation. Confirm first that `cargo test -p myne-core reads_known_text_from_a_fixture_image` passes, so that anything below is a fact about optics and not about the bundled weights. Then print myne-agents/docs/spec/account-number.md to A4 on an office laser printer, because it carries prose, a Crockford alphabet and the Damm-32 table, which is the mix real scans have. Before scanning anything, choose TWELVE search terms from the printed pages and write them down: EIGHT prose words that appear nowhere else in the test vault, and FOUR alphanumeric strings (an account-number group, a table row, a section number). Choosing them afterwards is how this item passes itself. Input 1, flatbed. Scan the printed pages at 300 dpi and import the result with attachment text extraction on. Wait for extraction, then search each of the twelve terms. PASS is at least TEN of the twelve returning the attachment, and at least THREE of the four alphanumerics found and character-exact when you open the extracted text. A digit silently wrong in a recognised number is worse than a term missing, because search then returns the wrong document confidently. Input 2, handheld. Photograph the same printed page with a phone under ordinary office lighting, page roughly filling the frame, held square, no flash. Import and search the same twelve. PASS is at least NINE of twelve. If it scores more than three terms below the flatbed run, hold the page squarer and retake once before recording a failure: the module documents that axis-aligned boxes read a page rotated a degree or two fine and degrade on a heavily rotated one, so the tester's hands are a known confound and must be ruled out rather than logged as a model fault. Negative control. Import a photograph with no text in it at all, a landscape or a face. Search all twelve terms again and confirm this photo is returned by NONE of them. One hit here is a FAIL on its own, whatever the other two inputs scored: hallucinated text in the index degrades search for documents that have nothing to do with the image. Record all three scores as \"n of 12\", plus the scanner and phone models.",
+        see: "Preparation. Confirm first that `cargo test -p myne-core reads_known_text_from_a_fixture_image` passes, so that anything below is a fact about optics and not about the bundled weights. Then print docs/spec/account-number.md to A4 on an office laser printer, because it carries prose, a Crockford alphabet and the Damm-32 table, which is the mix real scans have. Before scanning anything, choose TWELVE search terms from the printed pages and write them down: EIGHT prose words that appear nowhere else in the test vault, and FOUR alphanumeric strings (an account-number group, a table row, a section number). Choosing them afterwards is how this item passes itself. Input 1, flatbed. Scan the printed pages at 300 dpi and import the result with attachment text extraction on. Wait for extraction, then search each of the twelve terms. PASS is at least TEN of the twelve returning the attachment, and at least THREE of the four alphanumerics found and character-exact when you open the extracted text. A digit silently wrong in a recognised number is worse than a term missing, because search then returns the wrong document confidently. Input 2, handheld. Photograph the same printed page with a phone under ordinary office lighting, page roughly filling the frame, held square, no flash. Import and search the same twelve. PASS is at least NINE of twelve. If it scores more than three terms below the flatbed run, hold the page squarer and retake once before recording a failure: the module documents that axis-aligned boxes read a page rotated a degree or two fine and degrade on a heavily rotated one, so the tester's hands are a known confound and must be ruled out rather than logged as a model fault. Negative control. Import a photograph with no text in it at all, a landscape or a face. Search all twelve terms again and confirm this photo is returned by NONE of them. One hit here is a FAIL on its own, whatever the other two inputs scored: hallucinated text in the index degrades search for documents that have nothing to do with the image. Record all three scores as \"n of 12\", plus the scanner and phone models.",
         whyNotAutomated: "The input is an optical capture, and the apparatus that makes one (a printer, paper, a flatbed scanner, a phone camera and room lighting) is hardware no runner has, so no scan can be produced inside CI. A scan committed as a fixture stops being the measurement and becomes one fixed bitmap the model can pass while failing every other page, which is why the committed-fixture bar is filed as debt below rather than substituted here. The one scenario that runs the pipeline end to end, e2e/image-ocr-search.e2e.ts, is quarantined out of the blocking run and asserts a single seeded word against a synthesised PNG; un-quarantining it still measures a rendered bitmap and never an optical one.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 15,
@@ -6015,7 +6015,7 @@ export const ROSTER = Object.freeze([
     automatedBy: [],
     manual: [
       {
-        see: "With the vault LOCKED, share a file into Myne from another app and stop there, before unlocking. Pull the app's private storage (`adb shell run-as md.myne.mobile`) and inspect the pending-shares directory. ONE outcome passes and two fail, and knowing which is the whole point of doing this while locked. It passes if the queued entry is a sealed MYF1 blob with no readable copy of the shared bytes anywhere in private storage or the OS share cache. It FAILS if the shared bytes are persisted in any readable form: that is the realistic regression, and it is the one nobody can see after the drain. It ALSO FAILS if the locked-vault staging path REFUSED the share outright and queued nothing. That refusal was formerly a PASS, because the Android Keystore arm was then an Err(HardwareUnavailable) stub; the arm is wired now (core's `device_key::resolve` reads the host-registered provider, which reaches the Keystore through `tauri-plugin-share-intent`; mobile/src-tauri/tauri-plugin-share-intent/KEYSTORE_TODO.md), so the share path is expected to seal on Android and a refusal is the defect to record. The sealing itself is device-unverified, which is exactly why this item is manual. Record WHICH of the outcomes you observed, because myne-agents/docs/threat-model.md AS19 describes the sealed-blob outcome as the Android behaviour and only an observation says whether that holds. Then unlock, let it drain, and confirm no readable copy appears at any point.",
+        see: "With the vault LOCKED, share a file into Myne from another app and stop there, before unlocking. Pull the app's private storage (`adb shell run-as md.myne.mobile`) and inspect the pending-shares directory. ONE outcome passes and two fail, and knowing which is the whole point of doing this while locked. It passes if the queued entry is a sealed MYF1 blob with no readable copy of the shared bytes anywhere in private storage or the OS share cache. It FAILS if the shared bytes are persisted in any readable form: that is the realistic regression, and it is the one nobody can see after the drain. It ALSO FAILS if the locked-vault staging path REFUSED the share outright and queued nothing. That refusal was formerly a PASS, because the Android Keystore arm was then an Err(HardwareUnavailable) stub; the arm is wired now (core's `device_key::resolve` reads the host-registered provider, which reaches the Keystore through `tauri-plugin-share-intent`; mobile/src-tauri/tauri-plugin-share-intent/KEYSTORE_TODO.md), so the share path is expected to seal on Android and a refusal is the defect to record. The sealing itself is device-unverified, which is exactly why this item is manual. Record WHICH of the outcomes you observed, because docs/threat-model.md AS19 describes the sealed-blob outcome as the Android behaviour and only an observation says whether that holds. Then unlock, let it drain, and confirm no readable copy appears at any point.",
         whyNotAutomated: "The observation has to happen while the vault is still locked, on a device, in a window that ends the moment the tester unlocks, and no lane runs on Android at all. The Keystore-backed seal is what makes the pass condition interesting: the key is non-exportable and hardware-held, the non-prompting behaviour of a background seal cannot be observed from a desktop browser tier or a mock IPC layer, and a failure to seal is silent (the share simply queues nothing readable) until the tester inspects private storage before unlocking.",
         clients: ["android"],
         estimateMin: 12,
@@ -6220,9 +6220,9 @@ export const ROSTER = Object.freeze([
       "core/src/plugins/sync/prefs_merge.rs",
       "core/src/plugins/sync/prefs_classification.rs",
       "core/src/plugins/sync/state.rs",
-      "myne-agents/docs/spec/sync-protocol.md",
-      "myne-agents/docs/spec/server-protocol.md",
-      "myne-agents/docs/spec/protocol.md",
+      "docs/spec/sync-protocol.md",
+      "docs/spec/server-protocol.md",
+      "docs/spec/protocol.md",
       "scripts/check-version-routing.mjs",
       "src-tauri/tauri.conf.json",
     ],
@@ -6321,7 +6321,7 @@ export const ROSTER = Object.freeze([
        },
        {
          see: "On two real devices signed into one account, start a device approval and hold it at the fingerprint step. Confirm four things. The two screens show the SAME fingerprint, in a form a person can compare aloud without transcribing. The string does not change while you compare it, which is the push hold doing its job. A deliberate mismatch (approve on one device while the other shows a different code) is surfaced as a mismatch, and the offered action is Remove device rather than an accept-anyway. A third device pushing to the account mid-ceremony is announced rather than absorbed silently. Then confirm the joining phone can be brought BACK to that compare after losing it: with the approval still pending, force-quit the phone app (and separately, press the wait's Cancel), reopen it and unlock the vault, and confirm it returns to the waiting screen showing the same fingerprint rather than opening an empty editor. That last half is the myne-md/myne#535 defect on this client: the code lived only in the join overlay's own state, so once the overlay was gone the approving device waited on a comparison nothing could make, and the first background cycle claimed the token with the compare skipped. Record which two devices you used.",
-        whyNotAutomated: "The comparison is a person reading two screens at once, which no single-session driver can be, and the property under test is that a HUMAN can tell two strings apart under time pressure. It also needs two real enrolled devices and a live lease-bounded hold that a fixture cannot reproduce. myne-agents/docs/threat-model.md section 7's vault-head limit names this eye-compare as the only mitigation for a malicious server seating a device onto a stale or forked history, and its myne-md/myne#462 amendment records that a moved head is announced rather than swapped in silently, with the announcement being user attention rather than a structural property.",
+        whyNotAutomated: "The comparison is a person reading two screens at once, which no single-session driver can be, and the property under test is that a HUMAN can tell two strings apart under time pressure. It also needs two real enrolled devices and a live lease-bounded hold that a fixture cannot reproduce. docs/threat-model.md section 7's vault-head limit names this eye-compare as the only mitigation for a malicious server seating a device onto a stale or forked history, and its myne-md/myne#462 amendment records that a moved head is announced rather than swapped in silently, with the announcement being user attention rather than a structural property.",
         clients: ["desktop-macos", "ios", "android"],
         estimateMin: 18,
         tier: "core",
@@ -6808,7 +6808,7 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "Take a copy of a real v0.1 vault holding at least several hundred notes and attachments and migrate it on each OS behind the phrase re-entry. Afterwards confirm: the sidebar note count equals the pre-migration count, ten notes opened at random show their original bodies, attachments still render, and a legacy/ snapshot exists on disk. Then run Abort and confirm the vault re-unlocks with the ORIGINAL password with the same note count. Two preconditions on that last step, both from myne-agents/docs/spec/protocol.md §10.4.1 point 5, because without them the step tests something the spec does not promise: abort BEFORE any sync (the pre-sync condition is the device-local re-key re-base flag, armed by the migration and cleared by the push that publishes the re-authored v0.2 head) and BEFORE the post-migration confirm (which crypto-erases the old root_key and the legacy/ snapshot). Past either point abort MUST refuse, and observing that refusal is a PASS, not a failure. Say in the record which of the two you exercised.",
+        see: "Take a copy of a real v0.1 vault holding at least several hundred notes and attachments and migrate it on each OS behind the phrase re-entry. Afterwards confirm: the sidebar note count equals the pre-migration count, ten notes opened at random show their original bodies, attachments still render, and a legacy/ snapshot exists on disk. Then run Abort and confirm the vault re-unlocks with the ORIGINAL password with the same note count. Two preconditions on that last step, both from docs/spec/protocol.md §10.4.1 point 5, because without them the step tests something the spec does not promise: abort BEFORE any sync (the pre-sync condition is the device-local re-key re-base flag, armed by the migration and cleared by the push that publishes the re-authored v0.2 head) and BEFORE the post-migration confirm (which crypto-erases the old root_key and the legacy/ snapshot). Past either point abort MUST refuse, and observing that refusal is a PASS, not a failure. Say in the record which of the two you exercised.",
         whyNotAutomated: "vault-migrate.e2e.ts migrates a handful of fixture notes inside a throwaway XDG_DATA_HOME on ext4; the settle/abort step rewrites the on-disk container directly, and whether that is safe is decided by the filesystem: case-insensitive APFS, Windows file locking on an open handle, and a home directory on an SMB or NFS mount are three different rename-and-delete semantics, none of which exist on the runner.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 25,
@@ -7277,7 +7277,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "web/src/sw/update-policy.ts",
       "web/container/Caddyfile",
-      "myne-agents/docs/web-bundle-hashes.md",
+      "docs/web-bundle-hashes.md",
     ],
     clients: ["web"],
     automatedBy: [
@@ -7295,7 +7295,7 @@ export const ROSTER = Object.freeze([
       "web/container/Caddyfile",
       "web/container/generate-headers.mjs",
       "web/container/entrypoint.sh",
-      "myne-agents/docs/self-host-web.md",
+      "docs/self-host-web.md",
       "scripts/check-web-container-headers.sh",
       "web/src/environment-gate.ts",
       "web/src/UnsupportedEnvironment.tsx",
@@ -7966,8 +7966,8 @@ export const ROSTER = Object.freeze([
     automatedBy: ["e2e/plain-file-editor.e2e.ts"],
     manual: [
       {
-        see: "With the plain-file editor on (the Settings > Editor switch when a vault exists; a vault-less device needs no switch, since the feature is on by default and the Welcome footer toggle was removed): exercise the OS-level open paths that ship. Launch the built app with a .md path in argv on each desktop OS (the Windows/Linux file-association route). On macOS confirm Finder's 'Open With' now LISTS Myne and that Open With / double-click / `open -a Myne <file>` delivers the file through the macOS open event (the bundle declares md/markdown document types). Use the app menu's File > Open File... (Cmd+O) to open the FIRST file, since the in-surface Open button appears only once a tab is open; and confirm the 'Plain file editor' switch is reachable in Settings > Editor WITHOUT Developer mode, since it is on by default and the control to turn it off must be findable. Open a file with the vault locked and on a device with no vault. Each time: confirm the marked surface appears with its marker, edit a line, confirm the file's bytes changed on disk, and confirm no note appeared and nothing synced. Repeat on macOS (WKWebView) and Windows (WebView2) and judge the marker, tab strip and conflict banner renderings there, since the automated lane sees only WebKitGTK. Confirm no recent-files list holds the file (macOS Recent Items, Windows jump list). Drag onto the window is expected to do NOTHING: dragDropEnabled is false (myne-agents/docs/decisions/storage/0151) so the OS drop never reaches the WebView, which is blocked rather than failed; the two flows that block it are MYND-629's in-process drop-import (src/notes/dropImport.ts) and the sidebar's HTML5 reorder. Then the two flows just added: quit with Cmd+Q (and once from the app menu) while a line typed inside the autosave window is unsaved, confirming the text lands or the app said it would not; and disable the editor from Settings while a tab is open, confirming it closes after its flush, then repeat with a conflicted tab open and confirm the tab is KEPT and the refusal is reported rather than dropped. Then Import to vault: with an unlocked vault and a file open, press the Import control and confirm a new note is created and selected in the editor, the plain tab closes, and the original file on disk is unchanged.",
-        whyNotAutomated: "The OS event sources and the second WebView engine cannot be raised in the tauri-driver lane: the runner is a Linux container against WebKitGTK, with no Finder or Explorer, no file-association launch and no WKWebView or WebView2 rendering. Drag is blocked by product decision rather than by the harness: dragDropEnabled is false so an OS drop cannot reach the WebView while src/notes/dropImport.ts (MYND-629) and the sidebar HTML5 reorder depend on the HTML5 DataTransfer path (myne-agents/docs/decisions/storage/0151). The argv ingress, the device-local gate, autosave and the conflict banner ARE automated in e2e/plain-file-editor.e2e.ts, which is why this item is only the OS-level and second-engine half.",
+        see: "With the plain-file editor on (the Settings > Editor switch when a vault exists; a vault-less device needs no switch, since the feature is on by default and the Welcome footer toggle was removed): exercise the OS-level open paths that ship. Launch the built app with a .md path in argv on each desktop OS (the Windows/Linux file-association route). On macOS confirm Finder's 'Open With' now LISTS Myne and that Open With / double-click / `open -a Myne <file>` delivers the file through the macOS open event (the bundle declares md/markdown document types). Use the app menu's File > Open File... (Cmd+O) to open the FIRST file, since the in-surface Open button appears only once a tab is open; and confirm the 'Plain file editor' switch is reachable in Settings > Editor WITHOUT Developer mode, since it is on by default and the control to turn it off must be findable. Open a file with the vault locked and on a device with no vault. Each time: confirm the marked surface appears with its marker, edit a line, confirm the file's bytes changed on disk, and confirm no note appeared and nothing synced. Repeat on macOS (WKWebView) and Windows (WebView2) and judge the marker, tab strip and conflict banner renderings there, since the automated lane sees only WebKitGTK. Confirm no recent-files list holds the file (macOS Recent Items, Windows jump list). Drag onto the window is expected to do NOTHING: dragDropEnabled is false (decisions/storage/0151) so the OS drop never reaches the WebView, which is blocked rather than failed; the two flows that block it are MYND-629's in-process drop-import (src/notes/dropImport.ts) and the sidebar's HTML5 reorder. Then the two flows just added: quit with Cmd+Q (and once from the app menu) while a line typed inside the autosave window is unsaved, confirming the text lands or the app said it would not; and disable the editor from Settings while a tab is open, confirming it closes after its flush, then repeat with a conflicted tab open and confirm the tab is KEPT and the refusal is reported rather than dropped. Then Import to vault: with an unlocked vault and a file open, press the Import control and confirm a new note is created and selected in the editor, the plain tab closes, and the original file on disk is unchanged.",
+        whyNotAutomated: "The OS event sources and the second WebView engine cannot be raised in the tauri-driver lane: the runner is a Linux container against WebKitGTK, with no Finder or Explorer, no file-association launch and no WKWebView or WebView2 rendering. Drag is blocked by product decision rather than by the harness: dragDropEnabled is false so an OS drop cannot reach the WebView while src/notes/dropImport.ts (MYND-629) and the sidebar HTML5 reorder depend on the HTML5 DataTransfer path (decisions/storage/0151). The argv ingress, the device-local gate, autosave and the conflict banner ARE automated in e2e/plain-file-editor.e2e.ts, which is why this item is only the OS-level and second-engine half.",
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 12,
         tier: "standard",

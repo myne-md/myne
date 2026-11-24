@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Folder-scope predicate for `cli_excluded_folders` (cli-thin-client task 5;
 //! MYND-490) — the single canonicalization rule every CLI-bridge enforcement
 //! point (`src-tauri/src/cli_bridge/scope.rs`) matches against.

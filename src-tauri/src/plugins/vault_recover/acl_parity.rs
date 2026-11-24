@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The four registration sites of the `vault-recover` plugin, compared.
 //!
 //! The three commands this plugin ships sit in four files no compiler compares:

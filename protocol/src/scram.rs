@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! SCRAM-SHA-256-PLUS **client** proof (MYND-425; RFC 5802 / 7677 / 9266).
 //!
 //! The deterministic client-side crypto of the device-authentication handshake:
@@ -29,7 +29,7 @@
 //! is moved into, not the by-value return slot the callee wrote; the `pbkdf2`
 //! and `hkdf` crates' own internal state is unreachable from here; and LLVM
 //! register/stack spills are outside any wrapper. That is the same posture the
-//! rest of the crate has, and `myne-agents/docs/threat-model.md` §7 defers forensic-grade
+//! rest of the crate has, and `docs/threat-model.md` §7 defers forensic-grade
 //! (freed-page / swap / hibernation) scrubbing outright.
 
 use alloc::string::String;

@@ -7,7 +7,7 @@ import SwiftUI
 /// recording** (hold the mic open, chunk the audio, ship it — myne-md/myne#812).
 /// Either way it holds NO vault key and runs NO crypto (the phone seals + files it
 /// into the vault on unlock; `spec/protocol.md` §9.18, main-repo
-/// `myne-agents/docs/decisions.md` 2026-07-12).
+/// `decisions.md` 2026-07-12).
 @main
 struct MyneWatchApp: App {
     /// Which of the two surfaces the TabView is showing. Selected by a

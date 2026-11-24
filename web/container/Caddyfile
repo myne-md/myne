@@ -28,7 +28,7 @@
 	# record of when each user opens their notes. Exactly the record the whole
 	# design refuses to keep.
 	#
-	# The field-delete filter below is the same one `myne-ops/bundle/Caddyfile`
+	# The field-delete filter below is the same one `runbook/bundle/Caddyfile`
 	# uses at the sync edge, verbatim, so the two edges cannot drift.
 	log {
 		output stdout

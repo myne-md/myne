@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Native-messaging host-mode entry skeleton (TB10).
 //!
 //! When the production binary is launched by a browser with the

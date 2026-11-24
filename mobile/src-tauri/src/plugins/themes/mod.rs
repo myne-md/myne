@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `themes` Tauri plugin (mobile shim).
 //!
 //! Owns `themes_list` — and nothing else. The custom-theme palettes are vault

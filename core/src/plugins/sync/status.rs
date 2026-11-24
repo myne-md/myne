@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The sync status indicator's types and derivation (MYND-424 task 10).
 //!
 //! **Lifted out of the host-gated `commands.rs`** (phase3-web-client task 84) so

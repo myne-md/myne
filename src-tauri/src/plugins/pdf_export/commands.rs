@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `pdf-export` plugin commands (MYND-255 task 4).
 //!
 //! Pipeline (one in-flight session at a time; see `state.rs`):

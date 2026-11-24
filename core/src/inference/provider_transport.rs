@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! HTTPS to a **compiled-in** remote AI provider host (ai-remote-providers
 //! task 4, ledger SYNC-23).
 //!
@@ -8,7 +8,7 @@
 //!
 //! **1. No new HTTP client.** The wire framing is
 //! `crate::http::codec`, the first-party HTTP/1.1 codec promoted out of the
-//! sync plugin. `myne-agents/docs/dependency-policy.md` fast-rejects "adding an HTTP client
+//! sync plugin. `docs/dependency-policy.md` fast-rejects "adding an HTTP client
 //! when one already exists in the tree", and an HTTP crate is the one thing
 //! that genuinely trips the AI denylist gate.
 //!

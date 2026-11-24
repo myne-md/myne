@@ -120,7 +120,7 @@ companion's index when the companion is present and reports what it could not
 check when it is absent, because a build-time read of a companion repository
 would make the catalogue's contents a function of which machine built it, which
 breaks the property the URL contract exists to provide. That task was scoped and
-then deferred (`myne-agents/features/design-system-coverage/tasks.md` task 11),
+then deferred (`private-companion/features/design-system-coverage/tasks.md` task 11),
 so the mechanism the two would share is not written down here until it exists.
 
 ## Foundations

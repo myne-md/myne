@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Device-local on-disk layout for the pending-capture queue.
 //!
 //! Two directories under `<app_data_dir>/pending-captures/`:

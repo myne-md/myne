@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault-repair Tauri plugin (MYND-159) — mobile port of the desktop plugin.
 //!
 //! In-app cleanup of orphan vault artefacts left under `<app_data_dir>/vault/`

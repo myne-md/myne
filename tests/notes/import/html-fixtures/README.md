@@ -65,7 +65,7 @@ A new entry in `IMPORT_DELTA_TAGS` (`src/notes/import/html/sanitize.ts`) is a
 **security-relevant** change to the second untrusted-markup boundary in the
 codebase. It needs, in the same change: a fixture pair here, a unit test in
 `html-to-markdown.test.ts`, and a line in the delta table in
-`myne-agents/features/importer-breadth-spine/prd.md`.
+`private-companion/features/importer-breadth-spine/prd.md`.
 
 ## Current coverage
 

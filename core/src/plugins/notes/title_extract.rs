@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Hybrid byte-range slice extractor for `note_titles_batch`.
 //!
 //! The extractor lives in `myne-format` so the `myne-decrypt` CLI shares the

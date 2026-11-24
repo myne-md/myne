@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The canonical form-C embed span scanner, host-free.
 //!
 //! Moved out of `myne-core`'s `plugins::attachments::reconcile` so the

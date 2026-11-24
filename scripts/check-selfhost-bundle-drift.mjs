@@ -260,7 +260,7 @@ if (!websitePresent && !opsPresent) {
       fail(
         `the image pin disagrees between the guide and the bundle:\n` +
           `           guide  (${GUIDE.slice(ROOT.length + 1)}): ${guidePin}\n` +
-          `           bundle (myne-ops/bundle/docker-compose.yml): ${bundlePin}\n` +
+          `           bundle (runbook/bundle/docker-compose.yml): ${bundlePin}\n` +
           `         One of them is a self-hoster on the wrong build. Update both (the release\n` +
           `         checklist's phase-10 row lists every pin in one place).`,
       );

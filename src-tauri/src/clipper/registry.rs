@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Windows native-messaging registration: the registry write a browser reads.
 //!
 //! On macOS and Linux a browser discovers a native-messaging host by reading a

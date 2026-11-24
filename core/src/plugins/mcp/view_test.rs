@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Settings views, held to what the screen may claim: every count a row states
 //! is the resolver's own answer, the excluded set is what the tools actually
 //! enforce, a grant under the retired model is reported as needing re-approval

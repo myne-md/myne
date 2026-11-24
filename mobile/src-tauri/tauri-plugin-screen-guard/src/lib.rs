@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Android FLAG_SECURE bridge for the mobile screen-capture protection
 //! (`screen_guard`, MYND-469).
 //!

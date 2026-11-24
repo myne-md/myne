@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The three `screen-capture` plugin commands (myne-md/myne#482, #483).
 //!
 //! Desktop-only, and reachable **pre-unlock**. Which is the whole point of two

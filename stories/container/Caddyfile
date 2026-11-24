@@ -38,7 +38,7 @@
 	# and AS14 is normative, and it applies here with less at stake than on the
 	# web client and no less strictly: this is a public origin a person reads.
 	# Caddy's default access log emits the client IP, so the same field-delete
-	# filter `myne-ops/bundle/Caddyfile` and `web/container/Caddyfile` use is
+	# filter `runbook/bundle/Caddyfile` and `web/container/Caddyfile` use is
 	# applied verbatim, so the three edges cannot drift.
 	log {
 		output stdout

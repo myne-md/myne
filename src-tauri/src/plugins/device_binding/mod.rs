@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `device-binding` Tauri plugin: desktop wiring of the shared `myne-core`
 //! device-to-person binding store (`vault.device-bindings`, `MYU5`; protocol.md
 //! §9.30, the `member-devices` feature).

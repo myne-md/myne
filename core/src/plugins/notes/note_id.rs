@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `NoteId` — host-side UUIDv7 wrapper for note identifiers.
 //!
 //! The identifier lives in `myne-format` so the `myne-decrypt` CLI shares the

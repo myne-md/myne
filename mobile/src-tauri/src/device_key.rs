@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The host's half of the **device signing key** storage ladder
 //! (`decisions/protocol/0733` decision 4; `identity-seat-portability` tasks 9
 //! and 10).

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Tests for client awareness frame routing (`collab-editor-bridge` task 7).
 
 use super::awareness::{route_awareness_frame, AwarenessRoute};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! App-process wiring for the host↔app relay (TB10, task 6).
 //!
 //! [`relay`](super::relay) owns the transport + the keyed re-validation; this

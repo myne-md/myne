@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
-//! Shared canonical-JSON emit primitives (`myne-agents/docs/spec/protocol.md` § 9.5.2).
+//! Shared canonical-JSON emit primitives (`docs/spec/protocol.md` § 9.5.2).
 //!
 //! The string escaper + decimal-integer encoders are **load-bearing for
 //! cross-implementation byte-stability** — every canonical-JSON blob (the

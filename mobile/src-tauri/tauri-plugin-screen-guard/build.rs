@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // No WebView-facing commands — the empty list is deliberate (Rust-only
 // bridge; permission autogen is skipped for an empty command set). On Android
 // targets `android_path` emits `cargo:android_library_path=…` so the app's

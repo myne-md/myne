@@ -25,7 +25,7 @@
 // `session.execute` for the applied `--accent` value.
 //
 // Run via `scripts/capture-theme-demo.sh` (Linux container; tauri-driver has no
-// macOS support, `myne-agents/docs/dev/e2e.md`), which then turns the frames into the
+// macOS support, `dev-notes/e2e.md`), which then turns the frames into the
 // carousel's JPEGs on the host with `scripts/build-theme-demo-stills.mjs`.
 // Self-skips off-platform.
 
@@ -148,7 +148,7 @@ async function pickPreset(session: Session, index: number): Promise<void> {
  *
  *  - the note we created is the one on screen;
  *  - nothing on screen matches the documented account-number display form
- *    (`MY-XXXX-...`, `myne-agents/docs/spec/account-number.md`).
+ *    (`MY-XXXX-...`, `docs/spec/account-number.md`).
  *
  * A future step that opened the Account pane or the vault picker would fail
  * here, by name, instead of publishing that frame.

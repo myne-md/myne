@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Credential entry for `myne-decrypt`.
 //!
 //! The master password (or recovery phrase) enters the tool through a TTY

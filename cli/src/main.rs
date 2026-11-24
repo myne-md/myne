@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `myne` — the CLI thin client (cli-thin-client feature; MYND-490).
 //!
 //! Never opens the vault, never holds a key, never prompts for a password.
 //! Connects to the already-running, already-unlocked desktop over its local
 //! command socket through the [`backend::MyneBackend`] seam. See
-//! `myne-agents/features/cli-thin-client/prd.md` for the full feature.
+//! `private-companion/features/cli-thin-client/prd.md` for the full feature.
 
 mod backend;
 mod exit;

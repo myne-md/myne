@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Vault discovery (disk-scan) + best-effort registry cache.
 //!
 //! ## Discovery authority is the disk-scan (SYNC-10)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! One live co-editing session over an `NC05` note (epic live-collab,
 //! `collab-editor-bridge` task 2).
 //!

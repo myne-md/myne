@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 //! The host surface of the member-names store: the session-facing cores and their
 //! Tauri wrappers.

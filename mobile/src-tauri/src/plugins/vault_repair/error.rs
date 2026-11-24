@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `vault_repair` IPC error enum (MYND-159) — mobile port.
 //!
 //! Closed taxonomy, DENY-list clean (no path strings, no kernel-error
