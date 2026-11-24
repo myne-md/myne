@@ -189,9 +189,12 @@ describeE2E("ne2 attachments pre-flight modal + embed-rewrite export (MYND-116)"
 
         // Toggle defaults OFF on open; clicking flips it ON.
         const toggle = await s.byTestId("export.include-attachments-toggle");
-        expect(await toggle.property<boolean>("checked")).toBe(false);
+        // `aria-checked`: the modal's control is the `Checkbox` primitive
+        // (myne-md/myne#1099), a `<button role="checkbox">`, which has no
+        // `checked` DOM property to read.
+        expect(await toggle.attribute("aria-checked")).toBe("false");
         await toggle.click();
-        expect(await toggle.property<boolean>("checked")).toBe(true);
+        expect(await toggle.attribute("aria-checked")).toBe("true");
 
         // Cancel = free exit: modal unmounts, no dialog, nothing written.
         await (await s.byTestId("export.cancel")).click();
