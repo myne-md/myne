@@ -503,11 +503,46 @@ describeE2E("vm3 bulk set one declared field with a partial refusal and one rest
         expect(drifted.err, "the concurrent write lands").toBeUndefined();
 
         // Select all three and set the declared field to one value.
-        for (const row of await s.byTestIdAll("view.bulk-select-row")) {
-          await row.click();
+        //
+        // Clicked through a re-finding retry, and each click confirmed by the
+        // SELECTED COUNT rather than by the click returning: the table re-renders
+        // as each row is selected (the bulk bar mounts on the first one), so a
+        // handle collected up front is replaced before the second click and the
+        // driver reports `stale element reference` from its interactable poll.
+        for (let want = 1; want <= 3; want++) {
+          await s.waitUntil(
+            async () => {
+              const rows = await s.byTestIdAll("view.bulk-select-row");
+              const states = await Promise.all(rows.map((row) => row.attribute("aria-checked")));
+              if (states.filter((state) => state === "true").length >= want) return true;
+              const next = states.findIndex((state) => state !== "true");
+              if (next < 0) return null;
+              try {
+                await rows[next]!.click();
+              } catch {
+                return null;
+              }
+              return null;
+            },
+            { label: `${want} of 3 rows selected`, timeoutMs: 20_000 },
+          );
         }
         await replaceFieldText(s, "view.bulk-value", "done");
-        await (await s.byTestId("view.bulk-apply")).click();
+        // Same reason as the row clicks: the bar re-renders between the find and
+        // the click, so the handle is re-taken on every poll.
+        await s.waitUntil(
+          async () => {
+            const [apply] = await s.byTestIdAll("view.bulk-apply");
+            if (apply === undefined) return null;
+            try {
+              await apply.click();
+              return true;
+            } catch {
+              return null;
+            }
+          },
+          { label: "the bulk apply action accepts the click", timeoutMs: 20_000 },
+        );
 
         // Two landed, one refused, and the refusal is reported PER NOTE with the
         // host's own reason rather than folded into a count.
