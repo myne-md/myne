@@ -85,17 +85,6 @@ if (findings.length) {
   L.push('');
   L.push('</details>');
 }
-const blk = (title, arr) => {
-  if (!Array.isArray(arr) || !arr.length) return;
-  L.push('');
-  L.push('<details><summary><b>' + title + '</b></summary>');
-  L.push('');
-  for (const x of arr) L.push('- ' + esc(x));
-  L.push('');
-  L.push('</details>');
-};
-blk('Patterns observed', v.patterns);
-blk("What's good", v.whats_good);
 const hist = Array.isArray(packet.prior?.signature_history) ? packet.prior.signature_history.slice() : [];
 const today = new Date().toISOString().slice(0, 10);
 hist.push(today + ': `' + sig + '`');
