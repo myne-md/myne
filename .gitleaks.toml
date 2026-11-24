@@ -1,0 +1,19 @@
+title = "Myne public release"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixture-only generic-api-key matches: docs examples, e2e inputs, preview fixture and Rust test constants. Scoped by path; a real key elsewhere still fails."
+paths = [
+  '''^preview/src/preview\.html$''',
+  '''^docs/spec/protocol\.md$''',
+  '''^docs/glossary\.md$''',
+  '''^protocol/src/prefs\.rs$''',
+  '''^protocol/src/prefs_tests\.rs$''',
+  '''^e2e/change-password\.e2e\.ts$''',
+  '''^e2e/vault-creation\.e2e\.ts$''',
+  '''^e2e/clipboard-copy\.e2e\.ts$''',
+  '''^e2e/vault-recovery\.e2e\.ts$''',
+  '''^e2e/plaintext-residue\.e2e\.ts$''',
+  '''^src-tauri/src/plugins/local_inference/vector_store\.rs$''',
+]
