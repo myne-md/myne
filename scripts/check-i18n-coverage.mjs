@@ -83,6 +83,10 @@ export const CONFIG_PATH = "src/i18n/config.ts";
 export const EXTRACTOR_PATH = "i18next.config.js";
 export const LOCALES_DIR = "locales";
 export const RECORD_PATH = docsPath("dev", "i18n-coverage.md");
+if (!existsSync(RECORD_PATH) && !process.argv.includes("--emit")) {
+  console.log("i18n coverage: skipped (private docs/dev/i18n-coverage.md is not present)");
+  process.exit(0);
+}
 if (!docsPresent() && !process.argv.includes("--emit")) {
   console.log(`note: ${DOCS_ABSENT}`);
   process.exit(0);
