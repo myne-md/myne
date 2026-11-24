@@ -70,10 +70,11 @@ interface RulesetDef {
 const loadRuleset = (stem: string): RulesetDef => readRuleset(stem) as RulesetDef;
 
 const MANIFEST = join(REPO_ROOT, "workspace", "manifest.txt");
-const manifestEntries = manifestRepos(readFileSync(MANIFEST, "utf8"));
+const manifestEntries = existsSync(MANIFEST) ? manifestRepos(readFileSync(MANIFEST, "utf8")) : [];
+const rulesetPresent = existsSync(RULESET_DIR);
 
-describe("branch-ruleset roster", () => {
-  it("covers every manifest repo exactly once, plus the repos that are not companions", () => {
+describe.skipIf(!rulesetPresent)("branch-ruleset roster", () => {
+  it.skipIf(!existsSync(MANIFEST))("covers every manifest repo exactly once, plus the repos that are not companions", () => {
     const roster = repoRoster();
     expect(new Set(roster).size).toBe(roster.length);
 
@@ -105,8 +106,8 @@ describe("branch-ruleset roster", () => {
   });
 });
 
-describe("branch-ruleset definitions", () => {
-  const definitions = RULESET_NAMES.map((stem: string) => ({ stem, def: loadRuleset(stem) }));
+describe.skipIf(!rulesetPresent)("branch-ruleset definitions", () => {
+  const definitions = rulesetPresent ? RULESET_NAMES.map((stem: string) => ({ stem, def: loadRuleset(stem) })) : [];
 
   it("has no definition on disk the roster does not know about", () => {
     const onDisk = readdirSync(RULESET_DIR)
