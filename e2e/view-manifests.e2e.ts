@@ -543,7 +543,24 @@ describeE2E("vm3 bulk set one declared field with a partial refusal and one rest
         );
 
         // ONE action restores everything the action wrote.
-        await (await s.byTestId("view.bulk-restore")).click();
+        //
+        // Clicked through a re-finding retry rather than one handle: the bulk bar
+        // re-renders when the report grows, so a node found a moment earlier is
+        // replaced before the click lands and the driver reports `stale element
+        // reference` from its interactable poll.
+        await s.waitUntil(
+          async () => {
+            const [button] = await s.byTestIdAll("view.bulk-restore");
+            if (button === undefined) return null;
+            try {
+              await button.click();
+              return true;
+            } catch {
+              return null;
+            }
+          },
+          { label: "the restore action accepts the click", timeoutMs: 30_000 },
+        );
         await s.byTestId("view.bulk-restored", { timeoutMs: 30_000 });
         await s.waitUntil(
           async () =>

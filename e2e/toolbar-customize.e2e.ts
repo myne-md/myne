@@ -205,10 +205,15 @@ async function customizeToggle(s: Session, itemId: string) {
  *  `prefsRead()` in a mount effect — poll, don't snapshot the pre-effect
  *  default; the pf1 discipline). */
 async function expectHighlightToggleReadsBack(s: Session, checked: boolean): Promise<void> {
+  // `aria-checked`, not the `checked` DOM property: the row's control is the
+  // `Checkbox` primitive since myne-md/myne#1099, which renders a
+  // `<button role="checkbox" aria-checked>` — a button carries no `checked`
+  // property, so the old read was `undefined` and could never equal `false` or
+  // `true`.
   await s.waitUntil(
     async () =>
-      (await (await customizeToggle(s, "highlight")).property<boolean>("checked")) === checked ||
-      null,
+      (await (await customizeToggle(s, "highlight")).attribute("aria-checked")) ===
+        String(checked) || null,
     { label: `highlight toggle reads back ${checked ? "checked" : "unchecked"}` },
   );
 }
@@ -477,7 +482,10 @@ describeE2E("tc3 the formerly Coming-soon toolbar commands render and run (myne-
         await s.byTestId("settings.toolbar-customize");
         await (await customizeToggle(s, "quote")).click();
         await s.waitUntil(
-          async () => ((await (await customizeToggle(s, "quote")).property<boolean>("checked")) ? true : null),
+          async () =>
+            (await (await customizeToggle(s, "quote")).attribute("aria-checked")) === "true"
+              ? true
+              : null,
           { label: "the quote row reads back checked" },
         );
         await closeSettings(s);
@@ -504,7 +512,9 @@ describeE2E("tc3 the formerly Coming-soon toolbar commands render and run (myne-
         await selectSettingsTopic(s, "editor", "editing");
         await s.waitUntil(
           async () =>
-            (await (await customizeToggle(s, "quote")).property<boolean>("checked")) ? true : null,
+            (await (await customizeToggle(s, "quote")).attribute("aria-checked")) === "true"
+              ? true
+              : null,
           { label: "the quote row survived a Settings reopen" },
         );
         await closeSettings(s);
