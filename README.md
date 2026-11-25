@@ -86,7 +86,7 @@ Almost every file at the root is there because a tool looks for it **by name**, 
 | `index.html`, `pdf-export.html`, `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`, `tsconfig.node.json` | Vite's root is the current directory, so its HTML entry points must sit here; `vitest.config.ts` is discovered by name, which is what every bare `vitest run` in this tree depends on |
 | `tsconfig.tests.json` | the typecheck for the trees the shipped-code `tsconfig.json` deliberately excludes (`tests/`, `e2e/`, `e2e-web/`) |
 | `lefthook.yml`, `i18next.config.js` | git-hook and i18n-extractor configuration, each discovered by filename |
-| `flake.nix`, `flake.lock` | the Nix devshell; `nix develop` reads a flake from the repository root |
+| `flake.nix`, `flake.lock` | the source-only Nix development shell; `nix develop` reads a flake from the repository root. There is no prebuilt Nix package or AppImage wrapper. |
 | `README.md`, `LICENSE`, `LICENSING.md`, `SECURITY.md`, `AGENTS.md` | the files GitHub and contributor tooling render or look for at a root |
 | `PRODUCT.md`, `DESIGN.md`, `DESIGN.json` | the strategy and the visual system, read from the root by the design workflow and projected against [`DESIGN.md`](DESIGN.md) |
 | `.config/` | tool configuration that has **no** name-discovery constraint, which is why it is the one directory holding it: `nextest.toml` for `cargo-nextest`, and `vitest/` for the five test lanes that are not the default one |

@@ -1,23 +1,9 @@
 {
-  # A wrap-the-release flake: `nix run github:myne-md/myne` runs the published
-  # AppImage under an FHS shim. (The from-source Tauri-on-Nix build — webkitgtk
-  # + wrapGAppsHook + pnpm + sidecars — is a follow-up; this exists so Nix/NixOS
-  # users can run it without appimage-run gymnastics.)
-  #
-  # The URLs point at downloads.myne.md, not at GitHub, and that is not a
-  # preference. Every myne-md repository is private, so a release-asset URL on
-  # github.com answers 404 to everyone who is not a member, and `fetchurl`
-  # carries no credential. These URLs were pinned to v0.4.0 GitHub assets, so
-  # `nix run` had never once worked for an outside user and nothing said so.
-  # `decisions.md` 2026-08-15 (entry 0496).
-  #
-  # Fetching from the project's own origin does not cross the 2026-08-09 line
-  # against Myne-initiated downloads: Nix is not a Myne client, an AppImage is
-  # not a model, and the fetch happens because the user ran `nix run`.
-  #
-  # Updated to v0.18.0 on 2026-11-11; both arches ship an AppImage again, so both
-  # arms move together.
-  description = "Myne — calm, end-to-end-encrypted markdown notes";
+  # Source-only development shell. The old flake wrapped a published AppImage
+  # and therefore contradicted the source-only release policy; this flake now
+  # only provides the tools to build from the checkout. It deliberately exposes
+  # no `packages` or `apps` output: there is no prebuilt Nix package to run.
+  description = "Myne — source-only development shell";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -25,31 +11,21 @@
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAll = nixpkgs.lib.genAttrs systems;
-      srcFor = system: pkgs:
-        {
-          "x86_64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.18.0/Myne_0.18.0_amd64.AppImage";
-            sha256 = "sha256-maP6xrJPR0pOREzL8aM0ZTTXz+99FUPpTBz+DF7TdXQ=";
-          };
-          "aarch64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.18.0/Myne_0.18.0_aarch64.AppImage";
-            sha256 = "sha256-J4+2BFrgCeojw3eAW76JLA7VLYfk5xzQQLEGEqkgV/E=";
-          };
-        }.${system};
     in {
-      packages = forAll (system:
+      devShells = forAll (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          myne = pkgs.appimageTools.wrapType2 {
-            pname = "myne";
-            version = "0.18.0";
-            src = srcFor system pkgs;
+        in {
+          default = pkgs.mkShell {
+            packages = with pkgs; [
+              nodejs
+              pnpm
+              rustc
+              cargo
+              pkg-config
+              openssl
+            ];
           };
-        in { default = myne; myne = myne; });
-
-      apps = forAll (system: {
-        default = { type = "app"; program = "${self.packages.${system}.default}/bin/myne"; };
-        myne = { type = "app"; program = "${self.packages.${system}.default}/bin/myne"; };
-      });
+        });
     };
 }

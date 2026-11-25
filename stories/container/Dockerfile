@@ -34,7 +34,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 RUN pnpm stories:build:public
 
 # ── runtime ──────────────────────────────────────────────────────────────────
-FROM caddy:2.8-alpine
+FROM caddy:2.11.4-alpine
 COPY --from=build /src/stories/dist-public /srv/catalogue
 COPY stories/container/Caddyfile /etc/caddy/Caddyfile
 

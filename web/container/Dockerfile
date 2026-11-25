@@ -82,7 +82,7 @@ RUN pnpm web:build
 RUN pnpm exec tsc --ignoreConfig web/csp.ts --outDir /out/web --module es2022 --target es2022 --moduleResolution bundler --skipLibCheck
 
 # ── runtime ──────────────────────────────────────────────────────────────────
-FROM caddy:2.8-alpine
+FROM caddy:2.11.4-alpine
 RUN apk add --no-cache nodejs
 COPY --from=build /src/web/dist /srv/web
 COPY --from=build /out/web/csp.js /opt/myne/csp.js

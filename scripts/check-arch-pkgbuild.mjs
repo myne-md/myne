@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 export const FLAKE = "flake.nix";
+export const PACKAGE_JSON = "package.json";
 export const SOURCE_PKGBUILD = "packaging/arch/PKGBUILD";
 export const BINARY_PKGBUILD = "packaging/arch/myne-bin/PKGBUILD";
 
@@ -52,6 +53,16 @@ export function pkgverOf(text) {
 /** Every `v<X.Y.Z>` release version the flake's download URLs name. */
 export function flakeReleaseVersions(text) {
   return [...new Set([...text.matchAll(/downloads\.myne\.md\/releases\/v([0-9]+\.[0-9]+\.[0-9]+)\//g)].map((m) => m[1]))];
+}
+
+/** The package version from the root manifest, or null when unreadable. */
+export function packageVersionOf(text) {
+  try {
+    const version = JSON.parse(text).version;
+    return typeof version === "string" && version.length > 0 ? version : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -73,49 +84,69 @@ export function sourceRefOf(text) {
 }
 
 /** Pure over its inputs so `tests/scripts/` can inject each defect. */
-export function audit({ flakeText, sourcePkgbuildText, binaryPkgbuildText }) {
+export function audit({ flakeText, packageJsonText, sourcePkgbuildText, binaryPkgbuildText }) {
   const failures = [];
   const fail = (msg) => failures.push(msg);
 
   const fromSource = pkgverOf(sourcePkgbuildText);
   const binary = pkgverOf(binaryPkgbuildText);
-  const flakeVersions = flakeReleaseVersions(flakeText);
+  const packageVersion = packageJsonText ? packageVersionOf(packageJsonText) : null;
+  const flakeVersions = packageJsonText ? [] : flakeReleaseVersions(flakeText);
 
   if (!fromSource) fail(`${SOURCE_PKGBUILD}: no \`pkgver=\` line.`);
   if (!binary) fail(`${BINARY_PKGBUILD}: no \`pkgver=\` line.`);
-  if (flakeVersions.length === 0) {
-    fail(
-      `${FLAKE}: no \`downloads.myne.md/releases/v<X.Y.Z>/\` URL. That URL is the anchor the ` +
-        "Arch recipes are compared against, so a flake that names no release leaves this guard " +
-        "unable to see the drift it exists for.",
-    );
-  }
-  if (flakeVersions.length > 1) {
-    fail(
-      `${FLAKE}: names more than one release version (${flakeVersions.join(", ")}). Both ` +
-        "architecture URLs move together by the release runbook, so a file carrying two means " +
-        "one arm was missed.",
-    );
-  }
 
-  if (fromSource && binary && fromSource !== binary) {
-    fail(
-      `${SOURCE_PKGBUILD} says pkgver=${fromSource} and ${BINARY_PKGBUILD} says ` +
-        `pkgver=${binary}. They are one release stated twice; bump both in the same pass ` +
-        "(the release runbook's downstream-pin phase).",
-    );
-  }
-  if (flakeVersions.length === 1) {
-    for (const [rel, ver] of [
-      [SOURCE_PKGBUILD, fromSource],
-      [BINARY_PKGBUILD, binary],
-    ]) {
-      if (ver && ver !== flakeVersions[0]) {
-        fail(
-          `${rel} says pkgver=${ver} but ${FLAKE} serves v${flakeVersions[0]}. A recipe left ` +
-            "behind the release builds and installs an older version than every other Linux " +
-            "package of the same release.",
-        );
+  if (packageJsonText) {
+    if (!packageVersion) {
+      fail(`${PACKAGE_JSON}: no readable \`version\`; the source-only tree needs a version anchor.`);
+    } else {
+      for (const [rel, ver] of [
+        [SOURCE_PKGBUILD, fromSource],
+        [BINARY_PKGBUILD, binary],
+      ]) {
+        if (ver && ver !== packageVersion) {
+          fail(
+            `${rel} says pkgver=${ver} but ${PACKAGE_JSON} says ${packageVersion}. A recipe left ` +
+              "behind the source release builds and installs an older version than the tree it came from.",
+          );
+        }
+      }
+    }
+  } else {
+    if (flakeVersions.length === 0) {
+      fail(
+        `${FLAKE}: no \`downloads.myne.md/releases/v<X.Y.Z>/\` URL. That URL is the anchor the ` +
+          "Arch recipes are compared against, so a flake that names no release leaves this guard " +
+          "unable to see the drift it exists for.",
+      );
+    }
+    if (flakeVersions.length > 1) {
+      fail(
+        `${FLAKE}: names more than one release version (${flakeVersions.join(", ")}). Both ` +
+          "architecture URLs move together by the release runbook, so a file carrying two means " +
+          "one arm was missed.",
+      );
+    }
+
+    if (fromSource && binary && fromSource !== binary) {
+      fail(
+        `${SOURCE_PKGBUILD} says pkgver=${fromSource} and ${BINARY_PKGBUILD} says ` +
+          `pkgver=${binary}. They are one release stated twice; bump both in the same pass ` +
+          "(the release runbook's downstream-pin phase).",
+      );
+    }
+    if (flakeVersions.length === 1) {
+      for (const [rel, ver] of [
+        [SOURCE_PKGBUILD, fromSource],
+        [BINARY_PKGBUILD, binary],
+      ]) {
+        if (ver && ver !== flakeVersions[0]) {
+          fail(
+            `${rel} says pkgver=${ver} but ${FLAKE} serves v${flakeVersions[0]}. A recipe left ` +
+              "behind the release builds and installs an older version than every other Linux " +
+              "package of the same release.",
+          );
+        }
       }
     }
   }
@@ -163,12 +194,12 @@ function main() {
     return existsSync(p) ? readFileSync(p, "utf8") : null;
   };
   const texts = {
-    flakeText: read(FLAKE),
+    packageJsonText: read(PACKAGE_JSON),
     sourcePkgbuildText: read(SOURCE_PKGBUILD),
     binaryPkgbuildText: read(BINARY_PKGBUILD),
   };
   for (const [key, rel] of [
-    ["flakeText", FLAKE],
+    ["packageJsonText", PACKAGE_JSON],
     ["sourcePkgbuildText", SOURCE_PKGBUILD],
     ["binaryPkgbuildText", BINARY_PKGBUILD],
   ]) {
@@ -184,7 +215,7 @@ function main() {
     process.exit(1);
   }
   process.stdout.write(
-    `check-arch-pkgbuild: ok, v${pkgverOf(texts.sourcePkgbuildText)} across both recipes and ${FLAKE}, ` +
+    `check-arch-pkgbuild: ok, v${pkgverOf(texts.sourcePkgbuildText)} across both recipes and ${PACKAGE_JSON}, ` +
       "commit-pinned source\n",
   );
 }

@@ -1,6 +1,6 @@
 # Maintainer: Ömer Duran <78652445+omerdduran@users.noreply.github.com>
 pkgname=myne
-pkgver=0.18.0
+pkgver=0.19.0
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search"
 arch=('x86_64')
@@ -32,10 +32,10 @@ options=('!lto')
 # `scripts/check-arch-pkgbuild.mjs` holds both halves: a git source must carry a
 # 40-hex `#commit=`, and SKIP is refused for any source that is not one.
 #
-# Bump BOTH this and `myne-bin/PKGBUILD`'s `pkgver` together with `flake.nix`'s
-# two release URLs. The guard compares all three, because that is the drift this
-# lead found: this recipe was one stable release behind the other two.
-source=("$pkgname::git+https://github.com/myne-md/myne.git#commit=ca12a7e061bf878392f69fc671ff91c13a889256")
+# Bump BOTH this and `myne-bin/PKGBUILD`'s `pkgver` together with the root
+# `package.json` version. The guard compares all three, because that is the drift
+# this lead found: this recipe was one stable release behind the other two.
+source=("$pkgname::git+https://github.com/myne-md/myne.git#commit=74995f3ed12c9db528107c33d1f746527b075a72")
 sha256sums=('SKIP')
 
 prepare() {

@@ -150,7 +150,6 @@ const LINKS: readonly LinkGroup[] = [
             { href: "https://github.com/myne-md/myne-themes", icon: "palette", label: "myne-themes" },
             { href: "https://github.com/myne-md/myne-branding", icon: "image", label: "myne-branding" },
             { href: "https://github.com/myne-md/myne-test-vectors", icon: "circle-check", label: "myne-test-vectors" },
-            { href: "https://github.com/example-org/operations", icon: "settings", label: "operations" },
             { href: "https://github.com/myne-md/myne-clipper", icon: "paperclip", label: "myne-clipper" },
           ],
         },
