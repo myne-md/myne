@@ -13,7 +13,7 @@ body:
 
         - **Security issues do not go here.** Anything touching cryptography, key handling, recovery, sync
           integrity, or the reproducible-build chain goes to **security@myne.md** privately. See
-          [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+          [SECURITY.md](https://github.com/myne-md/myne/blob/develop/SECURITY.md).
         - **Never paste note content, an account number, a master password, or a recovery phrase.** The
           catalogue runs on synthetic fixtures, so nothing here needs real data.
         - **Search first.** The finding may already be filed, and a duplicate costs more than it saves.

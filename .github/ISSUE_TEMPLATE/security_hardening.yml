@@ -8,7 +8,7 @@ body:
       value: |
         **Read this first — is your report a vulnerability or a hardening?**
 
-        - **Undisclosed or exploitable vulnerability → STOP.** Anything that lets an attacker read plaintext, forge or bypass authentication, recover keys, break the reproducible-build / bundle chain, or otherwise defeat a guarantee the threat model claims **does not go in a public issue.** Email **security@myne.md** — coordinated disclosure per [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - **Undisclosed or exploitable vulnerability → STOP.** Anything that lets an attacker read plaintext, forge or bypass authentication, recover keys, break the reproducible-build / bundle chain, or otherwise defeat a guarantee the threat model claims **does not go in a public issue.** Email **security@myne.md** — coordinated disclosure per [SECURITY.md](https://github.com/myne-md/myne/blob/develop/SECURITY.md).
         - **This form is for the other case:** improving an **already-public accepted residual** (`docs/threat-model.md` §5 "NOT Protected Against" / §7 "Known Limitations"), reducing a documented metadata leak, or adding defense-in-depth. No new attack is being disclosed — the exposure is already written down.
 
         If you are unsure which side of the line you are on, treat it as a vulnerability and email security@myne.md. Marketing and UX may never exceed the threat model — read it and the vision's anti-features, both summarised in the user guide's security pages, before proposing.

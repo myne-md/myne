@@ -21,7 +21,7 @@ The threat model is normative: marketing copy and code may not exceed its guaran
 
 ## Status
 
-**Pre-alpha.** The on-disk format is still pre-1.0, and v0.1 and the next major are forward-incompatible by design. Releases are tagged; **no prebuilt binaries are distributed** — build from source. All three clients are well past scaffold stage. What concretely exists in this repo today:
+**Pre-alpha.** The on-disk format is still pre-1.0, and v0.1 and the next major are forward-incompatible by design. There are no tagged releases yet, and **no prebuilt binaries are distributed** — build from source. All three clients are well past scaffold stage. What concretely exists in this repo today:
 
 - **Protocol crate ([`protocol/`](protocol/))**: `#![no_std]` + `alloc`, built on the RustCrypto stack with no custom primitives. Implements account numbers, KDF, AEAD, subkey derivation, BIP-39 recovery, and every blob family the magic-byte registry allocates ([`docs/spec/protocol.md`](docs/spec/protocol.md) §10.3 is the registry of record, and it is the only place the roster is listed). Covered by a large unit, property-based, and attack test suite.
 - **Desktop core ([`src-tauri/`](src-tauri/))**: Tauri 2 host with atomic writes, auto-lock, snapshot/backup, vault registry and migration, on-device search and spell-check, screen-capture protection, and the browser-clipper native-messaging host. Capability ACLs live under [`src-tauri/capabilities/`](src-tauri/capabilities).
@@ -32,6 +32,8 @@ The threat model is normative: marketing copy and code may not exceed its guaran
 - **E2E suite ([`e2e/`](e2e/))**: scenario files (`e2e/*.e2e.ts`) driving the production binary via tauri-driver, plus the browser-driven web lane ([`e2e-web/`](e2e-web/)) and the mobile flow-logic tier. The number of scenarios that must actually execute is a recorded ratchet in [`scripts/e2e-scenario-floor.json`](scripts/e2e-scenario-floor.json), not a figure restated here. A new user-facing flow ships with its `data-testid` pass; its E2E scenario is written by hand, later.
 
 No prebuilt binaries are distributed. The web client's verifiability story rests on [`docs/web-bundle-hashes.md`](docs/web-bundle-hashes.md), an append-only record: a bundle whose hash was not recorded first should not reach an origin. **The maintainer-run web instance at `app.example.com` is closed** (2026-10-16): the web client ships as a container you serve yourself (`pnpm web:build`, `web/container/`), and Myne offers no hosted client. The sync **server** lives in its own companion repo (below); the web and mobile clients do not: they are the in-repo `web/` and `mobile/` targets above.
+
+Historical binaries distributed before the source-only switch are not maintained; [`SOURCE-OFFER.md`](SOURCE-OFFER.md) says how to obtain their corresponding source.
 
 ## Repository layout
 

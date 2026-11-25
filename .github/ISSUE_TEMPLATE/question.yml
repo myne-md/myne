@@ -1,0 +1,30 @@
+name: Question
+description: Ask how to use Myne, or ask about a design or documentation decision.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions are welcome. Read [`README.md`](https://github.com/myne-md/myne/blob/develop/README.md), [`docs/`](https://github.com/myne-md/myne/tree/develop/docs) and [`SUPPORT.md`](https://github.com/myne-md/myne/blob/develop/SUPPORT.md) first, and search the existing issues.
+
+        - **Security issues do not go here.** Email **security@myne.md** privately; see [`SECURITY.md`](https://github.com/myne-md/myne/blob/develop/SECURITY.md).
+        - **Never paste note content, your account number, your master password or your recovery phrase.**
+        - GitHub Discussions is disabled at present; this template is the question channel until it is enabled.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and where are you stuck?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Commands, documentation pages, search terms. The smallest useful detail is enough.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: If the question is about a build, the commit you built from.

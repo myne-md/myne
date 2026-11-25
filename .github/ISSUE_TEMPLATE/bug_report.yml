@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for taking the time to file a bug. First, a few things:
 
-        - **Security issues do not go here.** Anything touching cryptography, key handling, recovery, sync integrity, or the reproducible-build / bundle chain goes to **security@myne.md** privately — see [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - **Security issues do not go here.** Anything touching cryptography, key handling, recovery, sync integrity, or the reproducible-build / bundle chain goes to **security@myne.md** privately — see [SECURITY.md](https://github.com/myne-md/myne/blob/develop/SECURITY.md).
         - **Search first** — the bug may already be reported.
         - Myne is local-first and end-to-end encrypted: **never paste note content, your account number, your master password, or your recovery phrase.**
   - type: textarea
