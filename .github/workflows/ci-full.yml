@@ -233,7 +233,7 @@ jobs:
       - run: pnpm mobile:build
       - run: node scripts/check-npm-licenses.mjs
       - run: pnpm mobile:test
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter myne-mobile exec playwright install --with-deps chromium
       - run: pnpm mobile:test:flow
       - run: cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-device-key -p tauri-plugin-share-intent -p tauri-plugin-save-file -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
       - run: cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard -p tauri-plugin-save-file --no-fail-fast
