@@ -16,7 +16,7 @@ pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 # 5802). Serialization only, not crypto; no_std + alloc; already workspace-locked.
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
-chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
 # The hand-composed AEAD's cipher- and MAC-state wipe is requested HERE, at the
 # site that relies on it, because a property held by accident is not held. Both
 # impls are `#[cfg(feature = "zeroize")]`: `chacha20`'s `Drop`/`ZeroizeOnDrop`
