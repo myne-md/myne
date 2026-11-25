@@ -1,2 +1,10 @@
 # Every path is owned by the maintainer until a second maintainer is added.
 * @omerdduran
+
+# Security-sensitive surfaces stay with the same owner explicitly.
+/.github/ @omerdduran
+/docs/threat-model.md @omerdduran
+/docs/spec/ @omerdduran
+/LICENSE @omerdduran
+/LICENSE-CONTENT @omerdduran
+/LICENSE-ASSETS @omerdduran
