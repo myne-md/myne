@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The member display-name WRITE decision both clients answer, in one place: which
 // of the `sync.memberRoster.nameError*` messages a refused

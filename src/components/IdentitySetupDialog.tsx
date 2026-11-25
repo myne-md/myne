@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Identity-only setup DIALOG (myne-md/myne#711, b2b-member-sync).
 //
 // A vault-less person can add an identity without creating a vault: a 24-word

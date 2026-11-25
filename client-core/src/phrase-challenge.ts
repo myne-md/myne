@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The recovery-phrase type-back challenge's two RULES: which four words of a 24-word
 // phrase the user is asked to retype, and how a typed answer is compared to the word

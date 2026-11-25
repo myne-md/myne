@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Identity-only setup binding (myne-md/myne#711, b2b-member-sync).
 //
 // One invoke. The recovery phrase is the only secret that crosses this

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Manual TS mirror of `DeviceAttributionRow` / `DeviceAttributionView`
 // (`core/src/plugins/sync/identity_resolver.rs`, the `MYU5` device-binding

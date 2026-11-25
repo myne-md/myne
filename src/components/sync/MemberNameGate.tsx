@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The required name step (myne-md/myne#851 task 8, stories 5 to 7). It runs right
 // after an accept lands, and the accept's own completion callback is withheld until

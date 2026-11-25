@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // ONE owner for the window's close request (myne-md/myne#945 item 05).
 //
 // # The bug this exists to close

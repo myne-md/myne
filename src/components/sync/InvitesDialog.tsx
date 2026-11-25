@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The invitations dialog, reachable from the vault picker and the in-editor
 // vault switcher (myne-md/myne#911 follow-up).
 //

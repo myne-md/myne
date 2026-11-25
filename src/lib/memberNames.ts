@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The member display-name bindings (`vault.member-names`, magic `MYO5`;
 // myne-md/myne#851, `decisions/protocol/0666`). One `invoke` per command.

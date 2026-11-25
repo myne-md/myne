@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import SwiftUI
 
 /// The Myne Apple Watch companion — a single-target watchOS app (Xcode 14+/

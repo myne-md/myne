@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The first run (myne-md/myne#911 task 6): identity first, then the vault.
 //
 // # Why this is a stage and not the welcome screen

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The B2B member-roster panel (myne-md/myne#698, b2b-identity-substrate
 // task 9). Three surfaces, in order: unlock the backend-held person
 // identity once per process, invite a member, and list/remove members.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // ⚠️ DEVICE-VERIFY-PENDING — this Kotlin cannot be gradle-built in the mobile
 // repo (no gradle here); it is committed source at the `tauri-plugin-screen-

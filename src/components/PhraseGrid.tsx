@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The protected recovery-phrase grid: blurred until revealed, re-blurred the
 // moment the user walks away.
 //

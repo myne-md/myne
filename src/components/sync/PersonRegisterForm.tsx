@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The one register-an-identity form (2026-10-23 review; reshaped 2026-10-24).
 //
 // It exists because the review found the same secret-handling path written twice:

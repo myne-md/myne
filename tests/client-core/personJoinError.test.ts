@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The add-this-device refusal mapper both clients answer with
 // (myne-md/myne#932).

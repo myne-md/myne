@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The identity ceremony, as a PANEL rather than a dialog (myne-md/myne#911
 // task 6). The body is unchanged from the dialog it came out of
 // (myne-md/myne#711, #780, #792, #855, #869); what moved is who owns the frame.

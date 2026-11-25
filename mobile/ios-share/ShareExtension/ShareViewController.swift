@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // SF2 (MYND-510) — "Save to Myne" Share Extension, PLAINTEXT-STAGING design.
 //

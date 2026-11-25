@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Identity-only home (myne-md/myne#711, b2b-member-sync).
 //
 // Shown at zero vaults when this device already holds a person account: the

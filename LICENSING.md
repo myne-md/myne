@@ -27,6 +27,8 @@ housekeeping one.
 | `scripts/`, `tests/`, `e2e/`, `e2e-web/` (repo guards, specs, the E2E lanes) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
 | `packaging/` (Arch PKGBUILDs and the `.desktop` entry) | **AGPL-3.0-only** | [`LICENSE`](LICENSE) |
 | `docs/` (specifications, threat model, glossary, bundle-hash record) | **CC-BY-4.0** | [`docs/LICENSE`](docs/LICENSE) |
+| `README.md` and prose documentation outside `docs/` | **CC-BY-4.0** | [`LICENSE-CONTENT`](LICENSE-CONTENT) |
+| Visual and brand assets (icons, screenshots, theme previews, bundled imagery) | **All rights reserved** | [`LICENSE-ASSETS`](LICENSE-ASSETS) |
 | `public/fonts/` (the two bundled webfonts) | **SIL OFL-1.1** | [`public/fonts/LICENSE.txt`](public/fonts/LICENSE.txt) |
 | `src-tauri/resources/dictionaries/**`, `src-tauri/resources/models/**` (bundled third-party data) | **per asset** | each dictionary's own `<lang>/license`; the models are listed under "Bundled third-party assets" below |
 

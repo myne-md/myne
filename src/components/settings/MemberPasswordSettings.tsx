@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Settings → Privacy → Shared vault unlock. Shown only while a B2B member vault
 // is the active vault. A member holds no vault password: their portable

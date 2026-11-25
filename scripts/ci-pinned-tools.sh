@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Provision the two tools the pipeline EXECUTES, at pinned versions whose bytes
 # this repository checks (myne-md/myne#758, security-audit lead NV02).
 #

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // ⚠️ DEVICE-VERIFY-PENDING — this Swift cannot be compiled in the mobile repo
 // (no Xcode project is generated here; `src-tauri/gen/` holds only `schemas`).

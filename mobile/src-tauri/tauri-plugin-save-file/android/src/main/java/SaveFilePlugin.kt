@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // ⚠️ DEVICE-VERIFY-PENDING. The effect of this Kotlin on a real handset is owed
 // to `dev-notes/device-matrix.md` §8 row 8.8, NOT to the change that adds it. The

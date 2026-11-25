@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The person-identity session unlock (myne-md/myne#831: moved out of
 // MemberRosterPanel). One phrase entry, one surface: the Sync panel's Identity
 // row owns it, and the member roster reads the resulting `personIdentityState`

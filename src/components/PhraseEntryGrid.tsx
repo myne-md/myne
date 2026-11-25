@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The 24-cell recovery-phrase ENTRY grid, shared by every surface that takes a
 // phrase: device enrolment, vault recovery, vault import, whole-vault migration,
 // the B2B member-vault unlock, the person-identity unlock and the invite wizard.

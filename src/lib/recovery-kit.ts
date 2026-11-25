@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The recovery kit as a file: one plain-text document carrying both of a vault's
 // out-of-band credentials.
 //

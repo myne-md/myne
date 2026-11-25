@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import SwiftUI
 
 /// The watch **meeting** surface (myne-md/myne#812): start a recording, see an

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The vault member roster (myne-md/myne#698, b2b-identity-substrate task 9).
 // Lists the members of the unlocked shared vault from the membership roster
 // extension, drives the invite flow, and drives member removal. The invite

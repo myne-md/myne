@@ -145,7 +145,7 @@ Cryptography questions and vulnerability reports: see [`SECURITY.md`](SECURITY.m
 
 This repository is multi-licensed by subtree (see [`LICENSING.md`](LICENSING.md) for the authoritative map):
 
-- **Application code** is **AGPL-3.0** (not "or-later"): the shared UI (`src/`), the desktop core (`src-tauri/`), the web client (`web/`), the mobile client (`mobile/`), the shared backend (`core/`), and the [`protocol/`](protocol/) crate, as declared in the crate manifests and per-file SPDX headers. The repo-root [`LICENSE`](LICENSE) carries the AGPL-3.0 text.
+- **Application code** is **AGPL-3.0-only** (not "or-later"): the shared UI (`src/`), the desktop core (`src-tauri/`), the web client (`web/`), the mobile client (`mobile/`), the shared backend (`core/`), and the [`protocol/`](protocol/) crate, as declared in the crate manifests and per-file SPDX headers. The repo-root [`LICENSE`](LICENSE) carries the AGPL-3.0-only text. Prose is [CC-BY-4.0](LICENSE-CONTENT); visual assets are [reserved](LICENSE-ASSETS).
 - **Specifications** are **CC-BY-4.0**: the [`docs/`](docs/) subtree ([`docs/LICENSE`](docs/LICENSE)), so the protocol stays reusable for independent implementations as long as Myne is credited.
 
 The licensing decision is recorded in the private decision log (`decisions.md`).

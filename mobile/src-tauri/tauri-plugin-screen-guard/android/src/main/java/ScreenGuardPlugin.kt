@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Android half of the mobile screen-capture protection (MYND-469).
 //
 // FLAG_SECURE is the authoritative OS primitive: it blanks screenshots,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Manual TS mirror of `protocol::MemberNamesMap` and its entry
 // (`protocol/src/member_names_blob.rs`, the `MYO5` family, myne-md/myne#851). Shared

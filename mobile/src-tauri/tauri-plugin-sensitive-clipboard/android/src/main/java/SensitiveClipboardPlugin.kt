@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Android half of the mobile clipboard transport (myne-md/myne#390 +
 // myne-md/myne#455).
 //

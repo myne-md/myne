@@ -1,7 +1,7 @@
 # Trademark
 
 The Myne name, the Myne "M" mark, the wordmark and the app icon (together, the **Marks**) are
-**not** covered by this repository's licenses. The code is AGPL-3.0 and the specifications are
+**not** covered by this repository's licenses. The code is AGPL-3.0-only and the specifications are
 CC-BY-4.0 (see [`LICENSING.md`](LICENSING.md)); the Marks are neither. They are common-law
 trademarks asserted through use, and the full policy lives in the branding companion repo:
 [`myne-branding/TRADEMARK.md`](https://github.com/myne-md/myne-branding/blob/develop/TRADEMARK.md).

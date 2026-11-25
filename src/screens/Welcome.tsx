@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The zero-vault entry screen (MYND-80).
 //
 // # One create door (myne-md/myne#911 task 6)

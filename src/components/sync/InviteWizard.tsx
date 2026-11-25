@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The two identity invite wizards, run as full-stage takeovers by
 // `IdentityHome` (myne-md/myne#871).
 //

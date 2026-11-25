@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The accept-an-invite DECISION both clients answer, in one place: which of the
 // desktop's `identityHome.acceptError*` messages a refused

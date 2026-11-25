@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import SwiftUI
 
 /// The single watch surface: dictate a note and send it to the phone. Tapping the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Manual TS mirror of the Rust `MemberNamesError` enum
 // (`core/src/plugins/member_names/error.rs`, myne-md/myne#851). Shared by both

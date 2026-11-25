@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The register-an-identity DIALOG (2026-10-24 owner report).
 //
 // # Why the act moved into a dialog

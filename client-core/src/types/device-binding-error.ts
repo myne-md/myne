@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Manual TS mirror of the Rust `DeviceBindingError` enum
 // (`core/src/plugins/device_binding/error.rs`, the `MYU5` family,

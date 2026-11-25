@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The device-to-person binding view for the member roster (myne-md/myne#852,
 // cut down by myne-md/myne#976). Reads `vault.device-bindings` through

@@ -66,7 +66,7 @@ function recordOf(root: string): { readers: Record<string, Record<string, unknow
 }
 
 /** A read of the raw field, in the shape the guard matches: `.device_id_hex`. */
-const PROBE_SOURCE = `// SPDX-License-Identifier: AGPL-3.0
+const PROBE_SOURCE = `// SPDX-License-Identifier: AGPL-3.0-only
 //! Injection probe: a second reader of this device's id, which must not compile into a commit.
 pub fn second_reader(st: &super::state::SyncState) -> Option<String> {
     st.device_id_hex.clone()

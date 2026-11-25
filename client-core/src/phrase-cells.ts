@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // How many cells a recovery-phrase grid has, and it lives alone in its own
 // module for two reasons that are both about NOT duplicating it again.
 //

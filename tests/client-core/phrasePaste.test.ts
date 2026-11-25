@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The paste rule of `recovery-flow.md` §3.2, as one function instead of eleven
 // copies (myne-md/myne#932).

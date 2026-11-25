@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The add-this-device DECISION both clients answer: which sentence a refused
 // `sync_person_join_device` earns (myne-md/myne#932).

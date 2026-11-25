@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The invitations this device can act on, for the two surfaces that are NOT the
 // identity home (myne-md/myne#911 follow-up).
 //

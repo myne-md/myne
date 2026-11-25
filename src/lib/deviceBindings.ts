@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The device-to-person binding read (`vault.device-bindings`, magic `MYU5`;
 // myne-md/myne#852, `decisions/protocol/0669`). One `invoke`, one command.

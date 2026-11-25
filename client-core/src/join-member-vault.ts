@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The join-a-vault-on-this-device DECISION both clients answer, in one place:
 // which of the `identityHome.joinError*` messages a refused

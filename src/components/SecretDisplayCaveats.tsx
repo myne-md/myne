@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The three platform caveats owed by any screen that shows a once-only secret
 // and offers to copy it.
 //

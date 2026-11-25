@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The recovery-phrase type-back challenge, shared by the two ceremonies that put
 // a 24-word phrase on screen: vault creation (`CreateVault` -> `ConfirmStep`) and
 // identity creation (myne-md/myne#855).

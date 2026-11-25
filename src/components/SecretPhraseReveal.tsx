@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The shared protected recovery-phrase reveal: the grid, its display
 // protections, and Copy plus Save-as-file for the phrase alone.
 //

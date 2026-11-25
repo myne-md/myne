@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The B2B member bindings (myne-md/myne#698, b2b-identity-substrate).
 // One invoke per command. No secret crosses this boundary except the
 // recovery phrase at `personUnlock`, which is the deliberate

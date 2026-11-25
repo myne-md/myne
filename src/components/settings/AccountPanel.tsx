@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Settings → Account panel: the account-level surface, and ONLY that.
 //
 // ── What "account" means here ───────────────────────────────────────────────
