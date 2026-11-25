@@ -16,6 +16,10 @@
 # ── build ────────────────────────────────────────────────────────────────────
 FROM node:25-slim AS build
 WORKDIR /src
+# `public` keeps the deployed design.myne.md behaviour. `internal` is the
+# private catalogue image: it keeps the source links and the Welcome page's
+# repository list, so it must never be published to a public origin.
+ARG STORIES_VARIANT=public
 COPY . .
 RUN corepack enable pnpm || npm install -g pnpm@11.8.0
 RUN pnpm install --frozen-lockfile --ignore-scripts
@@ -31,11 +35,15 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # the branch is only ever used to build a source URL, and the public variant
 # renders none. `check-stories-public-bundle.mjs` is what keeps the fallback
 # from mattering.
-RUN pnpm stories:build:public
+RUN mkdir -p /out && if [ "$STORIES_VARIANT" = "public" ]; then \
+      pnpm stories:build:public && cp -a stories/dist-public /out/catalogue; \
+    else \
+      pnpm stories:build && cp -a stories/dist /out/catalogue; \
+    fi
 
 # ── runtime ──────────────────────────────────────────────────────────────────
 FROM caddy:2.11.4-alpine
-COPY --from=build /src/stories/dist-public /srv/catalogue
+COPY --from=build /out/catalogue /srv/catalogue
 COPY stories/container/Caddyfile /etc/caddy/Caddyfile
 
 ENV PORT=8080
