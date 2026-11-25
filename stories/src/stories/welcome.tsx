@@ -118,7 +118,6 @@ const LINKS: readonly LinkGroup[] = [
     items: [
       { href: "https://myne.md", icon: "globe", label: "myne.md" },
       { href: "https://myne.md/download", icon: "download", label: "Download" },
-      { href: "https://app.example.com", icon: "cloud-off", label: "Web client" },
       { href: "https://myne.md/spec", icon: "file-text", label: "Specification" },
       { href: "https://myne.md/security", icon: "lock", label: "Security" },
       { href: "https://myne.md/roadmap", icon: "calendar", label: "Roadmap" },

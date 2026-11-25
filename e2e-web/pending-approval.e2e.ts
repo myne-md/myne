@@ -3,7 +3,7 @@
 //
 // # What MYND-635 fixed, and what it broke
 //
-// Reported live on `app.example.com`: signing in enrols the browser on the password
+// Reported in a deployed web build: signing in enrols the browser on the password
 // path, which lands **pending** until an already-approved device approves it.
 // That is the only path a browser has, since the self-approving recovery path is
 // deliberately absent from this bundle. The wait screen appeared correctly.

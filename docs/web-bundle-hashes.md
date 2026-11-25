@@ -1,14 +1,13 @@
 # Published web-bundle hashes
 
-Every bundle Myne served from `app.example.com` appears here **before** it was deployed.
+Every bundle the project published appears here **before** it was deployed.
 `scripts/check-bundle-record.mjs` refuses a deploy whose hash is absent, so this
 was a precondition rather than a log kept afterwards: a substituted bundle could
 not reach the origin and then be written up.
 
-> **Status (2026-10-16).** The hosted web client is closing and Myne serves no
-> web bundle, so the deploy precondition this file was written for no longer
-> runs. The record is kept, append-only as it always was, for two uses that
-> survive: it is the worked example of the reference build environment described
+> **Status.** Myne serves no web bundle, so the deploy precondition this file
+> was written for no longer runs. The record is kept, append-only as it always
+> was, for two uses that survive: it is the worked example of the reference build environment described
 > under "Reproducing an entry yourself", and it is what a self-hoster can compare
 > their own `version.json` against if the bundle they built is the one a row was
 > recorded for. `docs/self-host-web.md` carries the obligations that now sit
@@ -204,8 +203,8 @@ HOST, which is the whole subject of this section: the wasm artefact differs per
 architecture, and entry 0498 settled that as a measured scope limit rather than
 as pending work.
 
-**The `linux/amd64` row is the one that shipped.** `app.example.com` ran on an
-x86_64 host and the image was built on that host's own daemon, so amd64 is what
+**The `linux/amd64` row is the one that shipped.** The published image ran on
+an x86_64 host and the image was built on that host's own daemon, so amd64 is what
 `/version.json` reported there. The other two are left in place rather than edited
 away: rows here are appended, never rewritten, and a row that turned out not to
 be the shipped one is still a true record of what was published in advance.

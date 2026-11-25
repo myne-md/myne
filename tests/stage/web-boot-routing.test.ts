@@ -111,7 +111,7 @@ describe("boot routing, per client", () => {
 
   // ── awaiting approval (MYND-635, corrected by myne-md/myne#535) ───────────
   //
-  // The reported bug MYND-635 fixed: enrol on `app.example.com`, see "Waiting for
+  // The reported bug MYND-635 fixed: enrol in a deployed web build, see "Waiting for
   // approval", refresh, get asked for the password, and land in an EMPTY vault
   // with the approval screen unreachable.
   //
