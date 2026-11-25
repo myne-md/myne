@@ -167,9 +167,9 @@ sha2 = { version = "0.10", default-features = false }
 # off (CPU baseline on mobile). iOS needs `-C target-feature=+fp16` for
 # gemm-f16's NEON half-precision matmul — set in `.cargo/config.toml`.
 # tokenizers uses the audited `onig` backend (same as desktop).
-candle-core = { version = "0.8", optional = true, default-features = false }
-candle-nn = { version = "0.8", optional = true, default-features = false }
-candle-transformers = { version = "0.8", optional = true, default-features = false }
+candle-core = { version = "0.11", optional = true, default-features = false }
+candle-nn = { version = "0.11", optional = true, default-features = false }
+candle-transformers = { version = "0.11", optional = true, default-features = false }
 tokenizers = { version = "0.20", optional = true, default-features = false, features = ["onig"] }
 
 # iOS-only: Objective-C runtime access for the WKWebView keyboard-accessory-bar

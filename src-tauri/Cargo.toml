@@ -121,7 +121,11 @@ tauri-plugin-fs = "2"
 # update manifest. The signature check is the plugin's and cannot be disabled;
 # the check is host-side, so no updater capability is granted to the WebView.
 # See `src-tauri/src/update/` and `src-tauri/src/no_egress.rs`.
-tauri-plugin-updater = "2"
+# Desktop self-update (in-app). `zip` is deliberately off: it pulled the
+# vulnerable zip 4.6.1 line and this source-only tree has no binary updater
+# feed. Rustls + system-proxy keep the HTTP/signature paths intact; the
+# Windows archive extraction arm is unavailable until the Tauri 3 migration.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 theme-validator = { path = "../theme-validator" }
@@ -198,9 +202,9 @@ postcard = { version = "1", default-features = false, features = ["alloc"] }
 # is confined to the `local-inference` feature (absent from `--no-default-features`).
 # Revisit if a
 # tokenizers release exposes a native-target pure-Rust regex feature.
-candle-core = { version = "0.8", optional = true, default-features = false }
-candle-nn = { version = "0.8", optional = true, default-features = false }
-candle-transformers = { version = "0.8", optional = true, default-features = false }
+candle-core = { version = "0.11", optional = true, default-features = false }
+candle-nn = { version = "0.11", optional = true, default-features = false }
+candle-transformers = { version = "0.11", optional = true, default-features = false }
 tokenizers = { version = "0.20", optional = true, default-features = false, features = ["onig"] }
 
 # Direct-dep widening of the existing workspace-transitive `sha2`
@@ -456,9 +460,9 @@ objc2-web-kit = { version = "0.3", default-features = false, features = [
 # instead of the CPU; `accelerate` stays as the CPU-BLAS fallback path (used when
 # Metal device creation fails). Device selection is runtime (`select_device()` in
 # engine_candle.rs, macOS→Metal-or-CPU).
-candle-core = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
-candle-nn = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
-candle-transformers = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
+candle-core = { version = "0.11", optional = true, default-features = false, features = ["accelerate", "metal"] }
+candle-nn = { version = "0.11", optional = true, default-features = false, features = ["accelerate", "metal"] }
+candle-transformers = { version = "0.11", optional = true, default-features = false, features = ["accelerate", "metal"] }
 
 # `myne daily`'s OS-local calendar date (cli-thin-client task 9, MYND-490):
 # `localtime_r` via direct FFI rather than `chrono`/`time`. `chrono` sits in
