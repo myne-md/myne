@@ -6,7 +6,7 @@
 
 This is the main repository of the [Myne](https://github.com/myne-md/myne) project: an end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. **All three clients live here**: the Tauri 2 desktop client ([`src/`](src/), [`src-tauri/`](src-tauri/)), the desktop-browser client ([`web/`](web/), the same [`src/`](src/) tree with the platform seam substituted at build time), and the iOS and Android client ([`mobile/`](mobile/)). The repository also holds the Rust cryptographic protocol crate ([`protocol/`](protocol/)), the shared Rust backend both native clients build on ([`core/`](core/)), the app-independent decrypter ([`decrypt/`](decrypt/)), the terminal client ([`cli/`](cli/)), the MCP front-end that lets a program you configure read an unlocked vault through the same local door ([`mcp/`](mcp/)), the canonical specification and threat model ([`docs/`](docs/)), and the browser-clipper native host ([`src-tauri/src/clipper/`](src-tauri/src/clipper)).
 
-The companion repos (server, website, ops, agents, clipper extension, themes, branding assets, test vectors, and the adversarial test range) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
+The companion repos (server, website, clipper extension, themes, branding assets, test vectors, and the adversarial test range) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
 
 ## What Myne commits to
 

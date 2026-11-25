@@ -13,7 +13,7 @@
     "start": "node scripts/dev-menu.mjs",
     "dev": "vite",
     "dev:reset": "bash scripts/dev-reset.sh",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/build-notices.mjs",
     "preview": "vite preview",
     "web:dev": "vite --config web/vite.config.ts",
     "web:build": "tsc -p web/tsconfig.json && vite build --config web/vite.config.ts && node scripts/emit-web-version.mjs",
@@ -48,7 +48,9 @@
     "coverage:rust": "cargo +nightly llvm-cov -p protocol --tests --html",
     "coverage:rust:summary": "cargo +nightly llvm-cov -p protocol --tests --summary-only",
     "coverage:rust:all": "pnpm build && cargo +nightly llvm-cov --workspace --tests --html",
-    "models:fetch": "bash scripts/fetch-models.sh"
+    "models:fetch": "bash scripts/fetch-models.sh",
+    "notices:rust": "node scripts/gen-rust-third-party-licenses.mjs",
+    "check:notices": "node scripts/check-build-notices.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

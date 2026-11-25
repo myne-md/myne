@@ -30,6 +30,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: node scripts/check-build-notices.mjs
       - run: pnpm test
 
   rust:
@@ -48,3 +49,5 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo test -p protocol
       - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
+      - run: node scripts/gen-rust-third-party-licenses.mjs
+      - run: node scripts/check-build-notices.mjs --rust-only
