@@ -103,7 +103,7 @@ EXPOSE 8080
 # AGPL §13: an operator serving this over a network owes its users the
 # corresponding source. The About surface carries the offer; this label is the
 # machine-readable half.
-LABEL org.opencontainers.image.licenses="AGPL-3.0"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
 LABEL org.opencontainers.image.source="https://github.com/myne-md/myne"
 
 # Probe over loopback so compose / Komodo can report container state and restart
