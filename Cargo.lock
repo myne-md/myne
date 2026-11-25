@@ -1247,6 +1247,7 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
  "rand_core 0.10.1",
+ "zeroize",
 ]
 
 [[package]]
@@ -6535,7 +6536,7 @@ dependencies = [
  "argon2",
  "base64 0.22.1",
  "bip39",
- "chacha20 0.9.1",
+ "chacha20 0.10.2",
  "chacha20poly1305",
  "curve25519-dalek",
  "ed25519-dalek",
