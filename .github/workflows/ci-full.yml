@@ -42,7 +42,11 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
       - run: cargo fmt --all -- --check
-      - run: cargo test -p protocol --no-fail-fast
+      # The dudect timing test is a measurement of a quiet host, not a merge
+      # gate: a loaded shared runner produces a false TIMING LEAK (the test's
+      # own control cannot tell the two apart at this sample size). It runs in
+      # the separate, non-blocking `timing` job on the full battery.
+      - run: cargo test -p protocol --no-fail-fast -- --skip dudect_decode_timing_independent_of_key_bytes
       - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
       - run: cargo clippy -p myne-web-wasm --target wasm32-unknown-unknown -- -D warnings
       - run: cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
@@ -56,6 +60,17 @@ jobs:
       - run: cargo deny check
       - run: node scripts/gen-rust-third-party-licenses.mjs
       - run: node scripts/check-build-notices.mjs --rust-only
+
+  timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - run: cargo test -p protocol --test crypto_attacks_timing -- --nocapture
 
   guards:
     runs-on: ubuntu-24.04
