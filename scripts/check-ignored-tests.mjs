@@ -241,8 +241,8 @@ if (RECORD) {
       "Written by `node scripts/check-ignored-tests.mjs --record`; checked by the same script " +
       "without the flag, BOTH WAYS, so a rename or a deletion fails and so does a test the " +
       "roster has never heard of. A bare `#[ignore]` is deliberately absent: those are " +
-      "time/soak opt-outs and make no claim about correctness. Read the diff before " +
-      "committing a re-baseline.",
+      "time/soak opt-outs and make no claim about correctness. `--check-issues` reads each " +
+      "named issue and fails when it is not OPEN. Read the diff before committing a re-baseline.",
     ignored: found
       .map((f) => ({ path: f.path, reason: f.reason, issue: f.issue }))
       .sort((a, b) => (a.path + a.reason).localeCompare(b.path + b.reason)),
