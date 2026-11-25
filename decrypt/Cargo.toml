@@ -36,7 +36,7 @@ uuid = { version = "1", features = ["v4"] }
 [dev-dependencies]
 # The round-trip test seals an NC05 note by building a single-`Text` Automerge
 # document inline (the encode half of the bridge lives in `myne-core`).
-automerge = "0.10"
+automerge = "0.12"
 # The B2B fixtures seal a person wrap, whose sealer takes a `CryptoRng`. Already
 # in the shared lock via `protocol`, and `getrandom` stays out of it: the test
 # supplies a deterministic generator, which is what a fixture wants.

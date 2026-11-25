@@ -21,7 +21,7 @@ protocol = { path = "../protocol" }
 # bridge. Decode-only here: the encode half stays in `myne-core`, which needs
 # `HostCtx` + the sync `crdt_doc` seam. Merges already-decrypted content; NOT
 # crypto (its `sha2` is content-addressed change hashing, not key material).
-automerge = "0.10"
+automerge = "0.12"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 # `#[async_trait]` for the `VaultIo` seam. The trait MUST be `dyn`-compatible
