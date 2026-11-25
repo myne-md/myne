@@ -1,10 +1,4 @@
 {
   "$comment": "Every `#[ignore = \"…\"]` in the governed roots, with the issue that owns its fix. Written by `node scripts/check-ignored-tests.mjs --record`; checked by the same script without the flag, BOTH WAYS, so a rename or a deletion fails and so does a test the roster has never heard of. A bare `#[ignore]` is deliberately absent: those are time/soak opt-outs and make no claim about correctness. Read the diff before committing a re-baseline.",
-  "ignored": [
-    {
-      "path": "core/src/inference/chatml.rs",
-      "reason": "unfixed: the ChatML filter is family-scoped; see myne-md/myne#760",
-      "issue": "760"
-    }
-  ]
+  "ignored": []
 }

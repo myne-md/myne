@@ -1789,12 +1789,12 @@ Two rules, and the second is the one that is easy to skip:
 
 Two things an ignored invariant test does not give you, and both have to be supplied separately:
 
-- **The count rots.** Nothing checks how many there are, so an entry that says "two tests, both red today" is a hand-maintained claim. `scripts/check-ignored-tests.mjs` holds the count and the open-issue requirement for `core/`.
+- **The count rots.** Nothing checks how many there are, so an entry that says "two tests, both red today" is a hand-maintained claim. `scripts/check-ignored-tests.mjs` holds the count for `core/`, and its `--check-issues` mode reads each named tracker issue and fails when it is closed.
 - **A right direction is not a working fixture.** A test whose fixture cannot reach the defective state passes with the defect present, and reads as rigor. Injection is the only thing that tells them apart: apply the fix, confirm the test turns red, restore. A test that was *supposed* to discriminate and does not is worse than one that was only ever documentation, because the documentation is now false in the direction that looks like coverage.
 
 Run one with `cargo test -p <crate> -- --ignored <name>`.
 
-Used in: `core/src/inference/chatml.rs`, `core/src/plugins/vault_migrate/mod.rs`, `scripts/check-ignored-tests.mjs`; `design-notes/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#760, myne-md/myne#759
+Used in: `scripts/check-ignored-tests.mjs`, `scripts/ignored-tests.json`. The family-scoped ChatML limitation is recorded in `docs/threat-model.md` §7 (D-04 A) rather than carried as an ignored test.
 
 ### **in-note find** &nbsp; 📦 *Product*
 

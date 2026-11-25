@@ -54,8 +54,10 @@
 //
 // Zero dependencies.
 //
-//   node scripts/check-ignored-tests.mjs            check
-//   node scripts/check-ignored-tests.mjs --record   rewrite the roster from the tree
+//   node scripts/check-ignored-tests.mjs                 check the tree/roster offline
+//   node scripts/check-ignored-tests.mjs --record        rewrite the roster from the tree
+//   node scripts/check-ignored-tests.mjs --check-issues  additionally require each named
+//                                                       issue to be OPEN on GitHub
 //   node scripts/check-ignored-tests.mjs --root <p>      check a different tree (testing)
 //   node scripts/check-ignored-tests.mjs --roster <path> check against a different roster
 //
@@ -67,16 +69,18 @@
 //
 // NOT CHECKED, and named rather than implied:
 //
-// - Whether a named issue is still OPEN. That is a tracker read, and a guard that
-//   silently skipped it would print `ok` on half its name, which is the failure
-//   `check-clipper-identifiers.mjs` records. The success line says so out loud.
+// - Whether a named issue is still OPEN by default. That is a tracker read and
+//   would make the normal check network/auth-dependent. `--check-issues` performs
+//   it explicitly; the default success line says the half was skipped rather
+//   than printing `ok` on half its name (`check-clipper-identifiers.mjs`).
 //
 // `--record` is a re-baseline, so read the diff it produces before committing it. A re-baseline
 // that lands without a human reading it is a re-baseline that licensed whatever it found.
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const rosterArg = process.argv.indexOf("--roster");
@@ -95,8 +99,9 @@ const rootArg = process.argv.indexOf("--root");
 const GOVERNED_ROOTS = rootArg !== -1 ? [process.argv[rootArg + 1]] : ["core/src", "core/tests"];
 
 const RECORD = process.argv.includes("--record");
+const CHECK_ISSUES = process.argv.includes("--check-issues");
 
-if (!GOVERNED_ROOTS.every((r) => existsSync(join(ROOT, r)))) {
+if (!GOVERNED_ROOTS.every((r) => existsSync(isAbsolute(r) ? r : join(ROOT, r)))) {
   console.error(
     `check-ignored-tests: a governed root is missing (${GOVERNED_ROOTS.join(", ")}). ` +
       `A check that skips on a missing input reads as a pass.`,
@@ -184,7 +189,7 @@ function withoutComments(text) {
 
 const found = [];
 for (const root of GOVERNED_ROOTS) {
-  for (const file of walk(join(ROOT, root))) {
+  for (const file of walk(isAbsolute(root) ? root : join(ROOT, root))) {
     const rel = relative(ROOT, file);
     const code = withoutComments(readFileSync(file, "utf8"));
     for (const m of code.matchAll(/#\[ignore(?:\s*=\s*"([^"]*)")?\s*\]/g)) {
@@ -291,6 +296,41 @@ for (const e of roster.ignored) {
   }
 }
 
+// ── optional issue-state check ───────────────────────────────────────────────
+
+if (CHECK_ISSUES) {
+  if (roster.ignored.length === 0) {
+    console.log("check-ignored-tests: issue-state check: no deferred entries to check.");
+  }
+  for (const e of roster.ignored) {
+    if (!e.issue) {
+      findings.push(
+        `${relative(ROOT, ROSTER)}: ${e.path} has no issue number, so its open state cannot be checked.`,
+      );
+      continue;
+    }
+    try {
+      const out = execFileSync(
+        "gh",
+        ["issue", "view", String(e.issue), "--repo", "myne-md/myne", "--json", "state,number,url"],
+        { cwd: ROOT, encoding: "utf8", stdio: "pipe" },
+      );
+      const issue = JSON.parse(out);
+      if (String(issue.state).toUpperCase() !== "OPEN") {
+        findings.push(
+          `${relative(ROOT, ROSTER)}: ${e.path} names myne-md/myne#${e.issue}, ` +
+            `which is ${issue.state}, not OPEN (${issue.url}). Remove the deferral or repoint it at an open issue.`,
+        );
+      }
+    } catch (err) {
+      findings.push(
+        `${relative(ROOT, ROSTER)}: could not read myne-md/myne#${e.issue} for ${e.path}: ` +
+          `${err.message}. A tracker read that fails must not read as a pass.`,
+      );
+    }
+  }
+}
+
 // ── report ───────────────────────────────────────────────────────────────────
 
 if (findings.length > 0) {
@@ -301,5 +341,7 @@ if (findings.length > 0) {
 console.log(
   `check-ignored-tests: ok (${found.length} deferred #[ignore] across ` +
     `${GOVERNED_ROOTS.join(", ")}, each naming a tracking issue and each on the roster). ` +
-    `Whether a named issue is still OPEN is not checked here; that half is a reviewer's read.`,
+    (CHECK_ISSUES
+      ? "Every named issue was required to be OPEN."
+      : "Issue state was not checked; pass --check-issues for the tracker read."),
 );
