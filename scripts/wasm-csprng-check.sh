@@ -58,12 +58,12 @@ fi
 echo "  ok"
 
 echo "== getrandom's custom hook is present and UNRESOLVED =="
-GETRANDOM_RLIB="$(grep '"name":"getrandom"' "$BUILD_LOG" \
+GETRANDOM_RLIBS="$(grep '"name":"getrandom"' "$BUILD_LOG" \
   | grep -o '"filenames":\[[^]]*\]' \
   | tr ',' '\n' | tr -d '[]"' | sed 's/^filenames://' \
-  | grep 'libgetrandom-.*\.rlib$' | tail -1)"
+  | grep 'libgetrandom-.*\.rlib$')"
 rm -f "$BUILD_LOG"
-if [ -z "$GETRANDOM_RLIB" ] || [ ! -f "$GETRANDOM_RLIB" ]; then
+if [ -z "$GETRANDOM_RLIBS" ]; then
   echo "  FAIL: this build produced no getrandom rlib — the dependency left protocol's wasm"
   echo "        graph, which means the entropy source is no longer where this gate can see it."
   exit 1
@@ -77,7 +77,15 @@ if [ -z "$NM" ]; then
   exit 1
 fi
 
-SYM_LINE="$("$NM" "$GETRANDOM_RLIB" 2>/dev/null | grep '__getrandom_custom' | head -1)"
+# protocol may carry both getrandom 0.2 (the embedder-hook version) and 0.4
+# (core's wasm_js backend); artifact order is not stable, so inspect every
+# getrandom rlib this build produced instead of assuming the last one is 0.2.
+SYM_LINE=""
+for GETRANDOM_RLIB in $GETRANDOM_RLIBS; do
+  [ -f "$GETRANDOM_RLIB" ] || continue
+  SYM_LINE="$("$NM" "$GETRANDOM_RLIB" 2>/dev/null | grep '__getrandom_custom' | head -1)"
+  [ -n "$SYM_LINE" ] && break
+done
 if [ -z "$SYM_LINE" ]; then
   echo "  FAIL: __getrandom_custom is absent from the wasm getrandom rlib."
   echo "        Either the 'custom' feature is no longer enabled for wasm32 (check the"
