@@ -1,0 +1,188 @@
+name: nightly-build
+
+# Unsigned internal builds. This is not a release: no tag, no GitHub release,
+# no signing key, no store upload. Each platform job uploads an Actions artifact
+# retained for 14 days, so the team can install and test the current develop
+# without turning a nightly into an official artefact.
+#
+# The extension lives in myne-clipper and is intentionally absent here.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev \
+            patchelf desktop-file-utils libfuse2
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sidecar:release
+      - name: Build unsigned bundle
+        run: pnpm tauri build --bundles deb,appimage -c '{"bundle":{"createUpdaterArtifacts":false}}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: myne-linux-${{ github.sha }}
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sidecar:release
+      - name: Build unsigned app bundle
+        run: pnpm tauri build --bundles app -c '{"bundle":{"createUpdaterArtifacts":false}}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: myne-macos-${{ github.sha }}
+          path: target/release/bundle/macos/*.app
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sidecar:release
+      - name: Build unsigned NSIS installer
+        run: pnpm tauri build --bundles nsis -c '{"bundle":{"createUpdaterArtifacts":false}}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: myne-windows-${{ github.sha }}
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Initialise the generated Android project
+        run: |
+          cd mobile
+          pnpm tauri android init
+          bash scripts/android-postinit.sh
+      - name: Build debug APK
+        run: |
+          cd mobile
+          pnpm tauri android build --apk
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: myne-android-${{ github.sha }}
+          path: mobile/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    runs-on: macos-14
+    timeout-minutes: 90
+    # An unsigned simulator build is useful as an internal smoke artefact but is
+    # not a TestFlight build. Keep it non-blocking until Apple signing material
+    # is provisioned; the other platform artefacts must not be held hostage to it.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: brew install xcodegen
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Initialise the generated iOS project
+        run: |
+          cd mobile
+          pnpm tauri ios init
+          bash scripts/ios-postinit.sh
+      - name: Build simulator/debug app
+        run: |
+          cd mobile
+          pnpm tauri ios build --export-method debugging --ci
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: myne-ios-${{ github.sha }}
+          path: |
+            mobile/src-tauri/gen/apple/build/**/*.ipa
+            mobile/src-tauri/gen/apple/build/**/*.app
+          if-no-files-found: warn
+          retention-days: 14

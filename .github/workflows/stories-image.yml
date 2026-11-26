@@ -1,0 +1,79 @@
+name: stories-image
+
+# One private catalogue image, built from the internal variant. The public
+# design.myne.md deploy keeps using the public variant through its own manual
+# runbook; this workflow exists for the team's private Storybook/stories preview.
+#
+# GHCR visibility is inherited from the repository on first publish. `myne` is
+# public, so the package must already exist as PRIVATE before this workflow can
+# keep it private. Bootstrap it once from a private context (or create it in the
+# package settings), grant `myne` write access, then run this workflow. The last
+# step verifies the result instead of assuming it.
+
+on:
+  push:
+    branches: [develop]
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: stories-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Require the package to exist as private before publishing
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN || secrets.MYNE_BOT_PAT }}
+        run: |
+          if ! visibility=$(gh api orgs/myne-md/packages/container/myne-stories --jq .visibility 2>/dev/null); then
+            echo "::error::myne-stories does not exist yet. Bootstrap it as private first; publishing from this public repository would create it public."
+            exit 1
+          fi
+          echo "myne-stories visibility before build: $visibility"
+          if [ "$visibility" != "private" ]; then
+            echo "::error::myne-stories is $visibility; refusing to publish"
+            exit 1
+          fi
+      - uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          # The package was bootstrapped from outside this repository, so
+          # `GITHUB_TOKEN` does not own it. A classic PAT with write:packages is
+          # the credential that can push to an unlinked private package.
+          username: omerdduran
+          password: ${{ secrets.GHCR_WRITE_TOKEN }}
+      - uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: .
+          file: stories/container/Dockerfile
+          push: true
+          build-args: |
+            STORIES_VARIANT=internal
+          tags: |
+            ghcr.io/myne-md/myne-stories:nightly
+            ghcr.io/myne-md/myne-stories:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify the package stayed private
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN || secrets.MYNE_BOT_PAT }}
+        run: |
+          visibility=$(gh api orgs/myne-md/packages/container/myne-stories --jq .visibility)
+          echo "myne-stories visibility: $visibility"
+          if [ "$visibility" != "private" ]; then
+            echo "::error::myne-stories is $visibility; it must be private"
+            exit 1
+          fi

@@ -1,26 +1,27 @@
 name: ci
 
-# Fork-safe lane: no secrets, no private checkouts. The full test battery still
-# runs on the project's own CI; this workflow exists so an outside pull request
-# gets a real build and test result instead of nothing.
+# The PR lane. It is fork-safe: no secrets, no private checkouts, no private
+# registry. The full battery runs on a push to develop and on the nightly
+# workflow; this file is the signal a reviewer waits for on a pull request.
 
 on:
   pull_request:
-  push:
-    branches: [develop, main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-pr-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   web:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.8.0
@@ -35,8 +36,11 @@ jobs:
 
   rust:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -47,7 +51,65 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --all -- --check
-      - run: cargo test -p protocol
+      # The dudect timing test is a measurement of a quiet host, not a merge
+      # gate: a loaded shared runner produces a false TIMING LEAK. It runs in
+      # the separate, non-blocking `timing` job on the full battery.
+      - run: cargo test -p protocol -- --skip dudect_decode_timing_independent_of_key_bytes
       - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
       - run: node scripts/gen-rust-third-party-licenses.mjs
       - run: node scripts/check-build-notices.mjs --rust-only
+
+  mobile-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm mobile:test
+
+  mobile-flow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter myne-mobile exec playwright install --with-deps chromium
+      - run: pnpm mobile:test:flow
+
+  stories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm stories:build
+      - run: node scripts/check-stories-bundle.mjs
+      - run: pnpm stories:build:public
+      - run: node scripts/check-stories-public-bundle.mjs

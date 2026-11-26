@@ -1,0 +1,366 @@
+name: ci-full
+
+# The push/nightly battery. It mirrors the old Woodpecker main.yml by area
+# rather than by one job per historical step: every command that gated a push
+# still runs here, but related checks share a runner so the free public-repo
+# minutes are not spent thirty times on the same checkout and pnpm install.
+#
+# This workflow never runs on a pull request. PRs get the fork-safe core in
+# ci.yml; private companions and the long compile lanes run here, on develop
+# and by hand.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-full-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev \
+            mold file git
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - run: cargo fmt --all -- --check
+      # The dudect timing test is a measurement of a quiet host, not a merge
+      # gate: a loaded shared runner produces a false TIMING LEAK (the test's
+      # own control cannot tell the two apart at this sample size). It runs in
+      # the separate, non-blocking `timing` job on the full battery.
+      - run: cargo test -p protocol --no-fail-fast -- --skip dudect_decode_timing_independent_of_key_bytes
+      - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
+      - run: cargo clippy -p myne-web-wasm --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo test -p myne-web-wasm
+      - run: bash scripts/wasm-csprng-check.sh
+      - run: bash scripts/wasm-core-graph-check.sh
+      - run: bash scripts/wasm-repro-check.sh
+      - run: bash src-tauri/scripts/ai-no-network-check.sh
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - run: cargo deny check
+      - run: node scripts/gen-rust-third-party-licenses.mjs
+      - run: node scripts/check-build-notices.mjs --rust-only
+
+  timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - run: cargo test -p protocol --test crypto_attacks_timing -- --nocapture
+
+  guards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-platform-seam.mjs
+      - run: node scripts/check-plain-surface-imports.mjs
+      - run: node scripts/check-core-task-seam.mjs
+      - run: node scripts/check-core-io-seam.mjs
+      - run: node scripts/check-version-routing.mjs
+      - run: node scripts/check-crypto-registries.mjs
+      - run: node scripts/check-prefs-nonce.mjs
+      - run: node scripts/check-device-actor.mjs
+      - run: node scripts/check-sync-authority.mjs
+      - run: node scripts/check-datetime-display-publisher.mjs
+      - run: node scripts/check-clipboard-feedback.mjs
+      - run: node scripts/check-unwired.mjs
+      - run: node scripts/check-ipc-binding-callers.mjs
+      - run: node scripts/check-export-callers.mjs
+      - run: node scripts/check-tracing-discipline.mjs
+      - run: node scripts/check-comment-density.mjs
+      - run: node scripts/check-copy-membership.mjs
+      - run: node scripts/check-private-path-refs.mjs
+      - run: node scripts/check-fdroid-metadata.mjs
+      - run: bash scripts/hooks-parity-check.sh
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/check-build-notices.mjs
+      - run: pnpm test
+      - run: pnpm test:seam:desktop
+      - run: pnpm stories:test
+
+  stories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm stories:build
+      - run: node scripts/check-stories-bundle.mjs
+      - run: pnpm stories:build:public
+      - run: node scripts/check-stories-public-bundle.mjs
+      - run: bash scripts/check-stories-container-headers.sh
+
+  web-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm web:build
+      - run: pnpm test:seam:web
+      - run: node scripts/check-web-third-party.mjs
+      - run: node scripts/check-web-no-test-hooks.mjs
+      - run: node scripts/check-web-command-coverage.mjs
+      - run: node scripts/check-web-capabilities.mjs
+      - run: node scripts/check-web-bundle-budget.mjs
+      - run: node scripts/check-web-screens.mjs
+      - run: node scripts/check-web-surfaces.mjs
+      - run: node scripts/check-web-testids.mjs
+      - run: pnpm exec vitest run tests/web tests/platform
+      - name: Build and probe the web container
+        run: |
+          docker build -f web/container/Dockerfile \
+            --build-arg MYNE_BUILD_COMMIT=${{ github.sha }} \
+            --build-arg "MYNE_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t myne-web:${{ github.sha }} .
+          MYNE_WEB_IMAGE=myne-web:${{ github.sha }} bash scripts/check-web-container-headers.sh --no-build
+
+  tauri:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          components: clippy
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo build --release --bins -p myne-cli -p myne-mcp -p myne-tor-sidecar
+      - run: |
+          node scripts/build-cli-sidecar.mjs --profile release --no-build
+          node scripts/build-mcp-sidecar.mjs --profile release --no-build
+          node scripts/build-tor-sidecar.mjs --profile release --no-build
+          node scripts/build-clipper-host.mjs --profile release --no-build
+      - run: pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"test -d dist || pnpm build"}}' -- --features voice-capture-stub,local-inference-stub
+      - run: cargo clippy -p myne-core -p myne-desktop -p e2e-fixture-gen --all-targets -- -D warnings
+      - run: cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings
+      - run: cargo test -p myne-desktop -p myne-core -p myne-format -p myne-decrypt --no-fail-fast
+
+  mobile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          components: clippy
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm mobile:build
+      - run: node scripts/check-npm-licenses.mjs
+      - run: pnpm mobile:test
+      - run: pnpm --filter myne-mobile exec playwright install --with-deps chromium
+      - run: pnpm mobile:test:flow
+      - run: cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-device-key -p tauri-plugin-share-intent -p tauri-plugin-save-file -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
+      - run: cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard -p tauri-plugin-save-file --no-fail-fast
+
+  sync-sim:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-server
+          path: myne-server
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: 1.26.4
+          cache-dependency-path: myne-server/go.mod
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - run: cargo build -p myne-core --tests
+      - run: (cd myne-server && CGO_ENABLED=0 go build -o myne-server ./cmd/myne-server)
+      - run: |
+          export MYNE_E2E_SERVER="$PWD/myne-server/myne-server"
+          export MYNE_TEST_REQUIRE_SERVER=1
+          cargo test -p myne-core plugins::sync --no-fail-fast
+
+  vectors:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-test-vectors
+          path: myne-test-vectors
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            chromium chromium-driver
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - run: |
+          export MYNE_VECTORS_REQUIRED=1
+          export MYNE_TEST_VECTORS_DIR="$PWD/myne-test-vectors/vectors"
+          cargo test -p protocol --test vectors
+          cargo test -p myne-core --lib dictionary_merge_matches_every_published_vector
+          CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
+
+  cross-repo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-server
+          path: myne-server
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-ops
+          path: myne-ops
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-website
+          path: myne-website
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-clipper
+          path: myne-clipper
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: myne-md/myne-branding
+          path: myne-branding
+          token: ${{ secrets.MYNE_BOT_PAT }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-stream-timeout-drift.mjs --require-companion
+      - run: node scripts/check-selfhost-bundle-drift.mjs --require-companion
+      - run: node scripts/check-server-env-roster.mjs --require-companion
+      - run: node scripts/check-web-image-tag-drift.mjs --require-companion
+      - run: node scripts/check-clipper-wire.mjs --require-companion
+      - run: node scripts/check-branding-parity.mjs --require-companion
