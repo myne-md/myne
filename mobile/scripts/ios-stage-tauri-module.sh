@@ -41,22 +41,33 @@ esac
 # swift-rs always builds the Tauri package in the release profile (the archive
 # `ios-link.sh` force-loads is `.../Tauri/release/libTauri.a` regardless of the
 # app configuration), so the module path is profile-independent.
-SRC=$(ls -td "$REPO_ROOT"/target/"$TRIPLE"/*/build/tauri-*/out/swift-rs/Tauri/out/Products/$PRODUCTS 2>/dev/null | head -1)
-if [ -z "$SRC" ] || [ ! -d "$SRC" ]; then
-  echo "ios-stage-tauri-module: no Tauri Products dir for $TRIPLE ($PRODUCTS); nothing staged" >&2
+# SwiftPM's output layout changed with Xcode 27 (Products/<Config>-<platform>)
+# and older Xcode puts the module elsewhere. Do not assume one path: find the
+# module that actually belongs to this Rust target, preferring the platform
+# products directory when it exists.
+SEARCH_ROOTS="$REPO_ROOT/target/$TRIPLE"
+MODULE=$(find "$SEARCH_ROOTS" -path "*/build/tauri-*/out/swift-rs/Tauri/*" \
+  -path "*$PRODUCTS*" -name 'Tauri.swiftmodule' -print -quit 2>/dev/null)
+[ -n "$MODULE" ] || MODULE=$(find "$SEARCH_ROOTS" -path "*/build/tauri-*/out/swift-rs/Tauri/*" \
+  -name 'Tauri.swiftmodule' -print -quit 2>/dev/null)
+if [ -z "$MODULE" ]; then
+  echo "ios-stage-tauri-module: no Tauri.swiftmodule for $TRIPLE ($PRODUCTS)" >&2
+  echo "ios-stage-tauri-module: searched under $SEARCH_ROOTS" >&2
+  find "$SEARCH_ROOTS" -path "*/build/tauri-*/out/swift-rs/*" -maxdepth 8 -type f -name '*.swiftmodule' 2>/dev/null | head -20 >&2 || true
   exit 0
 fi
+SRC=$(dirname "$MODULE")
 
 # Stage under both config dirs: a release build compiles with CONFIGURATION=release,
 # a dev/simulator build with debug, and SWIFT_INCLUDE_PATHS uses $(CONFIGURATION).
 for cfg in release debug; do
   dest="$GEN_EXTERNALS/$cfg"
   mkdir -p "$dest"
-  for mod in "$SRC"/*.swiftmodule; do
-    [ -d "$mod" ] || continue
+  for mod in "$SRC"/*.swiftmodule*; do
+    [ -e "$mod" ] || continue
     rm -rf "$dest/$(basename "$mod")"
     cp -Rf "$mod" "$dest/"
   done
 done
 
-echo "ios-stage-tauri-module: staged $(ls "$SRC"/*.swiftmodule 2>/dev/null | xargs -n1 basename | tr '\n' ' ')"
+echo "ios-stage-tauri-module: staged $(basename "$MODULE") from $SRC"
