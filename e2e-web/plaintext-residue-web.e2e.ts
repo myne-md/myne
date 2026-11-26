@@ -60,9 +60,13 @@ const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrows
 const SYNC_ORIGIN = "https://sync.example.test";
 
 /** The negative probe's plant. ≥24 chars, all-lowercase alphanumeric: survives
- *  the scanner's tokenizer verbatim, so a hit is unambiguous. */
-// secret-scan:allow — scenario constant, not a credential
-const PROBE_SECRET = "residuescanmasterpassword7x3k9q";
+ *  the scanner's tokenizer verbatim, so a hit is unambiguous. High-entropy and
+ *  long enough that LevelDB stores the containing block uncompressed: the
+ *  scanner reads bytes, and a short value would otherwise be compressed inside
+ *  the Local Storage block and look like a clean profile. */
+const PROBE_SECRET = Array.from({ length: 2048 }, () =>
+  "0123456789abcdef"[Math.floor(Math.random() * 16)],
+).join("");
 
 /** Needle order is the failure vocabulary: a hit reports this index, never the
  *  string. Index 0 is the phrase the ceremony rendered, which is the needle the
