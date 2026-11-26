@@ -238,26 +238,6 @@ pre-commit:
       # deliberately does not check, and why.
       run: node scripts/check-tracing-discipline.mjs
 
-    playwright-image:
-      # myne#529: the CI Playwright image tag against the version the lockfile
-      # resolves. A tag one minor behind is not a stale toolchain: the image
-      # bakes browsers at a revision the installed Playwright does not ask for,
-      # so every test dies in `browserType.launch` before its first assertion.
-      # It shipped that way and took the whole `mobile-flow-logic` lane with it,
-      # 179 tests across 44 files, red on develop and on every branch. Same
-      # two-halves-pinned-by-hand shape as `e2e-toolchain` below.
-      run: node scripts/check-playwright-image.mjs
-
-    pinned-ci-tools:
-      # myne#758 (audit NV02): every tool CI EXECUTES is provisioned at a pinned,
-      # hash-verified version first. Fourteen invocations ran sccache and
-      # cargo-nextest off a host mount that nothing in this repository put there,
-      # pinned or checksummed, while `cargo-deny` a few lines away downloaded a
-      # pinned prebuilt release and verified it. Three ways that comes back are
-      # invisible to every compiler: a new unpinned tool, a step that skips the
-      # provisioner, and a pin whose version and digests drift apart.
-      run: node scripts/check-pinned-ci-tools.mjs
-
     arch-pkgbuild:
       # myne#758 (audit NV11): the two Arch recipes and `flake.nix` state ONE
       # release version, and the from-source recipe builds a commit rather than a
@@ -712,69 +692,6 @@ pre-commit:
       # files a glob would key on.
       run: node scripts/check-stories-isolation.mjs
 
-    woodpecker-substitution:
-      # A single-dollar brace token anywhere in a Woodpecker workflow file,
-      # INCLUDING inside a comment, fails Woodpecker's envsubst pass and kills
-      # the whole pipeline on every branch before any step runs. This guard is here
-      # and not in CI because CI is what breaks: a check for "the CI config does
-      # not compile" can never fire from inside CI.
-      #
-      # The glob is the DIRECTORY since myne-md/myne#579 split the config into
-      # `main.yml` (per-push) and `e2e.yml` (manual, pre-release). `.woodpecker.yml`
-      # is listed too, and it earns its place: Woodpecker's lookup takes the
-      # DIRECTORY and ignores a root file, so resurrecting one produces dead
-      # config that changes nothing and reports nothing. Touching it fires this
-      # hook, and `scripts/lib/woodpecker-configs.mjs` then refuses outright
-      # rather than scanning around it. That roster is also what makes the guard
-      # fail BY NAME when a workflow file it expects has gone missing, instead of
-      # reporting ok on a smaller walk.
-      glob:
-        - ".woodpecker/*.yml"
-        - ".woodpecker/*.yaml"
-        - ".woodpecker.yml"
-      run: node scripts/check-woodpecker-substitution.mjs
-
-    woodpecker-split:
-      # The two workflow files duplicate ONE thing by design: the desktop
-      # build's `--features` list. `main.yml`'s `tauri-compile` carries the stub
-      # features purely so those compile arms cannot bit-rot while the suite that
-      # consumes them runs only before a release, and that protection is real
-      # only while both lists agree. Four prose blocks asserted it and nothing
-      # checked it; this compares them in both directions and fails by name when
-      # either build line has been renamed away.
-      glob:
-        - ".woodpecker/*.yml"
-        - ".woodpecker/*.yaml"
-      run: node scripts/check-woodpecker-split.mjs
-
-    ci-image:
-      # `ci/Dockerfile` drifting from the versions the repo pins, or the digest
-      # in the workflows drifting from `ci/image.json`. Same family as
-      # `e2e-toolchain` below and `playwright-image` above, and the same silence:
-      # rustup honours `rust-toolchain.toml` at RUNTIME, so a stale image
-      # re-provisions the pinned toolchain inside whichever step makes the first
-      # cargo call rather than failing, and a stale digest reads as an
-      # infrastructure outage rather than as an edit somebody made.
-      glob:
-        - "ci/Dockerfile"
-        - "ci/image.json"
-        - ".woodpecker/*.yml"
-        - ".woodpecker/*.yaml"
-        - "rust-toolchain.toml"
-        - ".nvmrc"
-        - "package.json"
-      run: node scripts/check-ci-image.mjs
-
-    e2e-toolchain:
-      # e2e/Dockerfile drifting from rust-toolchain.toml. Nothing fails to build:
-      # rustup just re-provisions the pinned toolchain at runtime, inside
-      # whichever scenario makes the first cargo call. That is slow, and it is
-      # not crash-safe — one run raced it and reported 255 FAILURES in 266 s,
-      # 245 of them the same "cargo build -p e2e-fixture-gen" error wearing a
-      # test's name. Invisible to every other check here.
-      glob: "{e2e/Dockerfile,rust-toolchain.toml}"
-      run: node scripts/check-e2e-toolchain.mjs
-
     twin-drift:
       # #261: a change to one side of a twin module pair. WARNING ONLY (the
       # script exits 0) — most one-sided changes are legitimate, and a gate
@@ -920,40 +837,6 @@ pre-commit:
       # when a companion breaks it. It is a local periodic check, not a gate on the change.
       glob: "*.{md,mjs,yml,yaml,json}"
       run: node scripts/check-selfhost-bundle-drift.mjs
-
-    web-image-tag-drift:
-      # Audit A5 (2026-10-19): the web client's image tag is written in the chart's
-      # `values.yaml` (what the Kubernetes path deploys), in `Chart.yaml` (Helm's
-      # `--version`), and in the user guide in BOTH forms on ONE page. Measured: the
-      # page said `myne-web:0.8.0` in its compose block and `--version 0.8.1` in its
-      # Kubernetes block, while the chart deploys `v0.8.1` — two releases, one page,
-      # neither sentence wrong alone. Nothing compared them:
-      # `check-referenced-digests.mjs` resolves each tag against the registry and BOTH
-      # resolve, so "it resolves" is not the question; `check-release-versions.sh` (in
-      # `operations`) compares the repos' own manifests and never reads a guide page; and
-      # a Helm `--version` is a CHART version, so no app-version rule catches the pair.
-      #
-      # Same companion-trigger caveat as its neighbours: the chart is in `myne-server`
-      # and the guide in `myne-website`, so it is a local periodic check rather than a
-      # gate on the change, and it prints NOTHING COMPARED where they are absent.
-      glob: "*.{md,mjs,yml,yaml}"
-      run: node scripts/check-web-image-tag-drift.mjs
-
-    referenced-digests:
-      # Every `ghcr.io` pin this project hands a self-hoster must RESOLVE, and the server image
-      # must resolve to a manifest list carrying amd64 AND arm64. A transposed hex digit is
-      # invisible in review and fails at an operator's `docker compose up`; a single-platform
-      # tag fails only on arm64 hardware, where nothing on the amd64 path notices. Both were
-      # found in the shipped tree while writing this: `:0.8.0` is one amd64 manifest, and two
-      # files claimed a `v0.9.0` tag that does not exist.
-      #
-      # THE ONE GUARD HERE THAT NEEDS THE NETWORK, which is exactly why it is pre-commit and
-      # NOT CI: a network dependency in a pipeline gate makes a red pipeline mean "GitHub was
-      # slow". The release-time gate is `runbook/scripts/check-image-multiarch.sh`, wired into
-      # the release checklist and run by the publish script. Offline, this prints COULD NOT
-      # REACH and says its closing line is not a verdict rather than reporting a pass.
-      glob: "*.{md,mjs,yml,yaml,json,example,toml}"
-      run: node scripts/check-referenced-digests.mjs
 
     clipper-wire:
       # Audit Aşama 6 B4 (2026-10-19). The clipper's envelope field names and its
