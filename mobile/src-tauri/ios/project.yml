@@ -23,6 +23,9 @@ fileGroups: [../../src]
 configs:
   debug: debug
   release: release
+settings:
+  base:
+    CODE_SIGNING_ALLOWED: "__MYNE_CODE_SIGNING_ALLOWED__"
 settingGroups:
   app:
     base:

@@ -68,16 +68,25 @@ if [ -z "$TEAM" ]; then
   TEAM=$(node -p "const c=require('./src-tauri/tauri.conf.json'); (c.bundle && c.bundle.iOS && c.bundle.iOS.developmentTeam) || ''")
 fi
 
+# An empty team means the nightly smoke build. Automatic signing with no team
+# stops xcodebuild on "requires a development team", so disable signing for
+# that case; a real team keeps the normal signed path.
+CODE_SIGNING=YES
+if [ -z "$TEAM" ]; then
+  CODE_SIGNING=NO
+fi
+
 node -e '
   const fs = require("fs");
-  const [src, dest, team, marketing, current] = process.argv.slice(1);
+  const [src, dest, team, codeSigning, marketing, current] = process.argv.slice(1);
   let s = fs.readFileSync(src, "utf8");
   s = s
     .split("__MYNE_DEVELOPMENT_TEAM__").join(team)
+    .split("__MYNE_CODE_SIGNING_ALLOWED__").join(codeSigning)
     .split("__MYNE_MARKETING_VERSION__").join(marketing)
     .split("__MYNE_CURRENT_PROJECT_VERSION__").join(current);
   fs.writeFileSync(dest, s);
-' "$SPEC" "$DEST" "$TEAM" "$MARKETING" "$CURRENT"
+' "$SPEC" "$DEST" "$TEAM" "$CODE_SIGNING" "$MARKETING" "$CURRENT"
 
 # Copy the committed extension Info.plists into gen/ and point INFOPLIST_FILE at
 # the copies. Xcode's ProcessInfoPlistFile REWRITES its INFOPLIST_FILE in place
