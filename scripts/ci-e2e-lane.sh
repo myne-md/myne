@@ -35,6 +35,13 @@
 
 set -euo pipefail
 
+# The GitHub container has no writable /cache mount. Use a job-local cache so
+# the unprivileged `ci` user can populate CARGO_HOME and the pnpm store; a
+# read-only /cache used to fail the lane at the first registry write.
+CACHE_ROOT="${MYNE_E2E_CACHE_ROOT:-/tmp/myne-e2e-cache}"
+mkdir -p "$CACHE_ROOT/cargo" "$CACHE_ROOT/sccache" "$CACHE_ROOT/pnpm-store"
+chmod -R 0777 "$CACHE_ROOT" 2>/dev/null || true
+
 LANE="${1:-}"
 case "$LANE" in
   stable)
@@ -187,7 +194,7 @@ command -v tauri-driver >/dev/null 2>&1 || cargo install tauri-driver --locked -
 # seconds while a missing one costs a release-time failure. Named here so the
 # next person tuning the cache does not read it as load-bearing.
 useradd -m ci
-chown -R ci:ci . /usr/local/cargo/registry
+chown -R ci:ci . /usr/local/cargo/registry "$CACHE_ROOT"
 
 # The binary `myne-server-build` produced. Exported only when it EXISTS: an
 # absent path would be worse than none, since the harness reports "server
@@ -243,7 +250,7 @@ fi
 # this is where the original inline version was hardest to read:
 #   - single quotes keep `$PATH` and `$(ulimit -Hn)` for the INNER shell;
 #   - double quotes interpolate MYNE_E2E_SERVER and LANE_ENV from THIS shell.
-INNER='export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup'
+INNER="export HOME=/home/ci CARGO_HOME=\"${CACHE_ROOT}/cargo/ci\" RUSTUP_HOME=/usr/local/rustup"
 INNER="$INNER"' PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true'
 INNER="$INNER ${LANE_ENV}"
 INNER="$INNER MYNE_E2E_SERVER=\"${MYNE_E2E_SERVER}\""
@@ -262,11 +269,11 @@ if [ -x /cache/tools/bin/sccache ]; then
 fi
 INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold"'
 INNER="$INNER ${SCCACHE_WRAPPER}"
-INNER="$INNER"' SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0'
+INNER="$INNER SCCACHE_DIR=\"${CACHE_ROOT}/sccache/ci\" SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0"
 # fd soft limit -> hard cap (EMFILE guard): the Tauri app plus parallel cargo
 # codegen open enough fds to hit the runner's low default.
 INNER="$INNER"' ; ulimit -n $(ulimit -Hn) 2>/dev/null || true'
-INNER="$INNER"' ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store'
+INNER="$INNER ; pnpm install --frozen-lockfile --store-dir \"${CACHE_ROOT}/pnpm-store\""
 INNER="$INNER"' && cargo build --release -p e2e-fixture-gen'
 INNER="$INNER"' && xvfb-run -a pnpm test:e2e '"${LANE_ONLY:-}"
 
