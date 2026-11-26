@@ -39,7 +39,7 @@ jobs:
             mold file git
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
-          components: rustfmt, clippy, llvm-tools
+          components: rustfmt, clippy, llvm-tools-preview
           targets: wasm32-unknown-unknown
       - run: cargo fmt --all -- --check
       # The dudect timing test is a measurement of a quiet host, not a merge
@@ -51,6 +51,8 @@ jobs:
       - run: cargo clippy -p myne-web-wasm --target wasm32-unknown-unknown -- -D warnings
       - run: cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
       - run: cargo test -p myne-web-wasm
+      - name: Install llvm-nm for the wasm symbol gate
+        run: rustup component add llvm-tools-preview
       - run: bash scripts/wasm-csprng-check.sh
       - run: bash scripts/wasm-core-graph-check.sh
       - run: bash scripts/wasm-repro-check.sh
