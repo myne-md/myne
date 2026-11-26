@@ -253,7 +253,15 @@ INNER="$INNER MYNE_E2E_SERVER=\"${MYNE_E2E_SERVER}\""
 # developer running this script by hand keeps their own value.
 INNER="$INNER MYNE_E2E_TIMEOUT_SCALE=\"${MYNE_E2E_TIMEOUT_SCALE:-1}\""
 INNER="$INNER MYNE_E2E_LANE=\"${LANE}\""
-INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/tools/bin/sccache'
+# sccache is optional: the GitHub container has no /cache mount, so the
+# pinned-tools bootstrap above is skipped. Pointing RUSTC_WRAPPER at a path
+# that does not exist turns every cargo invocation into exit 101.
+SCCACHE_WRAPPER=""
+if [ -x /cache/tools/bin/sccache ]; then
+  SCCACHE_WRAPPER="RUSTC_WRAPPER=/cache/tools/bin/sccache"
+fi
+INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold"'
+INNER="$INNER ${SCCACHE_WRAPPER}"
 INNER="$INNER"' SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0'
 # fd soft limit -> hard cap (EMFILE guard): the Tauri app plus parallel cargo
 # codegen open enough fds to hit the runner's low default.
