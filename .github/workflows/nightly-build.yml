@@ -199,7 +199,6 @@ jobs:
       - name: Build simulator/debug app
         env:
           CI: "true"
-          npm_config_confirm_modules_purge: "false"
           NPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
         run: |
           cd mobile
