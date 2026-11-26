@@ -197,6 +197,8 @@ jobs:
           pnpm tauri ios init
           bash scripts/ios-postinit.sh
       - name: Build simulator/debug app
+        env:
+          CI: "true"
         run: |
           cd mobile
           pnpm tauri ios build --export-method debugging --ci
