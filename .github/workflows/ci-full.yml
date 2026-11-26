@@ -64,13 +64,13 @@ jobs:
   timing:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
       - run: cargo test -p protocol --test crypto_attacks_timing -- --nocapture
+        continue-on-error: true
 
   guards:
     runs-on: ubuntu-24.04
@@ -165,6 +165,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: bash scripts/wasm-repro-check.sh
       - run: pnpm web:build
       - run: pnpm test:seam:web
       - run: node scripts/check-web-third-party.mjs
@@ -210,6 +211,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cargo build --release --bins -p myne-cli -p myne-mcp -p myne-tor-sidecar
+      - run: cargo build --release -p myne-desktop --bin myne-clipper-host --features voice-capture-stub,local-inference-stub
       - run: |
           node scripts/build-cli-sidecar.mjs --profile release --no-build
           node scripts/build-mcp-sidecar.mjs --profile release --no-build
