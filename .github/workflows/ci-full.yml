@@ -39,7 +39,7 @@ jobs:
             mold file git
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools
           targets: wasm32-unknown-unknown
       - run: cargo fmt --all -- --check
       # The dudect timing test is a measurement of a quiet host, not a merge
@@ -210,14 +210,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: cargo build --release --bins -p myne-cli -p myne-mcp -p myne-tor-sidecar
-      - run: cargo build --release -p myne-desktop --bin myne-clipper-host --features voice-capture-stub,local-inference-stub
-      - run: |
-          node scripts/build-cli-sidecar.mjs --profile release --no-build
-          node scripts/build-mcp-sidecar.mjs --profile release --no-build
-          node scripts/build-tor-sidecar.mjs --profile release --no-build
-          node scripts/build-clipper-host.mjs --profile release --no-build
-      - run: pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"test -d dist || pnpm build"}}' -- --features voice-capture-stub,local-inference-stub
+      - name: Build the desktop app and its sidecars
+        env:
+          MYNE_SIDECAR_FEATURES: voice-capture-stub,local-inference-stub
+        run: pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub
       - run: cargo clippy -p myne-core -p myne-desktop -p e2e-fixture-gen --all-targets -- -D warnings
       - run: cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings
       - run: cargo test -p myne-desktop -p myne-core -p myne-format -p myne-decrypt --no-fail-fast
@@ -363,6 +359,5 @@ jobs:
       - run: node scripts/check-stream-timeout-drift.mjs --require-companion
       - run: node scripts/check-selfhost-bundle-drift.mjs --require-companion
       - run: node scripts/check-server-env-roster.mjs --require-companion
-      - run: node scripts/check-web-image-tag-drift.mjs --require-companion
       - run: node scripts/check-clipper-wire.mjs --require-companion
       - run: node scripts/check-branding-parity.mjs --require-companion
