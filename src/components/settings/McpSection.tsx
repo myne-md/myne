@@ -1028,7 +1028,18 @@ export function McpSection({
             >
               <div style={ROW_HEAD_STYLE}>
                 <span style={NAME_STYLE}>{row.name}</span>
+                {/* Both acts on the line that names the connection (2026-11-27). */}
                 <div style={ACTIONS_STYLE}>
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => startEdit(row)}
+                    data-testid="settings.mcp-edit"
+                  >
+                    {row.legacy
+                      ? t("settings.ai.externalAccess.approveAgain")
+                      : t("settings.ai.externalAccess.editExclusions")}
+                  </Button>
                   <Button
                     variant="secondary"
                     disabled={busy}
@@ -1054,25 +1065,10 @@ export function McpSection({
                 {toolsLine(row, t)}
               </p>
               <WhenLine row={row} />
-              <div style={ACTIONS_STYLE}>
-                <Button
-                  variant="secondary"
-                  onClick={() => startEdit(row)}
-                  data-testid="settings.mcp-edit"
-                >
-                  {row.legacy
-                    ? t("settings.ai.externalAccess.approveAgain")
-                    : t("settings.ai.externalAccess.editExclusions")}
-                </Button>
-              </div>
             </div>
           ))}
-          <p style={HELPER_STYLE} data-testid="settings.mcp-device-claim">
-            {t("settings.ai.externalAccess.deviceClaim")}
-          </p>
-          {/* The primary lives in the zero state, so a second connection needs its
-              own way back in: without this the list would be the last word for
-              anyone who ever approved one. */}
+          {/* The primary lives in the zero state, so a second connection needs a
+              way back in: the list cannot be the last word. */}
           <div style={{ marginTop: "var(--space-2)" }}>
             <Button
               variant="secondary"

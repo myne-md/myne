@@ -3901,7 +3901,6 @@
         "editExclusions": "Change what it may use",
         "needsReapproval": "Approved by an older version, under the opposite rule. This build reads nothing for it until you approve it again.",
         "approveAgain": "Approve again",
-        "deviceClaim": "Approvals are on this device only: another computer starts with none.",
         "verb": {
           "note_search": "Search notes",
           "note_read": "Read a note",
