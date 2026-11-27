@@ -3939,7 +3939,16 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         >
         {tab === "notes" && (
           <>
-            <div style={{ flex: "none", padding: "8px 20px 0" }}>
+            <div
+              style={{
+                flex: "none",
+                // On the regular size classes the AppHeader is not rendered (the
+                // rail absorbs it), so this row IS the top of the page and owes
+                // the status bar its clearance. Without it the title drew under
+                // the clock on an iPad (owner, 2026-11-27 round 3).
+                padding: `${chrome.header ? 8 : LIST_TOP} 20px 0`,
+              }}
+            >
               {listView !== "notes" && sizeClass !== "expanded" && (
                 <button
                   onClick={() => setListView("notes")}
@@ -4290,6 +4299,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
         {tab === "graph" && (
           <GraphTab
+            // Same rule as the list header: the AppHeader clears the status bar
+            // on compact/medium, and on expanded this row is the top of the page.
+            topInset={chrome.header ? 8 : LIST_TOP}
             model={graphModel}
             onOpen={(id) => void openFromList(id)}
             tags={graphTags.tags}
@@ -4362,6 +4374,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {tab === "files" && (
           <AttachmentsSheet
             variant="page"
+            topInset={sizeClass === "expanded"}
             onClose={() => setTab("notes")}
             // Saving a transcript from the Files tab creates a note and opens
             // it, so the action lands somewhere the user can see. `openFromList`
@@ -4405,6 +4418,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // layout, where the rail replaces that header, needs the surface to
             // pay for the inset itself.
             insideHeader={sizeClass !== "expanded"}
+            compactWidth={!isRegular}
             tagsOf={tagsOfNote}
             view={vaultTaskView}
             onViewChange={setVaultTaskView}
@@ -4422,6 +4436,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           <TaskSurface
             scope={{ kind: "note", noteId: editing.id }}
             insideHeader={sizeClass !== "expanded"}
+            compactWidth={!isRegular}
             view={noteTaskView}
             onViewChange={setNoteTaskView}
             testIdPrefix="tasks.note-tab"

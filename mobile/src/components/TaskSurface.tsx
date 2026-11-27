@@ -36,6 +36,9 @@ export type TaskSurfaceProps = {
   /** True when the caller already renders a page header (the AppHeader) above
    *  this surface, so the surface must not add its own status-bar clearance. */
   insideHeader?: boolean;
+  /** Drop the source-note column, for a phone-width surface. The vault-wide list
+   *  keeps it on a tablet, where there is room for one more fact per row. */
+  compactWidth?: boolean;
   /** Injected in tests; production reads the local calendar day. */
   today?: string;
   testIdPrefix?: string;
@@ -56,6 +59,7 @@ export function TaskSurface({
   today,
   testIdPrefix,
   insideHeader = false,
+  compactWidth = false,
   view: controlledView,
   onViewChange,
 }: TaskSurfaceProps): ReactNode {
@@ -93,6 +97,11 @@ export function TaskSurface({
         // the bezel (owner, 2026-11-27 round 2: "sol sağ padding şimdi de aşırı
         // fazla").
         ...(insideHeader ? { paddingTop: 0 } : { paddingTop: SCREEN_TOP }),
+        // The shared panel insets its rows 8pt and its toolbar 12pt (its own
+        // desktop geometry). On a phone that 4pt shows as rows riding left of the
+        // search field, so the host closes the gap instead of forking either
+        // padding.
+        paddingInline: "var(--space-1)",
       }}
     >
       <TaskListPanel
@@ -104,10 +113,11 @@ export function TaskSurface({
       rowScope={scope.kind === "note" ? "note" : "vault"}
       // Touch-sized checkboxes: the shared dense 14px box is a mouse target.
       roomyBox
-      // The phone cannot fit a title, a date, a source note and a menu on one
-      // line without ellipsising every title; two lines puts the metadata under
-      // the text where it belongs on a narrow screen.
-      twoLine
+      // One line, because the windowed list owns a FIXED row height and a
+      // two-line row overflowed into its neighbour (owner, 2026-11-27 round 3:
+      // "rowlarda bir crop var"). The narrow screen is answered by dropping the
+      // source-note column instead — see `showNoteTitle`.
+      {...(compactWidth ? { showNoteTitle: false } : {})}
       // The desktop builder is a two-pane popover anchored to the toolbar. On a
       // phone that reads as a stray dropdown floating over the list, so the same
       // content is hosted in a bottom sheet instead.

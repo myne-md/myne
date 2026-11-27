@@ -78,6 +78,10 @@ export type TaskRowData = {
 export type TaskRowProps = {
   task: TaskRowData;
   scope: TaskRowScope;
+  /** Drop the source-note column even on a vault-scope row. A phone-width panel
+   *  spends that column on the task's own text instead (the windowed list's fixed
+   *  row height means a row cannot wrap to make room). */
+  hideNoteTitle?: boolean;
   /** Today as `YYYY-MM-DD`, injected. There is no hidden clock in a row. */
   today: string;
   /** Omitted for a read-only mount; the checkbox then renders inert. */
@@ -363,6 +367,7 @@ const NOTE_STYLE: CSSProperties = {
 export function TaskRow({
   task,
   scope,
+  hideNoteTitle,
   today,
   onToggle,
   onOpen,
@@ -460,7 +465,7 @@ export function TaskRow({
       )}
 
       {/* The source note is a SCOPE decision, not a caller decision. */}
-      {scope === "note" || task.noteTitle === null ? null : (
+      {scope === "note" || task.noteTitle === null || hideNoteTitle === true ? null : (
         <button
           type="button"
           style={NOTE_STYLE}

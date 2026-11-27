@@ -11,12 +11,16 @@ export function GraphTab({
   onOpen,
   tags,
   members,
+  /** Status-bar clearance for the header row, from the host: 0 when the
+   *  AppHeader renders above it, `LIST_TOP` when this is the top of the page. */
+  topInset,
 }: {
   model: GraphModel;
   onOpen: (id: string) => void;
   /** Forwarded to the shared overlay builder; see `WikiGraph`. */
   tags: ReadonlyArray<GraphTag>;
   members: ReadonlyMap<string, ReadonlySet<string>>;
+  topInset: string | number;
 }) {
   const { t } = useTranslation();
   const degree = new Map<string, number>();
@@ -28,7 +32,7 @@ export function GraphTab({
   const links = model.edges.length;
   return (
     <>
-      <div style={{ flex: "none", padding: "8px 20px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+      <div style={{ flex: "none", padding: `${topInset} 20px 0`, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
         <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("editor.chrome.barItems.graph")}</h1>
         {linked > 0 && (
           <span style={{ flexShrink: 0, fontSize: 13, color: "var(--fg-3)" }}>

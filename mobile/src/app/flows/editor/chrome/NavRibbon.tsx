@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon, VaultMark } from "../../../../components";
+import { Icon, LIST_TOP, VaultMark } from "../../../../components";
 import { RIBBON_ORDER, ribbonLayout, type RibbonItemId } from "../../../../lib/nav-ribbon";
 import { LayoutCustomizeSheet, type CustomizeRow } from "./LayoutCustomizeSheet";
 import type { WorkspaceTab } from "./TabBar";
@@ -328,7 +328,10 @@ export function NavRibbon({
           minHeight: 0,
           borderInlineEnd: "1px solid var(--line-1)",
           background: "var(--bg-2)",
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)",
+          // The SAME clearance the list's title uses, so the rail's vault mark and
+          // the page title sit on one line (owner, 2026-11-27 round 3: "soldaki
+          // vault selector ile eşitlenmeli").
+          paddingTop: LIST_TOP,
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
         }}
       >
@@ -338,7 +341,19 @@ export function NavRibbon({
           onClick={onSwitcher}
           aria-label={label}
           title={label}
-          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", marginBottom: 10 }}
+          style={{
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            // Matches the list header's line box (a 32pt title), so the mark and
+            // the page title sit on one horizontal line.
+            height: 38,
+            marginBottom: 6,
+          }}
         >
           <VaultMark icon={icon} size={26} radius={5} testId="ribbon.vault-mark" />
         </button>

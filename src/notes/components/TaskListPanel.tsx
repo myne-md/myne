@@ -55,10 +55,10 @@ export type TaskListPanelProps = {
   view: TaskView;
   today: string;
   rowScope: TaskRowScope;
-  /** Render each row on two lines (text, then its metadata underneath). A phone
-   *  cannot fit text + date + source note + menu on one line without ellipsising
-   *  every title, so the mobile host asks for this; desktop keeps one line. */
-  twoLine?: boolean;
+  /** Show the source-note column on every row. Off for a phone-width surface: the
+   *  windowed list owns a fixed row height, so a row can only be made roomier by
+   *  dropping a column, not by wrapping. */
+  showNoteTitle?: boolean;
   /** Host the filter builder in the caller's own surface instead of the
    *  tooltip-style popover. Mobile passes a bottom-sheet renderer: the popover
    *  is a pointer affordance and reads as a stray dropdown on a phone. */
@@ -948,7 +948,7 @@ export function TaskListPanel({
   view,
   today,
   rowScope,
-  twoLine,
+  showNoteTitle = true,
   filterSheet,
   tagsOf,
   rebuilding = false,
@@ -1252,8 +1252,8 @@ export function TaskListPanel({
                 today={today}
                 compactX
                 inlineDate
-                {...(twoLine === true ? { twoLine: true } : {})}
                 roomyBox={roomyBox}
+                {...(showNoteTitle ? {} : { hideNoteTitle: true })}
                 testIdPrefix={`${testIdPrefix}.row`}
                 {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                 {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
@@ -1280,7 +1280,7 @@ export function TaskListPanel({
                     scope={rowScope}
                     today={today}
                     roomyBox={roomyBox}
-                    {...(twoLine === true ? { twoLine: true } : {})}
+                    {...(showNoteTitle ? {} : { hideNoteTitle: true })}
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}

@@ -46,6 +46,7 @@ export function AttachmentsSheet({
   onInsertText,
   onSavedNote,
   variant = "sheet",
+  topInset = false,
 }: {
   onClose: () => void;
   /** When provided, each row shows an "Insert" action that embeds the
@@ -64,6 +65,12 @@ export function AttachmentsSheet({
   /** `"sheet"` = floating modal (in-editor insert picker). `"page"` = full
    *  bottom-tab page (the top-level Files library). */
   variant?: "sheet" | "page";
+  /** The page variant pays for the status bar only when NOTHING renders above it.
+   *  Under the AppHeader that header already carries the clearance, and a second
+   *  inset pushed the Files title a whole header-height down the page (owner,
+   *  2026-11-27 round 3: "files gibi bazı yerlerde ... çözülüyor olsun her
+   *  sayfada"). */
+  topInset?: boolean;
 }) {
   const { t } = useTranslation();
   // Transcription visibility is gated on the pref (MYND-563; the backend
@@ -463,7 +470,7 @@ export function AttachmentsSheet({
       <>
         {uploadInput}
         {/* Sits under the shared AppHeader (Files tab), so no safe-area top here. */}
-        <div data-testid="files.page" style={{ flex: "none", padding: `${LIST_TOP} 20px 0` }}>
+        <div data-testid="files.page" style={{ flex: "none", padding: `${topInset ? LIST_TOP : "8px"} 20px 0` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{title}</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
