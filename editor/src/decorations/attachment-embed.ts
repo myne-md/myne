@@ -228,7 +228,7 @@ class BlockEmbedFrame extends LineHeightWidget {
   /** Whether the caret's line is this embed's, as the field last built it. */
   private active: boolean;
 
-  constructor(private readonly inner: WidgetType, active: boolean) {
+  constructor(private inner: WidgetType, active: boolean) {
     super();
     this.active = active;
   }
@@ -249,6 +249,7 @@ class BlockEmbedFrame extends LineHeightWidget {
     // active toggle keeps the <img>; warmed URL/layout/retarget must rebuild.
     if (old.inner.constructor !== this.inner.constructor) return false;
     if (!this.inner.eq(old.inner)) return false;
+    this.inner = old.inner;
     dom.classList.toggle("cm-embed-active", this.active);
     return true;
   }

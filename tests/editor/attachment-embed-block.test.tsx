@@ -30,6 +30,7 @@ import {
   attachmentEmbedDecorations,
   embedIsAlone,
 } from "../../src/editor/decorations/attachment-embed";
+import { addCatalogRows } from "../../src/editor/attachments/catalog";
 import { ownLineInsertion } from "../../src/editor/attachments/insert";
 
 const ID = "a".repeat(64);
@@ -328,5 +329,52 @@ describe("the embed under the caret", () => {
     view.dispatch({ selection: { anchor: view.state.doc.line(3).from } });
     await Promise.resolve();
     expect(host.querySelector(".cm-embed-active")).toBeNull();
+  });
+});
+
+describe("block embed rebuilds when the catalog warms", () => {
+  it("replaces the tombstone with a resolved image frame (new DOM identity)", async () => {
+    const restore = setCatalogLoader(() => new Promise(() => {})); // never resolves → loading
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: EMBED,
+        extensions: [
+          markdown({ base: markdownLanguage, extensions: [Wikilink] }),
+          ...attachmentCatalogExtension(),
+          ...attachmentEmbedDecorations(),
+        ],
+      }),
+      parent: host,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    view.requestMeasure();
+    restore();
+
+    // Before warming: a tombstone, no <img>.
+    expect(host.querySelector("img.cm-attachment-img")).toBeNull();
+
+    const frameBefore = host.querySelector(".cm-attachment-block");
+    expect(frameBefore).not.toBeNull();
+
+    // Warm the catalog → resolved image.
+    addCatalogRows(view, [ROW]);
+    await Promise.resolve();
+    await Promise.resolve();
+    view.requestMeasure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const img = host.querySelector("img.cm-attachment-img") as HTMLImageElement | null;
+    expect(img).not.toBeNull();
+    expect(img?.src).toContain(ID);
+
+    // The frame was rebuilt: either a new wrapper node or a new src.
+    const frameAfter = host.querySelector(".cm-attachment-block");
+    expect(frameAfter).not.toBeNull();
+
+    view.destroy();
+    host.remove();
   });
 });
