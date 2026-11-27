@@ -23,7 +23,7 @@
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
 use myne_core::plugins::attachments::commands::MAX_ATTACHMENT_IMPORT_LEN;
-use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
+use myne_core::plugins::attachments::extract_types::ExtractStatus;
 use myne_core::plugins::attachments::sniff::sniff_content_type;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
@@ -52,9 +52,9 @@ pub struct EphemeralExtract {
     pub name: String,
     /// Empty unless `status` is `ok`.
     pub text: String,
-    /// `ok` | `empty` | `unsupported` | `failed`, so the composer can say *why*
-    /// there is nothing to send instead of attaching an empty document.
-    pub status: String,
+    /// `ok` | `empty` | `unsupported` | `failed`: a closed `&'static str` of four
+    /// tags, which is what the tracing rule wants behind a logged label.
+    pub status: &'static str,
     /// Char count before the extractor's own truncation, for the composer's
     /// "N characters" note.
     pub char_count: u32,
@@ -109,14 +109,16 @@ pub fn extract_ephemeral(filename: Option<String>, bytes: &[u8]) -> EphemeralExt
         } else {
             String::new()
         },
-        status: status_tag(extracted.status).to_string(),
+        status: status_tag(extracted.status),
         char_count: extracted.char_count,
         truncated: extracted.truncated,
     }
 }
 
 /// Materialize the source bytes, bounded before allocation.
-fn read_source(source: EphemeralSource) -> Result<(Zeroizing<Vec<u8>>, Option<String>), EphemeralError> {
+fn read_source(
+    source: EphemeralSource,
+) -> Result<(Zeroizing<Vec<u8>>, Option<String>), EphemeralError> {
     match source {
         EphemeralSource::BytesB64 {
             bytes_b64,
@@ -176,7 +178,7 @@ pub async fn attachment_extract_ephemeral(
     tracing::info!(
         stage = "ephemeral",
         event = "ephemeral_extract",
-        status = %out.status,
+        status = out.status,
         char_count = out.char_count,
         "a file was read for the composer without becoming an attachment"
     );
@@ -211,13 +213,15 @@ mod tests {
 
     #[test]
     fn an_oversize_base64_payload_is_refused_before_it_is_decoded() {
-        let huge = "A".repeat(MAX_ATTACHMENT_IMPORT_LEN);
-        let err = read_source(EphemeralSource::BytesB64 {
+        // Just over what the cap allows after the 4/3 inflation, and asserted
+        // WITHOUT `unwrap_err()`: the error's Debug would print the whole
+        // payload into a failing test's output.
+        let huge = "A".repeat(MAX_ATTACHMENT_IMPORT_LEN * 4 / 3 + 8);
+        let read = read_source(EphemeralSource::BytesB64 {
             bytes_b64: huge,
             filename: None,
-        })
-        .unwrap_err();
-        assert!(matches!(err, EphemeralError::Oversize { .. }));
+        });
+        assert!(matches!(read, Err(EphemeralError::Oversize { .. })));
     }
 
     #[test]

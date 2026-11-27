@@ -81,7 +81,12 @@
       "confirm_one": "Attach {{count}} file",
       "confirm_other": "Attach {{count}} files",
       "remove": "Remove {{name}}",
-      "noText": "{{name}} has no text the agent can read. Only files whose text could be extracted can be attached."
+      "noText": "{{name}} has no text the agent can read. Only files whose text could be extracted can be attached.",
+      "fromDevice": "Take a photo or pick a file",
+      "readingDevice": "Reading on this device…",
+      "deviceOnly": "Read on this device, never saved",
+      "deviceUnsupported": "{{name}} is not a file the agent can read. Photos, PDFs and plain text work.",
+      "deviceFailed": "That file could not be read. Nothing was sent."
     },
     "progress": {
       "working": "Working",

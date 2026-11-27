@@ -53,7 +53,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "CalendarSettings": { file: "src/components/settings/CalendarSettings.tsx", line: 45 },
   "cardBodies": { file: "src/notes/home/cardBodies.tsx", line: 1 },
   "CenteredCard": { file: "src/components/primitives/CenteredCard.tsx", line: 65 },
-  "ChatComposer": { file: "src/notes/components/ChatComposer.tsx", line: 354 },
+  "ChatComposer": { file: "src/notes/components/ChatComposer.tsx", line: 355 },
   "ChatHistoryModal": { file: "src/notes/components/ChatHistoryModal.tsx", line: 76 },
   "Checkbox": { file: "src/components/primitives/Checkbox.tsx", line: 59 },
   "ChoiceList": { file: "src/components/ChoiceList.tsx", line: 1 },
