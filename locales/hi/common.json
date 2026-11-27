@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} अनुरोध",
       "runSummaryNotes_one": "{{count}} नोट पढ़ा गया",
       "runSummaryNotes_other": "{{count}} नोट पढ़े गए",
-      "runSummaryOffDevice_one": "आपके नोट का लगभग {{count}} अक्षर प्रदाता को भेजा गया",
-      "runSummaryOffDevice_other": "आपके नोट के लगभग {{count}} अक्षर प्रदाता को भेजे गए",
       "runSummaryOnDevice": "कुछ भी इस डिवाइस से बाहर नहीं गया",
       "appendFlag": "अंत में जोड़ता है",
       "diffCurrent": "मौजूदा नोट में",

@@ -219,8 +219,6 @@
       "runSummaryRequests_other": "{{count}} requests",
       "runSummaryNotes_one": "{{count}} note read",
       "runSummaryNotes_other": "{{count}} notes read",
-      "runSummaryOffDevice_one": "about {{count}} character of your notes was sent to the provider",
-      "runSummaryOffDevice_other": "about {{count}} characters of your notes were sent to the provider",
       "runSummaryOnDevice": "nothing left this device",
       "refusedSetting": {
         "needsOwnAct": "Not applied here: a setting change is always approved on its own.",

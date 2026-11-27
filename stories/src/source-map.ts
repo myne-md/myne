@@ -190,7 +190,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "RestoreBackup": { file: "src/screens/RestoreBackup.tsx", line: 59 },
   "RibbonCustomizeSettings": { file: "src/components/settings/RibbonCustomizeSettings.tsx", line: 85 },
   "RootErrorBoundary": { file: "src/components/RootErrorBoundary.tsx", line: 31 },
-  "RunCostLine": { file: "src/notes/agent/components/RunCostLine.tsx", line: 31 },
+  "RunCostLine": { file: "src/notes/agent/components/RunCostLine.tsx", line: 30 },
   "SaveStatus": { file: "src/notes/components/SaveStatus.tsx", line: 92 },
   "ScopeExpansionDialog": { file: "src/notes/agent/components/ScopeExpansionDialog.tsx", line: 59 },
   "ScreenCaptureEscape": { file: "src/components/ScreenCaptureEscape.tsx", line: 146 },

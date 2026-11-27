@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} permintaan",
       "runSummaryNotes_one": "{{count}} catatan dibaca",
       "runSummaryNotes_other": "{{count}} catatan dibaca",
-      "runSummaryOffDevice_one": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
-      "runSummaryOffDevice_other": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
       "runSummaryOnDevice": "tidak ada yang keluar dari perangkat ini",
       "appendFlag": "ditambahkan di akhir",
       "diffCurrent": "Di catatan sekarang",

@@ -398,7 +398,7 @@ export const AI_STORIES: StoryDescriptor[] = [
     surface: "RunCostLine",
     state: "default",
     description:
-      "What a run cost, in one line: model round-trips, notes read, and the characters of note text that left the device, the figure the remote arm's disclosure rests on, and \"stayed on this device\" when none did.",
+      "What a run cost, in one line: model round-trips, notes read, and, for a run that never left this device, that it stayed here. The off-device character count was dropped on 2026-11-27.",
     tags: ["notes", "ai", "agent", "cost", "disclosure", "summary"],
     render: () => (
       <div style={{ padding: "var(--space-3)", color: "var(--fg-2)" }}>

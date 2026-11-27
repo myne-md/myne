@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} yêu cầu",
       "runSummaryNotes_one": "đã đọc {{count}} ghi chú",
       "runSummaryNotes_other": "đã đọc {{count}} ghi chú",
-      "runSummaryOffDevice_one": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
-      "runSummaryOffDevice_other": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
       "runSummaryOnDevice": "không có gì rời khỏi thiết bị này",
       "appendFlag": "thêm vào cuối",
       "diffCurrent": "Đang ở trong ghi chú",

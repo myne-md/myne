@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "요청 {{count}}건",
       "runSummaryNotes_one": "노트 {{count}}개 읽음",
       "runSummaryNotes_other": "노트 {{count}}개 읽음",
-      "runSummaryOffDevice_one": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
-      "runSummaryOffDevice_other": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
       "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다",
       "appendFlag": "끝에 추가",
       "diffCurrent": "현재 노트에서",

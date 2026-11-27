@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} αιτήματα",
       "runSummaryNotes_one": "{{count}} σημείωση διαβάστηκε",
       "runSummaryNotes_other": "{{count}} σημειώσεις διαβάστηκαν",
-      "runSummaryOffDevice_one": "περίπου {{count}} χαρακτήρας των σημειώσεών σας στάλθηκε στον πάροχο",
-      "runSummaryOffDevice_other": "περίπου {{count}} χαρακτήρες των σημειώσεών σας στάλθηκαν στον πάροχο",
       "runSummaryOnDevice": "τίποτα δεν έφυγε από αυτή τη συσκευή",
       "appendFlag": "προστίθεται στο τέλος",
       "diffCurrent": "Στο σημείωμα τώρα",

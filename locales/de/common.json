@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} Anfragen",
       "runSummaryNotes_one": "{{count}} Notiz gelesen",
       "runSummaryNotes_other": "{{count}} Notizen gelesen",
-      "runSummaryOffDevice_one": "etwa {{count}} Zeichen Ihrer Notizen wurde an den Anbieter gesendet",
-      "runSummaryOffDevice_other": "etwa {{count}} Zeichen Ihrer Notizen wurden an den Anbieter gesendet",
       "runSummaryOnDevice": "nichts hat dieses Gerät verlassen",
       "appendFlag": "wird am Ende angefügt",
       "diffCurrent": "Aktuell in der Notiz",

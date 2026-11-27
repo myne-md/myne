@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} pyyntöä",
       "runSummaryNotes_one": "{{count}} muistiinpano luettu",
       "runSummaryNotes_other": "{{count}} muistiinpanoa luettu",
-      "runSummaryOffDevice_one": "noin {{count}} merkki muistiinpanoistasi lähetettiin palveluntarjoajalle",
-      "runSummaryOffDevice_other": "noin {{count}} merkkiä muistiinpanoistasi lähetettiin palveluntarjoajalle",
       "runSummaryOnDevice": "mitään ei poistunut tältä laitteelta",
       "appendFlag": "lisätään loppuun",
       "diffCurrent": "Muistiinpanossa nyt",
