@@ -263,8 +263,11 @@ pub fn catalog() -> Vec<Value> {
                     "expected_value": {
                         "type": "string",
                         "description": "The value you believe is on disk. Omit it to mean the \
-                            field is absent. A mismatch is refused rather than overwritten, so a \
-                            concurrent change to the same field cannot be lost."
+                            field is not there at all, which is a question about the key: a \
+                            field holding a multi-line value counts as there, so omitting the \
+                            parameter will not clear it. A mismatch is refused rather than \
+                            overwritten, so a concurrent change to the same field cannot be \
+                            lost."
                     }
                 },
                 "required": ["note_id", "view_id", "field", "value"],

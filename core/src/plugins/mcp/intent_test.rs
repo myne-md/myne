@@ -107,7 +107,7 @@ impl McpNoteSource for Source {
 
     async fn derived_note(&self, note_id: &str) -> Result<Option<NoteFacts>, McpToolError> {
         match self.read_body(note_id).await {
-            Ok(body) => Ok(Some(note_facts_from_body(&body))),
+            Ok(body) => Ok(note_facts_from_body(&body)),
             Err(McpToolError::UnknownNote { .. }) => Ok(None),
             Err(other) => Err(other),
         }

@@ -154,18 +154,28 @@ impl NoteFacts {
 /// The facts a note's own bytes carry: one function rather than one per call site,
 /// so the adapter and the test doubles cannot pick different helpers and stop
 /// testing the same thing.
-pub(super) fn note_facts_from_body(body: &str) -> NoteFacts {
+pub(super) fn note_facts_from_body(body: &str) -> Option<NoteFacts> {
+    use crate::plugins::notes::frontmatter_patch::read_string_field;
     use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
-    NoteFacts {
-        title: crate::plugins::notes::title_extract::resolve_note_title(body.as_bytes()),
-        // The RAW value, not `folder_of`'s canonical one: a row's `folder` is what
-        // the person sees, and a derived row that spelled it differently from an
-        // indexed one would be two shapes for one field.
-        folder: extract_title_slices(body.as_bytes())
-            .frontmatter_bytes
-            .and_then(fm_folder),
-        live: crate::plugins::agent::hide::body_is_live(body),
+    // The RAW value, not `folder_of`'s canonical one: a row's `folder` is what the
+    // person sees, and a derived row that spelled it differently from an indexed
+    // one would be two shapes for one field.
+    let folder = extract_title_slices(body.as_bytes())
+        .frontmatter_bytes
+        .and_then(fm_folder);
+    // The folder decides the grant, so a second reader checks it: the parser the
+    // field write uses. Where they disagree — a trailing `# comment` is the live
+    // shape, `Private` against `Private #x` — this surface declines rather than
+    // placing a note the app hides outside the exclusion. `None` answers
+    // `unknown_note` on every verb.
+    if folder != read_string_field(body.as_bytes(), "folder") {
+        return None;
     }
+    Some(NoteFacts {
+        title: crate::plugins::notes::title_extract::resolve_note_title(body.as_bytes()),
+        folder,
+        live: crate::plugins::agent::hide::body_is_live(body),
+    })
 }
 
 /// From the index when it carries the note, from the note itself when it does not,

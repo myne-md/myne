@@ -150,7 +150,7 @@ impl McpNoteSource for Source {
     /// seen is answered from its own bytes, and only a missing body is absence.
     async fn derived_note(&self, note_id: &str) -> Result<Option<NoteFacts>, McpToolError> {
         match self.read_body(note_id).await {
-            Ok(body) => Ok(Some(note_facts_from_body(&body))),
+            Ok(body) => Ok(note_facts_from_body(&body)),
             Err(McpToolError::UnknownNote { .. }) => Ok(None),
             Err(other) => Err(other),
         }
@@ -293,6 +293,22 @@ fn read_rechecks_the_folder_from_the_note_itself() {
     ))
     .unwrap_err();
     assert!(matches!(error, McpToolError::OutOfScopeNote { .. }));
+}
+
+#[test]
+fn a_folder_value_two_readers_disagree_about_is_not_guessed_at() {
+    // `fm_folder` keeps a trailing `# comment`, the field write's parser strips it,
+    // and the judged reader is the app's YAML one: `Private`. Declining beats
+    // placing a note outside the exclusion the user set.
+    let facts = note_facts_from_body("---\nfolder: Private #x\n---\nx");
+    assert!(
+        facts.is_none(),
+        "a disputed folder must derive nothing: {facts:?}"
+    );
+    // A value both readers agree on still derives, or the fallback would be dead.
+    let facts = note_facts_from_body("---\nfolder: Projects\n---\nx")
+        .expect("a plain folder value derives");
+    assert_eq!(facts.folder.as_deref(), Some("Projects"));
 }
 
 #[test]

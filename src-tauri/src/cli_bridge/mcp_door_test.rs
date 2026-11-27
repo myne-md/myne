@@ -52,7 +52,10 @@ use myne_core::host::test_host::TestHost;
 use myne_core::plugins::mcp::host_adapters::{door_call, DoorContext};
 use myne_core::plugins::mcp::tools::WireCall;
 use myne_core::plugins::notes::commands::note_create_with_dir;
-use myne_core::plugins::prefs::commands::set_mcp_connection_grant_from_host;
+use myne_core::plugins::prefs::commands::{
+    set_mcp_connection_grant_from_host, set_view_approval_from_host, upsert_saved_view_from_host,
+    ViewApproval,
+};
 use myne_core::plugins::vault_indices::state::NoteRecord;
 use myne_core::plugins::vault_indices::VaultIndicesState;
 use myne_core::plugins::vault_unlock::state::{
@@ -61,6 +64,7 @@ use myne_core::plugins::vault_unlock::state::{
 use myne_core::search::SearchIndexState;
 use myne_core::test_support::{block_on, seed_real_vault_meta};
 use myne_core::vault_io::StdVaultIo;
+use protocol::saved_view::{FilterNode, SavedView, ViewType};
 use serde_json::{json, Value};
 
 use super::activity::SharedLastAccess;
@@ -999,6 +1003,136 @@ fn a_real_client_creates_a_note_inside_the_write_grant_and_reads_it_back() {
     assert!(
         body.contains("Paragraph two."),
         "the append did not land: {body}"
+    );
+}
+
+/// A note id, a view id and a field name are all `String`, so the compiler cannot
+/// see a swap between them. The door drives the real adapter over a vault holding an
+/// approved view and reads the value back off disk, which is the only shape that can
+/// tell a swapped pair from a working write.
+#[test]
+fn a_real_client_writes_a_field_through_the_view_that_authorises_it() {
+    const VIEW_ID: &str = "v-status-board";
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    let view = SavedView {
+        id: VIEW_ID.to_string(),
+        name: "Status board".to_string(),
+        view_type: ViewType::Table,
+        filters: FilterNode::All,
+        sort: None,
+        group_by: None,
+        columns: vec!["status".to_string()],
+        card_size: None,
+        image: None,
+        image_aspect_ratio: None,
+        version: Some(1),
+        write_fields: vec!["status".to_string()],
+        lanes: Vec::new(),
+        template: None,
+    };
+    // Saved and approved through the commands the settings screen calls: the approval
+    // is what the write checks, so seeding it any other way tests an unreachable state.
+    let hooks: myne_core::hooks::Hooks = fixture.hooks.clone();
+    block_on(async {
+        upsert_saved_view_from_host(
+            &*fixture.host,
+            &fixture.state,
+            &hooks,
+            view.clone(),
+            &StdVaultIo,
+        )
+        .await
+        .expect("save the view");
+        set_view_approval_from_host(
+            &*fixture.host,
+            &fixture.state,
+            &hooks,
+            ViewApproval {
+                view_id: VIEW_ID.to_string(),
+                version: view.version,
+                definition: None,
+            },
+            &StdVaultIo,
+        )
+        .await
+        .expect("approve the view this device just saved");
+    });
+
+    fixture.open_door();
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    // A field the view declares is written, and the answer names the note, the field
+    // and the folder.
+    let reply = session.call(
+        1,
+        "note_set_field",
+        json!({
+            "note_id": fixture.in_scope.as_str(),
+            "view_id": VIEW_ID,
+            "field": "status",
+            "value": "done",
+        }),
+    );
+    assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
+    let structured = &reply["result"]["structuredContent"];
+    assert_eq!(structured["noteId"], fixture.in_scope.as_str(), "{reply}");
+    assert_eq!(structured["field"], "status", "{reply}");
+    // The canonical (lower-cased) folder key: the answer names where the write
+    // landed rather than echoing the caller's spelling.
+    assert_eq!(
+        structured["folder"],
+        format!("{}/", IN_SCOPE_FOLDER.to_lowercase()),
+        "{reply}"
+    );
+
+    // Off disk: `status: done`, not the `done: status` a swap would have written.
+    let reply = session.call(
+        2,
+        "note_read",
+        json!({ "note_id": fixture.in_scope.as_str() }),
+    );
+    let body = reply["result"]["structuredContent"]["body"]
+        .as_str()
+        .expect("the note reads back");
+    assert!(
+        body.contains("status: done"),
+        "the field write did not land: {body}"
+    );
+    assert!(
+        !body.contains("done: status"),
+        "the field and the value were swapped: {body}"
+    );
+
+    // A field the view does not declare is refused, and the refusal is the one
+    // the catalog names.
+    let reply = session.call(
+        3,
+        "note_set_field",
+        json!({
+            "note_id": fixture.in_scope.as_str(),
+            "view_id": VIEW_ID,
+            "field": "rating",
+            "value": "5",
+        }),
+    );
+    assert_eq!(reply["result"]["isError"], true, "reply: {reply}");
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "field_not_writable",
+        "reply: {reply}"
+    );
+
+    // Nothing was written by the refused call.
+    let reply = session.call(
+        4,
+        "note_read",
+        json!({ "note_id": fixture.in_scope.as_str() }),
+    );
+    let body = reply["result"]["structuredContent"]["body"]
+        .as_str()
+        .expect("the note reads back");
+    assert!(
+        !body.contains("rating"),
+        "a refused write must not land: {body}"
     );
 }
 

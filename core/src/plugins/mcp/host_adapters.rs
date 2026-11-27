@@ -145,7 +145,7 @@ impl McpNoteSource for VaultNoteSource<'_> {
         note_id: &str,
     ) -> Result<Option<super::tools::NoteFacts>, McpToolError> {
         match self.read_body(note_id).await {
-            Ok(body) => Ok(Some(super::tools::note_facts_from_body(&body))),
+            Ok(body) => Ok(super::tools::note_facts_from_body(&body)),
             // Only "there is no such note" reads as absence. Every other failure
             // stays a failure: a locked vault answered as `None` would tell a
             // caller its note is gone.
