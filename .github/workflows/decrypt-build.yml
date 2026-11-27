@@ -1,0 +1,74 @@
+name: decrypt-build
+
+# Nightly build of the standalone `myne-decrypt` CLI. It is not a Tauri sidecar
+# and not part of the app bundle: this workflow produces the four platform
+# binaries that docs/threat-model.md TB7 names for this tool.
+#
+# Unsigned internal builds. No tag, no GitHub release, no signing key. Each
+# platform job uploads an Actions artifact retained for 14 days, matching the
+# app nightly. The schedule runs after the app nightly so the two do not share
+# a concurrency group.
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: decrypt-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  decrypt:
+    name: decrypt (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+            path: target/release/myne-decrypt
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            path: target/release/myne-decrypt
+          - name: macos-universal
+            os: macos-15
+            path: target/universal/release/myne-decrypt
+          - name: windows-x64
+            os: windows-2022
+            path: target/release/myne-decrypt.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - name: Build the CLI
+        if: matrix.name != 'macos-universal'
+        run: cargo build --release -p myne-decrypt
+      - name: Build the universal CLI
+        if: matrix.name == 'macos-universal'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo build --release -p myne-decrypt --target aarch64-apple-darwin
+          cargo build --release -p myne-decrypt --target x86_64-apple-darwin
+          mkdir -p target/universal/release
+          lipo -create -output target/universal/release/myne-decrypt \
+            target/aarch64-apple-darwin/release/myne-decrypt \
+            target/x86_64-apple-darwin/release/myne-decrypt
+      - name: Smoke the binary
+        shell: bash
+        run: '"${{ matrix.path }}" --help > /dev/null'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: myne-decrypt-${{ matrix.name }}-${{ github.sha }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+          retention-days: 14
