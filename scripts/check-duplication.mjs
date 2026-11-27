@@ -102,10 +102,10 @@
 // which is the direction nobody tries. `tests/scripts/duplication.test.ts` drives
 // every direction through injected sources.
 
-import { readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DOCS_ABSENT, docsPath, docsPresent } from "./lib/docs-tree.mjs";
+import { docsPath } from "./lib/docs-tree.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
@@ -935,11 +935,21 @@ if (isMain) {
     // Exactly one trailing newline: `renderReport`'s last section already ends with a
     // blank separator line, and the repo's `whitespace` hook refuses a blank line at EOF,
     // so appending `"\n"` to it produced a file no commit could carry.
-    writeFileSync(REPORT_PATH, `${renderReport({ ...actual, record: next }, actual).trimEnd()}\n`);
-    console.log(
-      `duplication: record + report written (${next.clones.baseline.length} clone baseline, ` +
-        `${next.repeats.baseline.length} repeat baseline, ${next.clones.verdicts.length + next.repeats.verdicts.length} verdicts).`,
-    );
+    //
+    // The report is the half a public checkout cannot have, so it is written only where it is
+    // readable: `--emit` used to throw ENOENT here and take the record's success message with it.
+    if (existsSync(dirname(REPORT_PATH))) {
+      writeFileSync(REPORT_PATH, `${renderReport({ ...actual, record: next }, actual).trimEnd()}\n`);
+      console.log(
+        `duplication: record + report written (${next.clones.baseline.length} clone baseline, ` +
+          `${next.repeats.baseline.length} repeat baseline, ${next.clones.verdicts.length + next.repeats.verdicts.length} verdicts).`,
+      );
+    } else {
+      console.log(
+        `duplication: record written, report skipped (its directory is not in this checkout: ` +
+          `${dirname(REPORT_PATH)})`,
+      );
+    }
   } else if (mode === "--list") {
     const { clones, repeats, qualified } = measure();
     for (const group of [...clones.values()].sort((a, b) => b.lines * b.copies - a.lines * a.copies)) {
@@ -960,9 +970,18 @@ if (isMain) {
     // tree nobody has, and regenerating it is one command.
     // The report lives in the private companion now, so a checkout without it cannot judge
     // staleness. Say so rather than reporting a document nobody here can read as current.
+    //
+    // **The file, not the tree** (2026-11-27). This asked `docsPresent()`, which only says
+    // `docs/` exists — true in every public checkout, while `docs/dev/duplication.md` is
+    // private and absent — so the read threw, `catch` called it stale, and every commit
+    // in a clean checkout was refused by a document that checkout cannot have. A guard
+    // that cannot read its own report has nothing to judge, which is what the note says.
     let reportStale = false;
-    if (!docsPresent()) {
-      console.log(`note: ${DOCS_ABSENT}`);
+    if (!existsSync(REPORT_PATH)) {
+      console.log(
+        `note: the report this gate compares against is not in this checkout (looked for ` +
+          `${REPORT_PATH}), so the staleness half did not run`,
+      );
     } else {
     try {
       const expected = renderReport({ ...actual, record }, actual).trim();
