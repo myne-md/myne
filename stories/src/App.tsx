@@ -403,8 +403,11 @@ function TreeRow({
         style={{
           width: "100%",
           justifyContent: "flex-start",
-          gap: "var(--space-2)",
-          paddingInlineStart: `calc(var(--space-2) + ${indent})`,
+          // An icon belongs to the SECTION TITLE, not to every entry under it:
+          // one glyph per row makes a column of identical marks that say nothing
+          // the label under the title did not, and it pushes each row's text out
+          // of line with the state rows below the one that does carry a title.
+          paddingInlineStart: `calc(var(--space-5) + ${indent})`,
           ...(selected ? {} : RAIL_ROW_REST),
         }}
         {...(selected ? {} : hoverSurface())}
@@ -412,7 +415,6 @@ function TreeRow({
         data-story-id={story.id}
         data-testid={`stories.item.${node.surface}`}
       >
-        <Icon name={entryIcon(node.group)} size={14} />
         {node.name}
       </Button>
     );
