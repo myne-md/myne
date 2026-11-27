@@ -4,6 +4,10 @@
 
 Report security issues to **`security@myne.md`** privately.
 
+You can also report privately through GitHub: open this repository's **Security**
+tab and choose **Report a vulnerability**. The report stays private between you
+and the maintainers.
+
 Please do **not** open a public GitHub issue for vulnerabilities. We don't have a public bug-bounty page yet (planned for Phase 1 ship), but we still want to hear about issues before they go public.
 
 If you don't get an acknowledgment within 5 business days, ping again. The address may have failed silently.
