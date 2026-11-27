@@ -219,6 +219,7 @@ export function PlainFileScreen() {
             alignItems: "center",
             gap: "var(--space-1)",
             overflowX: "auto",
+            overflowY: "hidden",
             minWidth: 0,
           }}
         >
