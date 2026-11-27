@@ -88,4 +88,8 @@ package() {
   install -Dm644 "src-tauri/icons/128x128.png"    "$pkgdir/usr/share/icons/hicolor/128x128/apps/md.myne.desktop.png"
   install -Dm644 "src-tauri/icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/md.myne.desktop.png"
   install -Dm644 "src-tauri/icons/icon.png"       "$pkgdir/usr/share/icons/hicolor/512x512/apps/md.myne.desktop.png"
+
+  # fakeroot in a container does not always catch bsdtar's ownership; normalize
+  # so a nightly package never installs files owned by the build user.
+  chown -R 0:0 "$pkgdir"
 }
