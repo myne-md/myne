@@ -55,11 +55,11 @@ function makeSandbox(opts: { docsDev: boolean; report: boolean; reportBody?: str
   return { dir };
 }
 
-function run(dir: string): { code: number; out: string } {
+function run(dir: string, args: string[] = []): { code: number; out: string } {
   try {
     return {
       code: 0,
-      out: execFileSync("node", [join(dir, "scripts", "check-duplication.mjs")], {
+      out: execFileSync("node", [join(dir, "scripts", "check-duplication.mjs"), ...args], {
         cwd: dir,
         encoding: "utf8",
       }),
@@ -103,6 +103,19 @@ describe("check-duplication.mjs process-level (clean-checkout arms)", () => {
       const r = run(dir);
       expect(r.code).not.toBe(0);
       expect(r.out).toContain("duplication.md is stale");
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  it("runs --emit in a docs/dev-absent sandbox: writes the record and prints the skip note", () => {
+    const { dir } = makeSandbox({ docsDev: false, report: false });
+    try {
+      const r = run(dir, ["--emit"]);
+      expect(r.code).toBe(0);
+      expect(r.out).toContain("report skipped");
+      expect(existsSync(join(dir, "scripts", "duplication-groups.json"))).toBe(true);
+      expect(existsSync(join(dir, "docs", "dev", "duplication.md"))).toBe(false);
     } finally {
       cleanup(dir);
     }
