@@ -59,7 +59,7 @@ const {
 }));
 
 const { listFolderPathsMock } = vi.hoisted(() => ({
-  listFolderPathsMock: vi.fn(() => Promise.resolve([])),
+  listFolderPathsMock: vi.fn((): Promise<{ path: string; label: string }[]> => Promise.resolve([])),
 }));
 
 vi.mock("../../src/notes/listFolderPaths", async (importOriginal) => ({
