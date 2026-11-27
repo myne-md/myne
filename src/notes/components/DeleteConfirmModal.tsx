@@ -118,8 +118,8 @@ export type DeleteConfirmModalProps = {
   body?: string;
   /**
    * Warning line override (shown below the body, muted). Default:
-   * "This cannot be undone." Pass a softer line for recoverable actions (e.g.
-   * a folder delete that only soft-trashes its notes).
+   * "This cannot be undone." Pass a softer line for recoverable actions, or ""
+   * to render no line at all when the body already carries it.
    */
   warning?: string;
   /** Confirm-button label override. Default: "Delete". */
@@ -438,9 +438,11 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
         <p id="delete-confirm-body" style={BODY_TITLE_STYLE}>
           {bodyLine}
         </p>
-        <p style={BODY_WARNING_STYLE}>
-          {warning ?? t("notes.deleteConfirm.warning")}
-        </p>
+        {warning === "" ? null : (
+          <p style={BODY_WARNING_STYLE}>
+            {warning ?? t("notes.deleteConfirm.warning")}
+          </p>
+        )}
         <div style={BUTTON_ROW_STYLE}>
           <button
             ref={cancelRef}

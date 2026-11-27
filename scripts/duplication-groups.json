@@ -758,13 +758,6 @@
         "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
       },
       {
-        "id": "src/notes/agent/AgentHubList.tsx + src/notes/components/ChatHistoryModal.tsx",
-        "lines": 40,
-        "copies": 2,
-        "verdict": "justified",
-        "reason": "The two 40-line windows the detector pairs are not the same fragment: the AgentHubList window is the conversation-title state machine (one `case` per outcome, each setting its own notice) and the ChatHistoryModal window is the error/loading/empty trio of `<EmptyState>`s. They read as one skeleton only after the vocabulary pass because both now call the same `common.*` keys and the same `setState` shape. Extracting a component would need the title machine and three empty states under one interface, whose only shared part is i18n keys, and that hides which outcome sets which notice. myne-md/myne#1049 review pass."
-      },
-      {
         "id": "protocol/src/prefs_tests.rs #37",
         "lines": 36,
         "copies": 7,

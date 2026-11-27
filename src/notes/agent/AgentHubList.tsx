@@ -27,6 +27,7 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Input } from "../../components/primitives/Input";
+import { DeleteConfirmModal } from "../components/DeleteConfirmModal";
 import { Tooltip } from "../../components/primitives/Tooltip";
 import { EmptyState } from "../../components/primitives/EmptyState";
 import {
@@ -406,6 +407,11 @@ export function AgentHubList({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** Whether a KEY opened the delete dialog, which it refuses to confirm while
+   *  that key is still held. */
+  const [deleteOpenedByKey, setDeleteOpenedByKey] = useState(false);
+  /** Escape closes the rename field, and the blur it causes must not save. */
+  const cancelledRename = useRef(false);
   const [query, setQuery] = useState("");
   // Which row the pointer or the keyboard is on, which row's menu is open, and
   // the opening-words preview for the hovered one. Local rather than store state:
@@ -885,78 +891,34 @@ export function AgentHubList({
                   index < visible.length - 1 ? "1px solid var(--line-1)" : undefined,
               }}
             >
-              {deletingId === row.id ? (
-                <div
-                  style={{
-                    ...ROW_STYLE,
-                    flexDirection: "column",
-                    alignItems: "stretch",
-                    // The one place the hairline stays: this panel is a
-                    // confirmation inside the row, and without an edge it reads
-                    // as the row's own content (myne-md/myne#848).
-                    border: "1px solid var(--line-1)",
-                  }}
-                >
-                  <p
-                    style={{
-                      ...ERROR_STYLE,
-                      color: "var(--fg-1)",
-                      margin: 0,
-                      fontWeight: "var(--weight-medium)",
-                    }}
-                  >
-                    {t("editor.chrome.rightPanel.aiChat.historyDeleteTitle")}
-                  </p>
-                  <p
-                    style={{ ...ERROR_STYLE, color: "var(--fg-1)", margin: 0 }}
-                  >
-                    {t("editor.chrome.rightPanel.aiChat.historyDeleteBody")}
-                  </p>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "var(--space-2)",
-                      justifyContent: "flex-end",
-                    }}
-                  >
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      data-testid="agent.hub-delete-cancel"
-                      onClick={() => setDeletingId(null)}
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      data-testid="agent.hub-delete-confirm"
-                      onClick={() => void commitDelete(row.id)}
-                    >
-                      {t("editor.chrome.rightPanel.aiChat.historyDelete")}
-                    </Button>
-                  </div>
-                </div>
-              ) : renamingId === row.id ? (
+              {renamingId === row.id ? (
+                // **The field IS the rename** (2026-11-27, on the owner's read:
+                // "there should be no Rename button, a text field is enough").
+                // Enter or leaving the field saves, Escape drops the edit, and
+                // the button that used to sit beside it restated what the field
+                // already said.
                 <div style={ROW_STYLE}>
                   <Input
                     data-testid="agent.hub-rename-input"
                     aria-label={t("common.rename")}
                     value={draft}
+                    autoFocus
                     onChange={(e) => setDraft(e.currentTarget.value)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onBlur={() => {
+                      // Escape already closed the field; this blur is the
+                      // consequence of that, not a second answer to it.
+                      if (cancelledRename.current) return;
+                      void commitRename(row.id);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void commitRename(row.id);
-                      if (e.key === "Escape") setRenamingId(null);
+                      if (e.key === "Escape") {
+                        cancelledRename.current = true;
+                        setRenamingId(null);
+                      }
                     }}
                   />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    data-testid="agent.hub-rename-confirm"
-                    onClick={() => void commitRename(row.id)}
-                  >
-                    {t("common.rename")}
-                  </Button>
                 </div>
               ) : (
                 <div
@@ -1249,6 +1211,7 @@ export function AgentHubList({
                             onClick={() => {
                               setDeletingId(null);
                               setDraft(row.title);
+                              cancelledRename.current = false;
                               setRenamingId(row.id);
                               setMenuId(null);
                             }}
@@ -1259,8 +1222,9 @@ export function AgentHubList({
                             variant="ghost"
                             data-testid="agent.hub-delete"
                             style={MENU_ITEM_STYLE}
-                            onClick={() => {
+                            onClick={(e) => {
                               setRenamingId(null);
+                              setDeleteOpenedByKey(e.detail === 0);
                               setDeletingId(row.id);
                               setMenuId(null);
                             }}
@@ -1296,28 +1260,14 @@ export function AgentHubList({
                         data-testid="agent.hub-anchor"
                         data-note-id={row.note_id}
                         disabled={onOpenNote === undefined}
-                        // **The note's NAME, not the words "On a note"**
-                        // (myne-md/myne#848, on the user's ask). "On a note"
-                        // told a reader the KIND of anchor and nothing else, on
-                        // the one line where the answer to "which note?" was
-                        // available all along: the sidebar's cache holds every
-                        // title, and the conversation row carries the id.
-                        //
-                        // A NAME IS CONTENT, so the question is whether this is
-                        // a new disclosure. It is not: the card already renders
-                        // the conversation's own title (often a phrase out of
-                        // the note), the sidebar beside it renders every note's
-                        // title, and the read is an in-memory lookup in the
-                        // UNLOCKED editor. Nothing here crosses a boundary,
-                        // no IPC, no sync field, no egress, no ACL grant, and
-                        // the vault's own titles are not a secret from the
-                        // vault's own UI. It is not shown anywhere a locked or
-                        // absent vault can see it, because this rail only
-                        // exists inside the unlocked editor.
-                        //
-                        // The full name is the accessible name; the visible text
-                        // ellipsizes, because the pill sits in a 248px row beside
-                        // the date.
+                        // **The note's NAME, not "On a note"** (myne-md/myne#848):
+                        // the answer to "which note?" was available all along,
+                        // and reading it crosses no boundary — an in-memory
+                        // lookup inside the unlocked editor, no IPC, no sync
+                        // field, no egress, and a vault's own titles are not a
+                        // secret from that vault's UI. The full name is the
+                        // accessible name; the visible text ellipsizes in a
+                        // 248px row beside the date.
                         aria-label={
                           anchorTitle === null
                             ? t("agent.hub.targetNote")
@@ -1440,6 +1390,27 @@ export function AgentHubList({
           })}
         </ScrollArea>
       )}
+
+      {/* **A dialog, not a confirmation grown inside the row** (2026-11-27, on
+          the owner's read). The inline version pushed every row below it down to
+          make room for two sentences and two buttons, and it read as the row's
+          own content. The dialog is the app's existing one, so the wording, the
+          danger button and the focus rules are the ones every other delete in
+          Myne already uses. */}
+      {deletingId !== null ? (
+        <DeleteConfirmModal
+          title={t("editor.chrome.rightPanel.aiChat.historyDeleteTitle")}
+          body={t("editor.chrome.rightPanel.aiChat.historyDeleteBody")}
+          // The body already says it cannot be undone.
+          warning=""
+          confirmLabel={t("editor.chrome.rightPanel.aiChat.historyDelete")}
+          confirmTestId="agent.hub-delete-confirm"
+          cancelTestId="agent.hub-delete-cancel"
+          openedByKey={deleteOpenedByKey}
+          onCancel={() => setDeletingId(null)}
+          onConfirm={() => void commitDelete(deletingId)}
+        />
+      ) : null}
     </div>
   );
 }
