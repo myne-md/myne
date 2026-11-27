@@ -344,15 +344,11 @@ export function CalendarEventForm({
   // instead of dropping the user's input.
   const openNote = useCallback(async () => {
     const dirty = JSON.stringify(values) !== JSON.stringify(initial);
-    try {
-      if (dirty) {
-        const ok = await submit();
-        if (!ok) return;
-      } else {
-        onClose();
-      }
-    } catch {
-      return;
+    if (dirty) {
+      const ok = await submit();
+      if (!ok) return;
+    } else {
+      onClose();
     }
     onOpenNote?.();
   }, [values, initial, submit, onClose, onOpenNote]);

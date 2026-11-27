@@ -143,6 +143,75 @@ describe("reaching the note behind an event", () => {
     expect(host.querySelector('[data-testid="workspace.activeTab"]')?.textContent).toBe("n1");
     cleanup();
   });
+
+  it("commits a dirty edit before opening the note", async () => {
+    const { host, cleanup } = await renderPane(
+      <>
+        <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />
+        <WorkspaceProbe />
+      </>,
+    );
+    const chip = host.querySelector('[data-testid="calendar.row"]');
+    expect(chip).not.toBeNull();
+    await act(async () => {
+      chip!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const openNote = host.querySelector('[data-testid="calendar.form.openNote"]');
+    expect(openNote).not.toBeNull();
+
+    // Dirty the form: change the title so submit() has something to write.
+    const field = host.querySelector(".myne-event-form input") as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(field, "Coffee");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const before = written.length;
+    await act(async () => {
+      openNote!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await act(async () => {});
+    await vi.waitFor(() => expect(written.length).toBe(before + 1));
+    expect(written[written.length - 1]).toContain("Coffee");
+    expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
+    expect(host.querySelector('[data-testid="workspace.activeTab"]')?.textContent).toBe("n1");
+    cleanup();
+  });
+
+  it("leaves the dialog open when the dirty edit is refused", async () => {
+    const { host, cleanup } = await renderPane(
+      <>
+        <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />
+        <WorkspaceProbe />
+      </>,
+    );
+    const chip = host.querySelector('[data-testid="calendar.row"]');
+    expect(chip).not.toBeNull();
+    await act(async () => {
+      chip!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const openNote = host.querySelector('[data-testid="calendar.form.openNote"]');
+    expect(openNote).not.toBeNull();
+
+    // Make the edit invalid: clear the title so planEventForm refuses.
+    const field = host.querySelector(".myne-event-form input") as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(field, "");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const before = written.length;
+    await act(async () => {
+      openNote!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await act(async () => {});
+    expect(written.length).toBe(before);
+    expect(host.querySelector('[data-testid="calendar.form"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="workspace.activeTab"]')?.textContent).not.toBe("n1");
+    cleanup();
+  });
 });
 
 describe("dragging an event", () => {
