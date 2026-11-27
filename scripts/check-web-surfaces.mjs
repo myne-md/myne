@@ -319,6 +319,15 @@ const V = {
     "`closeApp` was deleted in task 95; the fail-closed exit is the `app-exit` seam, whose web arm reloads the page.",
   ],
   "src/lib/attachments.ts": ["ported", "IPC bindings; the import path moved to the seam in task 67."],
+  "src/lib/ephemeralAttachment.ts": [
+    "typed-unsupported",
+    "Reads one picked/pasted/photographed file through `plugin:attachments|attachment_extract_ephemeral`, " +
+      "which the attachments plugin does not dispatch on web (`Class::Pending`, and the command is " +
+      "not in the dispatched list), so the backend answers a typed refusal rather than running. " +
+      "Ships in the bundle — the composer mounts it — but no web surface reads it: the AI panel " +
+      "is capability-gated and the device lane is desktop/mobile only. Typed rather than excluded " +
+      "because the module is still compiled and its binding is one invoke.",
+  ],
   "src/lib/import-source-vault.ts": [
     "typed-unsupported",
     "Vault import (myne-md/myne#464). Every binding here wraps an `importer:` " +

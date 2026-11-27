@@ -49,6 +49,11 @@ vi.mock("../../src/lib/agent-run", () => ({
   agentPreviewGrant: (...a: unknown[]) => agentPreviewGrant(...a),
 }));
 
+const readEphemeralFile = vi.fn();
+vi.mock("../../src/lib/ephemeralAttachment", () => ({
+  readEphemeralFile: (...a: unknown[]) => readEphemeralFile(...a),
+}));
+
 import {
   ChatComposer,
   VAULT_SCOPE_SENTINEL,
@@ -1529,5 +1534,34 @@ describe("ChatComposer: the draft belongs to its conversation (myne-md/myne#913)
     expect(
       (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
     ).toBe("");
+  });
+});
+
+describe("ChatComposer: send is gated while a device read is in flight", () => {
+  it("disables Send while readingDevice is true", async () => {
+    let resolveRead: ((r: unknown) => void) | undefined;
+    readEphemeralFile.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    mount();
+    type("hello");
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const file = new File(["x"], "a.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+    await act(async () => {
+      resolveRead?.({ name: "a.txt", text: "hi", status: "ok", char_count: 2, truncated: false });
+      await Promise.resolve();
+    });
   });
 });

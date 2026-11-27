@@ -685,7 +685,7 @@ export function ChatComposer({
    */
   const scopeEmpty = preview !== null && preview !== "failed" && preview.noteCount === 0;
   const blocked =
-    empty || busy || probing || refused || scopeEmpty || readingDocs || pasting.length > 0;
+    empty || busy || probing || refused || scopeEmpty || readingDocs || readingDevice || pasting.length > 0;
 
   // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
   // rather than counted from newlines, so a long wrapped line grows too.
