@@ -58,6 +58,15 @@ const {
   ),
 }));
 
+const { listFolderPathsMock } = vi.hoisted(() => ({
+  listFolderPathsMock: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock("../../src/notes/listFolderPaths", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/notes/listFolderPaths")>()),
+  listFolderPaths: listFolderPathsMock,
+}));
+
 vi.mock("../../src/lib/mcp-access", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/mcp-access")>()),
   readMcpExternalAccess,
@@ -185,6 +194,26 @@ describe("the external-access section", () => {
     expect(line).toContain("Work");
     expect(line).not.toContain("Projects/");
     expect(line).not.toContain("nowhere");
+  });
+
+  it("disambiguates two same-named folders via their full paths", async () => {
+    listFolderPathsMock.mockResolvedValue([
+      { path: "Work/Projects/", label: "  Projects" },
+      { path: "Home/Projects/", label: "  Projects" },
+    ]);
+    readMcpExternalAccess.mockResolvedValue(
+      view(
+        [connection({ writeFolders: ["Work/Projects/", "Home/Projects/"] })],
+        [request({ folder: "Work/Projects/" })],
+      ),
+    );
+    renderSection();
+    const card = await screen.findByTestId("settings.mcp-request");
+    expect(card.textContent).toContain("Work/Projects");
+    const line =
+      screen.getByTestId("settings.mcp-write-scope").textContent ?? "";
+    expect(line).toContain("Work/Projects");
+    expect(line).toContain("Home/Projects");
   });
 
   it("offers a queued out-of-scope write with what it wanted, and accepts it", async () => {

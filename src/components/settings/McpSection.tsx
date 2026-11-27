@@ -1171,12 +1171,6 @@ function useFolderLabels(): ReadonlyMap<string, string> {
   return labels;
 }
 
-function folderName(folder: string): string {
-  const trimmed = folder.replace(/\/+$/, "");
-  const cut = trimmed.lastIndexOf("/");
-  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
-}
-
 function folderOptions(
   folders: readonly string[],
   labels: ReadonlyMap<string, string>,
@@ -1187,7 +1181,7 @@ function folderOptions(
     label:
       folder === ""
         ? t("settings.ai.externalAccess.rootFolder")
-        : (labels.get(folder) ?? folderName(folder)),
+        : (labels.get(folder) ?? folder.replace(/\/+$/, "")),
   }));
 }
 
@@ -1199,7 +1193,7 @@ function folderLabel(
   if (folder === "") return t("settings.ai.externalAccess.rootFolder");
   const resolved = labels?.get(folder);
   if (resolved !== undefined) return resolved;
-  return folderName(folder);
+  return folder.replace(/\/+$/, "");
 }
 
 function verbLabel(
