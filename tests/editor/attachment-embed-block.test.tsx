@@ -82,6 +82,8 @@ function placement(host: HTMLElement): "block" | "inline" | "absent" {
 describe("an embed alone on its line is drawn as a block", () => {
   it("draws a block when the line holds nothing else", async () => {
     mounted = await mount(EMBED);
+    // eslint-disable-next-line no-console
+    console.log("DBG HTML", mounted.host.innerHTML.slice(0, 500));
     expect(placement(mounted.host)).toBe("block");
   });
 
@@ -274,7 +276,9 @@ describe("a block embed's spacing lives inside the measured box", () => {
     // so a margin on the card is height CodeMirror never counts. Padding on a
     // parent it does measure is counted. A card that IS the widget's DOM has
     // nowhere to put that padding without growing its own border.
-    expect(frame.parentElement?.className).toBe("cm-attachment-block");
+    // The wrapper, and (since 2026-11-27) the caret's own mark on it: the
+    // assertion is about the wrapper existing, not about it being the only class.
+    expect(frame.parentElement?.classList.contains("cm-attachment-block")).toBe(true);
   });
 
   it("leaves the INLINE form unwrapped", async () => {
@@ -285,5 +289,46 @@ describe("a block embed's spacing lives inside the measured box", () => {
     const frame = mounted.host.querySelector(".cm-attachment-frame") as HTMLElement;
     expect(frame).not.toBeNull();
     expect(frame.closest(".cm-attachment-block")).toBeNull();
+  });
+});
+
+// **The embed the caret is on shows itself** (2026-11-27, on the owner's read:
+// while moving through a note with the arrow keys, the image whose line the
+// caret reaches should wear the app's edge, which is more legible than the
+// zoom cursor alone). Lights up on the LINE the selection touches, and only
+// there: a ring on every embed would be ambient chrome on a writing surface.
+describe("the embed under the caret", () => {
+  it("marks the embed's own line and no other", async () => {
+    mounted = await mount(`prose above\n\n${EMBED}\n\nprose below`);
+    const { view, host } = mounted;
+    expect(host.querySelector(".cm-embed-active")).toBeNull();
+
+    // The line after the embed: the caret is outside it, so nothing lights up.
+    view.dispatch({ selection: { anchor: view.state.doc.line(5).from } });
+    await Promise.resolve();
+    expect(host.querySelector(".cm-embed-active")).toBeNull();
+
+    // Onto the embed's own line, where an atomic embed leaves the caret sitting
+    // before it.
+    const embedLine = view.state.doc.line(3);
+    view.dispatch({ selection: { anchor: embedLine.from } });
+    view.requestMeasure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const marked = host.querySelectorAll(".cm-embed-active");
+    expect(marked).toHaveLength(1);
+    // The mark is on the embed's own wrapper, not on a neighbour line.
+    expect(marked[0].classList.contains("cm-attachment-block")).toBe(true);
+  });
+
+  it("takes the mark off when the caret leaves the line", async () => {
+    mounted = await mount(`${EMBED}\n\nprose`);
+    const { view, host } = mounted;
+    view.dispatch({ selection: { anchor: 0 } });
+    await Promise.resolve();
+    expect(host.querySelector(".cm-embed-active")).not.toBeNull();
+
+    view.dispatch({ selection: { anchor: view.state.doc.line(3).from } });
+    await Promise.resolve();
+    expect(host.querySelector(".cm-embed-active")).toBeNull();
   });
 });
