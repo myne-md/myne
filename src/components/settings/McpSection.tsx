@@ -93,6 +93,24 @@ const ROW_STYLE: CSSProperties = {
   borderTop: "1px solid var(--line-1)",
 };
 
+const REQUEST_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexWrap: "wrap",
+  gap: "var(--space-3)",
+  padding: "var(--space-3)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+};
+// A request is a decision, not a scope line: own surface, buttons beside it.
+const REQUEST_LINE_STYLE: CSSProperties = {
+  ...HELPER_STYLE,
+  color: "var(--fg-1)",
+  flex: "1 1 240px",
+  minWidth: 0,
+};
 const ROW_HEAD_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -378,9 +396,6 @@ export function McpSection({
     return () => onDialogOpenChange?.(false);
   }, [flow !== null, onDialogOpenChange]);
 
-  // The count the scope step states, recomputed by the host as folders are
-  // ticked. Deliberately decorative: a missing count costs the number and never
-  // the accept (see the file header).
   // What the one list means to the grant underneath: the selected folders are the
   // write scope, and every folder it does not name is excluded from reads, so one
   // list answers both questions. A folder created later is in neither, which keeps
@@ -615,11 +630,11 @@ export function McpSection({
           {pending.map((request) => (
             <div
               key={`${request.connection}\u0000${request.folder}\u0000${request.kind}`}
-              style={ROW_STYLE}
+              style={REQUEST_STYLE}
               data-testid="settings.mcp-request"
               data-kind={request.kind}
             >
-              <p style={HELPER_STYLE}>
+              <p style={REQUEST_LINE_STYLE}>
                 {request.kind === "read"
                   ? t("settings.ai.externalAccess.requestLineRead", {
                       connection: request.connection,
