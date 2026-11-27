@@ -865,6 +865,26 @@ describe("AiChatFlow: turn diff and revert icons (myne-md/myne#741)", () => {
     expect(screen.queryByTestId("ai.composer-device-attachment")).toBeNull();
   });
 
+  it("caps device chips at MAX_RUN_ATTACHMENTS when more files are picked at once", async () => {
+    mockReadEphemeralFile.mockImplementation((file: File) => Promise.resolve({
+      name: file.name,
+      text: "reading " + file.name,
+      status: "ok",
+      char_count: 8,
+      truncated: false,
+    }));
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = Array.from({ length: 6 }, (_, i) =>
+      new File([new Uint8Array([i + 1])], `doc-${i + 1}.txt`, { type: "text/plain" }),
+    );
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+    });
+    await waitFor(() => expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(4));
+    expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(4);
+  });
+
   it("keeps Send disabled while a device read is still in flight", async () => {
     // readEphemeralFile never resolves: the reading is still running, so the
     // composer must not let a stale draft be sent over it.

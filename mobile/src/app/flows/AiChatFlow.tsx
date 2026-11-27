@@ -601,7 +601,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           }
           readings.push(reading);
         }
-        if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings]);
+        if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings].slice(0, MAX_RUN_ATTACHMENTS));
       } finally {
         setReadingDevice(false);
         // Or picking the same file twice fires no `change` event.
