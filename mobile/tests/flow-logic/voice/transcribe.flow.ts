@@ -156,6 +156,7 @@ test.describe("audio transcript reader (myne-md/myne#886)", () => {
     // Open the note so the editor (and its format bar) mount, then the in-editor
     // attachments sheet through the bar's library action.
     await page.getByTestId("notes.row").first().click();
+    await page.getByTestId("editor.format-more").click();
     await page.getByRole("button", { name: "Insert from library" }).click();
     await page.getByTestId("files.row-open").first().click();
     await expect(page.getByTestId("files.transcript-sheet")).toBeVisible();

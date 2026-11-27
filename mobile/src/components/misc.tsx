@@ -250,18 +250,34 @@ export function Sheet({
           // clamped and centred.
           width: sheetIsDocked ? "100%" : "min(560px, calc(100% - 24px))",
           margin: sheetIsDocked ? 0 : "0 auto",
-          marginBottom: sheetIsDocked
-            ? `env(safe-area-inset-bottom, 0px)`
-            : "calc(12px + env(safe-area-inset-bottom, 0px))",
+          // A docked sheet owes the home indicator PADDING, not a margin: a
+          // margin lifted the card off the screen edge and left a band of scrim
+          // visible under it on every sheet (owner, 2026-11-27 round 2:
+          // "sheet'in en alt kısmında bir problem var" / "bu bug her sheette var").
+          marginBottom: sheetIsDocked ? 0 : "calc(12px + env(safe-area-inset-bottom, 0px))",
           background: "var(--bg-1)",
           // The docking edge carries no border: a hairline drawn to the screen
           // edge is the "rectangle pasted on" look the owner rejected.
           border: sheetIsDocked ? "none" : "1px solid var(--line-2)",
           borderRadius: sheetIsDocked ? "var(--m-radius-sheet) var(--m-radius-sheet) 0 0" : 24,
-          padding: padded ? "10px 18px 20px" : "10px 0 20px",
+          padding: padded
+            ? sheetIsDocked
+              ? "10px 18px calc(18px + env(safe-area-inset-bottom, 0px))"
+              : "10px 18px 20px"
+            : sheetIsDocked
+              ? "10px 0 calc(18px + env(safe-area-inset-bottom, 0px))"
+              : "10px 0 20px",
           boxShadow: "var(--shadow-3)",
           transform: shown ? `translateY(${dragY}px)` : "translateY(calc(100% + 24px))",
-          transition: dragging ? "none" : "transform var(--duration-slow) var(--ease-emphasized)",
+          // A panel swap INSIDE an open sheet changes the card's height, and going
+          // long → short snapped (owner, 2026-11-27 round 2: "çat diye kısalıyor").
+          // `interpolate-size` lets `height: auto` interpolate; where the engine
+          // does not know it the declaration is ignored and the resize stays
+          // instant, which is the old behaviour rather than a broken one.
+          interpolateSize: "allow-keywords",
+          transition: dragging
+            ? "none"
+            : "transform var(--duration-slow) var(--ease-emphasized), height var(--duration-slow) var(--ease-standard)",
           willChange: "transform",
           ...style,
         }}

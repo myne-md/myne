@@ -55,6 +55,22 @@ export type TaskListPanelProps = {
   view: TaskView;
   today: string;
   rowScope: TaskRowScope;
+  /** Render each row on two lines (text, then its metadata underneath). A phone
+   *  cannot fit text + date + source note + menu on one line without ellipsising
+   *  every title, so the mobile host asks for this; desktop keeps one line. */
+  twoLine?: boolean;
+  /** Host the filter builder in the caller's own surface instead of the
+   *  tooltip-style popover. Mobile passes a bottom-sheet renderer: the popover
+   *  is a pointer affordance and reads as a stray dropdown on a phone. */
+  filterSheet?: (args: {
+    view: TaskView;
+    onViewChange: (next: TaskView) => void;
+    onClose: () => void;
+    folderOptions: readonly string[];
+    noteOptions: readonly (readonly [string, string])[];
+    tagOptions: readonly string[];
+    testIdPrefix: string;
+  }) => React.ReactNode;
   tagsOf?: (noteId: string) => readonly string[];
   rebuilding?: boolean;
   onViewChange: (next: TaskView) => void;
@@ -654,7 +670,7 @@ function BuilderValueRow({
  * It is an inline non-modal builder (no focus trap): Tab may leave it, and
  * Escape is the keyboard close.
  */
-function TaskFilterBuilder({
+export function TaskFilterBuilder({
   view,
   onViewChange,
   onClose,
@@ -932,6 +948,8 @@ export function TaskListPanel({
   view,
   today,
   rowScope,
+  twoLine,
+  filterSheet,
   tagsOf,
   rebuilding = false,
   onViewChange,
@@ -1159,20 +1177,32 @@ export function TaskListPanel({
           )}
         </div>
 
-        {!minimal && builderOpen ? (
-          <>
-            <div style={BUILDER_BACKDROP_STYLE} onClick={() => setBuilderOpen(false)} />
-            <TaskFilterBuilder
-              view={view}
-              onViewChange={onViewChange}
-              onClose={closeBuilder}
-              folderOptions={folderOptions}
-              noteOptions={noteOptions}
-              tagOptions={tagOptions}
-              testIdPrefix={testIdPrefix}
-            />
-          </>
-        ) : null}
+        {!minimal && builderOpen
+          ? filterSheet === undefined
+            ? (
+              <>
+                <div style={BUILDER_BACKDROP_STYLE} onClick={() => setBuilderOpen(false)} />
+                <TaskFilterBuilder
+                  view={view}
+                  onViewChange={onViewChange}
+                  onClose={closeBuilder}
+                  folderOptions={folderOptions}
+                  noteOptions={noteOptions}
+                  tagOptions={tagOptions}
+                  testIdPrefix={testIdPrefix}
+                />
+              </>
+            )
+            : filterSheet({
+                view,
+                onViewChange,
+                onClose: closeBuilder,
+                folderOptions,
+                noteOptions,
+                tagOptions,
+                testIdPrefix,
+              })
+          : null}
 
         {!minimal && chips.length > 0 ? (
           <div style={CHIPS_ROW_STYLE} data-testid={`${testIdPrefix}.appliedFilters`}>
@@ -1222,6 +1252,7 @@ export function TaskListPanel({
                 today={today}
                 compactX
                 inlineDate
+                {...(twoLine === true ? { twoLine: true } : {})}
                 roomyBox={roomyBox}
                 testIdPrefix={`${testIdPrefix}.row`}
                 {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
@@ -1249,6 +1280,7 @@ export function TaskListPanel({
                     scope={rowScope}
                     today={today}
                     roomyBox={roomyBox}
+                    {...(twoLine === true ? { twoLine: true } : {})}
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}

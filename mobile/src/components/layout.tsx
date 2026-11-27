@@ -8,10 +8,18 @@ import { Icon } from "./Icon";
  * header / footer fragments the design uses on most flow screens.
  */
 
-/** Top padding for a full-page tab header — clears the notch / status bar
- *  (safe-area-inset-top with a 60px floor for the gallery). Shared by the
- *  list, Search, Graph, Files, and Templates pages so their titles align. */
-export const LIST_TOP = "max(60px, calc(env(safe-area-inset-top) + 12px))";
+/** Top padding for every full-page header — the ONE status-bar clearance.
+ *
+ *  **The 60px floor is gone** (owner, 2026-11-27 round 2: "hala top safe space
+ *  sorunları var"). It existed for the design gallery, where `env()` resolves to
+ *  0, and it also fired on an iPad whose safe-area inset is only ~24pt: the list
+ *  header then sat 36pt lower than the rail beside it, and the Files page — which
+ *  never had the token at all — drew its title under the clock. One token, the
+ *  device's own inset plus a small gap, and a modest floor for the gallery.
+ *
+ *  Every page header inside the shell (list, Files, Templates, Graph, Tasks,
+ *  Calendar, the rail) reads this, so their first rows line up. */
+export const LIST_TOP = "max(calc(env(safe-area-inset-top, 0px) + 12px), 26px)";
 
 /** Status-bar clearance for a page that lives INSIDE the app shell (a full-screen
  *  destination pushed over the tabs, or a sheet expanded to the screen).
@@ -22,7 +30,7 @@ export const LIST_TOP = "max(60px, calc(env(safe-area-inset-top) + 12px))";
  *  2026-11-27: "o üst paddingler o kadar saçmaysa yapmayalım öyle"). These pages
  *  are only ever rendered on a device or in the flow-logic tier, so the floor is
  *  the small one. */
-export const SCREEN_TOP = "max(env(safe-area-inset-top, 0px) + 8px, 20px)";
+export const SCREEN_TOP = LIST_TOP;
 
 export function Screen({
   children,

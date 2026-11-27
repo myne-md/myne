@@ -28,6 +28,7 @@ import {
   SyncBanners,
   ConflictsSheet,
   AiOnboardingSheet,
+  LIST_TOP,
 } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted, createTitledNote } from "../../lib/notes";
 import {
@@ -187,6 +188,7 @@ import { ListDrawer } from "./editor/sheets/ListDrawer";
 import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRestore";
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { NavRibbon } from "./editor/chrome/NavRibbon";
+import { HomeSurfaceMobile } from "./editor/HomeSurfaceMobile";
 import { AppHeader } from "./editor/chrome/AppHeader";
 import { useAutosave } from "./editor/chrome/useAutosave";
 import { ActionPill } from "./editor/chrome/ActionPill";
@@ -204,7 +206,7 @@ import { AiChatFlow } from "./AiChatFlow";
 import { TaskSurface } from "../../components/TaskSurface";
 import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { takeReminderLanding } from "../../lib/reminderLanding";
-import { vaultTasks } from "../../lib/tasks";
+import { useVaultTasks, vaultTasks } from "../../lib/tasks";
 import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
 import { CommandPalette } from "./editor/sheets/CommandPalette";
 import { FilterSheet } from "./editor/sheets/FilterSheet";
@@ -258,6 +260,9 @@ type Editing = { id: string | null };
  *  transition: moving to a higher-indexed tab enters from the right, a
  *  lower-indexed tab from the left (an iOS push/pop feel across the tab row). */
 const TAB_ORDER: Record<WorkspaceTab, number> = {
+  // Home is the leftmost page: it sits before the list, so entering it slides in
+  // from the left like a back-navigation.
+  home: -1,
   notes: 0,
   // MYND-620: `tasks` is placed between notes and graph rather than appended,
   // because this record is what decides the push/pop slide direction - a tab
@@ -1269,6 +1274,19 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     | null
   >(null);
   const [folderPromptInput, setFolderPromptInput] = useState("");
+  // Focus the name field AFTER the sheet has finished sliding in (owner,
+  // 2026-11-27 round 2: the new-folder screen "bütün render olan ekranı yukarı
+  // itiyor sonra geri jumplıyor"). iOS raises the keyboard the moment a field
+  // takes focus, and the app's height follows the visual viewport, so an
+  // `autoFocus` inside a sheet that is still animating shrank the whole screen
+  // mid-slide and released it a frame later. Waiting for the enter transition is
+  // the standard shape: the sheet lands, then the keyboard rises under it.
+  const folderPromptInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!folderPrompt) return;
+    const handle = window.setTimeout(() => folderPromptInputRef.current?.focus(), 280);
+    return () => window.clearTimeout(handle);
+  }, [folderPrompt]);
   // Color / folder-icon picker target (MYND-516) - a note (color only) or a
   // folder (color + icon). Opened from the long-press action sheets.
   const [decoTarget, setDecoTarget] = useState<
@@ -3703,6 +3721,18 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // the list - the compact editor screen skips it entirely, so typing there
   // never pays for the tree/filter/sort recomputation. `chrome` strips the
   // AppHeader / TabBar on expanded, where the sidebar absorbs both.
+  // ── Home surface inputs ────────────────────────────────────────────────────
+  // `favNotes` is built inside the list-pane render helper because the strip
+  // owns it there; Home needs the same set one level up, so it is derived here
+  // rather than threaded out of a renderer.
+  const homeFavouriteNotes = prefs.favorites
+    .map((id) => workingNotes.find((n) => n.id === id))
+    .filter((n): n is NoteEntry => n != null);
+  const homeTasks = useVaultTasks().tasks;
+  // A count of the folders this vault REGISTERS, which is the same set the
+  // sidebar shows; deriving it from note bodies would need every body loaded.
+  const homeFolderCount = prefs.deliberate_folders.length;
+
   const renderNotesPane = (chrome: { header: boolean; tabBar: boolean }) => {
     const viewActive = listView === "notes" && activeView != null;
     const searchNeedle = searchQuery.trim().toLowerCase();
@@ -3887,7 +3917,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       <>
         {/* Fixed header - sits OUTSIDE the animated pane so it stays put while
             the tab content slides between pages. */}
-        {chrome.header && tab !== "templates" && (
+        {chrome.header && tab !== "templates" && tab !== "home" && (
           <AppHeader
             label={vaultDisplayLabel(prefs.label)}
             icon={prefs.icon}
@@ -3959,12 +3989,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 </div>
               </div>
 
-              {/* Secondary create/browse tiles - New drawing / Template / Daily
-                  note / Views. Each is hideable from Settings → Appearance: the
-                  original three via MYND-479, New drawing (MYND-515) folded into
-                  the same mechanism by MYND-538. */}
+              {/* The create/browse tiles (owner, 2026-11-27 round 2: "bunlar
+                  iPad'de 5'li, iPhone'da 6'lı olmalı"). Home leads, Files closes
+                  the row on a phone; on the regular size classes Files is
+                  dropped because the rail already carries it, which is what
+                  makes the row exactly 5 there and exactly 6 on a phone. Each
+                  tile stays hideable from Settings → Appearance. */}
               {listView === "notes" && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                  <ActionPill onClick={() => setTab("home")} label={t("notes.home.title")} testid="notes.home-tile">
+                    <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
+                  </ActionPill>
                   {!hiddenHomeTiles.has("new-drawing") && (
                     <ActionPill onClick={newDrawing} label={t("notes.newTab.createDrawing")} testid="notes.new-drawing-tile">
                       <path d="M12 20h9" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" />
@@ -3988,6 +4023,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                       <path d="M12 2 2 7l10 5 10-5-10-5z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                       <path d="M2 12l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
                       <path d="M2 17l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                    </ActionPill>
+                  )}
+                  {!isRegular && (
+                    <ActionPill onClick={() => setTab("files")} label={t("settings.shell.panels.files")} testid="notes.files-tile">
+                      <path d="M3.5 7a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.7.9l.9 1.4a2 2 0 0 0 1.7.9H19a2 2 0 0 1 2 2v6.8a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                     </ActionPill>
                   )}
                 </div>
@@ -4338,9 +4378,33 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             Files destination above - one component serving both a full-screen
             destination and an editor sheet. */}
         {tab === "calendar" && <CalendarSurface onClose={() => setTab("notes")} />}
+        {tab === "home" && (
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: LIST_TOP }}>
+            <HomeSurfaceMobile
+              notes={notes}
+              tasks={homeTasks}
+              favouriteNotes={homeFavouriteNotes}
+              views={orderedViews}
+              folderCount={homeFolderCount}
+              onOpenNote={(id) => void openFromList(id)}
+              onNewNote={() => void newNote()}
+              onNewDrawing={() => void newDrawing()}
+              onOpenToday={() => void openToday()}
+              onOpenTasks={() => setTab("tasks")}
+              onOpenViews={() => setViewsOpen(true)}
+              onOpenView={(v) => { setTab("notes"); setActiveViewId(v.id); }}
+              onOpenAllNotes={() => setTab("notes")}
+            />
+          </div>
+        )}
         {tab === "tasks" && (
           <TaskSurface
             scope={{ kind: "vault" }}
+            // The AppHeader (vault switcher + search + gear) already clears the
+            // status bar on the compact and medium layouts; only the expanded
+            // layout, where the rail replaces that header, needs the surface to
+            // pay for the inset itself.
+            insideHeader={sizeClass !== "expanded"}
             tagsOf={tagsOfNote}
             view={vaultTaskView}
             onViewChange={setVaultTaskView}
@@ -4357,6 +4421,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {tab === "note-tasks" && editing?.id && (
           <TaskSurface
             scope={{ kind: "note", noteId: editing.id }}
+            insideHeader={sizeClass !== "expanded"}
             view={noteTaskView}
             onViewChange={setNoteTaskView}
             testIdPrefix="tasks.note-tab"
@@ -4696,6 +4761,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                       : t("common.newfolder")}
                 </div>
                 <input
+                  ref={folderPromptInputRef}
                   data-testid="notes.folder-prompt-input"
                   value={folderPromptInput}
                   onChange={(e) => setFolderPromptInput(e.target.value)}
@@ -4705,7 +4771,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                       ? t("notes.list.newFolderInPlaceholder", { path: folderPrompt.parent.replace(/\/$/, "") })
                       : t("common.newfolder")
                   }
-                  autoFocus
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
@@ -5437,6 +5502,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             listView={listView}
             hasNote={editing?.id !== undefined}
             aiEnabled={prefs.ai_enabled === true}
+            onHome={() => setTab("home")}
             onAllNotes={() => { setTab("notes"); setListView("notes"); setActiveTag(null); setActiveViewId(null); }}
             onTasks={() => setTab("tasks")}
             {...(editing?.id === undefined ? {} : { onNoteTasks: () => setTab("note-tasks") })}

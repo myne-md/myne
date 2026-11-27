@@ -14,7 +14,8 @@
 // drift from the desktop's.
 
 import { useMemo, useState, type ReactNode } from "react";
-import { TaskListPanel } from "@myne/task-panel";
+import { TaskFilterBuilder, TaskListPanel } from "@myne/task-panel";
+import { Sheet } from "./misc";
 import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { todayLocal } from "@myne/task-filters";
 import { setTaskCompleted, setTaskField, useVaultTasks, type VaultTask } from "../lib/tasks";
@@ -32,6 +33,9 @@ export type TaskSurfaceProps = {
   tagsOf?: (noteId: string) => readonly string[];
   /** Open the task's note at its line. Absent → rows are not openable. */
   onOpen?: (task: VaultTask) => void;
+  /** True when the caller already renders a page header (the AppHeader) above
+   *  this surface, so the surface must not add its own status-bar clearance. */
+  insideHeader?: boolean;
   /** Injected in tests; production reads the local calendar day. */
   today?: string;
   testIdPrefix?: string;
@@ -51,6 +55,7 @@ export function TaskSurface({
   onOpen,
   today,
   testIdPrefix,
+  insideHeader = false,
   view: controlledView,
   onViewChange,
 }: TaskSurfaceProps): ReactNode {
@@ -82,8 +87,12 @@ export function TaskSurface({
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
-        paddingTop: SCREEN_TOP,
-        paddingInline: 20,
+        // The host owns the frame: `SCREEN_TOP` unless an AppHeader already sits
+        // above this surface, and no extra gutter — the panel's own row padding
+        // is the gutter, and adding 20pt to it made every row sit 32pt in from
+        // the bezel (owner, 2026-11-27 round 2: "sol sağ padding şimdi de aşırı
+        // fazla").
+        ...(insideHeader ? { paddingTop: 0 } : { paddingTop: SCREEN_TOP }),
       }}
     >
       <TaskListPanel
@@ -95,6 +104,26 @@ export function TaskSurface({
       rowScope={scope.kind === "note" ? "note" : "vault"}
       // Touch-sized checkboxes: the shared dense 14px box is a mouse target.
       roomyBox
+      // The phone cannot fit a title, a date, a source note and a menu on one
+      // line without ellipsising every title; two lines puts the metadata under
+      // the text where it belongs on a narrow screen.
+      twoLine
+      // The desktop builder is a two-pane popover anchored to the toolbar. On a
+      // phone that reads as a stray dropdown floating over the list, so the same
+      // content is hosted in a bottom sheet instead.
+      filterSheet={({ view: filterView, onViewChange, onClose, folderOptions, noteOptions, tagOptions, testIdPrefix: prefix }) => (
+        <Sheet onClose={onClose}>
+          <TaskFilterBuilder
+            view={filterView}
+            onViewChange={onViewChange}
+            onClose={onClose}
+            folderOptions={folderOptions}
+            noteOptions={noteOptions}
+            tagOptions={tagOptions}
+            testIdPrefix={prefix}
+          />
+        </Sheet>
+      )}
       {...(tagsOf === undefined ? {} : { tagsOf })}
       onViewChange={handleViewChange}
       // The write goes through the SHARED sequence with mobile IO - including

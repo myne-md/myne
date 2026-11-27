@@ -1,14 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon, Sheet, VaultMark } from "../../../../components";
-import {
-  RIBBON_ORDER,
-  moveRibbonItem,
-  resetRibbonLayout,
-  setRibbonItemHidden,
-  useRibbonLayout,
-  type RibbonItemId,
-} from "../../../../lib/nav-ribbon";
+import { Icon, VaultMark } from "../../../../components";
+import { RIBBON_ORDER, ribbonLayout, type RibbonItemId } from "../../../../lib/nav-ribbon";
+import { LayoutCustomizeSheet, type CustomizeRow } from "./LayoutCustomizeSheet";
 import type { WorkspaceTab } from "./TabBar";
 
 /** The expanded-size-class navigation rail (myne-md/myne, 2026-11-27 polish
@@ -236,6 +230,7 @@ export function NavRibbon({
   listView,
   hasNote,
   aiEnabled,
+  onHome,
   onAllNotes,
   onTasks,
   onNoteTasks,
@@ -258,6 +253,7 @@ export function NavRibbon({
   listView: "notes" | "archive" | "trash";
   hasNote: boolean;
   aiEnabled: boolean;
+  onHome: () => void;
   onAllNotes: () => void;
   onTasks: () => void;
   onNoteTasks?: () => void;
@@ -275,7 +271,7 @@ export function NavRibbon({
   onSettings: () => void;
 }) {
   const { t } = useTranslation();
-  const layout = useRibbonLayout();
+  const layout = ribbonLayout.useLayout();
   const [customizeOpen, setCustomizeOpen] = useState(false);
 
   const run = (id: RibbonItemId) => {
@@ -347,6 +343,12 @@ export function NavRibbon({
           <VaultMark icon={icon} size={26} radius={5} testId="ribbon.vault-mark" />
         </button>
 
+        <RailButton label={t("notes.home.title")} testid="ribbon.nav-home" active={tab === "home"} onClick={onHome}>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" {...gi} />
+          </svg>
+        </RailButton>
+
         <RailButton label={t("common.allnotes")} testid="ribbon.nav-notes" active={tab === "notes" && listView === "notes"} onClick={onAllNotes}>
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 3.5h9.5L19 7v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V5a1.5 1.5 0 0 1 1-1.5z" {...gi} />
@@ -386,97 +388,24 @@ export function NavRibbon({
       </div>
 
       {customizeOpen && (
-        <Sheet onClose={() => setCustomizeOpen(false)}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "4px 0 12px" }}>
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.sidebar.customize")}</span>
-            <button
-              type="button"
-              onClick={() => resetRibbonLayout()}
-              style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0 }}
-            >
-              {t("common.reset")}
-            </button>
-          </div>
-          <div style={{ maxHeight: "50vh", overflowY: "auto" }}>
-            {layout.order.map((id) => {
-              const item = ITEMS[id];
-              const supported = id === "chat" ? aiEnabled : id === "note-tasks" ? hasNote : true;
-              const shown = !layout.hidden.includes(id) && supported && available(id);
-              return (
-                <div
-                  key={id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    minHeight: 48,
-                    borderBottom: "1px solid var(--line-1)",
-                    opacity: supported ? 1 : 0.5,
-                  }}
-                >
-                  <span style={{ display: "flex", color: "var(--fg-2)", flex: "none" }}>{item.icon}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {t(item.labelKey)}
-                  </span>
-                  {/* Reorder: two 40px targets, disabled rather than hidden at the
-                      ends so the row's geometry does not shift while moving. */}
-                  <button
-                    type="button"
-                    aria-label={t("editor.sidebar.moveUp")}
-                    disabled={layout.order[0] === id}
-                    onClick={() => moveRibbonItem(id, -1)}
-                    style={{ width: 40, height: 40, border: "none", background: "transparent", color: "var(--fg-2)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                  >
-                    <Icon name="chevron-up" size={18} color="var(--fg-2)" strokeWidth={2} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t("editor.sidebar.moveDown")}
-                    disabled={layout.order[layout.order.length - 1] === id}
-                    onClick={() => moveRibbonItem(id, 1)}
-                    style={{ width: 40, height: 40, border: "none", background: "transparent", color: "var(--fg-2)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                  >
-                    <Icon name="chevron-down" size={18} color="var(--fg-2)" strokeWidth={2} />
-                  </button>
-                  {/* Show/hide as a real switch, so the state is announced. */}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={shown}
-                    aria-label={t(item.labelKey)}
-                    disabled={!supported}
-                    onClick={() => setRibbonItemHidden(id, shown)}
-                    style={{
-                      width: 46,
-                      height: 28,
-                      flex: "none",
-                      borderRadius: 999,
-                      border: "none",
-                      background: shown ? "var(--accent)" : "var(--line-2)",
-                      cursor: supported ? "pointer" : "default",
-                      position: "relative",
-                      padding: 0,
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        position: "absolute",
-                        top: 3,
-                        insetInlineStart: shown ? 21 : 3,
-                        width: 22,
-                        height: 22,
-                        borderRadius: 999,
-                        background: "#fff",
-                        transition: "inset-inline-start var(--duration-base) var(--ease-standard)",
-                      }}
-                    />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </Sheet>
+        <LayoutCustomizeSheet
+          title={t("editor.sidebar.customize")}
+          rows={layout.order.map((id): CustomizeRow => {
+            const item = ITEMS[id];
+            const supported = available(id) && (id === "chat" ? aiEnabled : id === "note-tasks" ? hasNote : true);
+            return {
+              id,
+              label: t(item.labelKey),
+              icon: item.icon,
+              supported,
+              shown: supported && !layout.hidden.includes(id),
+            };
+          })}
+          onToggle={(id, shown) => ribbonLayout.setHidden(id as RibbonItemId, shown)}
+          onMove={(id, delta) => ribbonLayout.move(id as RibbonItemId, delta)}
+          onReset={() => ribbonLayout.reset()}
+          onClose={() => setCustomizeOpen(false)}
+        />
       )}
     </>
   );

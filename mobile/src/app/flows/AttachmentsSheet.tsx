@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sheet, Banner, Spinner, Segmented } from "../../components";
+import { Sheet, Banner, Spinner, Segmented, LIST_TOP } from "../../components";
 import { catalogList, attachmentDelete, attachmentRename, attachmentSetFolders, attachmentUnusedList, attachmentCleanUnused, importFile, ATTACHMENT_ACCEPT, type CatalogEntry } from "../../lib/attachments";
 import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -463,7 +463,7 @@ export function AttachmentsSheet({
       <>
         {uploadInput}
         {/* Sits under the shared AppHeader (Files tab), so no safe-area top here. */}
-        <div data-testid="files.page" style={{ flex: "none", padding: "8px 20px 0" }}>
+        <div data-testid="files.page" style={{ flex: "none", padding: `${LIST_TOP} 20px 0` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{title}</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>

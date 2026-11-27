@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
  *  fails at every site that has to answer for it.
  */
 export type WorkspaceTab =
+  | "home"
   | "notes"
   | "tasks"
   | "note-tasks"
@@ -105,9 +106,15 @@ export function TabBar({
         // went with the inset card: the rounded edge is the separator now, and
         // a straight line under a rounded edge is what made the old bar read as
         // a rectangle pasted onto the screen.
+        // The docked shape keeps its rounded top edge, but it must still READ as
+        // a surface above the content (owner, 2026-11-27 round 2: "ikonlar güzel
+        // olmuş ama ayrım hiç yok şimdi de üst taraf ve bottom bar ile"): a
+        // hairline that follows the rounded corners is what separates a bar from
+        // the page, and `--bg-2` lifts it one step off the content.
         borderTop: "none",
+        boxShadow: "inset 0 1px 0 var(--line-1)",
         borderRadius: "var(--m-radius-sheet) var(--m-radius-sheet) 0 0",
-        background: "var(--bg-1)",
+        background: "var(--bg-2)",
         // The bar is TOP-LEVEL NAVIGATION and no destination may cover it. The
         // calendar draws itself as a full-screen surface at `--z-dropdown` (it has to
         // cover the list, the header and the editor), so on a phone opening the

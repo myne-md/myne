@@ -1853,7 +1853,9 @@
       "recordVoiceNote": "Record voice note",
       "showLivePreview": "Show live preview",
       "showRawMarkdown": "Show raw markdown",
-      "hideKeyboard": "Hide keyboard"
+      "hideKeyboard": "Hide keyboard",
+      "more": "More formatting",
+      "moreTitle": "Insert and format"
     },
     "topBar": {
       "backToNotes": "Back to notes",
@@ -2869,9 +2871,9 @@
         "writingStats": "Writing",
         "agentPrompt": "Ask the agent",
         "graph": "Your vault",
-        "unknown": "Unavailable card",
-        "unknownNote": "This card was added by a newer version of Myne, so this one cannot draw it. It is kept in place.",
-        "pending": "This card is being built.",
+        "unknown": "Unknown card",
+        "unknownNote": "This card comes from a newer version of Myne.",
+        "pending": "Not available yet.",
         "loading": "Reading the vault…",
         "recentNotesEmpty": "No notes opened yet on this device. The ones you open appear here.",
         "favoritesEmpty": "Nothing is starred yet. Star a note and it lands here.",
@@ -2892,7 +2894,20 @@
         "fileCount_one": "{{count}} file",
         "fileCount_other": "{{count}} files",
         "statNotes": "{{count}} notes",
-        "statFavorites": "{{count}} starred"
+        "statFavorites": "{{count}} starred",
+        "recentEmpty": "Nothing written yet. Start with one note; the rest can wait.",
+        "tasksEmpty": "No open tasks in this vault.",
+        "openTaskList": "Open the task list",
+        "comingUp": "Coming up",
+        "comingUpEmpty": "Nothing is scheduled in the next week.",
+        "favourites": "Favourites",
+        "favouritesEmpty": "Nothing is starred yet. Star a note and it lands here.",
+        "viewsEmpty": "No saved views yet.",
+        "manageViews": "Manage views",
+        "writing": "This vault",
+        "noteCount": "notes",
+        "folderCount": "folders",
+        "openTaskCount": "open tasks"
       }
     }
   },
