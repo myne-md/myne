@@ -691,7 +691,7 @@ export function AgentReview({
 
       </div>
 
-      {hasDecision || undoable ? (
+      {undoable || (agent.applied === null && anythingProposed) ? (
         <footer
           className="myne-review-region"
           style={{

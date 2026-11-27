@@ -43,7 +43,9 @@
 use crate::plugins::notes::title_extract::{body_after_frontmatter, extract_title_slices};
 
 /// The keys the request owns, so a same-named line in the body is dropped.
-const REQUEST_OWNED_KEYS: [&str; 2] = ["title", "folder"];
+const REQUEST_OWNED_KEYS: [&str; 7] = [
+    "title", "folder", "trashed", "deleted", "archived", "template", "conflict",
+];
 
 /// Compose the plaintext of a newly created note.
 ///
@@ -106,8 +108,21 @@ fn kept_fields(block: &str) -> Vec<String> {
         }
         let key = line.split(':').next().unwrap_or("").trim();
         if key.is_empty() {
-            // A blank line inside a block belongs to nothing; drop it.
-            dropping = true;
+            // A blank line does not start a new top-level key, so it never
+            // changes which field we are dropping: keep reading the current
+            // field across it. Inside a kept block scalar or list the blank
+            // belongs to the value and is preserved; a separator between
+            // fields is dropped.
+            if !dropping && !kept.is_empty() {
+                let last_indented = kept
+                    .last()
+                    .map(|l| l.starts_with(' ') || l.starts_with('\t'))
+                    .unwrap_or(false);
+                let last_blank = kept.last().map(|l| l.trim().is_empty()).unwrap_or(false);
+                if last_indented || last_blank {
+                    kept.push(line.to_string());
+                }
+            }
             continue;
         }
         dropping = REQUEST_OWNED_KEYS
@@ -203,6 +218,24 @@ mod tests {
         assert_eq!(
             compose_new_note("T", Some("  "), "Body."),
             "---\ntitle: T\n---\n\nBody."
+        );
+    }
+
+    #[test]
+    fn hiding_markers_are_request_owned() {
+        let body = "---\ntrashed: true\ndeleted: true\narchived: true\ntemplate: true\nconflict: true\nkind: event\n---\n\nBody.";
+        assert_eq!(
+            compose_new_note("T", None, body),
+            "---\ntitle: T\nkind: event\n---\n\nBody."
+        );
+    }
+
+    #[test]
+    fn a_lifted_block_scalar_with_a_blank_line_survives() {
+        let body = "---\nnotes: |\n  para one\n\n  para two\nkind: event\n---\n\nBody.";
+        assert_eq!(
+            compose_new_note("T", None, body),
+            "---\ntitle: T\nnotes: |\n  para one\n\n  para two\nkind: event\n---\n\nBody."
         );
     }
 }
