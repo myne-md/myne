@@ -23,10 +23,11 @@ use myne_core::plugins::sync::device_identity::{
 /// is forgotten.
 const DPAPI_FILE: &str = "device-key.dpapi";
 
-/// Additional entropy mixed into the protection. DPAPI already binds the blob to the
-/// user, but entropy binds it to *this* app: another program running as the same user
-/// cannot unprotect it without knowing the string.
-const DPAPI_ENTROPY: &[u8] = b"md.myne.devicekey v1";
+/// Additional entropy mixed into the protection, from the one list of families
+/// (`crate::dpapi_entropy`). DPAPI already binds the blob to the user; entropy binds it to
+/// *this* app and to *this* family, so another program running as the same user cannot
+/// unprotect it and the label store's blobs do not open here.
+const DPAPI_ENTROPY: &[u8] = crate::dpapi_entropy::DEVICE_KEY_ENTROPY;
 
 /// Install DPAPI as `core`'s device-key provider.
 pub fn install<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
@@ -70,7 +71,7 @@ impl<R: tauri::Runtime> DeviceKeyProvider for DpapiProvider<R> {
                 return Err(DeviceKeyStoreError::Backend);
             }
         };
-        let plaintext = match unprotect(&blob) {
+        let plaintext = match crate::dpapi::unprotect(&blob, DPAPI_ENTROPY) {
             Ok(plaintext) => plaintext,
             Err(()) => {
                 // A different Windows account, a re-imaged box, or a corrupted
@@ -95,7 +96,8 @@ impl<R: tauri::Runtime> DeviceKeyProvider for DpapiProvider<R> {
         let Some(path) = self.path() else {
             return Err(DeviceKeyStoreError::Unsupported);
         };
-        let sealed = protect(&to_item_bytes(pair)).map_err(|()| DeviceKeyStoreError::Backend)?;
+        let sealed = crate::dpapi::protect(&to_item_bytes(pair), DPAPI_ENTROPY)
+            .map_err(|()| DeviceKeyStoreError::Backend)?;
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -137,95 +139,4 @@ impl<R: tauri::Runtime> DeviceKeyProvider for DpapiProvider<R> {
             log_key_op("delete", if ok { "ok" } else { "refused" });
         }
     }
-}
-
-/// DPAPI-protect a plaintext under the current user and this app's entropy.
-fn protect(plaintext: &[u8]) -> Result<Vec<u8>, ()> {
-    use windows_sys::Win32::Foundation::LocalFree;
-    use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CRYPT_INTEGER_BLOB};
-
-    let in_blob = CRYPT_INTEGER_BLOB {
-        cbData: u32::try_from(plaintext.len()).map_err(|_| ())?,
-        pbData: plaintext.as_ptr().cast_mut(),
-    };
-    let entropy = CRYPT_INTEGER_BLOB {
-        cbData: u32::try_from(DPAPI_ENTROPY.len()).map_err(|_| ())?,
-        pbData: DPAPI_ENTROPY.as_ptr().cast_mut(),
-    };
-    let mut out = CRYPT_INTEGER_BLOB {
-        cbData: 0,
-        pbData: std::ptr::null_mut(),
-    };
-    // SAFETY: both input blobs point at live slices for the duration of the call, the
-    // output blob is a local, and no prompt struct is passed. `CRYPTPROTECT_LOCAL_MACHINE`
-    // is deliberately absent so the protection is user-scoped.
-    let ok = unsafe {
-        CryptProtectData(
-            &in_blob,
-            std::ptr::null(),
-            &entropy,
-            std::ptr::null(),
-            std::ptr::null(),
-            0,
-            &mut out,
-        )
-    };
-    if ok == 0 {
-        return Err(());
-    }
-    // SAFETY: a successful call hands back a buffer DPAPI allocated with `LocalAlloc`,
-    // which the caller owns and frees with `LocalFree`.
-    let sealed = unsafe {
-        let bytes = std::slice::from_raw_parts(out.pbData, out.cbData as usize).to_vec();
-        LocalFree(out.pbData.cast());
-        bytes
-    };
-    Ok(sealed)
-}
-
-/// DPAPI-unprotect a blob under the current user and this app's entropy.
-fn unprotect(sealed: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>, ()> {
-    use windows_sys::Win32::Foundation::LocalFree;
-    use windows_sys::Win32::Security::Cryptography::{CryptUnprotectData, CRYPT_INTEGER_BLOB};
-
-    let in_blob = CRYPT_INTEGER_BLOB {
-        cbData: u32::try_from(sealed.len()).map_err(|_| ())?,
-        pbData: sealed.as_ptr().cast_mut(),
-    };
-    let entropy = CRYPT_INTEGER_BLOB {
-        cbData: u32::try_from(DPAPI_ENTROPY.len()).map_err(|_| ())?,
-        pbData: DPAPI_ENTROPY.as_ptr().cast_mut(),
-    };
-    let mut out = CRYPT_INTEGER_BLOB {
-        cbData: 0,
-        pbData: std::ptr::null_mut(),
-    };
-    // SAFETY: as in `protect`.
-    let ok = unsafe {
-        CryptUnprotectData(
-            &in_blob,
-            std::ptr::null_mut(),
-            &entropy,
-            std::ptr::null(),
-            std::ptr::null(),
-            0,
-            &mut out,
-        )
-    };
-    if ok == 0 {
-        return Err(());
-    }
-    // SAFETY: as in `protect`. The plaintext is wrapped in `Zeroizing` before it can be
-    // copied anywhere else, so the device key is not left in a dropped `Vec`.
-    let plaintext = unsafe {
-        let bytes = zeroize::Zeroizing::new(
-            std::slice::from_raw_parts(out.pbData, out.cbData as usize).to_vec(),
-        );
-        // Wipe DPAPI's own copy before handing it back, since it is a second live
-        // plaintext buffer the allocator would otherwise free without clearing.
-        std::ptr::write_bytes(out.pbData, 0, out.cbData as usize);
-        LocalFree(out.pbData.cast());
-        bytes
-    };
-    Ok(plaintext)
 }
