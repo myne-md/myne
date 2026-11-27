@@ -818,6 +818,8 @@ export function ChatComposer({
         {
           scopeLabel,
           startFailed: t("agent.composer.startFailed"),
+          modelCannotEdit: t("agent.composer.modelCannotEdit"),
+          stillWorking: t("agent.composer.stillWorking"),
           // The two sentences a leg that RAN can owe, which the start path only
           // reaches through `legFailureSentence`'s arms (myne-md/myne#848).
           legFailed: t("agent.progress.legFailed"),

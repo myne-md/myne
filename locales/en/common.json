@@ -57,6 +57,8 @@
       "scopeExcluded_other": "{{count}} excluded from AI",
       "scopeNone": "no note open, so there is nothing to work on yet",
       "startFailed": "The agent could not start.",
+      "modelCannotEdit": "This model cannot make the changes agent mode needs. Choose a model that can in Settings, AI.",
+      "stillWorking": "The agent is still working on the last step. Wait for it to finish, then send again.",
       "autoApplyFailed": "The changes could not be applied automatically. Nothing was written; open the review to apply them yourself.",
       "permissionLabel": "When the run finishes",
       "permissionAsk": "Review first",
