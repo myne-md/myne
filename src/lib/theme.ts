@@ -118,7 +118,6 @@ export function applyCustomTheme(palette: Record<string, string>): void {
       keys.push(key);
     }
   }
-  keys.push("color-scheme");
   appliedCustomKeys = keys;
 }
 

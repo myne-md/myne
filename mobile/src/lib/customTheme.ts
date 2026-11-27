@@ -95,7 +95,6 @@ export function applyCustomTheme(palette: ThemePalette): void {
     }
   }
 
-  keys.push("color-scheme");
   appliedCustomKeys = keys;
 }
 
