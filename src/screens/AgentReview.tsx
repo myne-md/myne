@@ -691,7 +691,7 @@ export function AgentReview({
 
       </div>
 
-      {undoable || (agent.applied === null && anythingProposed) ? (
+      {undoable || hasDecision || (agent.applied === null && anythingProposed) ? (
         <footer
           className="myne-review-region"
           style={{
@@ -727,7 +727,7 @@ export function AgentReview({
               {t("agent.review.undo")}
             </Button>
           ) : null}
-          {hasDecision ? (
+          {hasDecision || (agent.applied === null && anythingProposed) ? (
             <>
               {/* `flex: 1` with a zero basis, so it eats the slack when there is room
                   and disappears when there is not (a `flex: 1` spacer with a content
@@ -783,15 +783,17 @@ export function AgentReview({
                   {proposedTotal}
                 </span>
               </Button>
-              <Button
-                variant="primary"
-                disabled={busy || !hasApprovedWork}
-                onClick={() => void approveAll()}
-                data-testid="agentReview.approveAll"
-                style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
-              >
-                {t("agent.review.approveAll", { count: approveAllCount })}
-              </Button>
+              {hasDecision ? (
+                <Button
+                  variant="primary"
+                  disabled={busy || !hasApprovedWork}
+                  onClick={() => void approveAll()}
+                  data-testid="agentReview.approveAll"
+                  style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
+                >
+                  {t("agent.review.approveAll", { count: approveAllCount })}
+                </Button>
+              ) : null}
             </>
           ) : null}
         </footer>
