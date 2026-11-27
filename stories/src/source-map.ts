@@ -137,7 +137,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "MemorySection": { file: "src/components/settings/MemorySection.tsx", line: 261 },
   "ModalShell": { file: "src/components/primitives/ModalShell.tsx", line: 103 },
   "ModelPathButton": { file: "src/components/settings/ModelPathButton.tsx", line: 70 },
-  "MultiSelectBox": { file: "src/components/primitives/MultiSelectBox.tsx", line: 103 },
+  "MultiSelectBox": { file: "src/components/primitives/MultiSelectBox.tsx", line: 93 },
   "MyneMark": { file: "src/components/primitives/MyneMark.tsx", line: 7 },
   "NameStep": { file: "src/screens/vault-creation/NameStep.tsx", line: 30 },
   "NetworkPanel": { file: "src/components/settings/NetworkPanel.tsx", line: 175 },

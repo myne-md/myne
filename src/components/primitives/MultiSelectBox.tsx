@@ -90,16 +90,6 @@ const FOLDED_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
 };
 
-const OPTION_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  justifyContent: "flex-start",
-  width: "100%",
-  padding: "var(--space-1) var(--space-2)",
-  fontSize: "var(--text-sm)",
-};
-
 export function MultiSelectBox({
   options,
   selected,
@@ -115,6 +105,7 @@ export function MultiSelectBox({
 }: MultiSelectBoxProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(!collapsible);
+  const [hovered, setHovered] = useState<string | null>(null);
   const searchId = useId();
 
   const chosen = useMemo(
@@ -200,7 +191,12 @@ export function MultiSelectBox({
       />
 
       <ScrollArea style={{ ...LIST_STYLE, maxHeight: `${maxListHeight}px` }}>
-        <div role="listbox" aria-multiselectable="true" aria-label={label}>
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          aria-label={label}
+          style={{ padding: "var(--space-1) 0" }}
+        >
           {shown.length === 0 && (
             <p
               style={{ margin: 0, padding: "var(--space-2)", color: "var(--fg-3)", fontSize: "var(--text-sm)" }}
@@ -212,23 +208,27 @@ export function MultiSelectBox({
           {shown.map((option) => {
             const isSelected = selected.includes(option.value);
             return (
-              <Button
+              <button
                 key={option.value}
-                variant="ghost"
+                type="button"
                 role="option"
                 aria-selected={isSelected}
-                style={OPTION_STYLE}
+                className="myne-select-option"
+                data-active={isSelected ? "true" : "false"}
+                data-selected={isSelected ? "true" : "false"}
+                data-highlighted={hovered === option.value ? "true" : "false"}
                 disabled={disabled}
+                onMouseEnter={() => setHovered(option.value)}
+                onMouseLeave={() => setHovered((current) => (current === option.value ? null : current))}
                 onClick={() => toggle(option.value)}
                 data-testid={testId === undefined ? undefined : `${testId}-option`}
                 data-value={option.value}
-                data-selected={isSelected ? "true" : "false"}
               >
-                <span style={{ width: 12, display: "inline-flex" }} aria-hidden="true">
-                  {isSelected && <Icon name="circle-check" size={12} />}
+                <span className="myne-select-option__check" aria-hidden="true">
+                  {isSelected && <Icon name="check" size={14} />}
                 </span>
-                {option.label}
-              </Button>
+                <span className="myne-select-option__label">{option.label}</span>
+              </button>
             );
           })}
         </div>
