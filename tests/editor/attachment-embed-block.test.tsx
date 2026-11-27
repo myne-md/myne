@@ -82,8 +82,6 @@ function placement(host: HTMLElement): "block" | "inline" | "absent" {
 describe("an embed alone on its line is drawn as a block", () => {
   it("draws a block when the line holds nothing else", async () => {
     mounted = await mount(EMBED);
-    // eslint-disable-next-line no-console
-    console.log("DBG HTML", mounted.host.innerHTML.slice(0, 500));
     expect(placement(mounted.host)).toBe("block");
   });
 

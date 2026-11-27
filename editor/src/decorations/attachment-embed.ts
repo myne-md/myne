@@ -244,10 +244,11 @@ class BlockEmbedFrame extends LineHeightWidget {
     );
   }
 
-  updateDOM(dom: HTMLElement): boolean {
-    // The OLD dom handed to the NEW widget: keeping it is only right while the
-    // widget inside is still the same one (a resolved tombstone must be redrawn).
-    if (dom.dataset.embedWidget !== this.inner.constructor.name) return false;
+  updateDOM(dom: HTMLElement, _view: EditorView, old: BlockEmbedFrame): boolean {
+    // Reuse previous DOM only when the embed *inside* is unchanged: an
+    // active toggle keeps the <img>; warmed URL/layout/retarget must rebuild.
+    if (old.inner.constructor !== this.inner.constructor) return false;
+    if (!this.inner.eq(old.inner)) return false;
     dom.classList.toggle("cm-embed-active", this.active);
     return true;
   }
