@@ -46,6 +46,7 @@ import {
   clearAgentForLock,
   currentRunEpoch,
   getAgent,
+  settleApply,
   settleStep,
 } from "../../src/notes/agent/agentStore";
 import { applyOutcome } from "../notes/_agentApplyOutcome";
@@ -208,6 +209,57 @@ describe("Approve all", () => {
     mount();
     expect(screen.getByTestId("agentReview.approveAll").textContent).toBe(
       "agent.review.approveAll:3",
+    );
+  });
+});
+
+// **A footer whose own labels say it would do nothing** (2026-11-27, reported
+// from a real run with "Apply automatically" on: the card ended in "Reject all
+// 0" beside a live-looking "Approve 0 changes", under a headline reading
+// "2 changes applied"). Both counts are zero because the deciding is done, and
+// the pair was still painted. The same emptiness arrives the other way, when a
+// reader approves or rejects every row by hand, so the rule is "nothing left to
+// decide" rather than "the run was automatic".
+describe("nothing left to decide", () => {
+  it("offers no decision when the run applied everything itself", () => {
+    settleWith([], [{ title: "New note", body: "b", folder: null }]);
+    // The automatic path settles its own apply; no click happens in this test.
+    // A created note carries no restore point, so there is nothing to undo
+    // either, and the footer has nothing to hold.
+    settleApply(
+      applyOutcome({
+        applied: 0,
+        notesCreated: ["new-1"],
+        notesWritten: [],
+        restorePoints: [],
+      }),
+      [],
+      currentRunEpoch(),
+      [],
+      [0],
+    );
+    mount();
+    expect(screen.queryByTestId("agentReview.rejectAll")).toBeNull();
+    expect(screen.queryByTestId("agentReview.approveAll")).toBeNull();
+    expect(screen.getByTestId("agentReview.screen").querySelector("footer")).toBeNull();
+    // The card itself stays, and says what landed: it is the run's report as
+    // well as its request.
+    expect(screen.getByTestId("agentReview.appliedCount").textContent).toBe(
+      "agent.review.appliedCount:1",
+    );
+  });
+
+  it("keeps the pair while any row is still decidable", () => {
+    // The other direction, so the rule cannot pass by removing the footer from
+    // every card: one of two edits landed, one is still waiting.
+    settleWith([ORDINARY, { ...ORDINARY, anchor: "three", replacement: "four" }]);
+    settleApply(applyOutcome(), [0], currentRunEpoch());
+    mount();
+    expect(screen.getByTestId("agentReview.rejectAll").textContent).toContain(
+      "agent.review.rejectAll",
+    );
+    expect(screen.getByTestId("agentReview.approveAll").textContent).toBe(
+      "agent.review.approveAll:1",
     );
   });
 });
