@@ -82,7 +82,7 @@ describe("every interactive primitive answers a pointer", () => {
     //  - `:not([role="tab"])` keeps a tab strip flat, which is that same shape
     //    (2026-11-27: a five-tab strip came back as five capsules).
     expect(SHEET).toContain(
-      '.myne-btn[data-variant="ghost"]:enabled:not([role="menuitem"]):not([role="tab"]) {',
+      '.myne-btn[data-variant="ghost"]:enabled:not([role="menuitem"], [role="tab"]) {',
     );
     const fill = ruleBody(SHEET, '.myne-btn[data-variant="ghost"]:enabled');
     expect(fill).toContain("background: color-mix(in srgb, var(--bg-3)");
