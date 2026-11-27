@@ -62,6 +62,7 @@ import { Input } from "../primitives/Input";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { MultiSelectBox } from "../primitives/MultiSelectBox";
+import { listFolderPaths } from "../../notes/listFolderPaths";
 import { ScrollArea } from "../primitives/ScrollArea";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
@@ -421,6 +422,7 @@ export function McpSection({
   }, [flow?.step, derived.excluded]);
 
   const pending = view?.writeRequests ?? [];
+  const folderLabels = useFolderLabels();
 
   const startNew = () =>
     setFlow({
@@ -899,7 +901,7 @@ export function McpSection({
 
               <MultiSelectBox
                 collapsible
-                options={folderOptions(view?.folders ?? [], t)}
+                options={folderOptions(view?.folders ?? [], folderLabels, t)}
                 selected={flow.access}
                 onChange={(next) =>
                   setFlow((current) => (current === null ? current : { ...current, access: next }))
@@ -1030,7 +1032,7 @@ export function McpSection({
                   ? t("settings.ai.externalAccess.writeNone")
                   : t("settings.ai.externalAccess.writeSummary", {
                       count: row.writeFolders.length,
-                      folders: row.writeFolders.join(", "),
+                      folders: row.writeFolders.map(folderName).join(", "),
                     })}
               </p>
               <p style={HELPER_STYLE} data-testid="settings.mcp-tools-scope">
@@ -1128,13 +1130,39 @@ function toolRoster(
   }));
 }
 
+function useFolderLabels(): ReadonlyMap<string, string> {
+  const [labels, setLabels] = useState<ReadonlyMap<string, string>>(new Map());
+  useEffect(() => {
+    let live = true;
+    void listFolderPaths()
+      .then((paths) => {
+        if (live) setLabels(new Map(paths.map((f) => [f.path, f.label])));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return labels;
+}
+
+function folderName(folder: string): string {
+  const trimmed = folder.replace(/\/+$/, "");
+  const cut = trimmed.lastIndexOf("/");
+  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
+}
+
 function folderOptions(
   folders: readonly string[],
+  labels: ReadonlyMap<string, string>,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): SelectOption<string>[] {
   return folders.map((folder) => ({
     value: folder,
-    label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
+    label:
+      folder === ""
+        ? t("settings.ai.externalAccess.rootFolder")
+        : (labels.get(folder) ?? folderName(folder)),
   }));
 }
 
@@ -1142,7 +1170,7 @@ function folderLabel(
   folder: string,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder;
+  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folderName(folder);
 }
 
 function verbLabel(

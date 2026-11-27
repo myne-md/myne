@@ -178,8 +178,12 @@ describe("the external-access section", () => {
     renderSection();
     await screen.findByTestId("settings.mcp-connection");
     const line = screen.getByTestId("settings.mcp-write-scope").textContent ?? "";
-    expect(line).toContain("Projects/");
-    expect(line).toContain("Work/");
+    // Names, not canonical paths (2026-11-27): the row reads "Writes in
+    // Projects, Work." — the trailing-slash form is what the vault stores, not
+    // what a person reads.
+    expect(line).toContain("Projects");
+    expect(line).toContain("Work");
+    expect(line).not.toContain("Projects/");
     expect(line).not.toContain("nowhere");
   });
 
@@ -193,7 +197,7 @@ describe("the external-access section", () => {
     renderSection();
     const card = await screen.findByTestId("settings.mcp-request");
     expect(card.textContent).toContain("claude-desktop");
-    expect(card.textContent).toContain("inbox/");
+    expect(card.textContent).toContain("inbox");
     expect(card.textContent).toContain("Shopping list");
 
     fireEvent.click(screen.getByTestId("settings.mcp-request-accept"));
@@ -459,7 +463,7 @@ describe("the approval dialog", () => {
     // stay there rather than a panel closing over the form.
     expect(box.getAttribute("data-testid")).toBe("settings.mcp-access-picker");
     expect(screen.getByTestId("settings.mcp-access-picker-chip").textContent).toContain(
-      "Private/",
+      "Private",
     );
   });
 

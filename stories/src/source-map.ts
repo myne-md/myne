@@ -128,7 +128,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "LeftRibbon": { file: "src/notes/components/LeftRibbon.tsx", line: 157 },
   "LineNumbersSettings": { file: "src/components/settings/LineNumbersSettings.tsx", line: 16 },
   "mcp-client-marks": { file: "src/components/settings/mcp-client-marks.tsx", line: 1 },
-  "McpSection": { file: "src/components/settings/McpSection.tsx", line: 340 },
+  "McpSection": { file: "src/components/settings/McpSection.tsx", line: 341 },
   "MeetingAiDialog": { file: "src/components/meeting/MeetingAiDialog.tsx", line: 65 },
   "MemberNameGate": { file: "src/components/sync/MemberNameGate.tsx", line: 45 },
   "MemberPasswordSettings": { file: "src/components/settings/MemberPasswordSettings.tsx", line: 68 },
