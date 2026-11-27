@@ -58,6 +58,12 @@ jobs:
       - run: cargo test -p protocol -- --skip dudect_decode_timing_independent_of_key_bytes
       - run: cargo test -p myne-mcp -p myne-cli -p theme-validator --no-fail-fast
       - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
+      # The host half of the MCP surface. `-p myne-mcp` is on the line above and
+      # the capability guard runs in the `guards` job; what was still missing is
+      # this: `plugins::mcp` holds every clamp, the write gate and the closed
+      # refusal taxonomy, and `-p myne-core` ran only in ci-full on a push to
+      # develop, so a PR could merge with all of it red.
+      - run: cargo test -p myne-core plugins::mcp --no-fail-fast
       - run: node scripts/gen-rust-third-party-licenses.mjs
       - run: node scripts/check-build-notices.mjs --rust-only
 

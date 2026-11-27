@@ -71,6 +71,13 @@ use crate::plugins::notes::title_extract::extract_title_slices;
 /// is one line in one place.
 type Markers = [bool; 5];
 
+/// The working-set markers as FIELD NAMES, for a caller that has the name and not
+/// the note: a write verb handed `field` has no body to read yet, and setting one of
+/// these is how a note leaves the working set. Held to the TS authority by
+/// [`tests::the_roster_matches_is_live_note`], so it cannot drift from [`markers`].
+pub const WORKING_SET_FIELDS: [&str; 5] =
+    ["trashed", "deleted", "archived", "template", "conflict"];
+
 /// Read every working-set marker off a note body.
 fn markers(body: &str) -> Markers {
     let Some(fm) = extract_title_slices(body.as_bytes()).frontmatter_bytes else {
@@ -96,6 +103,19 @@ pub fn edit_hides_note(before: &str, after: &str) -> bool {
         .iter()
         .zip(after.iter())
         .any(|(was, now)| !was && *now)
+}
+
+/// Whether a whole note body is in the working set: the dry counterpart of
+/// [`edit_hides_note`], over the same [`markers`] array.
+///
+/// One reader needs it for a note the sidebar's index does not carry yet: the
+/// external MCP door answers a note id straight off the disk when the index has no
+/// record (`plugins::mcp::host_adapters`), and a trashed, deleted, archived,
+/// template or conflicted note must stay indistinguishable from a missing one. Not
+/// a second rule: `isLiveNote` is the authority and
+/// [`tests::the_roster_matches_is_live_note`] holds the roster to it.
+pub fn body_is_live(body: &str) -> bool {
+    !markers(body).iter().any(|carried| *carried)
 }
 
 #[cfg(test)]
@@ -213,9 +233,58 @@ mod tests {
             MARKER_LINES.len(),
             "every marker owes this file a test line"
         );
+
+        // And the NAME roster a write verb reads, against the same authority. It is
+        // a third copy, so it is compared rather than trusted: a field added to
+        // `isLiveNote` must arrive here or a write verb could set a marker.
+        let named: BTreeSet<String> = WORKING_SET_FIELDS
+            .iter()
+            .map(|f| (*f).to_string())
+            .collect();
+        assert_eq!(
+            named, authority,
+            "WORKING_SET_FIELDS and the fields isLiveNote reads have diverged"
+        );
     }
 
     // ---- detection, every field ----------------------------------------
+
+    /// A note carrying any marker is out, and one carrying none is in. The second
+    /// half matters: answering "not live" for an ordinary note would make every
+    /// unindexed note read as missing, the fallback's bug wearing the opposite mask.
+    #[test]
+    fn a_whole_body_is_live_exactly_when_it_carries_no_marker() {
+        assert!(
+            body_is_live(&note("title: T")),
+            "a note with no marker is in the working set"
+        );
+        assert!(
+            body_is_live("no frontmatter at all, just prose"),
+            "a note with no frontmatter carries no marker"
+        );
+        for (line, name) in MARKER_LINES {
+            assert!(
+                !body_is_live(&note(&format!("title: T\n{line}"))),
+                "a note carrying {name:?} is out of the working set"
+            );
+        }
+    }
+
+    /// The helpers are value-strict, so "this field exists" is not "this note is
+    /// gone" — the distinction [`edit_hides_note`]'s tests pin for the edit direction.
+    #[test]
+    fn a_non_canonical_value_does_not_make_a_body_not_live() {
+        for (line, name) in [
+            ("trashed: true", "trashed"),
+            ("template: \"true\"", "template"),
+            ("archived: later", "archived"),
+        ] {
+            assert!(
+                body_is_live(&note(&format!("title: T\n{line}"))),
+                "{name:?} with a value the app does not treat as a marker must stay live"
+            );
+        }
+    }
 
     #[test]
     fn an_edit_that_adds_any_marker_is_recognised() {
