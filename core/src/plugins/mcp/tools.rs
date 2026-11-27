@@ -171,6 +171,15 @@ pub(super) fn note_facts_from_body(body: &str) -> Option<NoteFacts> {
     if folder != read_string_field(body.as_bytes(), "folder") {
         return None;
     }
+    // Both readers declining is not agreement: a `folder:` written as a block
+    // scalar reads as `None` to each of them while the app's YAML reader resolves it
+    // to a real folder, and a `None` folder is the vault ROOT — the most permissive
+    // answer this surface has. A key that is there and unresolvable derives nothing.
+    if folder.is_none()
+        && crate::plugins::notes::frontmatter_patch::has_field(body.as_bytes(), "folder")
+    {
+        return None;
+    }
     Some(NoteFacts {
         title: crate::plugins::notes::title_extract::resolve_note_title(body.as_bytes()),
         folder,

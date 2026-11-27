@@ -305,6 +305,13 @@ fn a_folder_value_two_readers_disagree_about_is_not_guessed_at() {
         facts.is_none(),
         "a disputed folder must derive nothing: {facts:?}"
     );
+    // Both readers declining is not agreement either: a block scalar resolves to a
+    // real folder in the app, and `None` here would mean the vault root.
+    let facts = note_facts_from_body("---\nfolder: |-\n  Private\n---\nx");
+    assert!(
+        facts.is_none(),
+        "an unreadable folder must derive nothing: {facts:?}"
+    );
     // A value both readers agree on still derives, or the fallback would be dead.
     let facts = note_facts_from_body("---\nfolder: Projects\n---\nx")
         .expect("a plain folder value derives");
