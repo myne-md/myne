@@ -215,7 +215,11 @@ export function FormatBar({
       }}
     >
       {glyph}
-      <span style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      {/* Two lines, not one ellipsised line: at four columns on a phone the
+          longest names ("Photo to note", "Show raw markdown") truncated into
+          "Photo to n…", which is a label nobody can read and therefore a tile
+          nobody can use. */}
+      <span style={{ maxWidth: "100%", textAlign: "center", lineHeight: 1.25, overflowWrap: "anywhere" }}>{label}</span>
     </button>
   );
 

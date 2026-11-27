@@ -259,7 +259,10 @@ export function HomeSurfaceMobile({
   const visibleCards = layout.order.filter((id) => !layout.hidden.includes(id));
 
   return (
-    <div data-testid="home.surface-mobile" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+    // The column caps its width on a tablet: a card 900pt wide with one sentence
+    // in it reads as a layout that lost its content, and the desktop's own home
+    // has the same measure discipline.
+    <div data-testid="home.surface-mobile" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", width: "100%", maxWidth: 720, margin: "0 auto" }}>
       <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "0 20px 10px" }}>
         <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>
           {t("notes.home.title")}
@@ -273,7 +276,20 @@ export function HomeSurfaceMobile({
           {t("notes.home.arrange")}
         </button>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          // The last card must clear the docked tab bar, which sits OVER this
+          // scroll area (`z-index: --z-dropdown + 1`): without the bottom inset
+          // the final card scrolled under it and could not be reached.
+          padding: "0 20px calc(24px + env(safe-area-inset-bottom, 0px))",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
         {visibleCards.map((id) => (
           <HomeCardShell key={id} title={cards[id].title} icon={cards[id].icon}>
             {cards[id].body}
