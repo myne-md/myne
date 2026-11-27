@@ -3946,7 +3946,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 // rail absorbs it), so this row IS the top of the page and owes
                 // the status bar its clearance. Without it the title drew under
                 // the clock on an iPad (owner, 2026-11-27 round 3).
-                padding: `${chrome.header ? "8px" : LIST_TOP} 20px 0`,
+                // Longhands, not a shorthand built from a variable: a shorthand
+                // with one non-length part is dropped whole, which is what glued
+                // this title and the tile row to the bezel.
+                paddingTop: chrome.header ? 8 : LIST_TOP,
+                paddingInline: 20,
               }}
             >
               {listView !== "notes" && sizeClass !== "expanded" && (
@@ -4390,7 +4394,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above - one component serving both a full-screen
             destination and an editor sheet. */}
-        {tab === "calendar" && <CalendarSurface onClose={() => setTab("notes")} />}
+        {tab === "calendar" && (
+          <CalendarSurface
+            pageTop={chrome.header ? 8 : LIST_TOP}
+            onClose={() => setTab("notes")}
+          />
+        )}
         {tab === "home" && (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: LIST_TOP }}>
             <HomeSurfaceMobile

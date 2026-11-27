@@ -102,9 +102,6 @@ export type TaskRowProps = {
    * case.
    */
   twoLine?: boolean;
-  /** Tighter horizontal padding, for the narrow note-scoped panel
-   *  (myne-md/myne#656 review). */
-  compactX?: boolean;
   /**
    * Roomier checkbox (22px instead of 14) for touch surfaces. The phone's
    * task list is the same shared row, and a 14px box with an invisible
@@ -201,10 +198,10 @@ const ROW_STYLE: CSSProperties = {
   // their natural (two-line) height (myne-md/myne#656 review).
   width: "100%",
   boxSizing: "border-box",
-  // The horizontal gutter is a VAR with a 0 fallback: desktop renders the row
-  // exactly as it always has, and a host whose toolbar sits further in (the
-  // phone's task list) raises it so rows and toolbar share one edge.
-  padding: "var(--space-1) calc(8px + var(--task-row-gutter, 0px))",
+  // ONE inset for the whole list, owned by the panel that renders it: the row,
+  // the section heading and the toolbar all read `--task-row-inset`, so they
+  // cannot drift apart. A host that wants them on one edge sets the var once.
+  padding: "var(--space-1) var(--task-row-inset, var(--space-2))",
   borderRadius: "var(--radius-2, 6px)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
@@ -248,15 +245,11 @@ function boxStyle(completed: boolean, disabled: boolean, roomy: boolean): CSSPro
  * to the flat row and only nested rows move. The step is a spacing token, so a
  * theme that re-scales the scale re-scales the tree with it.
  */
-function rowStyle(depth: number, compactX: boolean): CSSProperties {
-  const start = compactX ? "var(--space-1)" : "var(--space-2)";
-  const base = compactX
-    ? { ...ROW_STYLE, padding: `0 ${start}` }
-    : ROW_STYLE;
-  if (depth <= 0) return base;
+function rowStyle(depth: number): CSSProperties {
+  if (depth <= 0) return ROW_STYLE;
   return {
-    ...base,
-    paddingInlineStart: `calc(${start} + var(--space-4) * ${depth})`,
+    ...ROW_STYLE,
+    paddingInlineStart: `calc(var(--task-row-inset, var(--space-2)) + var(--space-4) * ${depth})`,
   };
 }
 
@@ -376,7 +369,6 @@ export function TaskRow({
   onOpen,
   testIdPrefix = "task-row",
   twoLine = false,
-  compactX = false,
   inlineDate = false,
   roomyBox = false,
   onEditFields,
@@ -494,7 +486,7 @@ export function TaskRow({
   return (
     <div
       style={{
-        ...rowStyle(depth, compactX),
+        ...rowStyle(depth),
         // A clearly visible hover: the row is a navigation target, and a
         // pointer alone was not enough to read (myne-md/myne#656 review).
         background: hover ? "var(--paper-3)" : "transparent",

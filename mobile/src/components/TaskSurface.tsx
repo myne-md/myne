@@ -97,14 +97,14 @@ export function TaskSurface({
         // the bezel (owner, 2026-11-27 round 2: "sol sağ padding şimdi de aşırı
         // fazla").
         ...(insideHeader ? { paddingTop: 0 } : { paddingTop: SCREEN_TOP }),
-        // The shared panel insets its rows 8pt and its toolbar 12pt (its own
-        // desktop geometry). On a phone that 4pt shows as rows riding left of the
-        // search field, so the host closes the gap instead of forking either
-        // padding.
-        // The shared panel insets its rows 8pt and its toolbar 12pt; the phone
-        // closes that 4pt through the row gutter var so checkboxes and the
-        // search field share one left edge (owner, 2026-11-27 round 4).
-        ["--task-row-gutter" as string]: "var(--space-1)",
+        // One page gutter, `--space-3` + `--space-2` = 20, matching every other
+        // mobile page. The panel's own toolbar padding is `--space-3`, so the
+        // wrapper contributes the missing `--space-2` and rows/headings take
+        // `--space-3` themselves from the same var: checkbox, section label and
+        // search field all land on 20 and cannot drift apart (owner, 2026-11-27
+        // round 4: "checkmarklar hâlâ search ile eşit değil").
+        paddingInline: "var(--space-2)",
+        ["--task-row-inset" as string]: "var(--space-3)",
       }}
     >
       <TaskListPanel

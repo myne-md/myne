@@ -160,6 +160,22 @@
     "reason": "Same generic failure on snapshots and the sync panel; generic fallback, intentionally shared."
   },
   {
+    "value": "Nothing is starred yet. Star a note and it lands here.",
+    "keys": [
+      "notes.home.cards.favoritesEmpty",
+      "notes.home.cards.favouritesEmpty"
+    ],
+    "reason": "One empty state, two keys: the desktop Home card is named Favorites and the mobile one Favourites, and each platform's card list has to be reorderable without reaching into the other's locale namespace."
+  },
+  {
+    "value": "Nothing is scheduled in the next week.",
+    "keys": [
+      "notes.home.cards.calendarAgendaEmpty",
+      "notes.home.cards.comingUpEmpty"
+    ],
+    "reason": "One empty state, two keys: the desktop Home card is Coming up and the mobile one Calendar agenda, and each platform's card list has to be reorderable without reaching into the other's locale namespace."
+  },
+  {
     "value": "The strength check could not load, so only the minimum length is checked.",
     "keys": [
       "password.createForm.strengthUnavailable",

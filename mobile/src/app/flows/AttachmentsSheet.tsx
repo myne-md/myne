@@ -470,7 +470,7 @@ export function AttachmentsSheet({
       <>
         {uploadInput}
         {/* Sits under the shared AppHeader (Files tab), so no safe-area top here. */}
-        <div data-testid="files.page" style={{ flex: "none", padding: `${topInset ? LIST_TOP : "8px"} 20px 0` }}>
+        <div data-testid="files.page" style={{ flex: "none", paddingTop: topInset ? LIST_TOP : 8, paddingInline: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{title}</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>

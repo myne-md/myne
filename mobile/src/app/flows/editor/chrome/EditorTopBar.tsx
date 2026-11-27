@@ -68,7 +68,9 @@ export function EditorTopBar({
       {...ornamentRole("chrome")}
       style={{
         flex: "none",
-        padding: `${EDITOR_TOP} 8px 8px`,
+        paddingTop: EDITOR_TOP,
+        paddingInline: 8,
+        paddingBottom: 8,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",

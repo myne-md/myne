@@ -497,8 +497,8 @@ const HEADER_BASE: CSSProperties = {
   gap: "var(--space-2)",
   boxSizing: "border-box",
   height: TASK_ROW_HEIGHT - 2,
-  // Same gutter var as the rows, so headings and rows share one edge.
-  padding: "0 calc(8px + var(--task-row-gutter, 0px))",
+  // Same inset var as the rows, so headings and rows share one edge.
+  padding: "0 var(--task-row-inset, var(--space-2))",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-xs)",
   fontWeight: 600,
@@ -1251,7 +1251,6 @@ export function TaskListPanel({
                 task={toRowData(item.task, item.depth)}
                 scope={rowScope}
                 today={today}
-                compactX
                 inlineDate
                 roomyBox={roomyBox}
                 {...(showNoteTitle ? {} : { hideNoteTitle: true })}

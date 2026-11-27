@@ -80,7 +80,7 @@ export function TemplatesSheet({
   if (variant === "page") {
     return (
       <>
-        <div style={{ flex: "none", padding: `${SCREEN_TOP} 20px 0` }}>
+        <div style={{ flex: "none", paddingTop: SCREEN_TOP, paddingInline: 20 }}>
           {onBack && (
             <button
               onClick={onBack}

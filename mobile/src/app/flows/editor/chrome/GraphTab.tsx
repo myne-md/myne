@@ -32,7 +32,19 @@ export function GraphTab({
   const links = model.edges.length;
   return (
     <>
-      <div style={{ flex: "none", padding: `${topInset} 20px 0`, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{
+          flex: "none",
+          // Longhands, never a shorthand built from a variable: one bad part in a
+          // shorthand drops the whole declaration and glues the page to the bezel.
+          paddingTop: topInset,
+          paddingInline: 20,
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("editor.chrome.barItems.graph")}</h1>
         {linked > 0 && (
           <span style={{ flexShrink: 0, fontSize: 13, color: "var(--fg-3)" }}>
