@@ -101,6 +101,23 @@ fn store_inner(account: &str, secret: &[u8]) -> Result<(), VaultLabelError> {
         log_backend_err("default_collection", error_class(&e));
         VaultLabelError::Backend
     })?;
+    // A locked collection makes `create_item` raise a prompt: the crate executes the
+    // prompt object the service returns when CreateItem answers "/". The picker calls
+    // this while a vault may be LOCKED, so refuse instead. The caller keeps the
+    // neutral label for this launch and the write is retried after an unlock.
+    if collection.is_locked().map_err(|e| {
+        log_backend_err("is_locked", error_class(&e));
+        VaultLabelError::Backend
+    })? {
+        tracing::warn!(
+            stage = "vault_label_key",
+            op = "store",
+            reason = "locked",
+            "the default collection is locked; refusing to write the label key rather \
+             than prompting in front of a locked screen"
+        );
+        return Err(VaultLabelError::Backend);
+    }
     // `replace = true`: one key per account name, so a second write replaces the
     // item rather than creating a sibling that `search_items().unlocked.first()`
     // would have to pick between arbitrarily.

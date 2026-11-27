@@ -73,8 +73,20 @@ pub(crate) fn write_item_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()
         SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     );
     let tmp = path.with_file_name(unique);
-    std::fs::write(&tmp, bytes)?;
-    match std::fs::rename(&tmp, path) {
+    // `sync_all` before the rename, then the canonical write-through rename
+    // (`format::atomic_write::finalize_atomic`). Without the flush the rename can become
+    // durable before the bytes do, and a crash leaves a truncated destination that
+    // `read_item` hands to unseal and the store reports as absent.
+    let written = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&tmp)?;
+        std::io::Write::write_all(&mut file, bytes)?;
+        file.sync_all()
+    })();
+    match written.and_then(|()| crate::atomic_write::finalize_atomic(&tmp, path, true)) {
         Ok(()) => Ok(()),
         Err(e) => {
             // Leave nothing behind that a later scan could mistake for an item.
