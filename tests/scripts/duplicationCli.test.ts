@@ -39,6 +39,10 @@ function makeSandbox(opts: { docsDev: boolean; report: boolean; reportBody?: str
     const src = join(ROOT, sub);
     if (existsSync(src)) cpSync(src, join(dir, sub), { recursive: true });
   }
+  // The public docs/ tree is present in every public checkout; only docs/dev/ (the
+  // private report directory) is absent there. Create docs/ unconditionally so the
+  // skip arm is exercised against the real "docs present, docs/dev absent" state.
+  mkdirSync(join(dir, "docs"), { recursive: true });
   if (opts.docsDev) {
     mkdirSync(join(dir, "docs", "dev"), { recursive: true });
     if (opts.report) {
