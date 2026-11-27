@@ -79,6 +79,49 @@ pub struct NoteAppendRequest {
     pub markdown: String,
 }
 
+/// `note_set_field`'s arguments, exactly as the compiled catalog declares them.
+///
+/// `view_id` is what makes this verb safe to offer. A note's properties are
+/// writable only through a saved view that DECLARES the field writable and is
+/// approved on this device, which is the host's rule (`notes::commands::
+/// note_set_field_from_host`) and not one this surface may relax: a view is data
+/// that can arrive from another person's file, so the authority to write a
+/// property is the host's. A wire verb with no view would have to invent that
+/// authority, which is why this one carries the id a caller gets from `view_list`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoteSetFieldRequest {
+    /// The note whose field changes.
+    pub note_id: String,
+    /// The saved view whose approved declaration authorises this write, as
+    /// `view_list` reports it.
+    pub view_id: String,
+    /// The frontmatter field to set. Must be a plain key, and must not be one of
+    /// the working-set markers (`archived`, `trashed`, `deleted`, `template`,
+    /// `conflict`): this surface has no delete, so no verb may produce one.
+    pub field: String,
+    /// The value to give the field.
+    pub value: String,
+    /// The value the caller believes is on disk. Omit it to mean "the field is
+    /// absent". A mismatch is refused rather than overwritten, which is how a
+    /// concurrent change to the same field is caught without new machinery.
+    #[serde(default)]
+    pub expected_value: Option<String>,
+}
+
+/// What a field write answered with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFieldNote {
+    /// The note that changed.
+    pub note_id: String,
+    /// The field that was set, echoed so a caller that sent several writes can
+    /// tell the answers apart.
+    pub field: String,
+    /// The folder the note lives in, canonical (`projects/`, the root as `""`).
+    pub folder: String,
+}
+
 /// What a create answered with.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +202,25 @@ pub trait McpNoteWriter: Send + Sync {
         note: &str,
         plaintext: &str,
         expected_base_hash_hex: &str,
+    ) -> Result<(), McpToolError>;
+    /// Set one frontmatter field through an approved view's declaration.
+    ///
+    /// The view's approval, its `write_fields` list, the reserved-marker refusal
+    /// and the value precondition are the host's checks, not this surface's: the
+    /// splice is quoting-sensitive and `frontmatter_patch::set_string_field` is
+    /// the one implementation of it (`notes::commands::note_set_field`'s own doc
+    /// says this verb is what it exists for).
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one call, five facts, no struct: the caller has all five already"
+    )]
+    async fn set_field(
+        &self,
+        note: &str,
+        view: &str,
+        field: &str,
+        expected_value: Option<&str>,
+        value: &str,
     ) -> Result<(), McpToolError>;
 }
 
@@ -250,6 +312,42 @@ pub async fn note_append(
     Ok(WriteAnswer::Applied(AppendedNote {
         note_id: request.note_id,
         appended_bytes: appended,
+        folder: folder_key,
+    }))
+}
+
+/// `note_set_field`: one frontmatter field, through a view that declares it.
+///
+/// The order is [`gate_existing`]'s, then the write. Nothing is re-derived here
+/// about which fields are writable: the host command owns the approval, the
+/// declaration, the reserved-marker refusal and the value precondition, and a
+/// second copy of any of them would be a second answer to a consent question.
+/// What this function adds is the two scopes and the restore point.
+pub async fn note_set_field(
+    read: &ConnectionScope,
+    write: &WriteScope,
+    request: NoteSetFieldRequest,
+    source: &dyn McpNoteSource,
+    writer: &dyn McpNoteWriter,
+) -> Result<WriteAnswer<SetFieldNote>, McpToolError> {
+    read.require_granted()?;
+    write.require_granted()?;
+    let folder_key = match gate_existing(read, write, &request.note_id, source, writer).await? {
+        Gate::Queued(folder) => return Ok(WriteAnswer::Queued { folder }),
+        Gate::Writable(folder) => folder,
+    };
+    writer
+        .set_field(
+            &request.note_id,
+            &request.view_id,
+            &request.field,
+            request.expected_value.as_deref(),
+            &request.value,
+        )
+        .await?;
+    Ok(WriteAnswer::Applied(SetFieldNote {
+        note_id: request.note_id,
+        field: request.field,
         folder: folder_key,
     }))
 }

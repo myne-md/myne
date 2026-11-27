@@ -617,6 +617,7 @@ pub enum ToolName {
     VaultState,
     NoteCreate,
     NoteAppend,
+    NoteSetField,
     NoteEdit,
     NoteMove,
     /// The four reads that joined in myne-md/myne#1077. Every one of them is a
@@ -645,6 +646,7 @@ impl ToolName {
             "vault_state" => Some(Self::VaultState),
             "note_create" => Some(Self::NoteCreate),
             "note_append" => Some(Self::NoteAppend),
+            "note_set_field" => Some(Self::NoteSetField),
             "note_edit" => Some(Self::NoteEdit),
             "note_move" => Some(Self::NoteMove),
             "attachment_list" => Some(Self::AttachmentList),
@@ -663,7 +665,11 @@ impl ToolName {
     pub fn is_write(self) -> bool {
         matches!(
             self,
-            Self::NoteCreate | Self::NoteAppend | Self::NoteEdit | Self::NoteMove
+            Self::NoteCreate
+                | Self::NoteAppend
+                | Self::NoteSetField
+                | Self::NoteEdit
+                | Self::NoteMove
         )
     }
 
@@ -691,6 +697,7 @@ impl ToolName {
             Self::VaultState => "vault_state",
             Self::NoteCreate => "note_create",
             Self::NoteAppend => "note_append",
+            Self::NoteSetField => "note_set_field",
             Self::NoteEdit => "note_edit",
             Self::NoteMove => "note_move",
             Self::AttachmentList => "attachment_list",
@@ -806,6 +813,7 @@ enum Parsed {
     State,
     Create(super::intent::NoteCreateRequest),
     Append(super::intent::NoteAppendRequest),
+    SetField(super::intent::NoteSetFieldRequest),
     Edit(super::anchor::NoteEditRequest),
     Move(super::anchor::NoteMoveRequest),
     Files(AttachmentListRequest),
@@ -841,6 +849,9 @@ fn parse_arguments(tool: ToolName, arguments: &Value) -> Option<Parsed> {
         ToolName::NoteAppend => serde_json::from_value(arguments.clone())
             .ok()
             .map(Parsed::Append),
+        ToolName::NoteSetField => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::SetField),
         ToolName::NoteEdit => serde_json::from_value(arguments.clone())
             .ok()
             .map(Parsed::Edit),
@@ -1024,6 +1035,30 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
             .await
             {
                 Ok(super::intent::WriteAnswer::Applied(appended)) => Ok(to_value(&appended)),
+                Ok(super::intent::WriteAnswer::Queued { folder }) => {
+                    return McpCallOutcome::QueueProposal {
+                        verb: tool.wire(),
+                        folder,
+                        summary,
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
+        Parsed::SetField(request) => {
+            // The review card's one line: the field and the value, because a
+            // proposal a person reads has to say what would be set.
+            let summary = one_line_summary(&format!("{}: {}", request.field, request.value));
+            match super::intent::note_set_field(
+                &scope,
+                write.as_ref().expect("resolved for a write verb"),
+                request,
+                source,
+                writer.expect("checked above for a write verb"),
+            )
+            .await
+            {
+                Ok(super::intent::WriteAnswer::Applied(set)) => Ok(to_value(&set)),
                 Ok(super::intent::WriteAnswer::Queued { folder }) => {
                     return McpCallOutcome::QueueProposal {
                         verb: tool.wire(),
@@ -1277,13 +1312,14 @@ pub fn excerpt(body: &str, query: &str) -> String {
 /// `mcp/src/surface_test.rs` holds all THREE (the catalog, this roster and the
 /// dispatch table) against each other from inside the build, so a verb only one of
 /// them names fails `cargo test -p myne-mcp`.
-pub const CATALOG_VERBS: [&str; 12] = [
+pub const CATALOG_VERBS: [&str; 13] = [
     "note_search",
     "note_read",
     "vault_list",
     "vault_state",
     "note_create",
     "note_append",
+    "note_set_field",
     "note_move",
     "note_edit",
     "attachment_list",

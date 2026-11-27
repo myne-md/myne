@@ -490,6 +490,58 @@ impl VaultNoteWriter<'_> {
     }
 }
 
+/// The host's field-write refusals, mapped onto the closed set a caller can act on.
+///
+/// A free function rather than a closure inside the trait impl so the mapping can
+/// be tested variant by variant: a caller told `vault_unavailable` for "the view is
+/// not approved" retries forever, which is the failure the calendar window had
+/// (myne-md/myne#1231) and this is the same shape of hole.
+///
+/// The two deliberate collapses, both stated: `FieldChanged` becomes
+/// [`McpToolError::NoteChanged`] because the next action is identical (read the
+/// note again), and the five "this device cannot answer right now" variants become
+/// [`McpToolError::VaultUnavailable`] because the caller's request is fine and no
+/// differently-worded request would be served.
+pub(super) fn set_field_refusal(
+    error: crate::plugins::notes::error::NoteSetFieldError,
+    note: &str,
+    view: &str,
+    field: &str,
+) -> McpToolError {
+    use crate::plugins::notes::error::NoteSetFieldError;
+    match error {
+        NoteSetFieldError::NotApproved => McpToolError::ViewNotApproved {
+            view_id: view.to_string(),
+        },
+        NoteSetFieldError::FieldNotDeclared => McpToolError::FieldNotWritable {
+            field: field.to_string(),
+        },
+        NoteSetFieldError::FieldReserved => McpToolError::FieldReserved {
+            field: field.to_string(),
+        },
+        NoteSetFieldError::InvalidField => McpToolError::InvalidField {
+            field: field.to_string(),
+        },
+        NoteSetFieldError::ValueTooLarge => McpToolError::ValueTooLarge,
+        NoteSetFieldError::FieldChanged => McpToolError::NoteChanged {
+            note_id: note.to_string(),
+        },
+        NoteSetFieldError::LiveSessionOpen => McpToolError::NoteOpenInEditor {
+            note_id: note.to_string(),
+        },
+        NoteSetFieldError::InvalidNoteId | NoteSetFieldError::NoteNotFound => {
+            McpToolError::UnknownNote {
+                note_id: note.to_string(),
+            }
+        }
+        NoteSetFieldError::VaultLocked
+        | NoteSetFieldError::CannotDecrypt
+        | NoteSetFieldError::PrefsUnreadable
+        | NoteSetFieldError::Io { .. }
+        | NoteSetFieldError::JoinFailure => McpToolError::VaultUnavailable,
+    }
+}
+
 #[async_trait]
 impl super::intent::McpNoteWriter for VaultNoteWriter<'_> {
     async fn capture_restore_point(
@@ -563,6 +615,50 @@ impl super::intent::McpNoteWriter for VaultNoteWriter<'_> {
             );
             McpToolError::VaultUnavailable
         })
+    }
+
+    /// The host's own field write, with its refusals mapped onto the closed set an
+    /// external caller can act on.
+    ///
+    /// **Every refusal keeps its own name**, which is the whole reason this maps
+    /// rather than folds: "the view is not approved" and "the field is a marker"
+    /// and "the value changed" have three different next actions, and a caller
+    /// told `vault_unavailable` for all three would retry forever. The one
+    /// deliberate collapse is `FieldChanged` onto [`McpToolError::NoteChanged`]:
+    /// same next action (read the note again), and the surface already has that
+    /// word for it.
+    async fn set_field(
+        &self,
+        note: &str,
+        view: &str,
+        field: &str,
+        expected_value: Option<&str>,
+        value: &str,
+    ) -> Result<(), McpToolError> {
+        match crate::plugins::notes::commands::note_set_field_from_host(
+            self.host,
+            self.state,
+            self.hooks,
+            note.to_string(),
+            view.to_string(),
+            field.to_string(),
+            expected_value.map(str::to_string),
+            value.to_string(),
+            self.io,
+            self.registry,
+        )
+        .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                tracing::warn!(
+                    target: "myne_core::mcp",
+                    event = "mcp_set_field_refused",
+                    error_kind = crate::plugins::notes::error::note_set_field_error_kind(&error)
+                );
+                Err(set_field_refusal(error, note, view, field))
+            }
+        }
     }
 
     async fn overwrite_note(

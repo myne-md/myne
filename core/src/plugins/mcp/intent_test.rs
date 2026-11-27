@@ -18,8 +18,8 @@
 
 use super::error::McpToolError;
 use super::intent::{
-    base_hash_hex, note_append, note_create, McpNoteWriter, NoteAppendRequest, NoteCreateRequest,
-    RestorePoint, WriteAnswer,
+    base_hash_hex, note_append, note_create, note_set_field, McpNoteWriter, NoteAppendRequest,
+    NoteCreateRequest, NoteSetFieldRequest, RestorePoint, WriteAnswer,
 };
 use super::scope::{resolve_scope, ConnectionScope};
 use super::tools::{note_facts_from_body, FileRow, McpNoteSource, NoteFacts, ViewRow};
@@ -212,6 +212,20 @@ impl McpNoteWriter for Writer {
             .expect("writer log")
             .push(format!("create:{folder}"));
         Ok("new-note".into())
+    }
+
+    async fn set_field(
+        &self,
+        note: &str,
+        view: &str,
+        field: &str,
+        expected_value: Option<&str>,
+        value: &str,
+    ) -> Result<(), McpToolError> {
+        self.log.lock().expect("writer log").push(format!(
+            "set_field:{note}:{view}:{field}={value}:expected={expected_value:?}"
+        ));
+        Ok(())
     }
 
     async fn overwrite_note(
@@ -460,6 +474,105 @@ fn mcp_intent_an_unindexed_note_in_a_left_out_folder_is_refused() {
             note_id: "n1".into()
         },
         "a note in a left-out folder must be refused even when the index cannot say so"
+    );
+    assert!(writer.calls().is_empty(), "a refused write wrote something");
+}
+
+fn set_field(note_id: &str, view: &str, field: &str, value: &str) -> NoteSetFieldRequest {
+    NoteSetFieldRequest {
+        note_id: note_id.to_string(),
+        view_id: view.to_string(),
+        field: field.to_string(),
+        value: value.to_string(),
+        expected_value: None,
+    }
+}
+
+#[test]
+fn mcp_intent_set_field_snapshots_before_it_writes() {
+    // The order is the security property the write half exists for: an external
+    // write the user cannot undo is the one outcome this path may not produce, and
+    // the host command captures its own snapshot only when its coalescing window
+    // allows, so the forced one has to come first.
+    let (read, write) = readable_except_private_writable_projects();
+    let source = Source::new(&[("n1", "Projects/", "---\nfolder: Projects/\n---\n\nBody.\n")]);
+    let writer = Writer::ok();
+
+    let answer = block_on(note_set_field(
+        &read,
+        &write,
+        set_field("n1", "view-1", "status", "done"),
+        &source,
+        &writer,
+    ))
+    .expect("a field write inside the grant applies");
+
+    match answer {
+        WriteAnswer::Applied(set) => {
+            assert_eq!(set.field, "status");
+            assert_eq!(set.folder, "projects/");
+        }
+        WriteAnswer::Queued { folder } => panic!("expected an apply, queued {folder}"),
+    }
+    let calls = writer.calls();
+    assert_eq!(calls.len(), 2, "{calls:?}");
+    assert!(
+        calls[0].starts_with("snapshot:n1"),
+        "the restore point must come FIRST: {calls:?}"
+    );
+    assert_eq!(
+        calls[1], "set_field:n1:view-1:status=done:expected=None",
+        "the view, the field and the absent-field precondition must reach the host: {calls:?}"
+    );
+}
+
+#[test]
+fn mcp_intent_set_field_queues_a_readable_folder_not_named_for_writing() {
+    let (read, write) = readable_except_private_writable_projects();
+    let source = Source::new(&[("n1", "Inbox/", "---\nfolder: Inbox/\n---\n\nBody.\n")]);
+    let writer = Writer::ok();
+
+    let answer = block_on(note_set_field(
+        &read,
+        &write,
+        set_field("n1", "view-1", "status", "done"),
+        &source,
+        &writer,
+    ))
+    .expect("a readable folder is a proposal, not a refusal");
+
+    match answer {
+        WriteAnswer::Queued { folder } => assert_eq!(folder, "inbox/"),
+        WriteAnswer::Applied(_) => panic!("a folder not named for writing must not apply"),
+    }
+    assert!(
+        writer.calls().is_empty(),
+        "a queued proposal wrote something: {:?}",
+        writer.calls()
+    );
+}
+
+#[test]
+fn mcp_intent_set_field_refuses_a_note_outside_the_read_grant() {
+    let (read, write) = readable_except_private_writable_projects();
+    let source = Source::new(&[("n1", "Private/", "---\nfolder: Private/\n---\n\nBody.\n")]);
+    let writer = Writer::ok();
+
+    let error = block_on(note_set_field(
+        &read,
+        &write,
+        set_field("n1", "view-1", "status", "done"),
+        &source,
+        &writer,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::OutOfScopeNote {
+            note_id: "n1".into()
+        },
+        "a folder the connection cannot read is a folder it cannot write"
     );
     assert!(writer.calls().is_empty(), "a refused write wrote something");
 }

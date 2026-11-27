@@ -70,6 +70,7 @@ const EXPECTED_TOOLS = [
   "vault_state",
   "note_create",
   "note_append",
+  "note_set_field",
   "note_move",
   "note_edit",
   // Four reads joined in myne-md/myne#1077: a file's extracted text, the calendar,

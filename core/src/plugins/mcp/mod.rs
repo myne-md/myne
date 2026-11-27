@@ -37,16 +37,14 @@
 //!
 //! ## What is not here yet
 //!
-//! `note_set_field` is the write verb the wire surface deliberately does not
-//! carry: the host's field write is VIEW-scoped (the field must be declared
-//! writable by an approved view, and a reserved marker is refused), and a wire
-//! verb whose arguments are `note_id`, `field` and `value` has no view to borrow
-//! that authority from. It used to be advertised in the catalog with no dispatch
-//! arm, so every call to it answered as version skew; it returns when the
-//! authority question is answered, which is a product decision and its own task.
-//! `mcp/src/surface_test.rs` is what keeps an advertised-and-unserved verb from
-//! happening again, and this paragraph is what keeps a reader from inferring that
-//! the verb was forgotten.
+//! Nothing. The surface is the thirteen verbs the catalog advertises, and
+//! `note_set_field` is one of them: it carries a `view_id`, because the host's
+//! field write is VIEW-scoped (the field must be declared writable by a view
+//! approved on this device, and a marker is refused), so the view is where the
+//! authority comes from rather than something this surface invents. It was
+//! advertised here for a while with no dispatch arm, which is what
+//! `mcp/src/surface_test.rs` now makes impossible; this paragraph stays so a
+//! reader can tell a deliberate absence from a forgotten verb.
 //!
 //! The write half is an ALLOW list where the read half beside it is a DENY list
 //! ([`write_scope`]), an empty write grant means "nowhere" where an empty exclusion

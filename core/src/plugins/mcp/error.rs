@@ -86,6 +86,28 @@ pub enum McpToolError {
     /// `vault_unavailable` and read as a locked vault (myne-md/myne#1231).
     #[serde(rename = "calendar_window_unreadable")]
     CalendarWindowUnreadable,
+    /// The saved view a field write named is not approved on this device, or it
+    /// is approved at a different version than the one stored. Both read the same
+    /// way, because nothing approved THIS definition.
+    #[serde(rename = "view_not_approved")]
+    ViewNotApproved { view_id: String },
+    /// The approved view does not declare this field as writable, so the write has
+    /// no authority behind it. The caller's next action is to name a field the
+    /// view offers, or a view that offers this one.
+    #[serde(rename = "field_not_writable")]
+    FieldNotWritable { field: String },
+    /// The field is one of the working-set markers. Refused even when a view
+    /// declares it: this surface has no delete, and a property write that can hide
+    /// a note is a delete wearing another name.
+    #[serde(rename = "field_reserved")]
+    FieldReserved { field: String },
+    /// The field name is not a plain YAML key, so no reader could find it again.
+    #[serde(rename = "invalid_field")]
+    InvalidField { field: String },
+    /// The value would push the note past the plaintext cap. The disk is fine; the
+    /// value is what does not fit.
+    #[serde(rename = "value_too_large")]
+    ValueTooLarge,
     /// A write named a title that is empty once trimmed. Refused rather than
     /// written, because a note with no title has no name in the sidebar and the
     /// caller cannot find it again to fix it.
@@ -209,6 +231,11 @@ impl McpToolError {
             McpToolError::OutOfScopeFile { .. } => "out_of_scope_file",
             McpToolError::CalendarWindowTooWide { .. } => "calendar_window_too_wide",
             McpToolError::CalendarWindowUnreadable => "calendar_window_unreadable",
+            McpToolError::ViewNotApproved { .. } => "view_not_approved",
+            McpToolError::FieldNotWritable { .. } => "field_not_writable",
+            McpToolError::FieldReserved { .. } => "field_reserved",
+            McpToolError::InvalidField { .. } => "invalid_field",
+            McpToolError::ValueTooLarge => "value_too_large",
             McpToolError::EmptyTitle => "empty_title",
             McpToolError::EmptyAppend => "empty_append",
             McpToolError::AnchorNotFound => "anchor_not_found",
@@ -281,6 +308,26 @@ impl McpToolError {
             McpToolError::OutOfScopeFolder { .. } => {
                 "That folder is one the user left out of this connection's approval: ask the user \
                  to stop leaving it out, under Settings, AI, in the Myne app."
+            }
+            McpToolError::ViewNotApproved { .. } => {
+                "That saved view is not approved on this device, or its definition changed: ask \
+                 the user to approve it under Settings, AI, in the Myne app, or call view_list for \
+                 a view that is already approved."
+            }
+            McpToolError::FieldNotWritable { .. } => {
+                "The view does not declare that field as writable: call view_list to see the \
+                 views this vault has, and set a field the approved view writes."
+            }
+            McpToolError::FieldReserved { .. } => {
+                "That field is one of the markers that move a note out of Myne's note list, and no \
+                 tool here may set one: a property write must not be able to hide a note."
+            }
+            McpToolError::InvalidField { .. } => {
+                "That field name is not one Myne can write and read back: send a plain key made of \
+                 letters, digits, underscores and dashes."
+            }
+            McpToolError::ValueTooLarge => {
+                "That value is too large for one note in Myne: send a shorter value."
             }
             McpToolError::EmptyTitle => {
                 "The new note had no title: send a title with the create, since a note that cannot \
@@ -409,6 +456,19 @@ mod tests {
             },
             McpToolError::CalendarWindowTooWide { max_days: 366 },
             McpToolError::CalendarWindowUnreadable,
+            McpToolError::ViewNotApproved {
+                view_id: "v1".into(),
+            },
+            McpToolError::FieldNotWritable {
+                field: "status".into(),
+            },
+            McpToolError::FieldReserved {
+                field: "trashed".into(),
+            },
+            McpToolError::InvalidField {
+                field: "a b".into(),
+            },
+            McpToolError::ValueTooLarge,
             McpToolError::EmptyTitle,
             McpToolError::EmptyAppend,
             McpToolError::AnchorNotFound,
@@ -450,7 +510,7 @@ mod tests {
         // unchecked.
         assert_eq!(
             all().len(),
-            25,
+            30,
             "the roster and the enum disagree: add the new variant to both"
         );
         let mut reasons: Vec<&str> = all().iter().map(McpToolError::reason).collect();

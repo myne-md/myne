@@ -15,18 +15,19 @@
 //! `format!`, `concat!`, `include_str!` or `env!` in this file so the property is
 //! checked rather than assumed.
 //!
-//! **Twelve is a ceiling, not a starting point.** Every tool is an injection
-//! surface and a scope-enforcement site, so a thirteenth verb is a deliberate
+//! **Thirteen is a ceiling, not a starting point.** Every tool is an injection
+//! surface and a scope-enforcement site, so a fourteenth verb is a deliberate
 //! cost rather than a convenience. Four reads joined the eight in
 //! myne-md/myne#1077, and the shape they follow is the one rule that decided
 //! them: **a verb may read a file by id, and no verb may name a path or a URL.**
 //! A by-id read stays inside the vault the grant covers; a path argument would
 //! let a caller name a file outside it, and a URL argument would make this
 //! process the fetch leg of the trifecta. `note_set_field` was advertised here
-//! while this build had no arm to serve it, which is why the surface has a
-//! three-way check (`mcp/src/surface_test.rs`) rather than a comment: it needs the
-//! view that owns field-write authority, and the wire verb carries no view, so it
-//! returns when that is a decision rather than a hope. Three write classes are absent by decision, not by
+//! for a while with no arm to serve it, which is why the surface has a three-way
+//! check (`mcp/src/surface_test.rs`) rather than a comment; it is served now, and
+//! what makes it safe is the `view_id` it carries — the host's field write is
+//! view-scoped, and a verb with no view would have had to invent that authority.
+//! Three write classes are absent by decision, not by
 //! omission: delete (a read is recoverable harm, a delete is not), rename (it
 //! rewrites the notes that link to the target, and those notes are outside any
 //! grant), and whole-body replace (two devices' splices both survive a merge and
@@ -225,6 +226,45 @@ pub fn catalog() -> Vec<Value> {
                     }
                 },
                 "required": ["note_id", "markdown"],
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "note_set_field",
+            "description": "Set one frontmatter field on a note, leaving every other field and \
+                the note body untouched. The write is authorised by a saved view: the view must \
+                be approved on this device and must declare the field writable, so call \
+                view_list first and pass the id it reports. A field that marks a note as \
+                trashed, deleted, archived, a template or a conflict is refused: this surface \
+                has no delete.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "note_id": {
+                        "type": "string",
+                        "description": "The id of the note to change."
+                    },
+                    "view_id": {
+                        "type": "string",
+                        "description": "The saved view whose approved declaration authorises this \
+                            write, as view_list reports it."
+                    },
+                    "field": {
+                        "type": "string",
+                        "description": "Name of the frontmatter field to set, as a plain key."
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Value to give the field."
+                    },
+                    "expected_value": {
+                        "type": "string",
+                        "description": "The value you believe is on disk. Omit it to mean the \
+                            field is absent. A mismatch is refused rather than overwritten, so a \
+                            concurrent change to the same field cannot be lost."
+                    }
+                },
+                "required": ["note_id", "view_id", "field", "value"],
                 "additionalProperties": false
             }
         }),

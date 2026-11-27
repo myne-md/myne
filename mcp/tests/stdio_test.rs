@@ -11,13 +11,14 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use serde_json::{json, Value};
 
-const EXPECTED_TOOLS: [&str; 12] = [
+const EXPECTED_TOOLS: [&str; 13] = [
     "note_search",
     "note_read",
     "vault_list",
     "vault_state",
     "note_create",
     "note_append",
+    "note_set_field",
     "note_move",
     "note_edit",
     "attachment_list",

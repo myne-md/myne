@@ -127,6 +127,55 @@ fn a_window_wider_than_the_bound_still_names_the_bound() {
     }
 }
 
+// ── every field-write refusal keeps its own name ───────────────────────────
+
+/// The field write's mapping, variant by variant.
+///
+/// Written as a list of (host refusal, expected wire reason) rather than as a
+/// match, because the assertion that matters is not "it compiles" but "each of the
+/// fourteen arrives as the reason whose sentence names the right next action". The
+/// calendar window's reversed range reached a client as "unlock the vault" for
+/// exactly this reason (myne-md/myne#1231); a field write has more ways to be
+/// refused than a date range does.
+#[test]
+fn every_field_write_refusal_is_mapped_to_the_reason_it_earned() {
+    use crate::io_failure_kind::IoFailureKind;
+    use crate::plugins::notes::error::NoteSetFieldError;
+
+    let cases: Vec<(NoteSetFieldError, &str)> = vec![
+        (NoteSetFieldError::NotApproved, "view_not_approved"),
+        (NoteSetFieldError::FieldNotDeclared, "field_not_writable"),
+        (NoteSetFieldError::FieldReserved, "field_reserved"),
+        (NoteSetFieldError::InvalidField, "invalid_field"),
+        (NoteSetFieldError::ValueTooLarge, "value_too_large"),
+        (NoteSetFieldError::FieldChanged, "note_changed"),
+        (NoteSetFieldError::LiveSessionOpen, "note_open_in_editor"),
+        (NoteSetFieldError::InvalidNoteId, "unknown_note"),
+        (NoteSetFieldError::NoteNotFound, "unknown_note"),
+        (NoteSetFieldError::VaultLocked, "vault_unavailable"),
+        (NoteSetFieldError::CannotDecrypt, "vault_unavailable"),
+        (NoteSetFieldError::PrefsUnreadable, "vault_unavailable"),
+        (
+            NoteSetFieldError::Io {
+                io_error_kind: IoFailureKind::Other,
+            },
+            "vault_unavailable",
+        ),
+        (NoteSetFieldError::JoinFailure, "vault_unavailable"),
+    ];
+    for (error, expected) in cases {
+        let described = format!("{error:?}");
+        let mapped = super::host_adapters::set_field_refusal(error, "n", "v", "status");
+        assert_eq!(
+            mapped.reason(),
+            expected,
+            "{described} was mapped to {} instead of {expected}, and a caller acts on the \
+             reason",
+            mapped.reason()
+        );
+    }
+}
+
 // ── the lock is an error, never an empty answer ─────────────────────────────
 
 #[test]

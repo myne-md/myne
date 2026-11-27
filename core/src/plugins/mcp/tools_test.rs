@@ -651,6 +651,17 @@ impl super::intent::McpNoteWriter for Writer {
         Ok("created".into())
     }
 
+    async fn set_field(
+        &self,
+        _note: &str,
+        _view: &str,
+        _field: &str,
+        _expected_value: Option<&str>,
+        _value: &str,
+    ) -> Result<(), McpToolError> {
+        Ok(())
+    }
+
     async fn overwrite_note(
         &self,
         _note: &str,
@@ -881,12 +892,10 @@ fn a_connection_with_no_grant_is_refused_before_the_vault_is_read() {
 fn an_unimplemented_verb_is_version_skew_rather_than_a_scope_refusal() {
     let map = grants(&[("claude-desktop", &["Projects"])]);
     let source = Source::new(&[("a", Some("Projects"), "alpha")]);
-    // A verb this build does not serve at all. `note_set_field` is kept as the
-    // example because it is the one name a newer shim could plausibly send: the
-    // host's field write is view-scoped and the wire verb has no view, so it is out
-    // of the catalog until that is decided (see `super::mod`). A shim newer than
-    // its host is version skew, and version skew is not a scope refusal.
-    for tool in ["note_set_field", "delete", ""] {
+    // Verbs this build does not serve at all: a name a NEWER shim could send once a
+    // fourteenth verb lands there, a verb the surface will never have, and garbage.
+    // A shim newer than its host is version skew, and skew is not a scope refusal.
+    for tool in ["note_delete", "delete", ""] {
         let arguments = json!({ "body": "x" });
         assert_eq!(
             block_on(call_tool(
@@ -1651,6 +1660,10 @@ fn every_served_verb_answers_a_call_tool_result_a_client_can_parse() {
         (
             "note_append",
             json!({ "note_id": "in", "markdown": "more" }),
+        ),
+        (
+            "note_set_field",
+            json!({ "note_id": "in", "view_id": "v1", "field": "status", "value": "done" }),
         ),
         (
             "note_edit",
