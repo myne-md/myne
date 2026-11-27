@@ -972,7 +972,8 @@
     "noinvitationsyet": "No invitations yet.",
     "createanidentity": "Create an identity",
     "confirmyourphrase": "Confirm your phrase",
-    "registerthisidentity": "Register this identity"
+    "registerthisidentity": "Register this identity",
+    "reset": "Reset"
   },
   "deviceRevoked": {
     "cta": "Start over",
@@ -1826,7 +1827,10 @@
       "confirm": "Move"
     },
     "sidebar": {
-      "browse": "Browse"
+      "browse": "Browse",
+      "customize": "Customize sidebar",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
     },
     "emptyDetail": {
       "title": "Select a note",
@@ -4951,7 +4955,8 @@
     "section": {
       "later": "Later",
       "overdue": "Overdue",
-      "upcoming": "Upcoming"
+      "upcoming": "Upcoming",
+      "none": "No date"
     },
     "sort": {
       "dueDesc": "Due date, latest first",

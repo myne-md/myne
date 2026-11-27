@@ -87,14 +87,25 @@ const PATHS: Record<IconName, string> = {
   // icon-only header buttons. Lucide stroke paths, same 24-grid language.
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18z|M12 7v5l3 2",
   bookmark: "M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z",
-  lock: "M5 11h14v10H5z|M8 11V7a4 4 0 018 0v4",
-  unlock: "M5 11h14v10H5z|M8 11V7a4 4 0 017.5-2",
-  "more-horizontal": "M5 12h.01M12 12h.01M19 12h.01",
-  "more-vertical": "M12 5h.01M12 12h.01M12 19h.01",
-  copy: "M9 9h11v11H9zM5 15H4V4h11v1",
-  share: "M4 12v8a1 1 0 001 1h14a1 1 0 001-1v-8|M16 6l-4-4-4 4|M12 2v14",
-  trash: "M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14",
-  folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z",
+  // Lucide `lock` / `lock-open`: a padlock BODY with a real shackle arc. These
+  // two were a bare rectangle joined to an arc segment, and the rectangle's
+  // sharp corners plus the disconnected arc is the "broken icon" the owner
+  // flagged (2026-11-27 polish round) — on the Settings rows and the sidebar
+  // footer they are the only lock-shaped glyph, so the defect was visible on
+  // every screen that mentions locking.
+  lock: "M5 11a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z|M8 9V7a4 4 0 0 1 8 0v2",
+  unlock: "M5 11a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z|M8 9V7a4 4 0 0 1 7.5-2",
+  // The dot trio: a zero-length `h.01` only draws under a round cap, so the
+  // stroke cap is fixed here rather than left to the default.
+  "more-horizontal": "M5 12h.01|M12 12h.01|M19 12h.01",
+  "more-vertical": "M12 5h.01|M12 12h.01|M12 19h.01",
+  // Lucide `copy`: two rounded sheets, the back one offset behind the front.
+  copy: "M8 8a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2z|M16 6V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h1",
+  share: "M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7|M16 6l-4-4-4 4|M12 2v13",
+  // Lucide `trash-2`: lid, handle, and the two inner lines. The old path drew a
+  // bare trapezoid that read as a bucket, not a bin.
+  trash: "M3 6h18|M8 6V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1|M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6|M10 11v6|M14 11v6",
+  folder: "M4 5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 4.9A2 2 0 0 0 7.93 4H4z",
   // The two target glyphs the conversation lists use (myne-md/myne#848): a
   // note-anchored conversation, and one about the whole vault. Same lucide
   // paths as the desktop registry, so the two clients draw the same shape.
@@ -105,7 +116,7 @@ const PATHS: Record<IconName, string> = {
   star: "M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.4 6.2 21.4l1.1-6.5L2.6 9.8l6.5-.9z",
   settings:
     "M12 15a3 3 0 100-6 3 3 0 000 6z|M19 12a7 7 0 00-.1-1.3l2-1.6-2-3.4-2.4 1a7 7 0 00-2.3-1.3L13.8 2h-3.6l-.4 2.4a7 7 0 00-2.3 1.3l-2.4-1-2 3.4 2 1.6A7 7 0 005 12a7 7 0 00.1 1.3l-2 1.6 2 3.4 2.4-1a7 7 0 002.3 1.3l.4 2.4h3.6l.4-2.4a7 7 0 002.3-1.3l2.4 1 2-3.4-2-1.6c.1-.4.1-.9.1-1.3z",
-  cloud: "M6 19a4 4 0 010-8 6 6 0 0111.5-1.5A3.5 3.5 0 0118 19z",
+  cloud: "M17.5 19H7a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.9 9.1 4.45 4.45 0 0 1 17.5 19z",
   "alert-triangle": "M12 3l9 16H3z|M12 9v5|M12 18h.01",
   info: "M12 21a9 9 0 100-18 9 9 0 000 18z|M12 11v5|M12 8h.01",
   "face-id":
@@ -116,9 +127,12 @@ const PATHS: Record<IconName, string> = {
   edit: "M12 20h9|M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z",
   "arrow-left": "M19 12H5|M12 19l-7-7 7-7",
   "arrow-right": "M5 12h14|M12 5l7 7-7 7",
-  download: "M12 3v12|M7 10l5 5 5-5|M5 21h14",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4|M7 10l5 5 5-5|M12 15V3",
   link: "M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1|M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1",
   "columns-2": "M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z|M12 3v18",
+  // The sync glyph (Lucide `rotate-ccw`). The old string was two disjoint
+  // fragments — an ellipse arc plus a corner tick — which rendered as the
+  // "broken" mark the owner saw on the Sync row and in Settings → Data.
   "rotate-ccw": "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8|M3 3v5h5",
   // The Archive list's zero state (myne-md/myne#970 item 25). The desktop draws
   // Lucide's `archive`; this registry stores stroke `d` strings only, so the

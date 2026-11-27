@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sheet, Icon, LIST_TOP } from "../../components";
+import { Sheet, Icon, SCREEN_TOP } from "../../components";
 
 export interface TemplateItem {
   id: string;
@@ -80,7 +80,7 @@ export function TemplatesSheet({
   if (variant === "page") {
     return (
       <>
-        <div style={{ flex: "none", padding: `${LIST_TOP} 20px 0` }}>
+        <div style={{ flex: "none", padding: `${SCREEN_TOP} 20px 0` }}>
           {onBack && (
             <button
               onClick={onBack}

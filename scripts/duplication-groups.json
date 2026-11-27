@@ -737,13 +737,6 @@
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
-        "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
-        "lines": 42,
-        "copies": 13,
-        "verdict": "consolidate",
-        "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
-      },
-      {
         "id": "protocol/src/prefs.rs",
         "lines": 11,
         "copies": 2,
@@ -770,6 +763,20 @@
         "copies": 7,
         "verdict": "justified",
         "reason": "A normalised-skeleton false positive across seven PrefsView fixture literals: the matcher ignores field names, so it sees the same shape repeated once per test that needs a populated view. The fixtures deliberately spell out every member (no `..Default::default()`) so a new prefs member fails to compile until each test's expectation is decided, which is the compile-time drift lock the sync classification relies on. Consolidating them into one builder would restore the silent default the lock exists to prevent (myne-md/myne#1074)."
+      },
+      {
+        "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + mobile/src/lib/nav-ribbon.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
+        "lines": 42,
+        "copies": 14,
+        "verdict": "justified",
+        "reason": "Two different things land in one normalized group and both are deliberate. (1) The mobile icon registry now carries the desktop's own Lucide path strings for lock/unlock/copy/trash/share/folder/download/cloud -- the 2026-11-27 polish round replaced hand-rolled paths that rendered wrong, and the desktop registry is the canonical drawing of the same action, so a byte-identical `d` string is the POINT (same glyph, same picture); consolidating would mean the mobile client importing the desktop's icon module, which drags one client's whole icon surface into the other (the same reason `client-core/emptyState` takes a glyph NODE rather than a name). (2) The device-local pref store in `mobile/src/lib/nav-ribbon.ts` repeats the ~15-line localStorage read/subscribe/notify shape of `lib/home-tiles.ts` and `lib/memory.ts`; it is three call sites of a shape whose generic form (keys, defaults, migration) would be longer than any of the three, and each carries different repair rules (nav-ribbon repairs order+hidden against a canonical list)."
+      },
+      {
+        "id": "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + mobile/src/lib/nav-ribbon.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
+        "lines": 42,
+        "copies": 14,
+        "verdict": "justified",
+        "reason": "Two different things land in one normalized group and both are deliberate. (1) The mobile icon registry now carries the desktop's own Lucide path strings for lock/unlock/copy/trash/share/folder/download/cloud -- the 2026-11-27 polish round replaced hand-rolled paths that rendered wrong, and the desktop registry is the canonical drawing of the same action, so a byte-identical `d` string is the POINT (same glyph, same picture); consolidating would mean the mobile client importing the desktop's icon module, which drags one client's whole icon surface into the other (the same reason `client-core/emptyState` takes a glyph NODE rather than a name). (2) The device-local pref store in `mobile/src/lib/nav-ribbon.ts` repeats the ~15-line localStorage read/subscribe/notify shape of `lib/home-tiles.ts` and `lib/memory.ts`; it is three call sites of a shape whose generic form (keys, defaults, migration) would be longer than any of the three, and each carries different repair rules (nav-ribbon repairs order+hidden against a canonical list)."
       }
     ],
     "baseline": [
@@ -777,7 +784,6 @@
       "cli/src/logging_discipline.rs + src-tauri/src/cli_bridge/logging_discipline.rs",
       "cli/src/windows_pipe.rs + src-tauri/src/win_pipe.rs",
       "client-core/src/accept-invite.ts + client-core/src/join-member-vault.ts",
-      "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + mobile/src/lib/attachments.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
       "client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts",
@@ -1099,7 +1105,6 @@
     "baseline": [
       "Clause",
       "Group",
-      "GroupLabel",
       "Header",
       "Meta",
       "NavHeader",

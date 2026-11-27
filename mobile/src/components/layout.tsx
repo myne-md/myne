@@ -13,6 +13,17 @@ import { Icon } from "./Icon";
  *  list, Search, Graph, Files, and Templates pages so their titles align. */
 export const LIST_TOP = "max(60px, calc(env(safe-area-inset-top) + 12px))";
 
+/** Status-bar clearance for a page that lives INSIDE the app shell (a full-screen
+ *  destination pushed over the tabs, or a sheet expanded to the screen).
+ *
+ *  `LIST_TOP` carries a 60px floor for the design gallery, where `env()` resolves
+ *  to 0; repeating that floor inside a pushed page added a second full status
+ *  bar's worth of empty space above a title that already sat below one (owner,
+ *  2026-11-27: "o üst paddingler o kadar saçmaysa yapmayalım öyle"). These pages
+ *  are only ever rendered on a device or in the flow-logic tier, so the floor is
+ *  the small one. */
+export const SCREEN_TOP = "max(env(safe-area-inset-top, 0px) + 8px, 20px)";
+
 export function Screen({
   children,
   style,

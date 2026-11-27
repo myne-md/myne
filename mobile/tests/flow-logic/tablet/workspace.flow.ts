@@ -1,9 +1,13 @@
 // Flow-logic: the tablet workspace layout (size-class adaptive split). Runs in
 // every `tablet-*` Playwright project; assertions branch on the project's
-// viewport width where expanded (≥1000, WS-01 three-pane: sidebar + list +
-// detail) and medium (≥700, two-pane: list + detail with the phone chrome)
-// legitimately differ. Same mock-IPC tier as the rest of flow-logic — no
-// device, no Rust.
+// viewport width where expanded (≥1000: nav RAIL + list + detail) and medium
+// (≥700, two-pane: list + detail with the phone chrome) legitimately differ.
+// Same mock-IPC tier as the rest of flow-logic — no device, no Rust.
+//
+// **The expanded shape is a rail, not the 248pt labelled sidebar** (owner,
+// 2026-11-27: three columns on a portrait iPad read as "çok rahatsız edici bir
+// look"). `workspace.ribbon` is the rail; every destination it offers keeps the
+// `ribbon.nav-*` testid the old `sidebar.nav-*` rows carried.
 
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
@@ -27,11 +31,13 @@ test.describe("tablet workspace layout", () => {
     await expect(page.getByTestId("workspace.empty-detail")).toBeVisible();
 
     if (isExpanded(page)) {
-      // WS-01: the sidebar absorbs the AppHeader + TabBar destinations.
-      await expect(page.getByTestId("workspace.sidebar")).toBeVisible();
+      // The rail absorbs the AppHeader + TabBar destinations.
+      await expect(page.getByTestId("workspace.ribbon")).toBeVisible();
+      await expect(page.getByTestId("workspace.sidebar")).toHaveCount(0);
       await expect(page.getByTestId("workspace.app-header")).toHaveCount(0);
       await expect(page.getByTestId("workspace.tab-bar")).toHaveCount(0);
     } else {
+      await expect(page.getByTestId("workspace.ribbon")).toHaveCount(0);
       await expect(page.getByTestId("workspace.sidebar")).toHaveCount(0);
       await expect(page.getByTestId("workspace.app-header")).toBeVisible();
       await expect(page.getByTestId("workspace.tab-bar")).toBeVisible();
@@ -55,7 +61,7 @@ test.describe("tablet workspace layout", () => {
     await expect(page.getByTestId("workspace.empty-detail")).toHaveCount(0);
   });
 
-  test("focusing an existing note collapses the left panes; the top-bar toggle reveals them", async ({ page }) => {
+  test("focusing an existing note keeps the left panes open; the top-bar toggle hides and restores them", async ({ page }) => {
     // Seed one existing note so we can focus a saved note (a brand-new note
     // deliberately keeps the list up — see the previous test).
     await installMockIpc(page, { syncStatus: { state: "idle" }, noteIds: ["n1"] });
@@ -63,34 +69,40 @@ test.describe("tablet workspace layout", () => {
     await expect(page.getByTestId("workspace.split")).toBeVisible();
     await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
 
-    // Open it → the left panes collapse so the editor gets the full width (the
-    // sidebar collapses too on expanded).
+    // Open it → the note opens BESIDE the list (owner, 2026-11-27: "iPad'de notu
+    // açınca default olarak sidebar'ı kapatıyor, bunu yapmamalı, direkt sağda
+    // açması lazım"). Collapsing is now an explicit choice, never the default.
     await page.getByTestId("notes.row").first().click();
     await expect(page.getByTestId("editor.top-bar")).toBeVisible();
-    // The pane stays mounted for the width animation — the collapsed state rides
-    // on `data-collapsed` (width 0), not an unmount.
-    await expect(page.getByTestId("workspace.list-pane")).toHaveAttribute("data-collapsed", "true");
-
-    // The EditorTopBar toggle brings the list back.
-    await page.getByTestId("editor.toggle-list").click();
     await expect(page.getByTestId("workspace.list-pane")).not.toHaveAttribute("data-collapsed", "true");
     await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
+    if (isExpanded(page)) await expect(page.getByTestId("workspace.ribbon")).toBeVisible();
+
+    // The EditorTopBar toggle still hides the panes for a distraction-free read.
+    // The pane stays mounted for the width animation — the collapsed state rides
+    // on `data-collapsed` (width 0), not an unmount.
+    await page.getByTestId("editor.toggle-list").click();
+    await expect(page.getByTestId("workspace.list-pane")).toHaveAttribute("data-collapsed", "true");
+
+    // ...and brings them back.
+    await page.getByTestId("editor.toggle-list").click();
+    await expect(page.getByTestId("workspace.list-pane")).not.toHaveAttribute("data-collapsed", "true");
   });
 
-  test("sidebar navigation drives the full-width tabs and the list slices (expanded only)", async ({ page }) => {
-    test.skip(!isExpanded(page), "sidebar renders only on the expanded size class");
+  test("rail navigation drives the full-width tabs and the list slices (expanded only)", async ({ page }) => {
+    test.skip(!isExpanded(page), "the rail renders only on the expanded size class");
     await bootToWorkspace(page);
 
     // Graph spans the content width (the list pane makes way).
-    await page.getByTestId("sidebar.nav-graph").click();
+    await page.getByTestId("ribbon.nav-graph").click();
     await expect(page.getByTestId("workspace.list-pane")).toHaveCount(0);
 
     // Back to notes; Trash is a list slice, so the split returns.
-    await page.getByTestId("sidebar.nav-trash").click();
+    await page.getByTestId("ribbon.nav-trash").click();
     await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
     await expect(page.getByText("Trash is empty")).toBeVisible();
 
-    await page.getByTestId("sidebar.nav-notes").click();
+    await page.getByTestId("ribbon.nav-notes").click();
     // Back on the notes slice with nothing in it. Row count rather than the
     // "No notes yet" placeholder: a deliberate folder keeps the tree non-empty
     // since myne-md/myne#613.
@@ -101,8 +113,8 @@ test.describe("tablet workspace layout", () => {
   test("sheets clamp to a centered card instead of stretching edge to edge", async ({ page }) => {
     await bootToWorkspace(page);
 
-    // Open Settings (sidebar on expanded; the AppHeader gear on medium).
-    if (isExpanded(page)) await page.getByTestId("sidebar.settings").click();
+    // Open Settings (the rail's gear on expanded; the AppHeader gear on medium).
+    if (isExpanded(page)) await page.getByTestId("ribbon.settings").click();
     else await page.getByLabel("Settings").click();
 
     const card = page.getByTestId("sheet.card");

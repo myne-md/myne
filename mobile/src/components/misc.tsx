@@ -1,6 +1,7 @@
 import { type CSSProperties, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type SetStateAction, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Icon, MyneMark, type IconName } from "./Icon";
 import { isRtl } from "../lib/util";
+import { useSizeClass } from "../formfactor/SizeClassContext";
 
 /** Pill chip / tag. */
 export function Chip({
@@ -174,6 +175,11 @@ export function Sheet({
   const cardRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useEnterTransition(cardRef);
   const closingRef = useRef(false);
+  // Phone class → a SHEET: flush to the left/right/bottom edges with only its
+  // top corners rounded, the iOS bottom-sheet shape. Tablet class keeps the
+  // floating card (560px, centred, all corners), because there it is a panel on
+  // a canvas rather than a phone sheet.
+  const sheetIsDocked = !useSizeClass().isRegular;
   // Drag-to-dismiss: the grabber can be pulled down; past a threshold (or a
   // quick flick) it closes, otherwise it springs back.
   const [dragY, setDragY] = useState(0);
@@ -239,14 +245,19 @@ export function Sheet({
         data-testid="sheet.card"
         style={{
           position: "relative",
-          // Phone-identical below 584px (12px side margins); on tablets the
-          // card clamps to 560 and centers instead of stretching edge to edge.
-          width: "min(560px, calc(100% - 24px))",
-          margin: "0 auto",
-          marginBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+          // Phone: edge to edge (owner, 2026-11-27: "direkt sağ sol bottom ekran
+          // kenarlarıyla, bir üst taraf rounded"); tablet: the floating card,
+          // clamped and centred.
+          width: sheetIsDocked ? "100%" : "min(560px, calc(100% - 24px))",
+          margin: sheetIsDocked ? 0 : "0 auto",
+          marginBottom: sheetIsDocked
+            ? `env(safe-area-inset-bottom, 0px)`
+            : "calc(12px + env(safe-area-inset-bottom, 0px))",
           background: "var(--bg-1)",
-          border: "1px solid var(--line-2)",
-          borderRadius: 24,
+          // The docking edge carries no border: a hairline drawn to the screen
+          // edge is the "rectangle pasted on" look the owner rejected.
+          border: sheetIsDocked ? "none" : "1px solid var(--line-2)",
+          borderRadius: sheetIsDocked ? "var(--m-radius-sheet) var(--m-radius-sheet) 0 0" : 24,
           padding: padded ? "10px 18px 20px" : "10px 0 20px",
           boxShadow: "var(--shadow-3)",
           transform: shown ? `translateY(${dragY}px)` : "translateY(calc(100% + 24px))",

@@ -20,10 +20,15 @@
    ========================================================================= */
 
 :root {
-  /* See the header: a raised recessed surface, because mobile's equivalents
-     overlay the page rather than sitting beside it. */
-  --_paper-2-amoled:  #0c0c0b;
-  --_paper-3-amoled:  #161614;
+  /* TRUE BLACK, on the owner's instruction (2026-11-27 polish round): "amoledde
+     sidebar ve toolbar falan full dark değil koyu bir gri, hepsinin siyah olması
+     lazım". Desktop already takes both to black; this file used to keep them
+     raised so an overlaying drawer would not vanish into the page, and the
+     trade-off is now decided the other way. The edges that need to stay legible
+     carry their own `--line-1` hairline, which is what separates a drawer from
+     the page once both are #000. */
+  --_paper-2-amoled:  #000000;
+  --_paper-3-amoled:  #000000;
 }
 
 /* =========================================================================
@@ -108,7 +113,27 @@ textarea,
   }
 }
 
-/* -- Spinner ----------------------------------------------------------------
+/* -- Touch feedback discipline (owner, 2026-11-27) ----------------------------
+   "bottom bar da clicklerken köşeli borderlı bir background geliyor". On a touch
+   surface WKWebView keeps `:focus-visible` on the element it just tapped, and
+   the canonical sheet draws that ring as a box-shadow — so every tap on the tab
+   bar, the vault switcher or a toolbar button left a hard rectangle behind until
+   the next tap. A ring is keyboard navigation feedback and has no meaning on a
+   finger. `:-webkit-any-link`-style UA focus remains for real keyboard use.
+   The tap highlight itself is also suppressed: iOS paints a translucent grey
+   overlay over any tapped element that carries a background, which is the other
+   half of the same artefact. */
+html.app-locked * {
+  -webkit-tap-highlight-color: transparent;
+}
+html.app-locked button:focus:not(:focus-visible),
+html.app-locked a:focus:not(:focus-visible),
+html.app-locked [role="button"]:focus:not(:focus-visible) {
+  box-shadow: none;
+  outline: none;
+}
+
+/* -- Spinner ——--------------------------------------------------------------
    Used by <Spinner /> primitive. Border-top accent + linear rotation.
    The reduced-motion media query above zeroes the animation duration, leaving
    a static ring — honest work-in-progress indicator without rotation. */

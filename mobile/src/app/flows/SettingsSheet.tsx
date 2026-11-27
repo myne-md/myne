@@ -2358,9 +2358,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               {t("commands.actions.lockVault.label")}
             </button>
 
-            <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
-              {t("settings.footerTagline")}
-            </div>
+
           </>
         )}
 
@@ -3080,9 +3078,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               ))}
             </Group>
 
-            <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
-              {t("settings.footerTagline")}
-            </div>
+
           </div>
         )}
 

@@ -186,7 +186,7 @@ import { isRegularSizeClass, useSizeClass } from "../../formfactor/SizeClassCont
 import { ListDrawer } from "./editor/sheets/ListDrawer";
 import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRestore";
 import { EmptyDetail } from "./editor/EmptyDetail";
-import { SidebarPane } from "./editor/SidebarPane";
+import { NavRibbon } from "./editor/chrome/NavRibbon";
 import { AppHeader } from "./editor/chrome/AppHeader";
 import { useAutosave } from "./editor/chrome/useAutosave";
 import { ActionPill } from "./editor/chrome/ActionPill";
@@ -632,18 +632,18 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [editorText],
   );
 
-  // Regular size classes: focusing a note collapses the left panes (sidebar +
-  // note list) so the editor gets the full width - the EditorTopBar toggle reveals
-  // them, and the next note open auto-collapses again (the effect below). On
-  // medium the main nav (TabBar) stays as a full-width bottom bar while collapsed.
-  const [panesRevealed, setPanesRevealed] = useState(false);
+  // Regular size classes: the left panes (nav + note list) stay OPEN when a note
+  // is opened, and the editor appears beside them (owner, 2026-11-27: "iPad'de
+  // notu açınca default olarak sidebar'ı kapatıyor, bunu yapmamalı, direkt sağda
+  // açması lazım"). Collapsing was the old default — the editor took the full
+  // width on every note open — which on a portrait tablet threw away the list a
+  // person had just tapped in. The toggle in the editor's top bar still hides
+  // them deliberately.
+  const [panesRevealed, setPanesRevealed] = useState(true);
   // Collapse only for an EXISTING focused note (`editing.id` set) - a brand-new
   // note keeps the list on screen (you're still placing it; matches the tablet
   // flow-logic UX), so `editing?.id` not `editing`.
   const panesCollapsed = isRegular && tab === "notes" && editing?.id != null && !panesRevealed;
-  useEffect(() => {
-    setPanesRevealed(false);
-  }, [editing?.id]);
 
   // No-op-write guard: the open note's RAW buffer text as of its last
   // successful read or write, keyed by id so a stale in-flight write can never
@@ -4100,7 +4100,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               // `fill` makes the state BE the surface, and `frame={false}` drops
               // the card's border and fill: the list area is already a panel, and
               // a rounded box drawn inside it is a dialog nobody can dismiss.
-              // The wash stays, which is what makes it read as a place.
+              //
+              // `fill` is OFF (owner, 2026-11-27): on a 316pt tablet list pane a
+              // filled zero state stretched a two-line message down the whole
+              // column and read as a broken layout ("çok extended ve garip").
+              // Centred and compact, it reads as the collection at rest.
               //
               // `firstRun` is the honest variant for all three views. An empty
               // Archive is not an error and not a filtered result; it is the
@@ -4108,7 +4112,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               <EmptyState
                 variant="firstRun"
                 size="md"
-                fill
                 frame={false}
                 glyph={
                   <Icon
@@ -4362,7 +4365,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {tab === "templates" && (
           <TemplatesSheet
             variant="page"
-            onBack={() => setTab("notes")}
+            // The "‹ Notes" row is a phone affordance, not a tablet one (owner,
+            // 2026-11-27: "'< Notes' yazan şeyler bence gerekli değil iPad'de ve
+            // iOS'ta"). On the regular size classes the ribbon/sidebar already
+            // names every destination one tap away, so a back link inside the
+            // page repeats it and costs a row of vertical space. Compact keeps
+            // it: there the list is the only way back.
+            {...(isRegular ? {} : { onBack: () => setTab("notes") })}
             templates={templateNotes}
             onClose={() => setTab("notes")}
             onEdit={(id) => {
@@ -5412,17 +5421,22 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       <div data-testid="workspace.split" style={{ flex: 1, minHeight: 0, display: "flex" }}>
         {sizeClass === "expanded" && (
           <div
-            // display:flex so the SidebarPane STRETCHES to full height (its
-            // flex:1 nav pushes the settings footer to the bottom, where its
-            // divider lines up with the editor FormatBar). Without it the block
-            // wrapper let the sidebar shrink to ~60% content height.
-            style={{ width: panesCollapsed ? 0 : 248, flex: "none", minHeight: 0, display: "flex", overflow: "hidden", transition: "width var(--duration-slow) var(--ease-standard)" }}
+            // display:flex so the rail STRETCHES to full height (its flex:1 nav
+            // pushes the footer to the bottom, where its edge lines up with the
+            // editor FormatBar).
+            style={{ width: panesCollapsed ? 0 : 64, flex: "none", minHeight: 0, display: "flex", overflow: "hidden", transition: "width var(--duration-slow) var(--ease-standard)" }}
           >
-          <SidebarPane
+          {/* The rail, not the 248px sidebar (owner, 2026-11-27: three panels on
+              a portrait iPad read as "çok rahatsız edici bir look"). Everyone
+              the labelled pane listed is still one tap away, and the width it
+              gives back belongs to the list and the note. */}
+          <NavRibbon
             label={vaultDisplayLabel(prefs.label)}
             icon={prefs.icon}
             tab={tab}
             listView={listView}
+            hasNote={editing?.id !== undefined}
+            aiEnabled={prefs.ai_enabled === true}
             onAllNotes={() => { setTab("notes"); setListView("notes"); setActiveTag(null); setActiveViewId(null); }}
             onTasks={() => setTab("tasks")}
             {...(editing?.id === undefined ? {} : { onNoteTasks: () => setTab("note-tasks") })}

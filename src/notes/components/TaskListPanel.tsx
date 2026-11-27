@@ -82,10 +82,32 @@ const PRIORITIES = ["highest", "high", "medium", "low", "lowest"] as const;
 /** Menu order, and the roster `present()` is computed over. */
 const FIELD_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priority"];
 
+/** The description as a READER sees it, not as the file spells it.
+ *
+ *  A task line is markdown, so it can carry `[[Writing with Markdown]]`, an
+ *  `![[att:…|diagram.png]]` embed or a `[label](url)` link. The row is a list of
+ *  sentences, not a source view: printing the delimiters is the phone showing
+ *  the note's bytes instead of its meaning, which is what the seeded vault did
+ *  on the Tasks screen (owner, 2026-11-27: "Read [[Writing with Markdown]]").
+ *
+ *  Display-only by construction: the row's field controls write through
+ *  `onWriteField`, which is given the TASK, never this string, so nothing here
+ *  can reach the file. `taskRowKey` keys off the raw line, so a display
+ *  transformation cannot re-key a row either. */
+function displayTaskText(line: string): string {
+  const target = (raw: string): string => raw.split("/").pop() ?? raw;
+  return taskDescription(line)
+    // Embeds first: `![[…]]` would otherwise be matched by the plain rule and
+    // leave its `!` behind.
+    .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t: string, alias?: string) => alias ?? target(t))
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t: string, alias?: string) => alias ?? target(t))
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+}
+
 function toRowData(task: VaultTask, depth: number): TaskRowData {
   return {
     key: taskRowKey(task),
-    text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
+    text: task.lineIndex === null ? (task.noteTitle ?? "") : displayTaskText(task.rawLine),
     completed: task.completed,
     noteTitle: task.noteTitle,
     ...(depth > 0 ? { depth } : {}),

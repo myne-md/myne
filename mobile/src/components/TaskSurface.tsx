@@ -18,6 +18,7 @@ import { TaskListPanel } from "@myne/task-panel";
 import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { todayLocal } from "@myne/task-filters";
 import { setTaskCompleted, setTaskField, useVaultTasks, type VaultTask } from "../lib/tasks";
+import { SCREEN_TOP } from "../components";
 
 export type TaskSurfaceScope =
   /** Every task in the vault - the bottom-bar destination and its sidebar tab. */
@@ -69,7 +70,23 @@ export function TaskSurface({
   );
 
   return (
-    <TaskListPanel
+    // The task DESTINATIONS are full screens, so the host supplies the page
+    // frame the shared panel expects and does not carry itself: status-bar
+    // clearance on top and the canon's 20px gutter on the sides. Without it the
+    // search field rendered UNDER the status bar and every row sat against the
+    // bezel (owner, 2026-11-27: "tasks panellerinin padding ve marginleri çok
+    // yanlış").
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        paddingTop: SCREEN_TOP,
+        paddingInline: 20,
+      }}
+    >
+      <TaskListPanel
       tasks={visible}
       view={view}
       today={today ?? todayLocal()}
@@ -90,6 +107,7 @@ export function TaskSurface({
       onWriteField={(task, kind, value) => setTaskField(task, kind, value)}
       {...(onOpen === undefined ? {} : { onOpen })}
       {...(testIdPrefix === undefined ? {} : { testIdPrefix })}
-    />
+      />
+    </div>
   );
 }

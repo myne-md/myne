@@ -560,14 +560,18 @@ const CSS = `
   font-weight: var(--weight-regular);
 }
 .cm-fm-properties-name:hover {
-  background: var(--paper-2, #f3f1eb);
+  /* No wash on hover either: the title is the note's first line, not a form
+     field, and a grey box appearing under the cursor is what the owner read as
+     "background color neden değişiyor" (2026-11-27). The caret and the hover
+     affordance of "Add cover" beside it are enough. */
+  background: transparent;
 }
 .cm-fm-properties-name:focus,
 .cm-fm-properties-name:focus-visible {
   outline: 0 !important;
   outline-style: none !important;
   box-shadow: none !important;
-  background: var(--paper-2, #f3f1eb);
+  background: transparent;
 }
 .cm-fm-properties-title {
   font-size: 1em;

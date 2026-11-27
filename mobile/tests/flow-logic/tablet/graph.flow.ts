@@ -32,7 +32,7 @@ const isExpanded = (page: Page): boolean => (page.viewportSize()?.width ?? 0) >=
 async function openGraph(page: Page): Promise<void> {
   await expect(page.getByTestId("workspace.split")).toBeVisible();
   if (isExpanded(page)) {
-    await page.getByTestId("sidebar.nav-graph").click();
+    await page.getByTestId("ribbon.nav-graph").click();
   } else {
     await page.getByTestId("workspace.tab-graph").click();
   }

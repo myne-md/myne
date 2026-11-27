@@ -227,7 +227,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "SyncUsageBlock": { file: "src/components/sync/SyncUsageBlock.tsx", line: 66 },
   "TabStrip": { file: "src/notes/components/TabStrip.tsx", line: 251 },
   "TagBrowser": { file: "src/notes/components/TagBrowser.tsx", line: 55 },
-  "TaskListPanel": { file: "src/notes/components/TaskListPanel.tsx", line: 908 },
+  "TaskListPanel": { file: "src/notes/components/TaskListPanel.tsx", line: 930 },
   "TasksPane": { file: "src/notes/components/TasksPane.tsx", line: 28 },
   "TemplatesManager": { file: "src/components/TemplatesManager.tsx", line: 165 },
   "Textarea": { file: "src/components/primitives/Textarea.tsx", line: 21 },
