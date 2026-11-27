@@ -369,6 +369,14 @@ describe("the approval dialog", () => {
       "true",
     );
     expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("Every folder");
+    // Whole-vault-off: the counted paragraph renders the plural scopeLine, so
+    // the new two-sentence wording must reach the screen (not the retired
+    // three-clause text).
+    fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
+    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain(
+      "can change anything in them",
+    );
+    fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
     // The switches are the host's catalog, and one verb this build cannot serve
     // is off with a reason rather than offered as a control that does nothing.
