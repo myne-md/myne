@@ -1,12 +1,13 @@
 <!--
 PR title = conventional-commit subject, e.g.
   fix(editor): reveal colored highlights cleanly
-Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects attribution trailers.
+Do NOT mention AI/assistant tooling anywhere; the commit-msg hook rejects attribution trailers.
 -->
 
 ## Summary
 
-<!-- What does this change, and why? -->
+<!-- What changed, and why. Two or three sentences in your own voice. No taglines,
+     no bolded commit subjects, no em or en dashes. See AGENTS.md, "Rules". -->
 
 ## Linked work
 
@@ -29,6 +30,7 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 ## Checklist
 
 - [ ] Conventional-commit subject; the issue is referenced above with a non-closing keyword (`Refs #n`), so the merge does not close it.
+- [ ] The branch starts at the default branch and this PR targets it; it is not stacked on another open PR.
 - [ ] Lint + tests pass locally (`cargo clippy --workspace --all-targets -- -D warnings`, `pnpm build`, `pnpm test`).
 - [ ] A new user-facing flow ships with its `data-testid` pass (`src/AGENTS.md` "Test observability"); its E2E scenario is written by hand, later.
 - [ ] Docs / specs / glossary / decisions updated where behavior changed.

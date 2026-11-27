@@ -52,7 +52,10 @@ use myne_core::host::test_host::TestHost;
 use myne_core::plugins::mcp::host_adapters::{door_call, DoorContext};
 use myne_core::plugins::mcp::tools::WireCall;
 use myne_core::plugins::notes::commands::note_create_with_dir;
-use myne_core::plugins::prefs::commands::set_mcp_connection_grant_from_host;
+use myne_core::plugins::prefs::commands::{
+    set_mcp_connection_grant_from_host, set_view_approval_from_host, upsert_saved_view_from_host,
+    ViewApproval,
+};
 use myne_core::plugins::vault_indices::state::NoteRecord;
 use myne_core::plugins::vault_indices::VaultIndicesState;
 use myne_core::plugins::vault_unlock::state::{
@@ -61,6 +64,7 @@ use myne_core::plugins::vault_unlock::state::{
 use myne_core::search::SearchIndexState;
 use myne_core::test_support::{block_on, seed_real_vault_meta};
 use myne_core::vault_io::StdVaultIo;
+use protocol::saved_view::{FilterNode, SavedView, ViewType};
 use serde_json::{json, Value};
 
 use super::activity::SharedLastAccess;
@@ -634,6 +638,39 @@ fn a_real_client_searches_inside_the_grant_and_never_outside_it() {
     assert!(text.contains("The quarterly alpha report."), "{text}");
 }
 
+/// The exclusion has no hole where the index has one: an unindexed note whose own
+/// `folder:` is the left-out one is refused, with the same `out_of_scope` reason an
+/// indexed note gets.
+#[test]
+fn a_real_client_cannot_read_an_unindexed_note_in_a_left_out_folder() {
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
+    fixture.open_door();
+    // Written by the app's own create path, then removed from the index: the state
+    // a note is in before the WebView has indexed it.
+    let private_id = block_on(myne_core::plugins::notes::commands::note_create_with_dir(
+        myne_core::paths::notes_dir_under(&myne_core::paths::vault_root_for_id_from_base(
+            &fixture.app_data,
+            test_vault_id(),
+        ))
+        .expect("notes dir"),
+        &fixture.state,
+        format!("---\nfolder: {OUT_OF_SCOPE_FOLDER}/\n---\n\nThe secret alpha plan."),
+        &StdVaultIo,
+        &*fixture.host,
+    ))
+    .expect("create the left-out note");
+    fixture.indices.remove(&private_id);
+
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+    let reply = session.call(1, "note_read", json!({ "note_id": private_id }));
+    assert_eq!(reply["result"]["isError"], true, "reply: {reply}");
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "out_of_scope",
+        "an unindexed note in a left-out folder must be refused for the reason it \
+         would have got with an index record: {reply}"
+    );
+}
+
 #[test]
 fn a_real_client_that_names_no_connection_is_refused_with_no_grant() {
     // No `MYNE_MCP_CONNECTION`: the shim sends `unnamed-client`, the vault holds
@@ -753,13 +790,16 @@ fn a_malformed_call_is_answered_with_invalid_request() {
             "tool": "note_search",
             "arguments": {},
         }),
-        // A verb this build does not implement (`note_set_field` and the two
-        // anchored verbs land as their own tasks).
+        // A verb this build does not implement, as `note_delete`: a name a newer shim
+        // could plausibly send and neither the catalog nor the dispatch table carries.
+        // This row used `note_set_field` while that verb was advertised and unserved,
+        // which would now answer `invalid_request` for a missing argument and exercise
+        // nothing about version skew — the one answer this row exists for.
         json!({
             "cmd": "mcp_call",
             "connection": CONNECTION,
-            "tool": "note_set_field",
-            "arguments": { "note_id": "x", "field": "f", "value": "v" },
+            "tool": "note_delete",
+            "arguments": { "note_id": "x" },
         }),
         // A WRITE verb this build does implement, missing its required fields:
         // malformed, not version skew. The two are different answers, and a test
@@ -922,18 +962,16 @@ fn a_real_client_creates_a_note_inside_the_write_grant_and_reads_it_back() {
         note_ids(&fixture).contains(&note_id),
         "the note must exist on disk: {note_id}"
     );
-
-    // The fixture's index is HAND-FED, exactly as it is for the two seeded notes
-    // above: in the app the notes plugin owns `VaultIndicesState` and upserts on
-    // create, and here that state is a standalone value the test owns. Sweeping it
-    // would make this test pass while proving nothing about the write.
-    fixture.indices.apply(
-        &note_id,
-        NoteRecord {
-            title: Some("Written by a client".into()),
-            folder: Some(format!("{IN_SCOPE_FOLDER}/")),
-            ..Default::default()
-        },
+    // **Nothing indexes it, and that is the point.** This test used to hand-feed
+    // `VaultIndicesState` with the note's record, on the stated belief that "the
+    // notes plugin owns it and upserts on create". It does not: the WebView is the
+    // only writer, through `vault_indices_apply`, so the hand-feed simulated
+    // something the app never does — and it is exactly what hid the bug where a
+    // created note was readable by nobody (myne-md/myne#1230). The fallback under
+    // test reads the note's own bytes when the index has no record.
+    assert!(
+        !fixture.indices.snapshot().contains_key(&note_id),
+        "premise: no record is written for a note the door created"
     );
 
     // Read it back through the door, which is the claim the caller cares about.
@@ -947,6 +985,154 @@ fn a_real_client_creates_a_note_inside_the_write_grant_and_reads_it_back() {
     assert!(
         body.contains(&format!("folder: {IN_SCOPE_FOLDER}/")),
         "{body}"
+    );
+
+    // And the sequence continues: an append needs the note's current bytes, so it
+    // needs the same lookup that the read did. A write surface whose verbs only
+    // work on notes somebody had already opened is not a write surface.
+    let appended = session.call(
+        3,
+        "note_append",
+        json!({ "note_id": note_id, "markdown": "Paragraph two." }),
+    );
+    assert_eq!(appended["result"]["isError"], false, "reply: {appended}");
+    let reply = session.call(4, "note_read", json!({ "note_id": note_id }));
+    let body = reply["result"]["structuredContent"]["body"]
+        .as_str()
+        .expect("a read answers with the body");
+    assert!(
+        body.contains("Paragraph two."),
+        "the append did not land: {body}"
+    );
+}
+
+/// A note id, a view id and a field name are all `String`, so the compiler cannot
+/// see a swap between them. The door drives the real adapter over a vault holding an
+/// approved view and reads the value back off disk, which is the only shape that can
+/// tell a swapped pair from a working write.
+#[test]
+fn a_real_client_writes_a_field_through_the_view_that_authorises_it() {
+    const VIEW_ID: &str = "v-status-board";
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    let view = SavedView {
+        id: VIEW_ID.to_string(),
+        name: "Status board".to_string(),
+        view_type: ViewType::Table,
+        filters: FilterNode::All,
+        sort: None,
+        group_by: None,
+        columns: vec!["status".to_string()],
+        card_size: None,
+        image: None,
+        image_aspect_ratio: None,
+        version: Some(1),
+        write_fields: vec!["status".to_string()],
+        lanes: Vec::new(),
+        template: None,
+    };
+    // Saved and approved through the commands the settings screen calls: the approval
+    // is what the write checks, so seeding it any other way tests an unreachable state.
+    let hooks: myne_core::hooks::Hooks = fixture.hooks.clone();
+    block_on(async {
+        upsert_saved_view_from_host(
+            &*fixture.host,
+            &fixture.state,
+            &hooks,
+            view.clone(),
+            &StdVaultIo,
+        )
+        .await
+        .expect("save the view");
+        set_view_approval_from_host(
+            &*fixture.host,
+            &fixture.state,
+            &hooks,
+            ViewApproval {
+                view_id: VIEW_ID.to_string(),
+                version: view.version,
+                definition: None,
+            },
+            &StdVaultIo,
+        )
+        .await
+        .expect("approve the view this device just saved");
+    });
+
+    fixture.open_door();
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    // A field the view declares is written, and the answer names the note, the field
+    // and the folder.
+    let reply = session.call(
+        1,
+        "note_set_field",
+        json!({
+            "note_id": fixture.in_scope.as_str(),
+            "view_id": VIEW_ID,
+            "field": "status",
+            "value": "done",
+        }),
+    );
+    assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
+    let structured = &reply["result"]["structuredContent"];
+    assert_eq!(structured["noteId"], fixture.in_scope.as_str(), "{reply}");
+    assert_eq!(structured["field"], "status", "{reply}");
+    // The canonical (lower-cased) folder key: the answer names where the write
+    // landed rather than echoing the caller's spelling.
+    assert_eq!(
+        structured["folder"],
+        format!("{}/", IN_SCOPE_FOLDER.to_lowercase()),
+        "{reply}"
+    );
+
+    // Off disk: `status: done`, not the `done: status` a swap would have written.
+    let reply = session.call(
+        2,
+        "note_read",
+        json!({ "note_id": fixture.in_scope.as_str() }),
+    );
+    let body = reply["result"]["structuredContent"]["body"]
+        .as_str()
+        .expect("the note reads back");
+    assert!(
+        body.contains("status: done"),
+        "the field write did not land: {body}"
+    );
+    assert!(
+        !body.contains("done: status"),
+        "the field and the value were swapped: {body}"
+    );
+
+    // A field the view does not declare is refused, and the refusal is the one
+    // the catalog names.
+    let reply = session.call(
+        3,
+        "note_set_field",
+        json!({
+            "note_id": fixture.in_scope.as_str(),
+            "view_id": VIEW_ID,
+            "field": "rating",
+            "value": "5",
+        }),
+    );
+    assert_eq!(reply["result"]["isError"], true, "reply: {reply}");
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "field_not_writable",
+        "reply: {reply}"
+    );
+
+    // Nothing was written by the refused call.
+    let reply = session.call(
+        4,
+        "note_read",
+        json!({ "note_id": fixture.in_scope.as_str() }),
+    );
+    let body = reply["result"]["structuredContent"]["body"]
+        .as_str()
+        .expect("the note reads back");
+    assert!(
+        !body.contains("rating"),
+        "a refused write must not land: {body}"
     );
 }
 

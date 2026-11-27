@@ -737,6 +737,13 @@
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
+        "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
+        "lines": 42,
+        "copies": 13,
+        "verdict": "consolidate",
+        "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
+      },
+      {
         "id": "protocol/src/prefs.rs",
         "lines": 11,
         "copies": 2,
@@ -765,18 +772,18 @@
         "reason": "A normalised-skeleton false positive across seven PrefsView fixture literals: the matcher ignores field names, so it sees the same shape repeated once per test that needs a populated view. The fixtures deliberately spell out every member (no `..Default::default()`) so a new prefs member fails to compile until each test's expectation is decided, which is the compile-time drift lock the sync classification relies on. Consolidating them into one builder would restore the silent default the lock exists to prevent (myne-md/myne#1074)."
       },
       {
-        "id": "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/app/flows/editor/chrome/TabBar.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + mobile/src/lib/nav-ribbon.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
-        "lines": 42,
-        "copies": 15,
+        "id": "mcp/src/tool_list.rs #1",
+        "lines": 39,
+        "copies": 2,
         "verdict": "justified",
-        "reason": "The normalized skeleton of a stroke-path TABLE. The mobile icon registry, the tab bar's inline glyphs and the desktop's `editor/src/*/icons.ts` all spell Lucide `d` strings, and byte-identical paths across clients are the POINT: the same action draws the same picture on a phone and on a computer, which is exactly what the 2026-11-27 review asked for when the hand-rolled mobile paths rendered as broken glyphs (lock/unlock/copy/trash). Consolidating would mean the phone importing the desktop's icon module and dragging one client's whole icon surface into the other — the same reason `client-core/emptyState` takes a glyph NODE instead of a name. The remaining members of the group (`capabilities.ts`, `memory.ts`, `history.ts`, `reducer.ts`, the two settings catalogues) are the pre-existing localStorage/pref-store shape this group has always contained; the two NEW device-layout stores were extracted into `mobile/src/lib/layout-store.ts` in this same change rather than recorded."
+        "reason": "The catalog is a CONSTANT EXPRESSION by design: scripts/check-mcp-tool-surface.mjs refuses format!/concat!/include_str!/env! in this file, because a description a note or the environment could contribute to is the tool-poisoning path the surface exists to close. So the repeated json! envelope cannot be factored into a builder, and what the detector sees is one hand-written literal per verb, which is what makes a verb reviewable in one place. myne-md/myne#1232."
       },
       {
-        "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + mobile/src/lib/nav-ribbon.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
-        "lines": 42,
-        "copies": 14,
+        "id": "mcp/src/tool_list.rs #2",
+        "lines": 35,
+        "copies": 3,
         "verdict": "justified",
-        "reason": "The normalized skeleton of a stroke-path TABLE. The mobile icon registry, the tab bar's inline glyphs, the desktop's `editor/src/*/icons.ts` and Settings' own glyph rows all spell Lucide `d` strings, and byte-identical paths across clients are the POINT: the same action draws the same picture on a phone and on a computer — exactly what the 2026-11-27 review asked for when the hand-rolled mobile paths rendered as broken glyphs (lock/unlock/copy/trash). Consolidating would mean the phone importing the desktop's icon module and dragging one client's whole icon surface into the other, the same reason `client-core/emptyState` takes a glyph NODE instead of a name. The remaining members (`capabilities.ts`, the two `memory.ts`, `history.ts`, `reducer.ts`, the settings catalogues, `edit.rs`) are the pre-existing preference/label table shape this group has always contained; the two NEW device-layout stores were extracted into `mobile/src/lib/layout-store.ts` in this same change rather than recorded here."
+        "reason": "The catalog is a CONSTANT EXPRESSION by design: scripts/check-mcp-tool-surface.mjs refuses format!/concat!/include_str!/env! in this file, because a description a note or the environment could contribute to is the tool-poisoning path the surface exists to close. So the repeated json! envelope cannot be factored into a builder, and what the detector sees is one hand-written literal per verb, which is what makes a verb reviewable in one place. myne-md/myne#1232."
       }
     ],
     "baseline": [
@@ -784,6 +791,7 @@
       "cli/src/logging_discipline.rs + src-tauri/src/cli_bridge/logging_discipline.rs",
       "cli/src/windows_pipe.rs + src-tauri/src/win_pipe.rs",
       "client-core/src/accept-invite.ts + client-core/src/join-member-vault.ts",
+      "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + mobile/src/lib/attachments.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
       "client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts",
@@ -828,7 +836,6 @@
       "core/src/plugins/live/session_test.rs #3",
       "core/src/plugins/live/session_test.rs #4",
       "core/src/plugins/live/session_test.rs #5",
-      "core/src/plugins/mcp/anchor_test.rs",
       "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #1",
       "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #2",
       "core/src/plugins/memory/commands.rs",
@@ -925,7 +932,6 @@
       "editor/src/slash/plugin.ts + editor/src/template-tokens/plugin.ts + editor/src/wikilink/picker.ts #2",
       "editor/src/slash/plugin.ts + editor/src/wikilink/picker.ts #1",
       "editor/src/slash/plugin.ts + editor/src/wikilink/picker.ts #2",
-      "mcp/src/tool_list.rs",
       "mobile/src/app/flows/AiHistorySheet.tsx + mobile/src/app/flows/MemorySheet.tsx",
       "mobile/src/app/flows/AttachmentsSheet.tsx",
       "mobile/src/app/flows/CreateVaultFlow.tsx + mobile/src/app/flows/IdentityFlow.tsx",
@@ -1105,6 +1111,7 @@
     "baseline": [
       "Clause",
       "Group",
+      "GroupLabel",
       "Header",
       "Meta",
       "NavHeader",

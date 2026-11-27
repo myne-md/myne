@@ -106,6 +106,104 @@ pub trait McpNoteSource: Send + Sync {
     async fn calendar(&self, from: &str, to: &str) -> Result<Vec<CalendarRow>, McpToolError>;
     /// The vault's saved views, as stored.
     async fn views(&self) -> Result<Vec<ViewRow>, McpToolError>;
+    /// The facts about ONE note read from the note itself, for the window in which
+    /// the index does not carry it.
+    ///
+    /// [`Self::records`] is the sidebar's index (`MYI1`) and the WebView is its
+    /// only writer, so a note created outside the editor — by this door, by `myne
+    /// new`, by a sync pull — is on disk while the record map has never heard of
+    /// it. Every by-id verb answered [`McpToolError::UnknownNote`] about a note the
+    /// agent had just written, and only a lock-and-unlock reindex repaired it
+    /// (myne-md/myne#1230).
+    ///
+    /// Three facts and not a [`NoteRecord`]: a record carries folded title keys,
+    /// edges, tags and typed properties, all computed TypeScript-side, so building
+    /// one here would be a second indexer that disagrees with the real one.
+    ///
+    /// `None` when there is no such note, which is also what the default answers —
+    /// the honest one for a source that cannot look at a note.
+    async fn derived_note(&self, _note_id: &str) -> Result<Option<NoteFacts>, McpToolError> {
+        Ok(None)
+    }
+}
+
+/// One note's scope-relevant facts: existence is the `Option`, and these three are
+/// the only things a clamp reads. Deliberately not a [`NoteRecord`] — see
+/// [`McpNoteSource::derived_note`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteFacts {
+    /// The note's title (frontmatter `title:`, else first H1), or `None`.
+    pub title: Option<String>,
+    /// The folder the note resolves to, in the same shape a
+    /// [`NoteRecord`] carries it: raw as written, `None` for the vault root.
+    /// [`Self::folder_key`] is the canonical form the clamps read.
+    pub folder: Option<String>,
+    /// Whether it is in the person's working set — no `trashed:`, `deleted:`,
+    /// `archived:`, `template:` or `conflict:` marker.
+    pub live: bool,
+}
+
+impl NoteFacts {
+    /// The canonical folder key, `""` for the vault root: what every clamp
+    /// compares, and the same value [`folder_key_of`] answers for a record.
+    pub fn folder_key(&self) -> String {
+        canonical_folder(self.folder.as_deref().unwrap_or(""))
+    }
+}
+
+/// The facts a note's own bytes carry: one function rather than one per call site,
+/// so the adapter and the test doubles cannot pick different helpers and stop
+/// testing the same thing.
+pub(super) fn note_facts_from_body(body: &str) -> Option<NoteFacts> {
+    use crate::plugins::notes::frontmatter_patch::read_string_field;
+    use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
+    // The RAW value, not `folder_of`'s canonical one: a row's `folder` is what the
+    // person sees, and a derived row that spelled it differently from an indexed
+    // one would be two shapes for one field.
+    let folder = extract_title_slices(body.as_bytes())
+        .frontmatter_bytes
+        .and_then(fm_folder);
+    // The folder decides the grant, so a second reader checks it: the parser the
+    // field write uses. Where they disagree — a trailing `# comment` is the live
+    // shape, `Private` against `Private #x` — this surface declines rather than
+    // placing a note the app hides outside the exclusion. `None` answers
+    // `unknown_note` on every verb.
+    if folder != read_string_field(body.as_bytes(), "folder") {
+        return None;
+    }
+    // Both readers declining is not agreement: a `folder:` written as a block
+    // scalar reads as `None` to each of them while the app's YAML reader resolves it
+    // to a real folder, and a `None` folder is the vault ROOT — the most permissive
+    // answer this surface has. A key that is there and unresolvable derives nothing.
+    if folder.is_none()
+        && crate::plugins::notes::frontmatter_patch::has_field(body.as_bytes(), "folder")
+    {
+        return None;
+    }
+    Some(NoteFacts {
+        title: crate::plugins::notes::title_extract::resolve_note_title(body.as_bytes()),
+        folder,
+        live: crate::plugins::agent::hide::body_is_live(body),
+    })
+}
+
+/// From the index when it carries the note, from the note itself when it does not,
+/// and `None` when neither knows it. The single seam for "does this note exist and
+/// where is it", so the read verbs and the write gate cannot drift apart on the
+/// fallback.
+pub(super) async fn facts_for(
+    records: &BTreeMap<String, NoteRecord>,
+    source: &dyn McpNoteSource,
+    note_id: &str,
+) -> Result<Option<NoteFacts>, McpToolError> {
+    if let Some(record) = records.get(note_id) {
+        return Ok(Some(NoteFacts {
+            title: record.title.clone(),
+            folder: record.folder.clone(),
+            live: record.live,
+        }));
+    }
+    source.derived_note(note_id).await
 }
 
 /// One file as `attachment_list` hands it over.
@@ -126,6 +224,10 @@ pub struct FileRow {
 }
 
 /// One saved view as `view_list` hands it over.
+///
+/// The last two fields exist because `note_set_field`'s refusals send the caller
+/// here: a client told "not approved" or "field not declared" has to be able to
+/// answer those two questions from this list, or it retries the same ids.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewRow {
@@ -135,6 +237,12 @@ pub struct ViewRow {
     pub name: String,
     /// `table` / `cards` / `list`.
     pub view_type: String,
+    /// Whether this device has approved the view's CURRENT definition, which is the
+    /// precondition a field write needs.
+    pub approved: bool,
+    /// The frontmatter fields the view declares writable, in the order it declares
+    /// them. Empty means the view writes nothing.
+    pub write_fields: Vec<String>,
 }
 
 /// `attachment_list`'s arguments.
@@ -279,10 +387,18 @@ pub async fn note_search(
 
     let mut out = Vec::new();
     for hit in ranked {
-        // Fail closed on an id the snapshot does not carry: an id with no known
-        // folder cannot be proven inside the scope, so it is dropped rather than
-        // handed back with an unknown provenance.
-        let Some(record) = records.get(&hit.note_id) else {
+        // Fail closed on an id neither the snapshot nor the note itself can
+        // place: an id with no known folder cannot be proven inside the scope, so
+        // it is dropped rather than handed back with an unknown provenance. The
+        // note itself is asked for the ids the snapshot has not caught up with,
+        // which is how a note this door created is findable by the next search.
+        // Dropped rather than propagated, like a note deleted mid-search: a note whose
+        // own bytes cannot be read is not a row. A lock cannot hide here — `records()`
+        // above has already failed the call if the vault is shut.
+        let Some(facts) = facts_for(&records, source, &hit.note_id)
+            .await
+            .unwrap_or(None)
+        else {
             continue;
         };
         // The liveness rule every note surface in the app applies, at the one
@@ -292,10 +408,10 @@ pub async fn note_search(
         // rule `note_read` applies to the one note it was asked for. The index
         // carries these notes (its producer indexes every `.myn`), so without
         // this a caller could search a note the sidebar would not show.
-        if !record.live {
+        if !facts.live {
             continue;
         }
-        let key = folder_key_of(record);
+        let key = facts.folder_key();
         if !scope.covers_key(&key) {
             continue;
         }
@@ -313,8 +429,8 @@ pub async fn note_search(
         };
         out.push(SearchRow {
             note_id: hit.note_id,
-            title: record.title.clone(),
-            folder: record.folder.clone(),
+            title: facts.title.clone(),
+            folder: facts.folder.clone(),
             excerpt: excerpt(&body, query),
         });
         if out.len() == limit {
@@ -345,7 +461,11 @@ pub async fn note_read(
         });
     }
     let records = source.records().await?;
-    let Some(record) = records.get(note_id) else {
+    // The index first, the note itself second: a note written outside the editor
+    // (by this door, by `myne new`, by a sync pull) is on disk before the
+    // WebView has indexed it, and answering `unknown_note` about a note the
+    // caller just created made the write verbs useless in sequence.
+    let Some(facts) = facts_for(&records, source, note_id).await? else {
         return Err(McpToolError::UnknownNote {
             note_id: note_id.to_string(),
         });
@@ -356,12 +476,12 @@ pub async fn note_read(
     // one that does not exist. That is the exact pair the CLI door collapses for
     // the same case (`ShowOutcome::NotFound`), and naming it here instead would
     // tell a caller that a note it may not read nevertheless exists.
-    if !record.live {
+    if !facts.live {
         return Err(McpToolError::UnknownNote {
             note_id: note_id.to_string(),
         });
     }
-    if !scope.covers_key(&folder_key_of(record)) {
+    if !scope.covers_key(&facts.folder_key()) {
         return Err(McpToolError::OutOfScopeNote {
             note_id: note_id.to_string(),
         });
@@ -532,6 +652,7 @@ pub enum ToolName {
     VaultState,
     NoteCreate,
     NoteAppend,
+    NoteSetField,
     NoteEdit,
     NoteMove,
     /// The four reads that joined in myne-md/myne#1077. Every one of them is a
@@ -545,10 +666,13 @@ pub enum ToolName {
 impl ToolName {
     /// The verb a caller named, or `None` if this build does not implement it.
     ///
-    /// `note_set_field` is still `None` here, which is the honest answer: a shim
-    /// newer than its host is version skew, not a scope decision, and
-    /// `invalid_request` is the kind this door already uses for version skew. It
-    /// lands as its own task.
+    /// `None` is the honest answer for a name the compiled catalog does not
+    /// carry: a shim newer than its host is version skew, not a scope decision,
+    /// and `invalid_request` is the kind this door already uses for version skew.
+    /// A verb the catalog DOES carry and this match does not is not version skew
+    /// but a broken surface, and `mcp/src/surface_test.rs` fails on it from inside
+    /// the build — before that check existed, `note_set_field` sat in the catalog
+    /// and every call to it answered as skew.
     pub fn from_wire(name: &str) -> Option<Self> {
         match name {
             "note_search" => Some(Self::NoteSearch),
@@ -557,6 +681,7 @@ impl ToolName {
             "vault_state" => Some(Self::VaultState),
             "note_create" => Some(Self::NoteCreate),
             "note_append" => Some(Self::NoteAppend),
+            "note_set_field" => Some(Self::NoteSetField),
             "note_edit" => Some(Self::NoteEdit),
             "note_move" => Some(Self::NoteMove),
             "attachment_list" => Some(Self::AttachmentList),
@@ -575,7 +700,11 @@ impl ToolName {
     pub fn is_write(self) -> bool {
         matches!(
             self,
-            Self::NoteCreate | Self::NoteAppend | Self::NoteEdit | Self::NoteMove
+            Self::NoteCreate
+                | Self::NoteAppend
+                | Self::NoteSetField
+                | Self::NoteEdit
+                | Self::NoteMove
         )
     }
 
@@ -603,6 +732,7 @@ impl ToolName {
             Self::VaultState => "vault_state",
             Self::NoteCreate => "note_create",
             Self::NoteAppend => "note_append",
+            Self::NoteSetField => "note_set_field",
             Self::NoteEdit => "note_edit",
             Self::NoteMove => "note_move",
             Self::AttachmentList => "attachment_list",
@@ -718,6 +848,7 @@ enum Parsed {
     State,
     Create(super::intent::NoteCreateRequest),
     Append(super::intent::NoteAppendRequest),
+    SetField(super::intent::NoteSetFieldRequest),
     Edit(super::anchor::NoteEditRequest),
     Move(super::anchor::NoteMoveRequest),
     Files(AttachmentListRequest),
@@ -753,6 +884,9 @@ fn parse_arguments(tool: ToolName, arguments: &Value) -> Option<Parsed> {
         ToolName::NoteAppend => serde_json::from_value(arguments.clone())
             .ok()
             .map(Parsed::Append),
+        ToolName::NoteSetField => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::SetField),
         ToolName::NoteEdit => serde_json::from_value(arguments.clone())
             .ok()
             .map(Parsed::Edit),
@@ -936,6 +1070,30 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
             .await
             {
                 Ok(super::intent::WriteAnswer::Applied(appended)) => Ok(to_value(&appended)),
+                Ok(super::intent::WriteAnswer::Queued { folder }) => {
+                    return McpCallOutcome::QueueProposal {
+                        verb: tool.wire(),
+                        folder,
+                        summary,
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
+        Parsed::SetField(request) => {
+            // The review card's one line: the field and the value, because a
+            // proposal a person reads has to say what would be set.
+            let summary = one_line_summary(&format!("{}: {}", request.field, request.value));
+            match super::intent::note_set_field(
+                &scope,
+                write.as_ref().expect("resolved for a write verb"),
+                request,
+                source,
+                writer.expect("checked above for a write verb"),
+            )
+            .await
+            {
+                Ok(super::intent::WriteAnswer::Applied(set)) => Ok(to_value(&set)),
                 Ok(super::intent::WriteAnswer::Queued { folder }) => {
                     return McpCallOutcome::QueueProposal {
                         verb: tool.wire(),
@@ -1179,13 +1337,16 @@ pub fn excerpt(body: &str, query: &str) -> String {
     out.trim_end().to_string()
 }
 
-/// The nine verbs the compiled catalog advertises, in catalog order
+/// The twelve verbs the compiled catalog advertises, in catalog order
 /// (`mcp/src/tool_list.rs`), so Settings can render one switch per verb.
 ///
 /// Duplicated here rather than imported because the catalog lives in the shim crate,
-/// a separate binary by design: this process must not link it. `scripts/check-mcp-tool-
-/// surface.mjs` holds the copy against the catalog; the test below only compares it to
-/// the DISPATCH table, so it cannot see a tenth verb arriving in the catalog.
+/// a separate binary by design: this process must not link it. Three holders of one
+/// contract is why the copies are checked twice: `scripts/check-mcp-tool-surface.mjs`
+/// holds this roster against the catalog and the capability rules, and
+/// `mcp/src/surface_test.rs` holds all THREE (the catalog, this roster and the
+/// dispatch table) against each other from inside the build, so a verb only one of
+/// them names fails `cargo test -p myne-mcp`.
 pub const CATALOG_VERBS: [&str; 13] = [
     "note_search",
     "note_read",
@@ -1205,11 +1366,11 @@ pub const CATALOG_VERBS: [&str; 13] = [
 #[cfg(test)]
 #[test]
 fn catalog_verbs_agree_with_the_dispatch_table() {
-    // Two facts, and both matter to the switches on screen: the roster carries the
-    // thirteen catalog names, and exactly one of them is absent from this build,
-    // which the UI renders as a switch that says why. A verb added to the catalog
-    // without a dispatch arm would otherwise appear on the screen as an enabled
-    // switch that answers version skew.
+    // Every name on screen is a name this build serves. The earlier version of this
+    // test asserted the opposite — that exactly one catalog verb had no arm, and that
+    // the UI rendered it as a switch that says why — so the suite stayed green while a
+    // client was handed a tool that could only answer version skew. Neither a grep nor
+    // a review could catch that drift, because the drift WAS the assertion.
     let unimplemented: Vec<&str> = CATALOG_VERBS
         .iter()
         .copied()
@@ -1217,8 +1378,9 @@ fn catalog_verbs_agree_with_the_dispatch_table() {
         .collect();
     assert_eq!(
         unimplemented,
-        vec!["note_set_field"],
-        "the catalog and the dispatch table disagree: {unimplemented:?}"
+        Vec::<&str>::new(),
+        "the catalog and the dispatch table disagree: {unimplemented:?} is advertised and \
+         cannot be called, so every call to it answers as version skew"
     );
     for name in CATALOG_VERBS {
         if let Some(tool) = ToolName::from_wire(name) {

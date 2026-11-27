@@ -49,6 +49,12 @@ use super::write_scope::resolve_write_scope;
 /// `available_in_build` is what this build can serve at all. A verb that is off
 /// because the build has no implementation shows a reason rather than a control
 /// that would do nothing (mcp external access rework, myne-md/myne#1052).
+///
+/// It is `false` for no verb today, and that is the state to keep: the roster is
+/// the catalog's own list, and `mcp/src/surface_test.rs` fails the build when a
+/// catalog verb has no dispatch arm. The field stays because the alternative —
+/// dropping it — would put the "which build can serve this" question back into a
+/// template that cannot answer it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpToolSwitchView {
