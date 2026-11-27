@@ -157,6 +157,7 @@ export default defineConfig({
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
       { find: /^@myne\/ephemeral-attachment$/, replacement: sib("../src/lib/ephemeralAttachment.ts") },
+      { find: /^@myne\/attachment-picker-dialog$/, replacement: sib("../src/notes/components/AttachmentPickerDialog.tsx") },
       // The shared label caption + section heading — mirror of vite.config.ts, which
       // carries the rationale. An alias added only to the build passes `pnpm
       // mobile:build` and fails every mobile suite with "Failed to resolve import".

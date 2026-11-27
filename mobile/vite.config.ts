@@ -288,6 +288,7 @@ export default defineConfig(async () => ({
       // contract with the host (`bytes`, never a vault write) and one place it
       // is spelled, so desktop and phone cannot drift about what is sent.
       { find: /^@myne\/ephemeral-attachment$/, replacement: sib("../src/lib/ephemeralAttachment.ts") },
+      { find: /^@myne\/attachment-picker-dialog$/, replacement: sib("../src/notes/components/AttachmentPickerDialog.tsx") },
       // The two label treatments a form or a settings panel needs — the small
       // uppercase caption over a control and the heading over a group (myne-md/myne#995).
       // Shared rather than re-declared: the caption existed ELEVEN times under

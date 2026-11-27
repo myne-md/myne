@@ -35,6 +35,7 @@ import { normalizeProviderError, providerErrorKey } from "@myne/engine-error";
 import type { ProviderErrorCause } from "@myne/engine-error";
 import { RunCostLine } from "@myne/run-cost-line";
 import { readEphemeralFile, type EphemeralReading } from "@myne/ephemeral-attachment";
+import { MAX_RUN_ATTACHMENTS } from "@myne/attachment-picker-dialog";
 import {
   beginRun,
   currentRunEpoch,
@@ -572,10 +573,17 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
     async (files: File[]) => {
       if (files.length === 0) return;
       setDeviceError(null);
+      const room = MAX_RUN_ATTACHMENTS - deviceDocs.length;
+      if (room <= 0) {
+        setDeviceError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
+        if (deviceInput.current !== null) deviceInput.current.value = "";
+        return;
+      }
+      const batch = files.slice(0, room);
       setReadingDevice(true);
       try {
         const readings: EphemeralReading[] = [];
-        for (const file of files) {
+        for (const file of batch) {
           let reading: EphemeralReading;
           try {
             reading = await readEphemeralFile(file);
@@ -600,7 +608,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         if (deviceInput.current !== null) deviceInput.current.value = "";
       }
     },
-    [t],
+    [t, deviceDocs],
   );
 
   const send = useCallback(async () => {
