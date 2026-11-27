@@ -1,0 +1,162 @@
+name: e2e-nightly
+
+# The end-to-end suites are not a pull-request gate. They run on a schedule and
+# by hand, exactly as the old e2e workflow did: a browser lane that needs a real
+# bundle, and a desktop lane that drives the release binary through tauri-driver
+# under Xvfb. The floor steps are blocking; the suites themselves are allowed to
+# carry their known contention flakes, but a run that executes nothing fails.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      run_stable:
+        description: "Run the stable desktop suite"
+        type: boolean
+        default: true
+      run_ai:
+        description: "Run the inference suite"
+        type: boolean
+        default: true
+      run_quarantine:
+        description: "Run the quarantine suite (also runs on the nightly schedule)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install browser and driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ca-certificates curl chromium chromium-driver
+      - run: pnpm install --frozen-lockfile
+      - run: bash scripts/wasm-repro-check.sh
+      - run: pnpm web:build
+      - name: Run the web e2e suite
+        env:
+          CI: "true"
+          MYNE_WEB_E2E_DRIVER_PORT: "4544"
+          MYNE_WEB_E2E_BROWSER: chrome
+          MYNE_WEB_E2E_SHARDS: "1"
+        run: |
+          chromedriver --port=4544 >/tmp/chromedriver.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1 && break
+            sleep 0.5
+          done
+          if ! curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1; then
+            echo "chromedriver did not come up on :4544"
+            cat /tmp/chromedriver.log
+            exit 1
+          fi
+          pnpm test:e2e:web
+
+  desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/myne-md/myne-ci-e2e@sha256:219f5994419f54810504c5aeb78a2fd49382e947727b481d8b4e874eff764d04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: myne-md/myne-server
+          path: myne-server
+          token: ${{ secrets.MYNE_BOT_PAT || secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+      - name: Build the real server used by the sync scenarios
+        run: |
+          (cd myne-server && CGO_ENABLED=0 go build -o "$GITHUB_WORKSPACE/myne-server-e2e" ./cmd/myne-server)
+      - name: Build the desktop binary
+        env:
+          CI: "true"
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm tauri build --no-bundle \
+            -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' \
+            -- --features voice-capture-stub,local-inference-stub
+      - name: Run the stable suite
+        env:
+          CI: "true"
+          E2E_LOCK: /tmp/myne-e2e.lock
+          MYNE_E2E_LOCK_WAIT: "1800"
+        run: bash scripts/ci-e2e-lane.sh stable
+        continue-on-error: true
+      - name: Stable floor
+        if: always()
+        run: node scripts/check-e2e-floor.mjs --lane stable
+      - name: Run the quarantine suite
+        if: always() && (github.event_name == 'schedule' || inputs.run_quarantine)
+        env:
+          CI: "true"
+          E2E_LOCK: /tmp/myne-e2e.lock
+          MYNE_E2E_LOCK_WAIT: "1800"
+        run: bash scripts/ci-e2e-lane.sh quarantine
+        continue-on-error: true
+
+  ai:
+    if: github.event_name == 'schedule' || inputs.run_ai
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/myne-md/myne-ci-e2e@sha256:219f5994419f54810504c5aeb78a2fd49382e947727b481d8b4e874eff764d04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: myne-md/myne-server
+          path: myne-server
+          token: ${{ secrets.MYNE_BOT_PAT || secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+      - name: Build the real server used by the sync scenarios
+        run: |
+          (cd myne-server && CGO_ENABLED=0 go build -o "$GITHUB_WORKSPACE/myne-server-e2e" ./cmd/myne-server)
+      - name: Build the desktop binary
+        env:
+          CI: "true"
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm tauri build --no-bundle \
+            -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' \
+            -- --features voice-capture-stub,local-inference-stub
+      - name: Run the AI suite
+        env:
+          CI: "true"
+          E2E_LOCK: /tmp/myne-e2e-ai.lock
+          MYNE_E2E_LOCK_WAIT: "1800"
+        run: bash scripts/ci-e2e-lane.sh ai
+        continue-on-error: true
+      - name: AI floor
+        if: always()
+        run: node scripts/check-e2e-floor.mjs --lane ai

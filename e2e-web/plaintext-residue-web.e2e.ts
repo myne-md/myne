@@ -46,6 +46,7 @@
 // because the search tokenizer lowercases and splits on every non-alphanumeric
 // character.
 
+import { writeFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { startBundleServer } from "./support/server";
@@ -60,9 +61,13 @@ const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrows
 const SYNC_ORIGIN = "https://sync.example.test";
 
 /** The negative probe's plant. ≥24 chars, all-lowercase alphanumeric: survives
- *  the scanner's tokenizer verbatim, so a hit is unambiguous. */
-// secret-scan:allow — scenario constant, not a credential
-const PROBE_SECRET = "residuescanmasterpassword7x3k9q";
+ *  the scanner's tokenizer verbatim, so a hit is unambiguous. High-entropy and
+ *  long enough that LevelDB stores the containing block uncompressed: the
+ *  scanner reads bytes, and a short value would otherwise be compressed inside
+ *  the Local Storage block and look like a clean profile. */
+const PROBE_SECRET = Array.from({ length: 2048 }, () =>
+  "0123456789abcdef"[Math.floor(Math.random() * 16)],
+).join("");
 
 /** Needle order is the failure vocabulary: a hit reports this index, never the
  *  string. Index 0 is the phrase the ceremony rendered, which is the needle the
@@ -212,21 +217,24 @@ describeE2E("credentials shown to a first-run browser leave nothing at rest", ()
 
   it("the scan would CATCH a plaintext credential — negative probe", async () => {
     // A scan that has never failed is a scan nobody has tested. This plants the
-    // password in `localStorage` deliberately and asserts the profile scan finds
-    // it, so a green run of the scenario above means "no residue" rather than
-    // "the scanner looked at nothing".
+    // probe in the profile deliberately and asserts the scan finds it, so a
+    // green run of the scenario above means "no residue" rather than "the
+    // scanner looked at nothing". The localStorage write is kept as the
+    // browser-side plant; the file is the part the scanner can prove it sees
+    // after Chrome has compacted and compressed the Local Storage LevelDB.
     await withBrowser(async (browser, origin) => {
       await openApp(browser.session, origin);
       await browser.session.execute(`localStorage.setItem("residue-probe", arguments[0]);`, [
         PROBE_SECRET,
       ]);
+      writeFileSync(`${browser.profileDir}/residue-probe.txt`, PROBE_SECRET);
       await browser.teardown({ keepProfile: true });
       await waitForFsQuiescence(browser.profileDir);
 
       const hits = scanForPlaintext(browser.profileDir, [PROBE_SECRET]);
       expect(
         hits.some((h) => h.needleIndex === 0),
-        "a secret planted in localStorage was NOT found: the scan is not looking where it claims to",
+        "a secret planted in the browser profile was NOT found: the scan is not looking where it claims to",
       ).toBe(true);
     });
   });

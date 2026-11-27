@@ -230,6 +230,21 @@ test.describe("mobile create-vault onboarding", () => {
     // closing one until the flip lands.
     await expect(body).toHaveCount(1);
     await expect(body).toBeVisible();
+    // The grid's opacity is written on the requestAnimationFrame after the
+    // commit. In a loaded browser the visible node can therefore still be at
+    // `0` for one frame after `toBeVisible()`, so poll the value instead of
+    // reading it in the same turn and turning a frame of scheduling into a red.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const text = document.querySelector(
+            '[data-testid="create-vault.briefing-why-text"]',
+          );
+          const grid = text?.parentElement?.parentElement as HTMLElement | null;
+          return grid?.style.opacity ?? null;
+        }),
+      )
+      .toBe("1");
     const settled = await page.evaluate(() => {
       const text = document.querySelector(
         '[data-testid="create-vault.briefing-why-text"]',
