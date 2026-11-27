@@ -22,7 +22,7 @@ use super::intent::{
     RestorePoint, WriteAnswer,
 };
 use super::scope::{resolve_scope, ConnectionScope};
-use super::tools::{FileRow, McpNoteSource, ViewRow};
+use super::tools::{note_facts_from_body, FileRow, McpNoteSource, NoteFacts, ViewRow};
 use super::write_scope::resolve_write_scope;
 use crate::plugins::agent::tools::SearchHit;
 use crate::plugins::vault_indices::calendar::CalendarRow;
@@ -103,6 +103,14 @@ impl Source {
 impl McpNoteSource for Source {
     async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, McpToolError> {
         Ok(self.records.clone())
+    }
+
+    async fn derived_note(&self, note_id: &str) -> Result<Option<NoteFacts>, McpToolError> {
+        match self.read_body(note_id).await {
+            Ok(body) => Ok(Some(note_facts_from_body(&body))),
+            Err(McpToolError::UnknownNote { .. }) => Ok(None),
+            Err(other) => Err(other),
+        }
     }
 
     async fn read_body(&self, note_id: &str) -> Result<String, McpToolError> {
@@ -364,6 +372,96 @@ fn mcp_intent_append_snapshots_before_it_writes() {
         "the restore point must come FIRST: {calls:?}"
     );
     assert!(calls[1].starts_with("overwrite:n1:"), "{calls:?}");
+}
+
+#[test]
+fn mcp_intent_append_works_against_a_note_the_index_has_not_seen() {
+    // The state a note is in between a create and the WebView's next index pass:
+    // its bytes are on disk, the sidebar's record map has never heard of it. The
+    // gate reads the note's own `folder:` instead, so the write verbs work in
+    // sequence rather than only on notes somebody had already opened.
+    let (read, write) = readable_except_private_writable_projects();
+    let mut source = Source::new(&[(
+        "n1",
+        "Projects/",
+        "---\nfolder: Projects/\n---\n\nFirst line.\n",
+    )]);
+    source.records.clear();
+    let writer = Writer::ok();
+
+    let answer = block_on(note_append(
+        &read,
+        &write,
+        append("n1", "Second line."),
+        &source,
+        &writer,
+    ))
+    .expect("an append to a note the index has not seen must still be gated and applied");
+
+    match answer {
+        WriteAnswer::Applied(appended) => assert!(appended.appended_bytes > 0),
+        WriteAnswer::Queued { folder } => panic!("expected an apply, queued {folder}"),
+    }
+}
+
+#[test]
+fn mcp_intent_an_unindexed_note_still_routes_by_its_own_folder() {
+    let (read, write) = readable_except_private_writable_projects();
+    // Readable, not named for writing: the answer is a proposal, and it is the
+    // proposal for the folder the NOTE says it is in.
+    let mut source = Source::new(&[("n1", "Inbox/", "---\nfolder: Inbox/\n---\n\nFirst line.\n")]);
+    source.records.clear();
+    let writer = Writer::ok();
+
+    let answer = block_on(note_append(
+        &read,
+        &write,
+        append("n1", "Second line."),
+        &source,
+        &writer,
+    ))
+    .expect("an unindexed note in a readable folder is a proposal, not a refusal");
+
+    match answer {
+        WriteAnswer::Queued { folder } => assert_eq!(folder, "inbox/"),
+        WriteAnswer::Applied(_) => panic!("a folder not named for writing must not apply"),
+    }
+    assert!(
+        writer.calls().is_empty(),
+        "a queued proposal wrote something: {:?}",
+        writer.calls()
+    );
+}
+
+#[test]
+fn mcp_intent_an_unindexed_note_in_a_left_out_folder_is_refused() {
+    // The exclusion must not have a hole exactly where the index has one.
+    let (read, write) = readable_except_private_writable_projects();
+    let mut source = Source::new(&[(
+        "n1",
+        "Private/",
+        "---\nfolder: Private/\n---\n\nSecret line.\n",
+    )]);
+    source.records.clear();
+    let writer = Writer::ok();
+
+    let error = block_on(note_append(
+        &read,
+        &write,
+        append("n1", "Second line."),
+        &source,
+        &writer,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::OutOfScopeNote {
+            note_id: "n1".into()
+        },
+        "a note in a left-out folder must be refused even when the index cannot say so"
+    );
+    assert!(writer.calls().is_empty(), "a refused write wrote something");
 }
 
 #[test]

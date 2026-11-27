@@ -303,7 +303,10 @@ fn a_session_survives_a_lock_and_an_unlock_and_names_each_closed_state() {
     let mut session = Session::start(dir.path());
 
     // Discovery answers in a closed state, from the compiled catalog.
-    assert_eq!(tool_names(&session.request(tools_list(1))).len(), 13);
+    assert_eq!(
+        tool_names(&session.request(tools_list(1))).len(),
+        crate::tools::catalog().len()
+    );
 
     let locked = session.request(tools_call(2, "vault_state", json!({})));
     assert_eq!(locked["result"]["isError"], true);
@@ -346,14 +349,20 @@ fn a_session_survives_a_lock_and_an_unlock_and_names_each_closed_state() {
     assert_eq!(reason(&disabled), "door_disabled");
     assert_eq!(text(&disabled), Refusal::DoorDisabled.sentence());
     assert_ne!(reason(&disabled), reason(&locked));
-    assert_eq!(tool_names(&session.request(tools_list(7))).len(), 13);
+    assert_eq!(
+        tool_names(&session.request(tools_list(7))).len(),
+        crate::tools::catalog().len()
+    );
 
     // ABSENT MARKER is the third state: the app is not running at all.
     dir.clear_marker();
     let absent = session.request(tools_call(8, "vault_state", json!({})));
     assert_eq!(reason(&absent), "app_not_running");
     assert_eq!(text(&absent), Refusal::AppNotRunning.sentence());
-    assert_eq!(tool_names(&session.request(tools_list(9))).len(), 13);
+    assert_eq!(
+        tool_names(&session.request(tools_list(9))).len(),
+        crate::tools::catalog().len()
+    );
 
     // The session is still a session after all of it.
     let ping = session.request(json!({ "jsonrpc": "2.0", "id": 10, "method": "ping" }));
@@ -537,7 +546,7 @@ fn server_discover_answers_from_the_same_compiled_catalog() {
     // state, or a client cannot even get configured.
     dir.clear_marker();
     let absent = session.request(json!({ "jsonrpc": "2.0", "id": 3, "method": "server/discover" }));
-    assert_eq!(tool_names(&absent).len(), 13);
+    assert_eq!(tool_names(&absent).len(), crate::tools::catalog().len());
 
     session.close();
 }
@@ -556,7 +565,7 @@ fn server_discover_reports_the_revision_the_first_frame_selected() {
     let discovered =
         session.request(json!({ "jsonrpc": "2.0", "id": 2, "method": "server/discover" }));
     assert_eq!(discovered["result"]["protocolVersion"], "2025-11-25");
-    assert_eq!(tool_names(&discovered).len(), 13);
+    assert_eq!(tool_names(&discovered).len(), crate::tools::catalog().len());
 
     session.close();
 }

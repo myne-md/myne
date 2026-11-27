@@ -822,7 +822,6 @@
       "core/src/plugins/live/session_test.rs #3",
       "core/src/plugins/live/session_test.rs #4",
       "core/src/plugins/live/session_test.rs #5",
-      "core/src/plugins/mcp/anchor_test.rs",
       "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #1",
       "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #2",
       "core/src/plugins/memory/commands.rs",

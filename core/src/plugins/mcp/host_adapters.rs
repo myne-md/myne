@@ -137,6 +137,23 @@ impl McpNoteSource for VaultNoteSource<'_> {
         }
     }
 
+    /// The by-id verbs' facts, read from the note's own bytes: the index above is
+    /// the WebView's, so this is the answer for a note it has not indexed yet. It
+    /// decrypts ONE note, and only after the index has already missed it.
+    async fn derived_note(
+        &self,
+        note_id: &str,
+    ) -> Result<Option<super::tools::NoteFacts>, McpToolError> {
+        match self.read_body(note_id).await {
+            Ok(body) => Ok(Some(super::tools::note_facts_from_body(&body))),
+            // Only "there is no such note" reads as absence. Every other failure
+            // stays a failure: a locked vault answered as `None` would tell a
+            // caller its note is gone.
+            Err(McpToolError::UnknownNote { .. }) => Ok(None),
+            Err(other) => Err(other),
+        }
+    }
+
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, McpToolError> {
         self.ensure_unlocked().await?;
         // De-duplicated by note id, highest rank kept. One note can own several
@@ -214,9 +231,22 @@ impl McpNoteSource for VaultNoteSource<'_> {
             ) => Err(McpToolError::CalendarWindowTooWide {
                 max_days: u32::try_from(max_days).unwrap_or(u32::MAX),
             }),
+            // A window the calendar could not read is the caller's own malformed
+            // range, and it has its own reason: folding it into "this device cannot
+            // answer right now" told the caller to unlock a vault that is already
+            // unlocked, which is a loop with no exit (myne-md/myne#1231).
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::CalendarWindowUnreadable,
+            ) => Err(McpToolError::CalendarWindowUnreadable),
             // Everything else is "this device cannot answer right now": a locked
-            // vault, an unreadable meta, an index that is not there.
-            Err(_) => Err(McpToolError::VaultUnavailable),
+            // vault, an unreadable meta, an index that is not there. Spelled out
+            // rather than left to a wildcard, so a variant added to the calendar's
+            // own error type cannot silently inherit the wrong sentence.
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::SlotNotUnlocked
+                | crate::plugins::vault_indices::error::VaultIndicesError::InvalidVaultMeta
+                | crate::plugins::vault_indices::error::VaultIndicesError::PersistIo,
+            ) => Err(McpToolError::VaultUnavailable),
         }
     }
 

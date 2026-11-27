@@ -37,12 +37,16 @@
 //!
 //! ## What is not here yet
 //!
-//! Three of the five write verbs the compiled catalog offers (`note_set_field`,
-//! `note_move`, `note_edit`) are still tasks 15 and 16 of the same feature.
-//! Until they land, [`tools::ToolName::from_wire`] answers `None` for each of them
-//! and the door reports version skew. Recording that here rather than letting a
-//! reader infer it: a verb the catalog advertises and the host refuses looks
-//! identical to a scope bug from the client's side.
+//! `note_set_field` is the write verb the wire surface deliberately does not
+//! carry: the host's field write is VIEW-scoped (the field must be declared
+//! writable by an approved view, and a reserved marker is refused), and a wire
+//! verb whose arguments are `note_id`, `field` and `value` has no view to borrow
+//! that authority from. It used to be advertised in the catalog with no dispatch
+//! arm, so every call to it answered as version skew; it returns when the
+//! authority question is answered, which is a product decision and its own task.
+//! `mcp/src/surface_test.rs` is what keeps an advertised-and-unserved verb from
+//! happening again, and this paragraph is what keeps a reader from inferring that
+//! the verb was forgotten.
 //!
 //! The write half is an ALLOW list where the read half beside it is a DENY list
 //! ([`write_scope`]), an empty write grant means "nowhere" where an empty exclusion

@@ -9,10 +9,11 @@
 use super::error::McpToolError;
 use super::scope::{resolve_scope, ConnectionScope};
 use super::tools::{
-    attachment_list, attachment_read, calendar_read, call_tool, excerpt, note_read, note_search,
-    vault_list, vault_state, view_list, AttachmentListRequest, AttachmentReadRequest,
-    CalendarReadRequest, CallInputs, FileRow, McpCallOutcome, McpNoteSource, NoteReadRequest,
-    NoteSearchRequest, ViewRow, WireCall, MAX_EXCERPT_BYTES, MAX_SEARCH_LIMIT,
+    attachment_list, attachment_read, calendar_read, call_tool, excerpt, note_facts_from_body,
+    note_read, note_search, vault_list, vault_state, view_list, AttachmentListRequest,
+    AttachmentReadRequest, CalendarReadRequest, CallInputs, FileRow, McpCallOutcome, McpNoteSource,
+    NoteFacts, NoteReadRequest, NoteSearchRequest, ViewRow, WireCall, MAX_EXCERPT_BYTES,
+    MAX_SEARCH_LIMIT,
 };
 use crate::plugins::agent::tools::SearchHit;
 use crate::plugins::vault_indices::calendar::CalendarRow;
@@ -130,6 +131,12 @@ impl Source {
     fn limits(&self) -> Vec<usize> {
         self.limits.lock().expect("limits lock").clone()
     }
+
+    /// Simulate the state the door is in between a write and the WebView's next
+    /// index pass: the note's bytes are there, the sidebar's record is not.
+    fn hide_record(&mut self, id: &str) {
+        self.records.remove(id);
+    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -137,6 +144,16 @@ impl Source {
 impl McpNoteSource for Source {
     async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, McpToolError> {
         Ok(self.records.clone())
+    }
+
+    /// The real adapter's rule, over the same helpers: a note the index has not
+    /// seen is answered from its own bytes, and only a missing body is absence.
+    async fn derived_note(&self, note_id: &str) -> Result<Option<NoteFacts>, McpToolError> {
+        match self.read_body(note_id).await {
+            Ok(body) => Ok(Some(note_facts_from_body(&body))),
+            Err(McpToolError::UnknownNote { .. }) => Ok(None),
+            Err(other) => Err(other),
+        }
     }
 
     async fn read_body(&self, note_id: &str) -> Result<String, McpToolError> {
@@ -611,6 +628,164 @@ fn a_read_of_a_trashed_note_is_indistinguishable_from_an_unknown_one() {
     );
 }
 
+/// The write half, for the tests that only care what the envelope looks like: the
+/// gates have their own suites, this one drives every verb to an ANSWER.
+struct Writer;
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+impl super::intent::McpNoteWriter for Writer {
+    async fn capture_restore_point(
+        &self,
+        _note: &str,
+    ) -> Result<super::intent::RestorePoint, McpToolError> {
+        Ok(super::intent::RestorePoint::Captured("snap".into()))
+    }
+
+    async fn create_note(
+        &self,
+        _folder: &str,
+        _title: &str,
+        _body: &str,
+    ) -> Result<String, McpToolError> {
+        Ok("created".into())
+    }
+
+    async fn overwrite_note(
+        &self,
+        _note: &str,
+        _plaintext: &str,
+        _expected_base_hash_hex: &str,
+    ) -> Result<(), McpToolError> {
+        Ok(())
+    }
+}
+
+/// The same inputs, with a write surface behind them.
+fn inputs_with_writer<'a>(
+    grants: &'a BTreeMap<String, McpConnectionGrant>,
+    connection: &'a str,
+    tool: &'a str,
+    arguments: &'a serde_json::Value,
+    writer: &'a dyn super::intent::McpNoteWriter,
+) -> CallInputs<'a> {
+    CallInputs {
+        writer: Some(writer),
+        ..inputs(grants, connection, tool, arguments)
+    }
+}
+
+// ── the index lags, the note does not ─────────────────────────────────────
+//
+// When the record map has no id, the note's own bytes answer the clamps
+// (myne-md/myne#1230).
+
+#[test]
+fn a_note_the_index_has_not_seen_is_still_readable() {
+    let mut source = Source::new(&[("fresh", Some("Projects"), "alpha body")]);
+    source.hide_record("fresh");
+
+    let answer = block_on(note_read(
+        &scope(),
+        NoteReadRequest {
+            note_id: "fresh".into(),
+        },
+        &source,
+    ))
+    .expect("a note on disk with no index record must still read");
+
+    assert_eq!(answer.body, "alpha body");
+}
+
+#[test]
+fn a_note_the_index_has_not_seen_is_still_findable() {
+    // The body carries the folder: the record that would have is what is missing.
+    let mut source = Source::new(&[(
+        "fresh",
+        Some("Projects"),
+        "---\ntitle: Fresh report\nfolder: Projects\n---\n\nalpha body",
+    )]);
+    source.hide_record("fresh");
+
+    let rows = block_on(note_search(&scope(), search("alpha"), &source)).expect("search");
+
+    let ids: Vec<&str> = rows.iter().map(|row| row.note_id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec!["fresh"],
+        "the agent's own note was dropped from its own search: {ids:?}"
+    );
+    assert_eq!(
+        rows[0].folder.as_deref(),
+        Some("Projects"),
+        "the row's folder is the note's own, in the shape an indexed row carries it"
+    );
+    assert_eq!(
+        rows[0].title.as_deref(),
+        Some("Fresh report"),
+        "the row's title is the note's own `title:`, not a blank"
+    );
+}
+
+#[test]
+fn a_note_the_index_has_not_seen_but_the_note_says_is_trashed_is_unknown() {
+    // The derived arm owes the indexed one's answer: a note the index has not seen
+    // must not become a way to read what the sidebar hid.
+    let mut source = Source::new(&[(
+        "gone",
+        Some("Projects"),
+        "---\ntrashed: 2026-08-16T10:00:00Z\n---\n\nalpha body",
+    )]);
+    source.hide_record("gone");
+
+    let error = block_on(note_read(
+        &scope(),
+        NoteReadRequest {
+            note_id: "gone".into(),
+        },
+        &source,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::UnknownNote {
+            note_id: "gone".into()
+        },
+        "a trashed note the index has not seen must read as unknown, not as a note"
+    );
+}
+
+#[test]
+fn a_note_the_index_has_not_seen_is_clamped_by_its_own_folder() {
+    // `Private` is the folder the grant leaves out. The index cannot say so here, so
+    // the frontmatter has to — or the exclusion would apply to everything except
+    // the notes nobody had indexed yet.
+    let mut source = Source::new(&[(
+        "hidden",
+        Some("Private"),
+        "---\nfolder: Private\n---\n\nalpha body",
+    )]);
+    source.hide_record("hidden");
+
+    let error = block_on(note_read(
+        &scope(),
+        NoteReadRequest {
+            note_id: "hidden".into(),
+        },
+        &source,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::OutOfScopeNote {
+            note_id: "hidden".into()
+        },
+        "an unindexed note in a left-out folder must be refused, not read"
+    );
+}
+
 // ── the call surface: one entry point, four ordered decisions ──────────────
 
 fn grants(pairs: &[(&str, &[&str])]) -> BTreeMap<String, McpConnectionGrant> {
@@ -706,11 +881,11 @@ fn a_connection_with_no_grant_is_refused_before_the_vault_is_read() {
 fn an_unimplemented_verb_is_version_skew_rather_than_a_scope_refusal() {
     let map = grants(&[("claude-desktop", &["Projects"])]);
     let source = Source::new(&[("a", Some("Projects"), "alpha")]);
-    // A verb the catalog offers and this build does not serve. `note_set_field` is
-    // the only one left: it needs the frontmatter splice, which lives in the
-    // dialect's TypeScript and has no Rust port yet, so reimplementing it here would
-    // be a second opinion about quoting, multi-line values and inline comments
-    // (feature task 16, blocked rather than reimplemented).
+    // A verb this build does not serve at all. `note_set_field` is kept as the
+    // example because it is the one name a newer shim could plausibly send: the
+    // host's field write is view-scoped and the wire verb has no view, so it is out
+    // of the catalog until that is decided (see `super::mod`). A shim newer than
+    // its host is version skew, and version skew is not a scope refusal.
     for tool in ["note_set_field", "delete", ""] {
         let arguments = json!({ "body": "x" });
         assert_eq!(
@@ -1429,5 +1604,132 @@ fn every_read_answer_carries_an_object_in_structured_content() {
                 "{tool}'s text block must stay a bare list: {text}"
             );
         }
+    }
+}
+
+/// Every served verb, driven to an ANSWER and checked against what a client parses.
+///
+/// `structuredContent` must be an OBJECT — an SDK refuses the call when it is not,
+/// which is how myne-md/myne#1106 reached a real client — and `content` is an array
+/// of typed blocks. The read verbs had this; the write verbs did not, so a create
+/// could have handed back a bare string with every test green. Walks
+/// [`super::tools::CATALOG_VERBS`], so a thirteenth verb is covered the day it lands.
+#[test]
+fn every_served_verb_answers_a_call_tool_result_a_client_can_parse() {
+    let writer = Writer;
+    let mut connect = grants(&[("claude-desktop", &["Private"])]);
+    // The connection may write `Projects`, so the write verbs ANSWER rather than
+    // propose: a queued proposal is a legitimate outcome, but not the one this test
+    // is about.
+    connect
+        .get_mut("claude-desktop")
+        .expect("the fixture's connection")
+        .write_folders = vec!["Projects/".to_string()];
+
+    let mut source = Source::new(&[("in", Some("Projects"), "the quarterly alpha report")]);
+    source.files.push(FileRow {
+        attachment_id: "aa".to_string(),
+        filename: Some("scan.png".to_string()),
+        folder: Some("Projects".to_string()),
+    });
+    source.file_texts.insert("aa".into(), "text".into());
+    source.views.push(ViewRow {
+        view_id: "v1".into(),
+        name: "Reading".into(),
+        view_type: "table".into(),
+    });
+
+    let cases = [
+        ("note_search", json!({ "query": "alpha" })),
+        ("note_read", json!({ "note_id": "in" })),
+        ("vault_list", json!({})),
+        ("vault_state", json!({})),
+        (
+            "note_create",
+            json!({ "folder": "Projects/", "title": "T", "body": "b" }),
+        ),
+        (
+            "note_append",
+            json!({ "note_id": "in", "markdown": "more" }),
+        ),
+        (
+            "note_edit",
+            json!({ "note_id": "in", "source": "alpha", "replacement": "beta" }),
+        ),
+        (
+            "note_move",
+            json!({ "note_id": "in", "folder": "Projects/" }),
+        ),
+        ("attachment_list", json!({})),
+        ("attachment_read", json!({ "attachment_id": "aa" })),
+        (
+            "calendar_read",
+            json!({ "from": "2030-01-01", "to": "2030-01-31" }),
+        ),
+        ("view_list", json!({})),
+    ];
+    // The roster and the cases are the same SET: a verb with no case here would
+    // silently lose the assertion. Sorted rather than in catalog order, because the
+    // order is the catalog's business and this test's business is coverage.
+    let mut driven: Vec<&str> = cases.iter().map(|(tool, _)| *tool).collect();
+    driven.sort_unstable();
+    let mut catalog: Vec<&str> = super::tools::CATALOG_VERBS.to_vec();
+    catalog.sort_unstable();
+    assert_eq!(
+        driven, catalog,
+        "every catalog verb needs a case in this test"
+    );
+
+    for (tool, arguments) in cases {
+        let outcome = block_on(call_tool(
+            inputs_with_writer(&connect, "claude-desktop", tool, &arguments, &writer),
+            &source,
+        ));
+        let McpCallOutcome::Result(result) = outcome else {
+            panic!("{tool} refused an in-scope call: {outcome:?}");
+        };
+        let content = result["content"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{tool} answered no content blocks: {result}"));
+        assert_eq!(
+            content.len(),
+            1,
+            "{tool} answered {} content blocks; one answer is one block: {result}",
+            content.len()
+        );
+        assert_eq!(content[0]["type"], "text", "{tool}: {result}");
+        assert!(
+            content[0]["text"].is_string(),
+            "{tool} answered a text block that is not a string: {result}"
+        );
+        assert_eq!(
+            result["isError"], false,
+            "{tool} answered a result that calls itself an error: {result}"
+        );
+        assert!(
+            result["structuredContent"].is_object(),
+            "{tool} answered structuredContent as {}: a client SDK refuses the call before \
+             reading it (myne-md/myne#1106): {result}",
+            kind_name(&result["structuredContent"])
+        );
+        // The two halves must agree that the call worked: a client that reads only
+        // the text block and one that reads only the object must not disagree.
+        let text = content[0]["text"].as_str().unwrap_or_default();
+        assert!(
+            !text.is_empty(),
+            "{tool} answered an empty text block, which reads as a broken server: {result}"
+        );
+    }
+}
+
+/// The JSON type of a value, for assertion messages that have to say what arrived.
+fn kind_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "a boolean",
+        Value::Number(_) => "a number",
+        Value::String(_) => "a string",
+        Value::Array(_) => "an array",
+        Value::Object(_) => "an object",
     }
 }

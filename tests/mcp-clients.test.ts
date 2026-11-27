@@ -8,6 +8,7 @@
 // in full rather than derived from the builder: a derived expectation would agree
 // with any bug the builder grew.
 
+import { load as parseYaml } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CONNECTION_NAME,
@@ -124,5 +125,103 @@ describe("the snippets", () => {
     for (const preset of [...MCP_CLIENT_PRESETS, GENERIC_CLIENT]) {
       expect(mcpSnippet(preset, "a-different-name")).toContain("a-different-name");
     }
+  });
+});
+
+// ── the snippets, as the CLIENT parses them ────────────────────────────────
+//
+// The string comparisons above are the guard against a shape drifting back to a
+// shared one. They cannot answer the question a person actually has: is this text
+// something the client will PARSE? A snippet with a trailing comma, a quote the
+// builder did not escape or the wrong nesting depth passes a `toBe` and is rejected
+// by the client, silently, with the connection simply never appearing — which is the
+// failure this roster exists to prevent. So every preset's snippet is parsed here by
+// the grammar its client reads, and the server entry is checked in the parsed tree.
+
+describe("every snippet parses in the grammar its client reads", () => {
+  const parses = (presetId: string, connection: string) => {
+    const preset = presetById(presetId);
+    expect(preset, `${presetId} is a preset`).not.toBeNull();
+    const text = mcpSnippet(preset!, connection);
+    if (preset!.shape === "yaml-mcp_servers") return parseYaml(text) as Record<string, unknown>;
+    if (preset!.shape === "command") return null;
+    return JSON.parse(text) as Record<string, unknown>;
+  };
+
+  it("parses the connection name a person actually typed", () => {
+    // A name with both quote characters in it is the input that breaks an unescaped
+    // builder, so every client is parsed with it rather than with "myne".
+    const connection = 'odd "name" \'with quotes\'';
+    for (const preset of [...MCP_CLIENT_PRESETS, GENERIC_CLIENT]) {
+      expect(
+        () => parses(preset.id, connection),
+        `${preset.name}'s snippet does not parse with a quoted connection name`,
+      ).not.toThrow();
+    }
+  });
+
+  it("puts the server entry where that client looks for it, with the binary and the name", () => {
+    // The one key each client reads its stdio servers from. Written out rather than
+    // read from the preset, because the preset's `shape` is the thing under test.
+    const path: Record<string, string[]> = {
+      "claude-desktop": ["mcpServers"],
+      "claude-code": ["mcpServers"],
+      cursor: ["mcpServers"],
+      opencode: ["mcp", "servers"],
+      vscode: ["servers"],
+      // YAML with a snake-case key: a JSON block beside this client's config is
+      // rejected, which is how this preset came to exist.
+      hermes: ["mcp_servers"],
+    };
+    for (const [id, keys] of Object.entries(path)) {
+      const parsed = parses(id, DEFAULT_CONNECTION_NAME) as Record<string, unknown>;
+      let node: unknown = parsed;
+      for (const key of keys) {
+        node = (node as Record<string, unknown>)[key];
+        expect(node, `${id}: no ${keys.join(".")} in the parsed snippet`).toBeTruthy();
+      }
+      const entry = (node as Record<string, <T>() => T>)["myne"] as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(entry, `${id}: no server named "myne" under ${keys.join(".")}`).toBeTruthy();
+      // The command is the sidecar's name, not a path: it is on PATH by the same
+      // launcher that puts `myne` there, and a path would be wrong on every other
+      // machine.
+      const command = entry["command"];
+      const spelled = Array.isArray(command) ? command.join(" ") : command;
+      expect(spelled, `${id}: the command must be the sidecar, not a path`).toBe("myne-mcp");
+      // And the connection name travels in the environment, under the one variable
+      // the shim reads.
+      const env = (entry["environment"] ?? entry["env"]) as Record<string, string> | undefined;
+      expect(env?.[MCP_CONNECTION_ENV], `${id}: the connection name is not in env`).toBe(
+        DEFAULT_CONNECTION_NAME,
+      );
+    }
+  });
+
+  it("keeps the stdio type on the two clients that require it", () => {
+    // Cursor's docs make `type` required for a stdio entry and VS Code's native
+    // shape does too; omitting it is the copy-paste failure those presets exist for.
+    for (const id of ["cursor", "vscode"]) {
+      const parsed = parses(id, DEFAULT_CONNECTION_NAME) as Record<string, never>;
+      const servers = (parsed["mcpServers"] ?? parsed["servers"]) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(servers["myne"]["type"], `${id} requires type: stdio`).toBe("stdio");
+    }
+  });
+
+  it("keeps OpenCode's nested local-server shape", () => {
+    // V2 nests servers under `mcp.servers` and spells a stdio server `type: local`
+    // with `command` as an ARRAY. All three are what an older snippet got wrong.
+    const parsed = parses("opencode", DEFAULT_CONNECTION_NAME) as Record<string, never>;
+    const entry = (parsed["mcp"] as Record<string, never>)["servers"] as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(entry["myne"]["type"]).toBe("local");
+    expect(Array.isArray(entry["myne"]["command"])).toBe(true);
   });
 });

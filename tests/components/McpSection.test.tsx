@@ -94,7 +94,6 @@ function connection(overrides: Record<string, unknown> = {}) {
       { verb: "vault_state", enabled: true, availableInBuild: true, isWrite: false },
       { verb: "note_create", enabled: true, availableInBuild: true, isWrite: true },
       { verb: "note_append", enabled: true, availableInBuild: true, isWrite: true },
-      { verb: "note_set_field", enabled: false, availableInBuild: false, isWrite: false },
       { verb: "note_move", enabled: true, availableInBuild: true, isWrite: true },
       { verb: "note_edit", enabled: true, availableInBuild: true, isWrite: true },
       // The four reads that joined in myne-md/myne#1077, in the host catalog's own
@@ -366,12 +365,21 @@ describe("the approval dialog", () => {
     );
     expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("every note");
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
-    // The switches are the host's catalog, and one verb this build cannot serve
-    // is off with a reason rather than offered as a control that does nothing.
-    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(13);
-    expect(
-      (screen.getByTestId("settings.mcp-tool-note_set_field") as HTMLInputElement).disabled,
-    ).toBe(true);
+    // The switches are the host's catalog, and every one of them is a verb this
+    // build serves: the bank used to carry a thirteenth that answered version skew,
+    // which `mcp/src/surface_test.rs` now makes impossible. A row that cannot be
+    // flipped is worse than an absent row, because it reads as a permission.
+    const toolRows = screen.getAllByTestId("settings.mcp-tool");
+    expect(toolRows).toHaveLength(12);
+    // Not one row is disabled, because not one row is a verb this build cannot
+    // serve. The bank used to carry a thirteenth that could only be turned on and
+    // then answer version skew; `mcp/src/surface_test.rs` makes that unreachable.
+    for (const row of toolRows) {
+      const verb = row.getAttribute("data-verb") as string;
+      expect(
+        (screen.getByTestId(`settings.mcp-tool-${verb}`) as HTMLInputElement).disabled,
+      ).toBe(false);
+    }
 
     // Leave one folder out, which under this reading is the exclusion list.
     fireEvent.click(screen.getByTestId("settings.mcp-access-picker-toggle"));
@@ -537,7 +545,7 @@ describe("the approval dialog", () => {
     fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
     fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
     await screen.findByTestId("settings.mcp-step-scope");
-    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(13);
+    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(12);
   });
 
   it("offers the raw command behind the other-clients disclosure", async () => {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The compiled tool surface, held to the three rules that make it safe to
-//! hand to a model: the set is exactly the thirteen verbs, every schema is
+//! hand to a model: the set is exactly the twelve verbs, every schema is
 //! internally consistent, and nothing in it names a capability outside the
 //! vault.
 
@@ -8,15 +8,14 @@ use crate::tools::catalog;
 
 /// Written out here on purpose rather than derived from [`catalog`]. A roster
 /// compared against a second copy of itself cannot fail on the drift it exists
-/// for, so the expected set is a literal that a fourteenth verb has to edit.
-const EXPECTED_TOOLS: [&str; 13] = [
+/// for, so the expected set is a literal that a thirteenth verb has to edit.
+const EXPECTED_TOOLS: [&str; 12] = [
     "note_search",
     "note_read",
     "vault_list",
     "vault_state",
     "note_create",
     "note_append",
-    "note_set_field",
     "note_move",
     "note_edit",
     "attachment_list",
@@ -62,7 +61,7 @@ fn names() -> Vec<String> {
 }
 
 #[test]
-fn the_catalog_is_exactly_the_thirteen_verbs() {
+fn the_catalog_is_exactly_the_twelve_verbs() {
     let mut found = names();
     found.sort();
     let mut expected = EXPECTED_TOOLS.map(str::to_string).to_vec();
@@ -70,8 +69,8 @@ fn the_catalog_is_exactly_the_thirteen_verbs() {
     assert_eq!(found, expected);
     assert_eq!(
         catalog().len(),
-        13,
-        "thirteen is a ceiling, not a start: a verb is an injection surface and a \
+        12,
+        "twelve is a ceiling, not a start: a verb is an injection surface and a \
          scope-enforcement site, so widening the list edits this number and the guard's \
          roster in the same change"
     );

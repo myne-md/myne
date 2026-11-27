@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The compiled-in tool surface: thirteen verbs, declared as data.
+//! The compiled-in tool surface: twelve verbs, declared as data.
 //!
 //! **This file is the list, and it is the ONLY file a guard reads to answer
 //! "what can an MCP connection do?"** `scripts/check-mcp-tool-surface.mjs` parses
@@ -15,14 +15,18 @@
 //! `format!`, `concat!`, `include_str!` or `env!` in this file so the property is
 //! checked rather than assumed.
 //!
-//! **Thirteen is a ceiling, not a starting point.** Every tool is an injection
-//! surface and a scope-enforcement site, so a fourteenth verb is a deliberate
-//! cost rather than a convenience. Four reads joined the nine in
+//! **Twelve is a ceiling, not a starting point.** Every tool is an injection
+//! surface and a scope-enforcement site, so a thirteenth verb is a deliberate
+//! cost rather than a convenience. Four reads joined the eight in
 //! myne-md/myne#1077, and the shape they follow is the one rule that decided
 //! them: **a verb may read a file by id, and no verb may name a path or a URL.**
 //! A by-id read stays inside the vault the grant covers; a path argument would
 //! let a caller name a file outside it, and a URL argument would make this
-//! process the fetch leg of the trifecta. Three write classes are absent by decision, not by
+//! process the fetch leg of the trifecta. `note_set_field` was advertised here
+//! while this build had no arm to serve it, which is why the surface has a
+//! three-way check (`mcp/src/surface_test.rs`) rather than a comment: it needs the
+//! view that owns field-write authority, and the wire verb carries no view, so it
+//! returns when that is a decision rather than a hope. Three write classes are absent by decision, not by
 //! omission: delete (a read is recoverable harm, a delete is not), rename (it
 //! rewrites the notes that link to the target, and those notes are outside any
 //! grant), and whole-body replace (two devices' splices both survive a merge and
@@ -51,7 +55,9 @@ pub fn catalog() -> Vec<Value> {
             "name": "note_search",
             "description": "Search the notes inside the folders this connection may read. \
                 Returns each match with its note id, title, folder and a short excerpt around \
-                the match, never the whole note. Read-only.",
+                the match, never the whole note. A folder argument outside the granted scope is \
+                refused; a folder that does not exist is not, and answers an empty list, so an \
+                empty result and a mistyped folder look the same. Read-only.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -126,9 +132,10 @@ pub fn catalog() -> Vec<Value> {
         }),
         json!({
             "name": "vault_list",
-            "description": "List the folders this connection may read, with the number of notes \
-                in each. Gives the shape of the vault in one answer, without reading note text. \
-                Read-only.",
+            "description": "List the folders this connection may read that HOLD notes, with the \
+                number of notes in each. A folder with no notes is not listed, so this is fewer \
+                rows than the folder count `vault_state` reports, which counts folders that exist. \
+                The vault root is the row whose folder is null. Read-only.",
             "inputSchema": {
                 "type": "object",
                 "properties": {},
@@ -165,7 +172,9 @@ pub fn catalog() -> Vec<Value> {
             "name": "vault_state",
             "description": "Report whether the vault is unlocked, whether external access is \
                 enabled, how many notes and folders this connection may read, and how many \
-                folders the user left out. Read-only, and safe to call before any other tool.",
+                folders the user left out. The folder count includes folders that exist and hold \
+                no notes, so it is larger than the number of rows `vault_list` returns. Read-only, \
+                and safe to call before any other tool.",
             "inputSchema": {
                 "type": "object",
                 "properties": {},
@@ -216,31 +225,6 @@ pub fn catalog() -> Vec<Value> {
                     }
                 },
                 "required": ["note_id", "markdown"],
-                "additionalProperties": false
-            }
-        }),
-        json!({
-            "name": "note_set_field",
-            "description": "Set one frontmatter field on an existing note, leaving every other \
-                field and the note body untouched. An absent field is added and an existing \
-                field is replaced. Refused when the note is outside the write grant.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "note_id": {
-                        "type": "string",
-                        "description": "The id of the note to change."
-                    },
-                    "field": {
-                        "type": "string",
-                        "description": "Name of the frontmatter field to set."
-                    },
-                    "value": {
-                        "type": "string",
-                        "description": "Value to give the field."
-                    }
-                },
-                "required": ["note_id", "field", "value"],
                 "additionalProperties": false
             }
         }),

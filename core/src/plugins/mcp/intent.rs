@@ -48,7 +48,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::error::McpToolError;
-use super::scope::{folder_key_of, ConnectionScope};
+use super::scope::ConnectionScope;
 use super::tools::McpNoteSource;
 use super::write_scope::{WriteRoute, WriteScope};
 use crate::folder_key::canonical_input_folder;
@@ -280,12 +280,17 @@ pub(super) async fn check_existing(
     source: &dyn McpNoteSource,
 ) -> Result<Gate, McpToolError> {
     let records = source.records().await?;
-    let record = records
-        .get(note_id)
-        .ok_or_else(|| McpToolError::UnknownNote {
+    // The same seam the read verbs use: the index when it carries the note, the
+    // note itself when it does not. Without it a write against a note created a
+    // moment ago by another connection (or by `myne new`, or by a sync pull)
+    // answered `unknown_note`, which turned the write surface into a set of verbs
+    // that only worked on notes somebody had already opened in the editor.
+    let Some(facts) = super::tools::facts_for(&records, source, note_id).await? else {
+        return Err(McpToolError::UnknownNote {
             note_id: note_id.to_string(),
-        })?;
-    let folder_key = folder_key_of(record);
+        });
+    };
+    let folder_key = facts.folder_key();
     if !read.covers_key(&folder_key) {
         return Err(McpToolError::OutOfScopeNote {
             note_id: note_id.to_string(),

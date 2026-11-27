@@ -1156,7 +1156,6 @@ function verbLabel(
     "vault_state",
     "note_create",
     "note_append",
-    "note_set_field",
     "note_move",
     "note_edit",
     // The four reads that joined in myne-md/myne#1077. Each gets a label rather

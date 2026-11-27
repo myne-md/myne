@@ -406,7 +406,6 @@ describeE2E("mcp1 External access opens the door and approves a deny-list grant 
           "note_move",
           "note_read",
           "note_search",
-          "note_set_field",
           "vault_list",
           "vault_state",
           "view_list",

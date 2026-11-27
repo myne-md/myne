@@ -3909,7 +3909,6 @@
           "vault_state": "Vault summary",
           "note_create": "Create a note",
           "note_append": "Append to a note",
-          "note_set_field": "Set a note field",
           "note_move": "Move a note",
           "note_edit": "Edit a note",
           "attachment_list": "List files",

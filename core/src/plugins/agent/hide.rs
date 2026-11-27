@@ -98,6 +98,19 @@ pub fn edit_hides_note(before: &str, after: &str) -> bool {
         .any(|(was, now)| !was && *now)
 }
 
+/// Whether a whole note body is in the working set: the dry counterpart of
+/// [`edit_hides_note`], over the same [`markers`] array.
+///
+/// One reader needs it for a note the sidebar's index does not carry yet: the
+/// external MCP door answers a note id straight off the disk when the index has no
+/// record (`plugins::mcp::host_adapters`), and a trashed, deleted, archived,
+/// template or conflicted note must stay indistinguishable from a missing one. Not
+/// a second rule: `isLiveNote` is the authority and
+/// [`tests::the_roster_matches_is_live_note`] holds the roster to it.
+pub fn body_is_live(body: &str) -> bool {
+    !markers(body).iter().any(|carried| *carried)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +229,43 @@ mod tests {
     }
 
     // ---- detection, every field ----------------------------------------
+
+    /// A note carrying any marker is out, and one carrying none is in. The second
+    /// half matters: answering "not live" for an ordinary note would make every
+    /// unindexed note read as missing, the fallback's bug wearing the opposite mask.
+    #[test]
+    fn a_whole_body_is_live_exactly_when_it_carries_no_marker() {
+        assert!(
+            body_is_live(&note("title: T")),
+            "a note with no marker is in the working set"
+        );
+        assert!(
+            body_is_live("no frontmatter at all, just prose"),
+            "a note with no frontmatter carries no marker"
+        );
+        for (line, name) in MARKER_LINES {
+            assert!(
+                !body_is_live(&note(&format!("title: T\n{line}"))),
+                "a note carrying {name:?} is out of the working set"
+            );
+        }
+    }
+
+    /// The helpers are value-strict, so "this field exists" is not "this note is
+    /// gone" — the distinction [`edit_hides_note`]'s tests pin for the edit direction.
+    #[test]
+    fn a_non_canonical_value_does_not_make_a_body_not_live() {
+        for (line, name) in [
+            ("trashed: true", "trashed"),
+            ("template: \"true\"", "template"),
+            ("archived: later", "archived"),
+        ] {
+            assert!(
+                body_is_live(&note(&format!("title: T\n{line}"))),
+                "{name:?} with a value the app does not treat as a marker must stay live"
+            );
+        }
+    }
 
     #[test]
     fn an_edit_that_adds_any_marker_is_recognised() {

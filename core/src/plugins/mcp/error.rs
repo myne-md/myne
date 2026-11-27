@@ -75,6 +75,17 @@ pub enum McpToolError {
     /// make unexpressible.
     #[serde(rename = "calendar_window_too_wide")]
     CalendarWindowTooWide { max_days: u32 },
+    /// A calendar window whose bounds the calendar could not read: `from` later
+    /// than `to`, or a bound that is not a date the app parses.
+    ///
+    /// Separate from [`Self::VaultUnavailable`] for one reason: that reason tells a
+    /// caller to unlock the vault and try again, which is the wrong next action for
+    /// a reversed range and sends it round a loop it cannot leave. The host had the
+    /// distinction already (`VaultIndicesError::CalendarWindowUnreadable`) and this
+    /// door threw it away in a catch-all, so every such call answered
+    /// `vault_unavailable` and read as a locked vault (myne-md/myne#1231).
+    #[serde(rename = "calendar_window_unreadable")]
+    CalendarWindowUnreadable,
     /// A write named a title that is empty once trimmed. Refused rather than
     /// written, because a note with no title has no name in the sidebar and the
     /// caller cannot find it again to fix it.
@@ -197,6 +208,7 @@ impl McpToolError {
             McpToolError::UnknownFile { .. } => "unknown_file",
             McpToolError::OutOfScopeFile { .. } => "out_of_scope_file",
             McpToolError::CalendarWindowTooWide { .. } => "calendar_window_too_wide",
+            McpToolError::CalendarWindowUnreadable => "calendar_window_unreadable",
             McpToolError::EmptyTitle => "empty_title",
             McpToolError::EmptyAppend => "empty_append",
             McpToolError::AnchorNotFound => "anchor_not_found",
@@ -258,8 +270,13 @@ impl McpToolError {
                  Myne app."
             }
             McpToolError::CalendarWindowTooWide { .. } => {
-                "That date range is wider than this surface reads in one call: ask for a shorter \
+                "That date range is wider than Myne reads in one call: ask for a shorter \
                  range, at most a year at a time."
+            }
+            McpToolError::CalendarWindowUnreadable => {
+                "That date range could not be read: the start has to be on or before the end, \
+                 both as dates, and nothing about the vault is wrong, so unlocking Myne will \
+                 not help."
             }
             McpToolError::OutOfScopeFolder { .. } => {
                 "That folder is one the user left out of this connection's approval: ask the user \
@@ -384,6 +401,14 @@ mod tests {
             McpToolError::OutOfScopeNote {
                 note_id: "n".into(),
             },
+            McpToolError::UnknownFile {
+                attachment_id: "aa".into(),
+            },
+            McpToolError::OutOfScopeFile {
+                attachment_id: "aa".into(),
+            },
+            McpToolError::CalendarWindowTooWide { max_days: 366 },
+            McpToolError::CalendarWindowUnreadable,
             McpToolError::EmptyTitle,
             McpToolError::EmptyAppend,
             McpToolError::AnchorNotFound,
@@ -413,6 +438,30 @@ mod tests {
             },
             McpToolError::VaultUnavailable,
         ]
+    }
+
+    #[test]
+    fn the_roster_covers_every_variant() {
+        // A property test is only as good as its roster, and this one had silently
+        // fallen four variants behind the enum: the calendar pair and the two file
+        // reasons were never checked, so a bad label there would have shipped as a
+        // generic `refused`. The length is a literal on purpose — a variant added
+        // without adding it here fails this count rather than quietly going
+        // unchecked.
+        assert_eq!(
+            all().len(),
+            25,
+            "the roster and the enum disagree: add the new variant to both"
+        );
+        let mut reasons: Vec<&str> = all().iter().map(McpToolError::reason).collect();
+        reasons.sort_unstable();
+        let unique = reasons.len();
+        reasons.dedup();
+        assert_eq!(
+            unique,
+            reasons.len(),
+            "two variants share one wire label, so a client cannot tell them apart"
+        );
     }
 
     #[test]
@@ -459,8 +508,17 @@ mod tests {
                 "{:?} is more than one sentence: {message}",
                 error.reason()
             );
+            // "Names the product, or the call it can make next." The second half
+            // used to be spelled `message.contains("note_search")`, which is true of
+            // exactly one sentence's worth of advice: `unknown_file` says "call
+            // attachment_list" and failed a rule that meant to allow it, so the
+            // narrower rule would have pushed copy towards the one tool name it
+            // recognised. Asking the catalog instead is the rule the doc states.
+            let names_a_tool = crate::plugins::mcp::tools::CATALOG_VERBS
+                .iter()
+                .any(|verb| message.contains(verb));
             assert!(
-                message.contains("Myne") || message.contains("note_search"),
+                message.contains("Myne") || names_a_tool,
                 "{:?} must name the product or the next call: {message}",
                 error.reason()
             );
