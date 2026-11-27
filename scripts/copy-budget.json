@@ -52,6 +52,10 @@
       "owner": "common.tryagain",
       "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
     },
+    "notes.example.tasks.title": {
+      "owner": "common.tasks",
+      "reason": "The example-notes surface resolves this key by name while `common.tasks` owns the value; the key stays local so the example stays a named catalogue entry."
+    },
     "notes.import.modal.closeAriaLabel": {
       "owner": "common.close",
       "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
@@ -167,11 +171,11 @@
   },
   "surfaces": {
     "src/components/settings/settingsTopics.ts": 182,
-    "src/components/settings/AboutPanel.tsx": 1252,
+    "src/components/settings/AboutPanel.tsx": 1163,
     "src/components/settings/AccountPanel.tsx": 1057,
     "src/components/settings/AiModelCatalogue.tsx": 410,
     "src/components/settings/AiOnboardingSurface.tsx": 511,
-    "src/components/settings/AiPanel.tsx": 4078,
+    "src/components/settings/AiPanel.tsx": 3808,
     "src/components/settings/AiProviderConsent.tsx": 227,
     "src/components/settings/AppearancePanel.tsx": 1095,
     "src/components/settings/ArchiveSettings.tsx": 284,
@@ -188,7 +192,7 @@
     "src/components/settings/CustomizeList.tsx": 32,
     "src/components/settings/DateTimeSettings.tsx": 607,
     "src/components/settings/DefaultViewModeSettings.tsx": 178,
-    "src/components/settings/DiagnosticsPanel.tsx": 1206,
+    "src/components/settings/DiagnosticsPanel.tsx": 994,
     "src/components/settings/EditorPanel.tsx": 509,
     "src/components/settings/FilesPanel.tsx": 28,
     "src/components/settings/FocusModeSettings.tsx": 248,
@@ -197,7 +201,7 @@
     "src/components/settings/HotkeysPanel.tsx": 687,
     "src/components/settings/LanguageSelect.tsx": 48,
     "src/components/settings/LineNumbersSettings.tsx": 128,
-    "src/components/settings/McpSection.tsx": 2562,
+    "src/components/settings/McpSection.tsx": 2540,
     "src/components/settings/MemberPasswordSettings.tsx": 736,
     "src/components/settings/MemorySection.tsx": 1299,
     "src/components/settings/ModelPathButton.tsx": 29,
