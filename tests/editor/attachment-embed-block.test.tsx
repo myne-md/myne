@@ -378,3 +378,31 @@ describe("block embed rebuilds when the catalog warms", () => {
     host.remove();
   });
 });
+
+describe("block embed rebuilds when layout changes (same widget class)", () => {
+  it("replaces the <img> node when w= changes", async () => {
+    mounted = await mount(EMBED);
+    const imgBefore = mounted.host.querySelector("img.cm-attachment-img") as HTMLImageElement | null;
+    expect(imgBefore).not.toBeNull();
+    const frameBefore = mounted.host.querySelector(".cm-attachment-block");
+    expect(frameBefore).not.toBeNull();
+
+    const newDoc = `![[att:${ID}|shot.png|w=400]]`;
+    mounted.view.dispatch({
+      changes: { from: 0, to: mounted.view.state.doc.length, insert: newDoc },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    mounted.view.requestMeasure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const imgAfter = mounted.host.querySelector("img.cm-attachment-img") as HTMLImageElement | null;
+    expect(imgAfter).not.toBeNull();
+    // The frame was rebuilt: a new <img> node, not the reused one.
+    expect(imgAfter).not.toBe(imgBefore);
+
+    const frameAfter = mounted.host.querySelector(".cm-attachment-block");
+    expect(frameAfter).not.toBeNull();
+    expect(frameAfter).not.toBe(frameBefore);
+  });
+});
