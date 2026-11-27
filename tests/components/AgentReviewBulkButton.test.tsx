@@ -48,6 +48,7 @@ import {
   getAgent,
   settleApply,
   settleStep,
+  toggleEdit,
 } from "../../src/notes/agent/agentStore";
 import { applyOutcome } from "../notes/_agentApplyOutcome";
 
@@ -261,5 +262,47 @@ describe("nothing left to decide", () => {
     expect(screen.getByTestId("agentReview.approveAll").textContent).toBe(
       "agent.review.approveAll:1",
     );
+  });
+
+  it("keeps Approve all when a create was refused after an applied run", () => {
+    // A refused create is still decidable (it never landed), so the decision
+    // bar stays and Approve all remains the way to retry it. Undo alone is not
+    // a decision and must not be the only thing left.
+    settleWith([], [{ title: "Refused", body: "b", folder: null }]);
+    settleApply(
+      applyOutcome({
+        applied: 0,
+        notesCreated: [],
+        notesWritten: [],
+        restorePoints: [],
+        refusedNewNotes: [{ index: 0, reason: "unsafeFrontmatter" }],
+      }),
+      [],
+      currentRunEpoch(),
+      [],
+      [],
+    );
+    mount();
+    const button = screen.getByTestId("agentReview.approveAll");
+    expect(button).toBeTruthy();
+    expect(button.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("keeps Reject all (which closes the card) after the last row is rejected", () => {
+    const onClose = vi.fn();
+    settleWith([ORDINARY]);
+    toggleEdit(0);
+    render(
+      <AgentReview
+        onClose={onClose}
+        onNotesWritten={() => {}}
+        titleOf={() => null}
+        folderOf={() => null}
+      />,
+    );
+    const reject = screen.getByTestId("agentReview.rejectAll");
+    expect(reject).toBeTruthy();
+    fireEvent.click(reject);
+    expect(onClose).toHaveBeenCalled();
   });
 });
