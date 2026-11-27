@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
       - name: Require the package to exist as private before publishing
         env:
-          GH_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN || secrets.MYNE_BOT_PAT }}
+          GH_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN }}
         run: |
           if ! visibility=$(gh api orgs/myne-md/packages/container/myne-web-nightly --jq .visibility 2>/dev/null); then
             echo "::error::myne-web-nightly does not exist yet. Bootstrap it as private first; publishing from this public repository would create it public."
@@ -71,7 +71,7 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Verify the package stayed private
         env:
-          GH_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN || secrets.MYNE_BOT_PAT }}
+          GH_TOKEN: ${{ secrets.GHCR_WRITE_TOKEN }}
         run: |
           visibility=$(gh api orgs/myne-md/packages/container/myne-web-nightly --jq .visibility)
           echo "myne-web-nightly visibility: $visibility"

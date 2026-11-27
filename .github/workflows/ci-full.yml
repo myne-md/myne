@@ -264,7 +264,6 @@ jobs:
         with:
           repository: myne-md/myne-server
           path: myne-server
-          token: ${{ secrets.MYNE_BOT_PAT }}
           persist-credentials: false
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
@@ -296,7 +295,6 @@ jobs:
         with:
           repository: myne-md/myne-test-vectors
           path: myne-test-vectors
-          token: ${{ secrets.MYNE_BOT_PAT }}
           persist-credentials: false
       - name: Install Linux dependencies
         run: |
@@ -324,31 +322,16 @@ jobs:
         with:
           repository: myne-md/myne-server
           path: myne-server
-          token: ${{ secrets.MYNE_BOT_PAT }}
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: myne-md/myne-ops
-          path: myne-ops
-          token: ${{ secrets.MYNE_BOT_PAT }}
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myne-md/myne-website
           path: myne-website
-          token: ${{ secrets.MYNE_BOT_PAT }}
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myne-md/myne-clipper
           path: myne-clipper
-          token: ${{ secrets.MYNE_BOT_PAT }}
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: myne-md/myne-branding
-          path: myne-branding
-          token: ${{ secrets.MYNE_BOT_PAT }}
           persist-credentials: false
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
@@ -358,8 +341,12 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Private companions (myne-ops, myne-branding) are not checked out in the
+      # public workflow: a public repository must not hold a credential that can
+      # read private repositories. Their drift lanes run from the private repos.
+      # The guards below report the absent private companions without failing.
       - run: node scripts/check-stream-timeout-drift.mjs --require-companion
-      - run: node scripts/check-selfhost-bundle-drift.mjs --require-companion
-      - run: node scripts/check-server-env-roster.mjs --require-companion
+      - run: node scripts/check-selfhost-bundle-drift.mjs
+      - run: node scripts/check-server-env-roster.mjs
       - run: node scripts/check-clipper-wire.mjs --require-companion
-      - run: node scripts/check-branding-parity.mjs --require-companion
+      - run: node scripts/check-branding-parity.mjs
