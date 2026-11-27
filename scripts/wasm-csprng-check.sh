@@ -58,12 +58,12 @@ fi
 echo "  ok"
 
 echo "== getrandom's custom hook is present and UNRESOLVED =="
-GETRANDOM_RLIB="$(grep '"name":"getrandom"' "$BUILD_LOG" \
+GETRANDOM_RLIBS="$(grep '"name":"getrandom"' "$BUILD_LOG" \
   | grep -o '"filenames":\[[^]]*\]' \
   | tr ',' '\n' | tr -d '[]"' | sed 's/^filenames://' \
-  | grep 'libgetrandom-.*\.rlib$' | tail -1)"
+  | grep 'libgetrandom-.*\.rlib$')"
 rm -f "$BUILD_LOG"
-if [ -z "$GETRANDOM_RLIB" ] || [ ! -f "$GETRANDOM_RLIB" ]; then
+if [ -z "$GETRANDOM_RLIBS" ]; then
   echo "  FAIL: this build produced no getrandom rlib — the dependency left protocol's wasm"
   echo "        graph, which means the entropy source is no longer where this gate can see it."
   exit 1
@@ -72,13 +72,41 @@ fi
 # llvm-nm ships with the llvm-tools component; fall back to a plain nm.
 NM="$(find "$(rustc --print sysroot)" -name 'llvm-nm' 2>/dev/null | head -1)"
 [ -n "$NM" ] || NM="$(command -v llvm-nm || command -v nm || true)"
+OBJDUMP="$(find "$(rustc --print sysroot)" -name 'llvm-objdump' 2>/dev/null | head -1)"
 if [ -z "$NM" ]; then
   echo "  FAIL: no nm available (install the llvm-tools rustup component)."
   exit 1
 fi
 
-SYM_LINE="$("$NM" "$GETRANDOM_RLIB" 2>/dev/null | grep '__getrandom_custom' | head -1)"
+# protocol may carry both getrandom 0.2 (the embedder-hook version) and 0.4
+# (core's wasm_js backend); artifact order is not stable, so inspect every
+# getrandom rlib this build produced instead of assuming the last one is 0.2.
+SYM_LINE=""
+for GETRANDOM_RLIB in $GETRANDOM_RLIBS; do
+  [ -f "$GETRANDOM_RLIB" ] || continue
+  SYM_LINE="$("$NM" "$GETRANDOM_RLIB" 2>/dev/null | grep '__getrandom_custom' | head -1)"
+  if [ -z "$SYM_LINE" ] && [ -n "$OBJDUMP" ]; then
+    OBJ_LINE="$("$OBJDUMP" -t "$GETRANDOM_RLIB" 2>/dev/null | grep '__getrandom_custom' | head -1)"
+    if [ -n "$OBJ_LINE" ]; then
+      if echo "$OBJ_LINE" | grep -q 'UND'; then
+        SYM_LINE="U __getrandom_custom"
+      else
+        SYM_LINE="$OBJ_LINE"
+      fi
+    fi
+  fi
+  [ -n "$SYM_LINE" ] && break
+done
 if [ -z "$SYM_LINE" ]; then
+  echo "  debug: nm=${NM:-<none>} objdump=${OBJDUMP:-<none>}"
+  echo "  debug: getrandom rlibs:"
+  printf '    %s\n' $GETRANDOM_RLIBS
+  echo "  debug: nm version: $("$NM" --version 2>&1 | head -1)"
+  for GETRANDOM_RLIB in $GETRANDOM_RLIBS; do
+    [ -f "$GETRANDOM_RLIB" ] || continue
+    echo "  debug: first symbols from $GETRANDOM_RLIB"
+    "$NM" "$GETRANDOM_RLIB" 2>&1 | head -5
+  done
   echo "  FAIL: __getrandom_custom is absent from the wasm getrandom rlib."
   echo "        Either the 'custom' feature is no longer enabled for wasm32 (check the"
   echo "        [target.'cfg(target_arch = \"wasm32\")'.dependencies] block in protocol/Cargo.toml),"
