@@ -110,6 +110,30 @@ beforeEach(() => {
 // instead, because a day-granular drop cannot say "10:30"; that path is
 // `calendarGestures.test.tsx`. Both run through one writer, so the rollback this
 // file is about is the same code either way.
+describe("reaching the note behind an event", () => {
+  // The pane supplies the handler, which is the half a form-only test cannot see:
+  // without it the control is not rendered at all, so its absence here is the
+  // wiring being missing rather than the button looking different (2026-11-27).
+  it("opens the event's note from the edit form and closes the form", async () => {
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const chip = host.querySelector('[data-testid="calendar.row"]');
+    expect(chip).not.toBeNull();
+    await act(async () => {
+      chip!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const openNote = host.querySelector('[data-testid="calendar.form.openNote"]');
+    expect(openNote).not.toBeNull();
+
+    await act(async () => {
+      openNote!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
+    cleanup();
+  });
+});
+
 describe("dragging an event", () => {
   it("draws the row where it was dropped, then writes the note once", async () => {
     const { host, cleanup } = await renderPane(

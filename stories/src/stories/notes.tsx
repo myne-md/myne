@@ -1497,6 +1497,10 @@ export const NOTES_STORIES: StoryDescriptor[] = [
                 repeat: { kind: "interval", unit: "week", count: 2 },
                 remind: { raw: "30m", minutes: 30 },
               }}
+              // An EDIT, which is the case a reminder to a reader who already has
+              // the event: its note is reachable from the form (2026-11-27).
+              mode="edit"
+              onOpenNote={action("onOpenNote")}
               onClose={action("onClose")}
             />
           </Box>

@@ -5890,6 +5890,7 @@
     },
     "form": {
       "title": "New event",
+      "openNote": "Open note",
       "eventTitle": "Event title",
       "starts": "Starts",
       "startDate": "Start date",
