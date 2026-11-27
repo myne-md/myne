@@ -1,0 +1,41 @@
+name: arch-source-weekly
+
+# Weekly/manual Arch source build. The nightly build repackages the Linux deb;
+# this workflow proves the from-source PKGBUILD still compiles on Arch. It is
+# deliberately not on the daily schedule: one build takes roughly 40 minutes and
+# adds nothing to the nightly artefact set.
+#
+# The source package is model-less and dictionary-less by design; see
+# packaging/arch/PKGBUILD. It is an internal validation package, not a release.
+
+on:
+  schedule:
+    - cron: "30 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the Arch source package
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          mkdir -p target/release/bundle/arch-source
+          docker run --rm \
+            -v "$PWD:/src:ro" \
+            -v "$PWD/target/release/bundle/arch-source:/out" \
+            archlinux:base-devel \
+            /src/packaging/arch/nightly-source-container.sh "$VERSION" "$GITHUB_SHA"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: myne-arch-source-${{ github.sha }}
+          path: target/release/bundle/arch-source/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 14
