@@ -24,7 +24,7 @@
 // what a connected tool does with what it reads is outside Myne (the switch); a
 // name is a label, not a password (the name field); approvals are on this device
 // (the list footer); what is shared grows with the vault (the scope line); writing
-// is a named list and every write keeps a restore point (the write disclosure).
+// is a named list and every write keeps a restore point (the scope paragraph).
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -876,12 +876,18 @@ export function McpSection({
           )}
 
           {flow.step === 3 && (
-            <div data-testid="settings.mcp-step-scope">
+            <div
+              data-testid="settings.mcp-step-scope"
+              // A column with a gap, not a stack of blocks: the row, its one
+              // paragraph and the folder list used to sit edge to edge.
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
+            >
               <SettingRow
                 testId="settings.mcp-whole-vault"
+                helperTestId="settings.mcp-scope-line"
                 stateAttrs={{ "data-whole-vault": String(flow.wholeVault) }}
                 label={t("settings.ai.externalAccess.wholeVaultLabel")}
-                helper={t("settings.ai.externalAccess.wholeVaultHelper")}
+                helper={`${scopeLine} ${t("settings.ai.externalAccess.writeRestore")}`}
                 control={(helperId) => (
                   <Switch
                     checked={flow.wholeVault}
@@ -905,16 +911,6 @@ export function McpSection({
                   />
                 )}
               />
-
-              <p style={HELPER_STYLE} data-testid="settings.mcp-scope-line">
-                {scopeLine}
-              </p>
-              {/* A guarantee rather than a restatement of a control, so it stays:
-                  a write is recoverable, and that is the fact that decides whether
-                  the person switches a write verb on at all. */}
-              <p style={HELPER_STYLE} data-testid="settings.mcp-write-restore">
-                {t("settings.ai.externalAccess.writeRestore")}
-              </p>
 
               <MultiSelectBox
                 collapsible

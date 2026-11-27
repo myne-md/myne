@@ -368,7 +368,7 @@ describe("the approval dialog", () => {
     expect(screen.getByTestId("settings.mcp-whole-vault").getAttribute("data-whole-vault")).toBe(
       "true",
     );
-    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("every note");
+    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("Every folder");
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
     // The switches are the host's catalog, and one verb this build cannot serve
     // is off with a reason rather than offered as a control that does nothing.

@@ -3938,7 +3938,6 @@
           "view_list": "Listaa tallennetut näkymät"
         },
         "wholeVaultLabel": "Lue ja kirjoita koko holvi",
-        "wholeVaultHelper": "Jokainen kansio, myös ne jotka luot myöhemmin. Jos jätät kansion pois alta, se on pois sekä lukemisesta että kirjoittamisesta.",
         "excludeNothing": "Ei mitään pois jätetty",
         "scopeLineAll": "Tavoittaa jokaisen holvin muistiinpanon, myös myöhemmin luoduissa kansioissa, ja voi muuttaa mitä tahansa niistä.",
         "scopeLine": "Tavoittaa {{count}} muistiinpanoa {{folders}} kansiossa ja voi muuttaa niissä kaikkea.",
@@ -4172,8 +4171,7 @@
       "strong": "Vahva",
       "tooWeak": "Liian heikko"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Vietiin {{count}} muistiinpano → {{label}}",
       "exported_other": "Vietiin {{count}} muistiinpanoa → {{label}}",

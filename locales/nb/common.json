@@ -3943,7 +3943,6 @@
           "calendar_read": "Les kalenderen",
           "view_list": "List lagrede visninger"
         },
-        "wholeVaultHelper": "Hver mappe, også de du lager senere. Holder du en mappe utenfor nedenfor, er den utenfor både for lesing og skriving.",
         "wholeVaultLabel": "Les og skriv hele hvelvet"
       },
       "autoApplyLabel": "Bruk foreslåtte tagger automatisk",
@@ -4172,8 +4171,7 @@
       "strong": "Sterkt",
       "tooWeak": "For svakt"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Eksporterte {{count}} notat → {{label}}",
       "exported_other": "Eksporterte {{count}} notater → {{label}}",

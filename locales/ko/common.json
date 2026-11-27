@@ -3938,7 +3938,6 @@
           "view_list": "저장된 보기 목록"
         },
         "wholeVaultLabel": "보관함 전체 읽기 및 쓰기",
-        "wholeVaultHelper": "나중에 만드는 폴더를 포함한 모든 폴더. 아래에서 폴더를 제외하면 읽기와 쓰기 모두에서 제외됩니다.",
         "excludeNothing": "제외된 항목 없음",
         "scopeLineAll": "보관함의 모든 노트에 닿으며, 나중에 만드는 폴더도 포함하고, 어느 것이든 바꿀 수 있습니다.",
         "scopeLine": "{{folders}}개 폴더의 노트 {{count}}개에 닿고, 그 안의 무엇이든 바꿀 수 있습니다.",
@@ -4172,8 +4171,7 @@
       "strong": "강함",
       "tooWeak": "너무 약함"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "노트 {{count}}개 내보냄 → {{label}}",
       "exported_other": "노트 {{count}}개 내보냄 → {{label}}",
