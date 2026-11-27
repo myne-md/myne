@@ -146,6 +146,10 @@ export function capabilitiesFor(
           args: [
             `--user-data-dir=${profileDir}`,
             ...(headless ? ["--headless=new"] : []),
+            // The suite asserts English UI text, and the app follows
+            // `navigator.language`; a tr-TR host otherwise renders Turkish and
+            // fails a correct build (e2e-web/unlock-from-fixture).
+            "--lang=en-US",
             // The container runs as root and Chrome refuses to start without
             // this there. Harmless elsewhere: the sandbox it disables protects
             // the HOST from the page, and the page here is our own bundle
@@ -168,6 +172,10 @@ export function capabilitiesFor(
             // without them, and a suite that silently tested a different code
             // path would be worse than one that failed.
             "dom.fs.enabled": true,
+            // Same reason as Chrome's --lang: the scenarios assert English
+            // strings, and the app reads `navigator.language`.
+            "intl.locale.requested": "en-US",
+            "intl.accept_languages": "en-US,en",
           },
         },
       };
