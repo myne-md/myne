@@ -747,7 +747,9 @@ export function McpSection({
                             : {}),
                       }}
                     >
-                      {done ? <Icon name="circle-check" size={14} /> : String(step)}
+                      {/* The disc is already the shape; `circle-check` inside it
+                          drew a second, thinner circle. */}
+                      {done ? <Icon name="check" size={13} /> : String(step)}
                     </span>
                     <span
                       style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
