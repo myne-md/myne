@@ -977,7 +977,11 @@ if (isMain) {
     // in a clean checkout was refused by a document that checkout cannot have. A guard
     // that cannot read its own report has nothing to judge, which is what the note says.
     let reportStale = false;
-    if (!existsSync(REPORT_PATH)) {
+    // A missing report is only "this checkout cannot have it" when its directory is
+    // absent too. When docs/dev/ exists but duplication.md does not, the report was
+    // deleted, which is stale rather than absent — match the --emit branch's
+    // `existsSync(dirname(REPORT_PATH))` test for the same checkout-capability question.
+    if (!existsSync(dirname(REPORT_PATH))) {
       console.log(
         `note: the report this gate compares against is not in this checkout (looked for ` +
           `${REPORT_PATH}), so the staleness half did not run`,
