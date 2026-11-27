@@ -21,6 +21,7 @@
 import { setCustomTheme, type ThemeChoice } from "./prefs";
 import { applyOrnamentAttributes, clearOrnamentAttributes } from "@myne/ornaments";
 import { readAppearanceCanon } from "./themeCanon";
+import { isDarkBackground } from "./syntaxTheme";
 import { clampPalette, readMeasureDefaults } from "./themeMeasure";
 import type { ThemePalette } from "./themes";
 
@@ -93,7 +94,9 @@ export function applyCustomTheme(palette: Record<string, string>): void {
   // built-in happened to be active: a dark theme applied while Light was on still
   // needs the dark canon for the families it omits.
   const canon = readAppearanceCanon(root, palette);
+  const dark = isDarkBackground(palette["--paper"] ?? "");
   root.removeAttribute("data-theme");
+  root.style.setProperty("color-scheme", dark ? "dark" : "light");
   // Colour and ornament keys pass through untouched; measure keys are bounded to
   // 0.5×–2× of their default, and one that cannot be bounded (unit mismatch, no
   // known default) is skipped rather than painted unbounded — an unusable window
@@ -115,6 +118,7 @@ export function applyCustomTheme(palette: Record<string, string>): void {
       keys.push(key);
     }
   }
+  keys.push("color-scheme");
   appliedCustomKeys = keys;
 }
 
@@ -122,6 +126,7 @@ export function applyCustomTheme(palette: Record<string, string>): void {
 export function clearCustomTheme(): void {
   const root = document.documentElement;
   for (const key of appliedCustomKeys) root.style.removeProperty(key);
+  root.style.removeProperty("color-scheme");
   appliedCustomKeys = [];
   // Off with the palette: a leftover attribute would keep a locked screen wearing
   // the vault's ornament (A6), exactly like a leftover variable.

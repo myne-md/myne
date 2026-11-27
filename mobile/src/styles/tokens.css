@@ -356,9 +356,11 @@ a:focus-visible,
    The default WebKit scrollbar is ~15px and reads as a heavy bar. Slim it to
    a ~4px thumb (10px track minus a 3px transparent padding-box border) with a
    transparent track, app-wide. Firefox/standards via `scrollbar-width`. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-2) transparent;
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-2) transparent;
+  }
 }
 ::-webkit-scrollbar {
   width: 10px;

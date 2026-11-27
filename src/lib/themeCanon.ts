@@ -139,3 +139,5 @@ export function readAppearanceCanon(
   else root.setAttribute("data-theme", previous);
   return canon;
 }
+
+export { isDarkBackground } from "./syntaxTheme";
