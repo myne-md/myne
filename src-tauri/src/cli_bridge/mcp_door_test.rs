@@ -786,16 +786,16 @@ fn a_malformed_call_is_answered_with_invalid_request() {
             "tool": "note_search",
             "arguments": {},
         }),
-        // A verb this build does not implement. `note_set_field` is kept as the
-        // example because it is a name a newer shim could plausibly send: it left the
-        // catalog when the surface stopped advertising what it cannot serve, and the
-        // host still answers an unknown name as version skew rather than as a scope
-        // refusal.
+        // A verb this build does not implement, as `note_delete`: a name a newer shim
+        // could plausibly send and neither the catalog nor the dispatch table carries.
+        // This row used `note_set_field` while that verb was advertised and unserved,
+        // which would now answer `invalid_request` for a missing argument and exercise
+        // nothing about version skew — the one answer this row exists for.
         json!({
             "cmd": "mcp_call",
             "connection": CONNECTION,
-            "tool": "note_set_field",
-            "arguments": { "note_id": "x", "field": "f", "value": "v" },
+            "tool": "note_delete",
+            "arguments": { "note_id": "x" },
         }),
         // A WRITE verb this build does implement, missing its required fields:
         // malformed, not version skew. The two are different answers, and a test

@@ -259,8 +259,8 @@ impl McpNoteSource for VaultNoteSource<'_> {
             .saved_views
             .into_iter()
             .map(|view| ViewRow {
-                view_id: view.id,
-                name: view.name,
+                view_id: view.id.clone(),
+                name: view.name.clone(),
                 view_type: match view.view_type {
                     protocol::saved_view::ViewType::Table => "table",
                     protocol::saved_view::ViewType::Cards => "cards",
@@ -268,6 +268,11 @@ impl McpNoteSource for VaultNoteSource<'_> {
                     protocol::saved_view::ViewType::Board => "board",
                 }
                 .to_string(),
+                // The same predicate the field write uses, so "approved" here and the
+                // refusal there cannot disagree: one implementation, in the protocol
+                // crate, reading the same stored map.
+                approved: protocol::view_manifest::is_view_approved(&prefs.view_approvals, &view),
+                write_fields: view.write_fields.clone(),
             })
             .collect())
     }

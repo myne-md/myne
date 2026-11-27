@@ -1499,10 +1499,21 @@ fn view_list_answers_the_stored_rows_and_runs_no_filter() {
         view_id: "v1".into(),
         name: "Reading".into(),
         view_type: "table".into(),
+        approved: true,
+        write_fields: vec!["status".into()],
     }];
     let rows = block_on(view_list(&scope(), &source)).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].name, "Reading");
+    // The two facts `note_set_field`'s refusals send the caller here for: without
+    // them a client told "not approved" or "field not declared" would get the same
+    // undecorated list back and retry the same ids.
+    assert!(rows[0].approved, "the approval state must reach the caller");
+    assert_eq!(
+        rows[0].write_fields,
+        vec!["status".to_string()],
+        "the declared fields must reach the caller"
+    );
     assert_eq!(rows[0].view_type, "table");
 }
 
@@ -1556,6 +1567,8 @@ fn every_read_answer_carries_an_object_in_structured_content() {
         view_id: "v1".to_string(),
         name: "Reading".to_string(),
         view_type: "table".to_string(),
+        approved: true,
+        write_fields: vec!["status".to_string()],
     });
 
     // The verbs whose answer IS a list.
@@ -1646,6 +1659,8 @@ fn every_served_verb_answers_a_call_tool_result_a_client_can_parse() {
         view_id: "v1".into(),
         name: "Reading".into(),
         view_type: "table".into(),
+        approved: true,
+        write_fields: vec!["status".into()],
     });
 
     let cases = [

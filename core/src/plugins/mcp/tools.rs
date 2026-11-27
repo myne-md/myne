@@ -205,6 +205,10 @@ pub struct FileRow {
 }
 
 /// One saved view as `view_list` hands it over.
+///
+/// The last two fields exist because `note_set_field`'s refusals send the caller
+/// here: a client told "not approved" or "field not declared" has to be able to
+/// answer those two questions from this list, or it retries the same ids.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewRow {
@@ -214,6 +218,12 @@ pub struct ViewRow {
     pub name: String,
     /// `table` / `cards` / `list`.
     pub view_type: String,
+    /// Whether this device has approved the view's CURRENT definition, which is the
+    /// precondition a field write needs.
+    pub approved: bool,
+    /// The frontmatter fields the view declares writable, in the order it declares
+    /// them. Empty means the view writes nothing.
+    pub write_fields: Vec<String>,
 }
 
 /// `attachment_list`'s arguments.
@@ -363,7 +373,13 @@ pub async fn note_search(
         // it is dropped rather than handed back with an unknown provenance. The
         // note itself is asked for the ids the snapshot has not caught up with,
         // which is how a note this door created is findable by the next search.
-        let Some(facts) = facts_for(&records, source, &hit.note_id).await? else {
+        // Dropped rather than propagated, like a note deleted mid-search: a note whose
+        // own bytes cannot be read is not a row. A lock cannot hide here — `records()`
+        // above has already failed the call if the vault is shut.
+        let Some(facts) = facts_for(&records, source, &hit.note_id)
+            .await
+            .unwrap_or(None)
+        else {
             continue;
         };
         // The liveness rule every note surface in the app applies, at the one

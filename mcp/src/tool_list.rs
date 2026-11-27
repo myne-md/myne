@@ -418,8 +418,11 @@ pub fn catalog() -> Vec<Value> {
         }),
         json!({
             "name": "view_list",
-            "description": "List the vault's saved views: each view's id, its name and the \
-                kind of view it is. Listing does not run the view, so this returns no note \
+            "description": "List the vault's saved views: each view's id, its name, the kind of \
+                view it is, whether this device has approved it, and which frontmatter \
+                fields it declares writable. That last pair is what note_set_field needs: \
+                an unapproved view cannot authorise a write, and a view authorises only the \
+                fields it declares. Listing does not run the view, so this returns no note \
                 ids and reads no note. Read-only.",
             "inputSchema": {
                 "type": "object",
@@ -431,7 +434,8 @@ pub fn catalog() -> Vec<Value> {
                 "properties": {
                     "items": {
                         "type": "array",
-                        "description": "One entry per saved view: its id, its name and its kind."
+                        "description": "One entry per saved view: its id, its name, its kind, \
+                            whether this device approved it, and the fields it declares writable."
                     }
                 },
                 "required": ["items"]
