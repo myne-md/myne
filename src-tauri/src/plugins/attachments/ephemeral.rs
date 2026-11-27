@@ -20,23 +20,22 @@
 //! untouched: an image never leaves the device, only the reading of it does, the
 //! same way an imported document's text already does.
 
-use base64::engine::general_purpose::STANDARD as B64;
-use base64::Engine as _;
 use myne_core::plugins::attachments::commands::MAX_ATTACHMENT_IMPORT_LEN;
 use myne_core::plugins::attachments::extract_types::ExtractStatus;
 use myne_core::plugins::attachments::sniff::sniff_content_type;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-/// Where the bytes came from. The webview sends `bytes_b64` (a picked file, a
-/// pasted image, a capture from `<input capture>`); `path` exists for the drag
-/// and drop lane, where the host already holds a path and marshalling 64 MiB
-/// through the webview would be a copy for nothing.
+/// Where the bytes came from. The webview sends `bytes` (a picked file, a pasted
+/// image, a capture from `<input capture>`) in the SAME shape `attachment_import`
+/// takes, so one marshalling contract serves both; `path` exists for the drag and
+/// drop lane, where the host already holds a path and copying 64 MiB through the
+/// webview would be a copy for nothing.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EphemeralSource {
-    BytesB64 {
-        bytes_b64: String,
+    Bytes {
+        bytes: Vec<u8>,
         filename: Option<String>,
     },
     Path {
@@ -67,8 +66,6 @@ pub enum EphemeralError {
     Oversize { cap_bytes: usize },
     /// The path lane could not read its file.
     Unreadable,
-    /// The base64 payload did not decode.
-    Malformed,
 }
 
 impl std::fmt::Display for EphemeralError {
@@ -77,7 +74,6 @@ impl std::fmt::Display for EphemeralError {
         match self {
             Self::Oversize { cap_bytes } => write!(f, "oversize:{cap_bytes}"),
             Self::Unreadable => f.write_str("unreadable"),
-            Self::Malformed => f.write_str("malformed"),
         }
     }
 }
@@ -120,20 +116,7 @@ fn read_source(
     source: EphemeralSource,
 ) -> Result<(Zeroizing<Vec<u8>>, Option<String>), EphemeralError> {
     match source {
-        EphemeralSource::BytesB64 {
-            bytes_b64,
-            filename,
-        } => {
-            // Reject before decoding when the encoding alone is over the cap:
-            // base64 inflates by 4/3, so this cannot refuse a legal payload.
-            if bytes_b64.len() > MAX_ATTACHMENT_IMPORT_LEN.saturating_mul(4) / 3 + 4 {
-                return Err(EphemeralError::Oversize {
-                    cap_bytes: MAX_ATTACHMENT_IMPORT_LEN,
-                });
-            }
-            let bytes = B64
-                .decode(bytes_b64.as_bytes())
-                .map_err(|_| EphemeralError::Malformed)?;
+        EphemeralSource::Bytes { bytes, filename } => {
             if bytes.len() > MAX_ATTACHMENT_IMPORT_LEN {
                 return Err(EphemeralError::Oversize {
                     cap_bytes: MAX_ATTACHMENT_IMPORT_LEN,
@@ -212,26 +195,14 @@ mod tests {
     }
 
     #[test]
-    fn an_oversize_base64_payload_is_refused_before_it_is_decoded() {
-        // Just over what the cap allows after the 4/3 inflation, and asserted
-        // WITHOUT `unwrap_err()`: the error's Debug would print the whole
-        // payload into a failing test's output.
-        let huge = "A".repeat(MAX_ATTACHMENT_IMPORT_LEN * 4 / 3 + 8);
-        let read = read_source(EphemeralSource::BytesB64 {
-            bytes_b64: huge,
+    fn a_payload_over_the_cap_is_refused() {
+        // Asserted WITHOUT `unwrap_err()`: the error's Debug would print the
+        // whole payload into a failing test's output.
+        let read = read_source(EphemeralSource::Bytes {
+            bytes: vec![0u8; MAX_ATTACHMENT_IMPORT_LEN + 1],
             filename: None,
         });
         assert!(matches!(read, Err(EphemeralError::Oversize { .. })));
-    }
-
-    #[test]
-    fn a_broken_payload_is_malformed_rather_than_empty() {
-        let err = read_source(EphemeralSource::BytesB64 {
-            bytes_b64: "!!!not base64!!!".into(),
-            filename: None,
-        })
-        .unwrap_err();
-        assert!(matches!(err, EphemeralError::Malformed));
     }
 
     #[test]

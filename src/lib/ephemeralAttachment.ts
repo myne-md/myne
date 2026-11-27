@@ -31,19 +31,6 @@ export interface EphemeralReading {
 /** The hosts cap a payload at the attachment cap (64 MiB); refuse earlier. */
 const MAX_DEVICE_BYTES = 64 * 1024 * 1024;
 
-/** Base64 of the whole file, which is what the bytes lane carries. */
-async function fileToBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  // Chunked because `String.fromCharCode(...bytes)` on a 6 MB photo blows the
-  // argument limit and throws a RangeError the user would meet as "failed".
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
-
 /**
  * Read one picked, pasted or photographed file without making an attachment.
  *
@@ -56,11 +43,13 @@ export async function readEphemeralFile(file: File): Promise<EphemeralReading> {
   if (file.size > MAX_DEVICE_BYTES) {
     return { name: file.name, text: "", status: "failed", char_count: 0, truncated: false };
   }
-  const bytes_b64 = await fileToBase64(file);
+  // The same byte-array shape `attachment_import` takes, so one marshalling
+  // contract serves both lanes and no base64 step can disagree about padding.
+  const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
   return await invoke<EphemeralReading>("plugin:attachments|attachment_extract_ephemeral", {
     source: {
-      kind: "bytes_b64",
-      bytes_b64,
+      kind: "bytes",
+      bytes,
       filename: file.name === "" ? null : file.name,
     },
   });

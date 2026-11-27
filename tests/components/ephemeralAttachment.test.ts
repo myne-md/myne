@@ -31,7 +31,7 @@ describe("the composer's device lane", () => {
     // folder, no scope — just the bytes and the name the composer shows.
     expect(command).toBe("plugin:attachments|attachment_extract_ephemeral");
     expect(payload).toEqual({
-      source: { kind: "bytes_b64", bytes_b64: "AQID", filename: "receipt.png" },
+      source: { kind: "bytes", bytes: [1, 2, 3], filename: "receipt.png" },
     });
   });
 
