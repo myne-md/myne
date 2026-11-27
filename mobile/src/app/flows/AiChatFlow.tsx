@@ -25,7 +25,7 @@
 // land a finished run's proposal is reported and not applied, which is the
 // honest intermediate state rather than a silent write.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "@myne/i18n";
@@ -34,6 +34,7 @@ import { providerLabelOf } from "@myne/copy";
 import { normalizeProviderError, providerErrorKey } from "@myne/engine-error";
 import type { ProviderErrorCause } from "@myne/engine-error";
 import { RunCostLine } from "@myne/run-cost-line";
+import { readEphemeralFile, type EphemeralReading } from "@myne/ephemeral-attachment";
 import {
   beginRun,
   currentRunEpoch,
@@ -99,6 +100,16 @@ function proposalOf(s: AgentSummaryJson | undefined): FrozenProposal | null {
     ? s.proposal
     : null;
 }
+
+const DEVICE_CHIPS_STYLE: CSSProperties = {
+  flex: "none",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "var(--space-1)",
+  padding: "var(--space-2) var(--space-3) 0",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-2)",
+};
 
 const COMPOSER_BAR: CSSProperties = {
   flex: "none",
@@ -290,6 +301,15 @@ export function AiChatFlow({
   const [diffProposal, setDiffProposal] = useState<FrozenProposal | null>(null);
   const [revertConfirmRunId, setRevertConfirmRunId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  /** Read for this message and never stored: a receipt photographed on the way
+   *  into a question. `{ name, text }` is the payload an imported document
+   *  contributes, so the run cannot tell the two apart. */
+  const [deviceDocs, setDeviceDocs] = useState<EphemeralReading[]>([]);
+  const [readingDevice, setReadingDevice] = useState(false);
+  /** Why the last pickup produced nothing. A caption above the composer, which
+   *  is where the chips that would have appeared are. */
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+  const deviceInput = useRef<HTMLInputElement | null>(null);
   // The task the run in flight was started with, so the surface can show what
   // was asked while the answer is still coming. Not in the store: the store is
   // the RUN's state and this is the composer's memory of its own send.
@@ -546,6 +566,43 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
     if (activeId === null && id !== null) setActiveId(id);
   }
 
+  /** Read picked or shot files WITHOUT importing them. The host extracts on
+   *  this device, so no attachment exists afterwards; only the reading is sent. */
+  const readDeviceFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      setDeviceError(null);
+      setReadingDevice(true);
+      try {
+        const readings: EphemeralReading[] = [];
+        for (const file of files) {
+          let reading: EphemeralReading;
+          try {
+            reading = await readEphemeralFile(file);
+          } catch {
+            setDeviceError(t("agent.attachments.deviceFailed"));
+            continue;
+          }
+          if (reading.status !== "ok" || reading.text.trim() === "") {
+            setDeviceError(
+              reading.status === "unsupported"
+                ? t("agent.attachments.deviceUnsupported", { name: reading.name })
+                : t("agent.attachments.noText", { name: reading.name }),
+            );
+            continue;
+          }
+          readings.push(reading);
+        }
+        if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings]);
+      } finally {
+        setReadingDevice(false);
+        // Or picking the same file twice fires no `change` event.
+        if (deviceInput.current !== null) deviceInput.current.value = "";
+      }
+    },
+    [t],
+  );
+
   const send = useCallback(async () => {
     const task = draft.trim();
     if (task.length === 0 || agent.running || grant === null) return;
@@ -565,6 +622,10 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
     // settle path reads it to decide whether to fall back to the live transcript,
     // which is exactly what this client wants.
     beginRun(null);
+    // The chips go with the message that carried them: a reading that stayed on
+    // screen after its run started would read as still waiting to be sent.
+    setDeviceDocs([]);
+    setDeviceError(null);
     // Captured BEFORE the await, which is the whole contract of the epoch: a
     // reply that lands after the user locked the vault, switched vault or
     // started another run must be dropped rather than repopulate the store.
@@ -592,12 +653,11 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         // keeps the verb inert rather than half-wired. The day a setting row
         // lands in `AiReviewFlow`, this becomes `offeredSettingIds()`.
         [],
-        // **No documents, because this client has no picker** (myne-md/myne#913).
-        // The parameter exists on both clients so the shared binding's argument
-        // order is one thing; a phone that sent nothing here would be reading a
-        // file it was never handed. When the flow grows an attach control, this
-        // is the argument it fills.
-        [],
+        // **The device lane** (myne-md/myne#913, #1052): files read on this phone
+        // and never imported, so a photographed receipt can be ASKED about
+        // without becoming a blob, a catalog row and a sync entry. Already text,
+        // so there is no vault read here and nothing to await.
+        deviceDocs.map((doc) => ({ name: doc.name, text: doc.text })),
         // The run becomes addressable here, long before the promise resolves.
         // Without it Stop has no id for the whole first leg.
         (view) => void openRun(view, epoch),
@@ -1011,7 +1071,59 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         ) : null}
       </div>
 
+      {deviceDocs.length > 0 || readingDevice || deviceError !== null ? (
+        <div data-testid="ai.composer-device-attachments" style={DEVICE_CHIPS_STYLE}>
+          {deviceDocs.map((doc) => (
+            <span key={doc.name} data-testid="ai.composer-device-attachment" data-device-name={doc.name}>
+              <Icon name="file-text" size={12} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {doc.name}
+              </span>
+              <span style={{ color: "var(--fg-3)" }}>{t("agent.attachments.deviceOnly")}</span>
+              <Button
+                variant="ghost"
+                full={false}
+                data-testid="ai.composer-device-attachment-remove"
+                aria-label={t("agent.attachments.remove", { name: doc.name })}
+                onClick={() => setDeviceDocs((rows) => rows.filter((row) => row.name !== doc.name))}
+                style={{ padding: "0 var(--space-1)", height: 24 }}
+              >
+                <Icon name="x" size={12} />
+              </Button>
+            </span>
+          ))}
+          {readingDevice ? (
+            <span data-testid="ai.composer-device-pending">{t("agent.attachments.readingDevice")}</span>
+          ) : null}
+          {deviceError !== null ? (
+            <span data-testid="ai.composer-device-error" style={{ color: "var(--danger)" }}>
+              {deviceError}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <div style={COMPOSER_BAR}>
+        <input
+          ref={deviceInput}
+          type="file"
+          accept="image/*,application/pdf,.md,.txt,.docx"
+          capture="environment"
+          multiple
+          hidden
+          data-testid="ai.composer-device-input"
+          onChange={(event) => void readDeviceFiles(Array.from(event.currentTarget.files ?? []))}
+        />
+        <Button
+          variant="ghost"
+          full={false}
+          data-testid="ai.composer-device"
+          aria-label={t("agent.attachments.fromDevice")}
+          onClick={() => deviceInput.current?.click()}
+          style={{ flex: "none", padding: "0 var(--space-2)", height: 44 }}
+        >
+          <Icon name="image-plus" size={20} />
+        </Button>
         <textarea
           data-testid="ai.composer-input"
           // A placeholder is not an accessible name: it disappears on input,

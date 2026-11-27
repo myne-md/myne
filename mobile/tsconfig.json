@@ -75,6 +75,7 @@
       "@myne/agent-store": ["../src/notes/agent/agentStore.ts"],
       "@myne/agent-run-core": ["../src/lib/agent-run-core.ts"],
       "@myne/run-cost-line": ["../src/notes/agent/components/RunCostLine.tsx"],
+      "@myne/ephemeral-attachment": ["../src/lib/ephemeralAttachment.ts"],
       "@myne/field-label": ["../src/components/primitives/FieldLabel.tsx"],
       "@myne/undo-last-run": ["../src/notes/agent/useUndoLastRun.ts"],
       "@myne/engine-error": ["../src/lib/engine-error.ts"],

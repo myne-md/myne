@@ -284,6 +284,10 @@ export default defineConfig(async () => ({
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      // The composer's device lane, shared for the reason the cost line is: one
+      // contract with the host (`bytes`, never a vault write) and one place it
+      // is spelled, so desktop and phone cannot drift about what is sent.
+      { find: /^@myne\/ephemeral-attachment$/, replacement: sib("../src/lib/ephemeralAttachment.ts") },
       // The two label treatments a form or a settings panel needs — the small
       // uppercase caption over a control and the heading over a group (myne-md/myne#995).
       // Shared rather than re-declared: the caption existed ELEVEN times under
