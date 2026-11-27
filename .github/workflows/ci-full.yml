@@ -47,6 +47,7 @@ jobs:
       # own control cannot tell the two apart at this sample size). It runs in
       # the separate, non-blocking `timing` job on the full battery.
       - run: cargo test -p protocol --no-fail-fast -- --skip dudect_decode_timing_independent_of_key_bytes
+      - run: cargo test -p myne-mcp -p myne-cli -p theme-validator --no-fail-fast
       - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
       - run: cargo clippy -p myne-web-wasm --target wasm32-unknown-unknown -- -D warnings
       - run: cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
@@ -89,26 +90,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/check-platform-seam.mjs
-      - run: node scripts/check-plain-surface-imports.mjs
-      - run: node scripts/check-core-task-seam.mjs
-      - run: node scripts/check-core-io-seam.mjs
-      - run: node scripts/check-version-routing.mjs
-      - run: node scripts/check-crypto-registries.mjs
-      - run: node scripts/check-prefs-nonce.mjs
-      - run: node scripts/check-device-actor.mjs
-      - run: node scripts/check-sync-authority.mjs
-      - run: node scripts/check-datetime-display-publisher.mjs
-      - run: node scripts/check-clipboard-feedback.mjs
-      - run: node scripts/check-unwired.mjs
-      - run: node scripts/check-ipc-binding-callers.mjs
-      - run: node scripts/check-export-callers.mjs
-      - run: node scripts/check-tracing-discipline.mjs
-      - run: node scripts/check-comment-density.mjs
-      - run: node scripts/check-copy-membership.mjs
-      - run: node scripts/check-private-path-refs.mjs
-      - run: node scripts/check-fdroid-metadata.mjs
-      - run: bash scripts/hooks-parity-check.sh
+      - run: bash scripts/ci-guards.sh
 
   web:
     runs-on: ubuntu-24.04

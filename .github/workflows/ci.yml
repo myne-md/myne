@@ -33,6 +33,7 @@ jobs:
       - run: pnpm build
       - run: node scripts/check-build-notices.mjs
       - run: pnpm test
+      - run: pnpm test:seam:desktop
 
   rust:
     runs-on: ubuntu-24.04
@@ -55,6 +56,7 @@ jobs:
       # gate: a loaded shared runner produces a false TIMING LEAK. It runs in
       # the separate, non-blocking `timing` job on the full battery.
       - run: cargo test -p protocol -- --skip dudect_decode_timing_independent_of_key_bytes
+      - run: cargo test -p myne-mcp -p myne-cli -p theme-validator --no-fail-fast
       - run: cargo clippy -p protocol -p myne-core --all-targets -- -D warnings
       - run: node scripts/gen-rust-third-party-licenses.mjs
       - run: node scripts/check-build-notices.mjs --rust-only
@@ -109,7 +111,25 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm stories:test
       - run: pnpm stories:build
       - run: node scripts/check-stories-bundle.mjs
       - run: pnpm stories:build:public
       - run: node scripts/check-stories-public-bundle.mjs
+
+  guards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: bash scripts/ci-guards.sh

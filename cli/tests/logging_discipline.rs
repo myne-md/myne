@@ -162,12 +162,21 @@ impl FakeDesktop {
             .spawn()
             .expect("spawn the myne binary");
         if let Some(text) = stdin {
-            child
+            // A usage error can exit before this write; the child closing stdin
+            // first is EPIPE, not a test failure. The assertions below still
+            // check the exit code and the diagnostics.
+            if let Err(err) = child
                 .stdin
                 .take()
                 .expect("piped stdin")
                 .write_all(text.as_bytes())
-                .expect("write stdin");
+            {
+                assert_eq!(
+                    err.kind(),
+                    std::io::ErrorKind::BrokenPipe,
+                    "write stdin: {err}"
+                );
+            }
         }
         let output = child.wait_with_output().expect("wait for myne");
         Run {

@@ -43,6 +43,7 @@ const BINARY = ["pkgname=myne-bin", "pkgver=0.11.4", "pkgrel=1", ""].join("\n");
 const run = (over = {}) =>
   audit({
     flakeText: FLAKE,
+    packageJsonText: null,
     sourcePkgbuildText: pkgbuild(),
     binaryPkgbuildText: BINARY,
     ...over,
