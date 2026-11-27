@@ -4142,6 +4142,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 <div style={{ flex: 1 }} />
               )
             ) : (treeMode ? treeEmpty && !favStripVisible : orderedNotes.length === 0 && !archiveHasFolders && !inArchiveFolder) && !listError ? (
+              // Centred in the pane rather than hugging its top: the state is
+              // what the pane IS while there is nothing in it, so it holds the
+              // middle the list will fill. No wash (`field={false}`) and no
+              // `fill`: on a 316pt tablet pane the accent gradient read as a
+              // glowing box and a filled state stretched a two-line message
+              // down the whole column (owner, 2026-11-27 round 4).
               // **The app's one zero state, not a fourth one** (myne-md/myne#970
               // items 4 and 25). This block used to be its own layout: a bold
               // sentence, a grey line, no glyph, no wash, and a centred column
@@ -4162,10 +4168,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               // `firstRun` is the honest variant for all three views. An empty
               // Archive is not an error and not a filtered result; it is the
               // collection at rest.
+              <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: "var(--space-6)" }}>
               <EmptyState
                 variant="firstRun"
                 size="md"
                 frame={false}
+                field={false}
                 glyph={
                   <Icon
                     name={listView === "trash" ? "trash" : listView === "archive" ? "archive" : "file-text"}
@@ -4183,6 +4191,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 }
                 testId="editor.list-empty"
               />
+              </div>
             ) : treeMode ? (
               <ScreenScroll style={{ marginTop: 4 }} ref={treeScrollRef}>
                 {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} onHold={setRowActions} />}

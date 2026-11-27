@@ -326,7 +326,13 @@ export function AttachmentsSheet({
             <Spinner />
           </div>
         ) : entries.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
+          // No wash and no stretch: the message holds the middle of the pane the
+          // list will occupy (owner, 2026-11-27 round 4), rather than sitting as
+          // a caption under the header.
+          <div style={{ // `height: 100%` (not `minHeight`) because the scroll container around it is a
+          // block box with a definite height: a percentage resolves there and the
+          // message truly holds the middle of the pane.
+          height: "100%", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
             {t("attachments.emptyState")}
           </div>
         ) : (
