@@ -101,7 +101,10 @@ export function TaskSurface({
         // desktop geometry). On a phone that 4pt shows as rows riding left of the
         // search field, so the host closes the gap instead of forking either
         // padding.
-        paddingInline: "var(--space-1)",
+        // The shared panel insets its rows 8pt and its toolbar 12pt; the phone
+        // closes that 4pt through the row gutter var so checkboxes and the
+        // search field share one left edge (owner, 2026-11-27 round 4).
+        ["--task-row-gutter" as string]: "var(--space-1)",
       }}
     >
       <TaskListPanel

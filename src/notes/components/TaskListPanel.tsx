@@ -497,7 +497,8 @@ const HEADER_BASE: CSSProperties = {
   gap: "var(--space-2)",
   boxSizing: "border-box",
   height: TASK_ROW_HEIGHT - 2,
-  padding: "0 8px",
+  // Same gutter var as the rows, so headings and rows share one edge.
+  padding: "0 calc(8px + var(--task-row-gutter, 0px))",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-xs)",
   fontWeight: 600,

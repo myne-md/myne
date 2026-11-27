@@ -3946,7 +3946,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 // rail absorbs it), so this row IS the top of the page and owes
                 // the status bar its clearance. Without it the title drew under
                 // the clock on an iPad (owner, 2026-11-27 round 3).
-                padding: `${chrome.header ? 8 : LIST_TOP} 20px 0`,
+                padding: `${chrome.header ? "8px" : LIST_TOP} 20px 0`,
               }}
             >
               {listView !== "notes" && sizeClass !== "expanded" && (

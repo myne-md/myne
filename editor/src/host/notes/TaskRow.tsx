@@ -201,7 +201,10 @@ const ROW_STYLE: CSSProperties = {
   // their natural (two-line) height (myne-md/myne#656 review).
   width: "100%",
   boxSizing: "border-box",
-  padding: "var(--space-1) 8px",
+  // The horizontal gutter is a VAR with a 0 fallback: desktop renders the row
+  // exactly as it always has, and a host whose toolbar sits further in (the
+  // phone's task list) raises it so rows and toolbar share one edge.
+  padding: "var(--space-1) calc(8px + var(--task-row-gutter, 0px))",
   borderRadius: "var(--radius-2, 6px)",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
