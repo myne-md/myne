@@ -50,6 +50,17 @@ jobs:
       - run: pnpm sidecar:release
       - name: Build unsigned bundle
         run: pnpm tauri build --bundles deb,appimage --config src-tauri/tauri.nightly.conf.json
+      - name: Build the Arch nightly package
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          DEB="$(find target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          mkdir -p target/release/bundle/arch
+          docker run --rm \
+            -v "$PWD:/src:ro" \
+            -v "$PWD/target/release/bundle/arch:/out" \
+            -v "$(dirname "$DEB"):/deb:ro" \
+            archlinux:base-devel \
+            /src/packaging/arch/nightly-container.sh "/deb/$(basename "$DEB")" "$VERSION" "$GITHUB_SHA"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: myne-linux-${{ github.sha }}
@@ -58,6 +69,65 @@ jobs:
             target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
           retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: myne-arch-${{ github.sha }}
+          path: target/release/bundle/arch/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev \
+            patchelf desktop-file-utils libfuse2
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sidecar:release
+      - name: Build unsigned bundle
+        run: pnpm tauri build --bundles deb,appimage --config src-tauri/tauri.nightly.conf.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: myne-linux-arm64-${{ github.sha }}
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  nix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@d698718aa798980d17dd749f03beae0b51183399 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      # The flake is deliberately source-only: it has devShells and no
+      # packages/apps. This checks the NixOS entry point without pretending a
+      # prebuilt Nix package exists.
+      - run: nix flake check --no-build
+      - run: nix develop --command pnpm --version
 
   macos:
     runs-on: macos-15
