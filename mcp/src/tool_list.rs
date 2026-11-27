@@ -234,9 +234,10 @@ pub fn catalog() -> Vec<Value> {
             "description": "Set one frontmatter field on a note, leaving every other field and \
                 the note body untouched. The write is authorised by a saved view: the view must \
                 be approved on this device and must declare the field writable, so call \
-                view_list first and pass the id it reports. A field that marks a note as \
-                trashed, deleted, archived, a template or a conflict is refused: this surface \
-                has no delete.",
+                view_list first and pass the id it reports. The five fields that move a note \
+                out of Myne's note list (trashed, deleted, archived, template, conflict) are \
+                refused, and `folder` is refused because that is a move: this surface has no \
+                delete and no second way to move a note.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -251,7 +252,9 @@ pub fn catalog() -> Vec<Value> {
                     },
                     "field": {
                         "type": "string",
-                        "description": "Name of the frontmatter field to set, as a plain key."
+                        "description": "Name of the frontmatter field to set, as a plain key. \
+                            `folder` is refused: call note_move, which checks both the folder the \
+                            note leaves and the one it lands in."
                     },
                     "value": {
                         "type": "string",

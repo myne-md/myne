@@ -96,9 +96,13 @@ pub struct NoteSetFieldRequest {
     /// The saved view whose approved declaration authorises this write, as
     /// `view_list` reports it.
     pub view_id: String,
-    /// The frontmatter field to set. Must be a plain key, and must not be one of
-    /// the working-set markers (`archived`, `trashed`, `deleted`, `template`,
-    /// `conflict`): this surface has no delete, so no verb may produce one.
+    /// The frontmatter field to set. Must be a plain key.
+    ///
+    /// Two names are refused: the five working-set markers (`trashed`, `deleted`,
+    /// `archived`, `template`, `conflict`), because setting one is how a note leaves
+    /// the note list and this surface has no delete; and `folder`, because that is a
+    /// move and `note_move` is the verb that checks both the folder a note leaves and
+    /// the one it lands in.
     pub field: String,
     /// The value to give the field.
     pub value: String,
@@ -332,6 +336,28 @@ pub async fn note_set_field(
 ) -> Result<WriteAnswer<SetFieldNote>, McpToolError> {
     read.require_granted()?;
     write.require_granted()?;
+    // Two field names this verb may not carry, checked before the note because both
+    // are request facts: a refusal costs no read and no restore point, and neither can
+    // become a proposal for something the surface will not do.
+    //
+    // `folder` is a MOVE, and this gate reads the note's CURRENT folder only, so a
+    // view declaring it writable would let a caller land the note anywhere — outside
+    // the write grant included. `note_edit` refuses the same outcome as
+    // [`McpToolError::EditWouldMove`], and the wording fits here too.
+    //
+    // The markers are the app's own working-set roster, and setting one is a delete in
+    // the only sense this surface could have. The host reserves three of the five and
+    // refuses them even when a view declares them; the two it does not reserve
+    // (`template`, `conflict`) are refused here, so the promise holds for all five.
+    let field = request.field.trim();
+    if field == "folder" {
+        return Err(McpToolError::EditWouldMove);
+    }
+    if crate::plugins::agent::hide::WORKING_SET_FIELDS.contains(&field) {
+        return Err(McpToolError::FieldReserved {
+            field: request.field.clone(),
+        });
+    }
     let folder_key = match gate_existing(read, write, &request.note_id, source, writer).await? {
         Gate::Queued(folder) => return Ok(WriteAnswer::Queued { folder }),
         Gate::Writable(folder) => folder,
@@ -388,6 +414,14 @@ pub(super) async fn check_existing(
             note_id: note_id.to_string(),
         });
     };
+    // The liveness rule before the scope, as every read verb applies it: a write gate
+    // that CONFIRMED a hidden note instead would let a client change a note it cannot
+    // read, and the fallback above is what made that reachable for unindexed notes.
+    if !facts.live {
+        return Err(McpToolError::UnknownNote {
+            note_id: note_id.to_string(),
+        });
+    }
     let folder_key = facts.folder_key();
     if !read.covers_key(&folder_key) {
         return Err(McpToolError::OutOfScopeNote {

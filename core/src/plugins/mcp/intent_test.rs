@@ -527,6 +527,94 @@ fn mcp_intent_set_field_snapshots_before_it_writes() {
 }
 
 #[test]
+fn mcp_intent_set_field_refuses_a_folder_write_before_it_reads_the_note() {
+    // Without this the verb is a move with only the note's CURRENT folder checked:
+    // `folder` is not in the host's reserved list, so a view could declare it.
+    let (read, write) = readable_except_private_writable_projects();
+    let source = Source::new(&[("n1", "Projects/", "---\nfolder: Projects/\n---\n\nBody.\n")]);
+    let writer = Writer::ok();
+
+    let error = block_on(note_set_field(
+        &read,
+        &write,
+        set_field("n1", "view-1", "folder", "Private/"),
+        &source,
+        &writer,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::EditWouldMove,
+        "a folder field is a move, and note_move is the verb that checks the destination"
+    );
+    assert!(
+        writer.calls().is_empty(),
+        "a refused request took a snapshot or wrote: {:?}",
+        writer.calls()
+    );
+}
+
+#[test]
+fn mcp_intent_set_field_refuses_every_working_set_marker() {
+    // The host reserves three of the five; `template` and `conflict` are not in that
+    // list, so the surface refuses all five for "no verb here can hide a note".
+    let (read, write) = readable_except_private_writable_projects();
+    let source = Source::new(&[("n1", "Projects/", "---\nfolder: Projects/\n---\n\nBody.\n")]);
+    for field in crate::plugins::agent::hide::WORKING_SET_FIELDS {
+        let writer = Writer::ok();
+        let error = block_on(note_set_field(
+            &read,
+            &write,
+            set_field("n1", "view-1", field, "true"),
+            &source,
+            &writer,
+        ))
+        .unwrap_err();
+        assert_eq!(
+            error,
+            McpToolError::FieldReserved {
+                field: field.to_string()
+            },
+            "{field} is a working-set marker and no verb here may set one"
+        );
+        assert!(writer.calls().is_empty(), "{field} reached the writer");
+    }
+}
+
+#[test]
+fn mcp_intent_a_write_to_a_hidden_note_the_index_has_not_seen_is_unknown() {
+    // The read verbs answer `unknown_note` for a note the sidebar hides; the write
+    // gate owes the same answer.
+    let (read, write) = readable_except_private_writable_projects();
+    let mut source = Source::new(&[(
+        "gone",
+        "Projects/",
+        "---\nfolder: Projects/\ntrashed: 2026-08-16T10:00:00Z\n---\n\nBody.\n",
+    )]);
+    source.records.clear();
+    let writer = Writer::ok();
+
+    let error = block_on(note_append(
+        &read,
+        &write,
+        append("gone", "more"),
+        &source,
+        &writer,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::UnknownNote {
+            note_id: "gone".into()
+        },
+        "a trashed note the index has not seen must read as unknown here too"
+    );
+    assert!(writer.calls().is_empty(), "a hidden note was written to");
+}
+
+#[test]
 fn mcp_intent_set_field_queues_a_readable_folder_not_named_for_writing() {
     let (read, write) = readable_except_private_writable_projects();
     let source = Source::new(&[("n1", "Inbox/", "---\nfolder: Inbox/\n---\n\nBody.\n")]);

@@ -71,6 +71,13 @@ use crate::plugins::notes::title_extract::extract_title_slices;
 /// is one line in one place.
 type Markers = [bool; 5];
 
+/// The working-set markers as FIELD NAMES, for a caller that has the name and not
+/// the note: a write verb handed `field` has no body to read yet, and setting one of
+/// these is how a note leaves the working set. Held to the TS authority by
+/// [`tests::the_roster_matches_is_live_note`], so it cannot drift from [`markers`].
+pub const WORKING_SET_FIELDS: [&str; 5] =
+    ["trashed", "deleted", "archived", "template", "conflict"];
+
 /// Read every working-set marker off a note body.
 fn markers(body: &str) -> Markers {
     let Some(fm) = extract_title_slices(body.as_bytes()).frontmatter_bytes else {
@@ -225,6 +232,18 @@ mod tests {
             markers("").len(),
             MARKER_LINES.len(),
             "every marker owes this file a test line"
+        );
+
+        // And the NAME roster a write verb reads, against the same authority. It is
+        // a third copy, so it is compared rather than trusted: a field added to
+        // `isLiveNote` must arrive here or a write verb could set a marker.
+        let named: BTreeSet<String> = WORKING_SET_FIELDS
+            .iter()
+            .map(|f| (*f).to_string())
+            .collect();
+        assert_eq!(
+            named, authority,
+            "WORKING_SET_FIELDS and the fields isLiveNote reads have diverged"
         );
     }
 
