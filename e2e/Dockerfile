@@ -46,7 +46,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Node 25.9.0 (.nvmrc pin), arch-aware (the dev Mac builds linux/arm64,
-# CI is linux/amd64) + pnpm 9 (CI convention: npm install, no corepack).
+# CI is linux/amd64) + pnpm 11.8.0 (root packageManager; CI convention:
+# npm install, no corepack).
 RUN ARCH="$(uname -m)" \
     && case "$ARCH" in \
          x86_64) NODE_ARCH=x64 ;; \
@@ -55,7 +56,7 @@ RUN ARCH="$(uname -m)" \
        esac \
     && curl -fsSL "https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-${NODE_ARCH}.tar.xz" \
        | tar -xJ -C /usr/local --strip-components=1 \
-    && npm install -g pnpm@9
+    && npm install -g pnpm@11.8.0
 
 # tauri-driver — exact pin (a new version is a deliberate bump here +
 # dev-notes/e2e.md note, not a drive-by).
