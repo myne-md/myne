@@ -864,4 +864,21 @@ describe("AiChatFlow: turn diff and revert icons (myne-md/myne#741)", () => {
     await waitFor(() => expect(screen.getByTestId("ai.composer-device-error")).toBeTruthy());
     expect(screen.queryByTestId("ai.composer-device-attachment")).toBeNull();
   });
+
+  it("keeps Send disabled while a device read is still in flight", async () => {
+    // readEphemeralFile never resolves: the reading is still running, so the
+    // composer must not let a stale draft be sent over it.
+    mockReadEphemeralFile.mockImplementation(() => new Promise(() => {}));
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { files: [new File([new Uint8Array([1, 2, 3])], "receipt.png", { type: "image/png" })] },
+      });
+    });
+    // The pending indicator shows the read is in flight.
+    await waitFor(() => expect(screen.getByTestId("ai.composer-device-pending")).toBeTruthy());
+    type("add this to my expenses");
+    expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(true);
+  });
 });

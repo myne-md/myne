@@ -605,7 +605,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
 
   const send = useCallback(async () => {
     const task = draft.trim();
-    if (task.length === 0 || agent.running || grant === null) return;
+    if (task.length === 0 || agent.running || grant === null || readingDevice) return;
     const verdict = await ensureCapability();
     // **The draft is cleared AFTER the gate, not before.** The refusal is
     // rendered by the notice below, and a user who switches provider and sends
@@ -707,7 +707,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
       ]);
       setAsked(null);
     }
-  }, [draft, agent.running, grant, t, ensureCapability, openTurns, activeId]);
+  }, [draft, agent.running, grant, t, ensureCapability, openTurns, activeId, readingDevice]);
 
   const stop = useCallback(() => {
     // The id may genuinely be null: the window between `beginRun()` and the
@@ -1150,7 +1150,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           <Button
             data-testid="ai.composer-send"
             full={false}
-            disabled={draft.trim().length === 0 || grant === null || probing || refused}
+            disabled={draft.trim().length === 0 || grant === null || probing || refused || readingDevice}
             onClick={() => void send()}
             style={{ flex: "none" }}
           >
