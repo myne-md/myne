@@ -88,7 +88,7 @@
     "core/src/plugins/mcp/budget.rs": 44,
     "core/src/plugins/mcp/budget_test.rs": 13,
     "core/src/plugins/mcp/commands.rs": 53,
-    "core/src/plugins/mcp/error.rs": 198,
+    "core/src/plugins/mcp/error.rs": 206,
     "core/src/plugins/mcp/host_adapters.rs": 224,
     "core/src/plugins/mcp/host_adapters_test.rs": 61,
     "core/src/plugins/mcp/intent.rs": 229,

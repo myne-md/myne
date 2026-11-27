@@ -393,17 +393,20 @@ impl McpToolError {
                 // echoes nothing it does not have. The remedy names where the switch
                 // is, because the connection tab is one tab in a panel the agent
                 // cannot see.
-                match verb.as_str() {
-                    "note_create" | "note_append" | "note_edit" | "note_move" => {
-                        "That change was switched off for this connection in Myne: ask the user to \
-                         turn it back on under Settings, AI, External access, then call this tool \
-                         again."
-                    }
-                    _ => {
-                        "Reading through that tool was switched off for this connection in Myne: \
-                         ask the user to turn it back on under Settings, AI, External access, then \
-                         call this tool again."
-                    }
+                //
+                // Asked of the dispatch table, not of a list written out here: the
+                // hand-enumerated copy this replaced named the four write verbs that
+                // existed then, so the fifth answered with the reading sentence.
+                if crate::plugins::mcp::tools::ToolName::from_wire(verb)
+                    .is_some_and(crate::plugins::mcp::tools::ToolName::is_write)
+                {
+                    "That change was switched off for this connection in Myne: ask the user to \
+                     turn it back on under Settings, AI, External access, then call this tool \
+                     again."
+                } else {
+                    "Reading through that tool was switched off for this connection in Myne: \
+                     ask the user to turn it back on under Settings, AI, External access, then \
+                     call this tool again."
                 }
             }
             McpToolError::BudgetExhausted {
@@ -522,6 +525,32 @@ mod tests {
             reasons.len(),
             "two variants share one wire label, so a client cannot tell them apart"
         );
+    }
+
+    #[test]
+    fn a_disabled_write_verb_is_told_it_was_a_change_and_a_read_verb_a_read() {
+        // Walks the catalog, so a sixth verb lands covered: the sentence decides the
+        // next action a person is asked to take.
+        for verb in crate::plugins::mcp::tools::CATALOG_VERBS {
+            let is_write = crate::plugins::mcp::tools::ToolName::from_wire(verb)
+                .is_some_and(crate::plugins::mcp::tools::ToolName::is_write);
+            let message = McpToolError::VerbDisabled {
+                verb: verb.to_string(),
+            }
+            .message();
+            assert_eq!(
+                message.starts_with("That change was switched off"),
+                is_write,
+                "{verb} answered with the wrong kind of switch: {message}"
+            );
+        }
+        // And a name the catalog does not carry still reads as a read, which is the
+        // conservative half: nothing was changed by a verb this build does not serve.
+        assert!(McpToolError::VerbDisabled {
+            verb: "note_delete".into()
+        }
+        .message()
+        .starts_with("Reading through that tool"));
     }
 
     #[test]
