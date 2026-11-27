@@ -318,23 +318,44 @@ export function CalendarEventForm({
     setRefusal(null);
   }, []);
 
-  const submit = useCallback(async () => {
+  const submit = useCallback(async (): Promise<boolean> => {
     const current = planEventForm(values, REMINDER_HORIZON_DAYS, {
       requireCalendar: mode === "create",
     });
     if (!current.ok) {
       setRefusal(current.refusal);
-      return;
+      return false;
     }
     setBusy(true);
     try {
       if (onSubmit !== undefined) await onSubmit(values);
       else await createEvent(current.input);
       onClose();
+      return true;
     } finally {
       setBusy(false);
     }
   }, [values, onSubmit, onClose]);
+
+  // "Open note" must not silently discard edits typed into the form: submit the
+  // pending edit first (so it lands on the note) and only then navigate. A clean
+  // form has nothing to save, so it just closes and opens the note. A failed
+  // submit (validation or I/O) leaves the form open with the refusal on screen
+  // instead of dropping the user's input.
+  const openNote = useCallback(async () => {
+    const dirty = JSON.stringify(values) !== JSON.stringify(initial);
+    try {
+      if (dirty) {
+        const ok = await submit();
+        if (!ok) return;
+      } else {
+        onClose();
+      }
+    } catch {
+      return;
+    }
+    onOpenNote?.();
+  }, [values, initial, submit, onClose, onOpenNote]);
 
   const allDay = values.startTime === null;
 
@@ -678,7 +699,7 @@ export function CalendarEventForm({
           {mode === "edit" && onOpenNote !== undefined ? (
             <Button
               variant="ghost"
-              onClick={onOpenNote}
+              onClick={() => void openNote()}
               data-testid="calendar.form.openNote"
               style={{ marginInlineEnd: "auto" }}
             >
