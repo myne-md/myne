@@ -37,7 +37,7 @@
     "@myne/dialect": "workspace:*",
     "@replit/codemirror-vim": "6.3.0",
     "d3-force": "3.0.0",
-    "dompurify": "3.4.10",
+    "dompurify": "3.4.17",
     "js-yaml": "4.3.2",
     "katex": "0.17.0",
     "mermaid": "11.15.0"
