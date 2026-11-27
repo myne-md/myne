@@ -106,8 +106,12 @@
    - `:not([role="menuitem"])`, so a menu is not a stack of filled bars: a row
      whose every sibling is filled has no affordance left, and the menu item is
      the one call site where "hoverable" is the whole signal. Hover still paints
-     one full step for it, like every other ghost button. */
-.myne-btn[data-variant="ghost"]:enabled:not([role="menuitem"]) {
+     one full step for it, like every other ghost button.
+   - `:not([role="tab"])`, because a tab strip is that same shape (2026-11-27: a
+     five-tab strip came back as five capsules, and a rail of thirty rows as
+     thirty). A tab's own idiom is a label over an underline and its hover is
+     ink; the call sites that still want a fill on hover ask for one. */
+.myne-btn[data-variant="ghost"]:enabled:not([role="menuitem"]):not([role="tab"]) {
   background: color-mix(in srgb, var(--bg-3) 70%, transparent);
 }
 .myne-btn[data-variant="ghost"] {
