@@ -1,41 +1,14 @@
 {
-  "accountBootstrap": {
-    "accountMismatch": "Deze browser bevat al de kluis van een ander account. Open die, of meld je eerst af en wis de kopie van deze browser.",
-    "changeAccount": "Een ander accountnummer gebruiken",
-    "continue": "Doorgaan",
-    "hint": "Voer het hoofdwachtwoord voor dit account in. Myne haalt je kluis op en stelt deze browser in als apparaat op je account.",
-    "noEndpoint": "Voor deze installatie van Myne is geen synchronisatieserver ingesteld, dus die kan je kluis niet bereiken. Neem contact op met degene die hem beheert.",
-    "passwordLabel": "Hoofdwachtwoord",
-    "approversIntro": "Deze apparaten kunnen dit apparaat goedkeuren:",
-    "noApprovers": "Geen enkel ander apparaat op dit account kan het nu goedkeuren. Open Myne op een apparaat dat al toegang heeft en kom daarna hier terug.",
-    "pendingStartOver": "Opnieuw beginnen met een ander account",
-    "pendingTitle": "Wachten op goedkeuring",
-    "sasMatch": "Ze komen overeen, doorgaan",
-    "sasMismatch": "Ze komen niet overeen",
-    "verifyBody": "Controleer of deze code op beide apparaten hetzelfde is voordat je doorgaat. Zo niet, stop dan: er is iets mis met de verbinding, niet met je wachtwoord.",
-    "verifyChanged": "De code is veranderd terwijl je keek. Vergelijk beide schermen opnieuw. Als hij blijft veranderen, stop dan en ga niet verder.",
-    "verifyTitle": "Vergelijk deze code",
-    "title": "Meld je aan bij je kluis",
-    "working": "Instellen…"
-  },
-  "accountEntry": {
-    "createAccount": "Ik heb nog geen account. Maak er een aan.",
-    "checkFailed": "Kon dat accountnummer niet controleren. Probeer het opnieuw.",
-    "checking": "Controleren…",
-    "continue": "Doorgaan",
-    "hint": "Het ziet eruit als MY-XXXX-XXXX-XXXX-XXXX-XXXX. Wordt hier op je apparaat gecontroleerd. Er wordt nog niets verzonden.",
-    "invalid": "Dat accountnummer is niet geldig. Controleer het en probeer het opnieuw.",
-    "title": "Voer je accountnummer in"
-  },
   "agent": {
     "composer": {
       "placeholder": "Vraag iets aan de AI…",
       "scopeLabel": "Werkt aan",
-      "scopeOpenNote": "Deze notitie",
       "scopeCount_one": "{{count}} notitie",
       "scopeCount_other": "{{count}} notities",
       "scopeCountUnavailable": "Hoeveel notities die map bevat, kon nu niet worden gecontroleerd.",
       "startFailed": "De agent kon niet starten.",
+      "modelCannotEdit": "Dit model kan de wijzigingen die de agentmodus nodig heeft niet maken. Kies bij Instellingen, AI een model dat dat wel kan.",
+      "stillWorking": "De agent is nog bezig met de laatste stap. Wacht tot hij klaar is en verzend daarna opnieuw.",
       "autoApplyFailed": "De wijzigingen konden niet automatisch worden toegepast. Er is niets weggeschreven; open de beoordeling om ze zelf toe te passen.",
       "permissionLabel": "Als de uitvoering klaar is",
       "permissionAsk": "Eerst beoordelen",
@@ -49,7 +22,6 @@
       "checking": "Controleren",
       "unsupportedProvisional": "Die slaaggrens is nog niet over meerdere modellen gemeten, dus hij kan strenger of soepeler zijn dan zou moeten.",
       "scopeNone": "geen notitie open, dus er is nog niets om aan te werken",
-      "scopeAllVault": "Alle notities",
       "scopeQuestion": "Wat de agent kan lezen",
       "scopeFolders": "Mappen",
       "scopeApplies": "Geldt voor je volgende bericht. Verwijderde, gearchiveerde en sjabloonnotities worden altijd weggelaten.",
@@ -70,7 +42,13 @@
       "confirm_one": "{{count}} bestand bijvoegen",
       "confirm_other": "{{count}} bestanden bijvoegen",
       "remove": "{{name}} verwijderen",
-      "noText": "{{name}} bevat geen tekst die de agent kan lezen. Alleen bestanden waarvan tekst kon worden uitgelezen, kunnen worden bijgevoegd."
+      "noText": "{{name}} bevat geen tekst die de agent kan lezen. Alleen bestanden waarvan tekst kon worden uitgelezen, kunnen worden bijgevoegd.",
+      "fromDevice": "Maak een foto of kies een bestand",
+      "readingDevice": "Op dit apparaat lezen…",
+      "deviceOnly": "Op dit apparaat gelezen, nooit opgeslagen",
+      "deviceUnsupported": "{{name}} is geen bestand dat de agent kan lezen. Foto's, PDF's en platte tekst werken wel.",
+      "deviceFailed": "Dat bestand kon niet worden gelezen. Er is niets verzonden.",
+      "readingInProgress": "Rond eerst het lezen van het bestand af en plak daarna opnieuw."
     },
     "progress": {
       "working": "Bezig",
@@ -108,7 +86,6 @@
     "review": {
       "title": "Wijzigingen beoordelen",
       "statusWaiting": "Wacht op je goedkeuring",
-      "close": "Sluiten",
       "scopeTotal_one": "{{count}} notitie in bereik",
       "scopeTotal_other": "{{count}} notities in bereik",
       "noChanges": "De agent heeft geen wijzigingen voorgesteld.",
@@ -178,8 +155,6 @@
       "undoFailed": "De uitvoering kon niet ongedaan worden gemaakt.",
       "undoReport": "{{reverted}} notities hersteld. {{kept}} notities die de uitvoering heeft aangemaakt, zijn blijven staan.",
       "alreadyApplied": "Toegepast",
-      "untitledNote": "Naamloze notitie",
-      "vaultRoot": "Hoofdmap van de kluis",
       "newNotesHeading_one": "{{count}} nieuwe notitie",
       "newNotesHeading_other": "{{count}} nieuwe notities",
       "createdCount_one": "{{count}} notitie aangemaakt.",
@@ -245,7 +220,6 @@
       "loading": "Gesprekken laden…",
       "modeLabel": "Welke gesprekken",
       "modeVault": "Alle",
-      "modeNote": "Deze notitie",
       "renamedAnnouncement": "Hernoemd naar {{name}}",
       "deletedAnnouncement": "Gesprek verwijderd",
       "loadFailed": "Je gesprekken konden nu niet worden geladen.",
@@ -261,7 +235,6 @@
       "titleSaveFailed": "De titel kon niet worden opgeslagen.",
       "searchLabel": "Gesprekken zoeken",
       "searchPlaceholder": "Gesprekken zoeken…",
-      "noMatchTitle": "Geen overeenkomsten",
       "noMatchBody": "Geen enkel gesprek komt overeen met “{{query}}”. Wis de zoekopdracht om ze allemaal te zien.",
       "emptyBody": "Gesprekken die je start, verschijnen hier.",
       "menu": "Gespreksacties",
@@ -293,9 +266,7 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "Annuleren",
       "cleaning": "Opruimen…",
-      "close": "Sluiten",
       "completeTitle": "Opruimen voltooid",
       "deleteCta": "{{count}} ongebruikte verwijderen",
       "deleteCta_one": "{{count}} ongebruikte verwijderen",
@@ -315,16 +286,13 @@
       "willBeReclaimed": "{{size}} wordt vrijgemaakt."
     },
     "coverPicker": {
-      "close": "Sluiten",
       "dropHint": "Sleep een afbeelding hierheen om die als omslag te gebruiken.",
       "empty": "Nog geen afbeeldingen in deze kluis. Upload er een of sleep hier een afbeelding naartoe.",
-      "loading": "Laden…",
       "removeCover": "Omslag verwijderen",
       "title": "Kies een omslagafbeelding",
       "upload": "Uploaden"
     },
     "deleteDialog": {
-      "cancel": "Annuleren",
       "confirmPrompt": "Deze bijlage definitief verwijderen? Dit kan niet ongedaan worden gemaakt.",
       "delete": "Verwijderen",
       "deleting": "Verwijderen…",
@@ -332,8 +300,7 @@
       "notUsed": "In geen enkele notitie gebruikt.",
       "stillUsed_one": "De bijlage wordt nog gebruikt in {{count}} notitie. Bij verwijderen blijft er een markering achter op de plek waar de bijlage was ingesloten:",
       "stillUsed_other": "De bijlage wordt nog gebruikt in {{count}} notities. Bij verwijderen blijft er een markering achter op de plek waar de bijlage was ingesloten:",
-      "title": "Bijlage verwijderen",
-      "untitled": "Naamloos"
+      "title": "Bijlage verwijderen"
     },
     "library": {
       "actionsAriaLabel": "Bijlageacties",
@@ -351,7 +318,6 @@
       "colUsedIn": "Gebruikt in",
       "decrypting": "Bijlagen ontsleutelen…",
       "clearSearchAriaLabel": "Zoekopdracht wissen",
-      "emptyClearSearch": "Zoekopdracht wissen",
       "emptyImportHint": "Bestanden die je aan een notitie toevoegt, worden in je kluis bewaard en op dit apparaat versleuteld voordat ze ergens naartoe gaan. Importeer er een om te beginnen.",
       "emptyLoadError": "Kon de bijlagencatalogus niet lezen",
       "emptyNoAttachments": "Nog geen bijlagen",
@@ -364,9 +330,7 @@
       "importing": "Importeren…",
       "listView": "Lijstweergave",
       "menuDelete": "Verwijderen",
-      "menuExport": "Exporteren",
       "menuPreview": "Voorbeeld",
-      "menuRename": "Hernoemen",
       "menuTranscribe": "Transcriberen",
       "menuViewTranscription": "Transcriptie bekijken",
       "noUnusedNotice": "Geen ongebruikte bijlagen om op te ruimen.",
@@ -402,8 +366,6 @@
       "emptyFilteredBody": "Niets hier komt overeen met het huidige typefilter. Wis het om de hele bibliotheek weer te zien.",
       "emptyFilteredBodyQuery": "Niets in de bibliotheek komt overeen met",
       "emptyLoadErrorBody": "De catalogus is versleuteld met je kluis, dus dit is meestal een onderbroken leesbewerking en geen verloren gegevens. Probeer het opnieuw; als het blijft mislukken, zijn je notities en hun bestanden ongemoeid.",
-      "emptyRetry": "Opnieuw proberen",
-      "transcriptCopy": "Kopiëren",
       "transcriptCopied": "Transcript gekopieerd.",
       "transcriptCopyFailed": "Kon het transcript niet kopiëren.",
       "transcriptEmpty": "In deze opname is geen spraak gevonden.",
@@ -435,8 +397,7 @@
       "play": "Afspelen"
     },
     "usedInNotesPopover": {
-      "empty": "In geen enkele notitie gebruikt.",
-      "untitled": "Naamloos"
+      "empty": "In geen enkele notitie gebruikt."
     },
     "needsApp": "Bijlagen opschonen vereist de app.",
     "noUnused": "Geen ongebruikte bijlagen: naar elk bestand wordt verwezen.",
@@ -468,7 +429,6 @@
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
         "cancelled": "Back-up geannuleerd. Er is geen bestand achtergelaten.",
         "invalidDestination": "Die doelmap is niet bruikbaar.",
         "ioGeneric": "Het back-upbestand kon niet worden geschreven.",
@@ -481,7 +441,6 @@
         "unknown": "De back-up is mislukt om een reden die Myne niet kon identificeren. Vertrouw op geen enkel bestand op de bestemming; probeer het opnieuw."
       },
       "restore": {
-        "authOperationInProgress": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
         "cancelled": "Herstel geannuleerd. Er is niets gewijzigd.",
         "damagedBackup": "Het back-upbestand is beschadigd.",
         "futureVersionBackup": "Deze back-up is gemaakt met een nieuwere versie van Myne. Werk Myne bij en herstel hem daarna.",
@@ -496,20 +455,17 @@
       }
     },
     "export": {
-      "cancel": "Annuleren",
-      "close": "Sluiten",
       "copying": "{{done}} van {{total}} kopiëren…",
       "preparing": "Voorbereiden…",
       "successToast": "Back-up geverifieerd en opgeslagen.",
       "title": "Back-up van kluis maken",
       "verifying": "{{done}} van {{total}} verifiëren…",
-      "phraseNotSubstitute": "Een back-up alleen krijg je niet terug binnen als je je wachtwoord kwijtraakt."
+      "phraseNotSubstitute": "Een back-up alleen brengt je niet terug als je je wachtwoord kwijtraakt: het bestand bevat je notities, niet je wachtwoord of je identiteitszin."
     }
   },
   "clipper": {
     "pairing": {
       "accept": "Accepteren",
-      "close": "Sluiten",
       "codeAriaLabel": "Koppelcode",
       "intro": "Bevestig dat deze code overeenkomt met die in de extensie en kies Accepteren om te koppelen.",
       "reject": "Weigeren",
@@ -525,7 +481,6 @@
     "matchedInAttachment": "in bijlage",
     "matchedInAttachmentTitle": "De zoekopdracht kwam overeen in een bestand dat in deze notitie is ingesloten",
     "matchedInBody": "↳ gevonden in tekst",
-    "noMatches": "Geen overeenkomsten",
     "operatorHint": "Tab om aan te vullen",
     "operators": {
       "tag": "Notities met een tag",
@@ -538,7 +493,6 @@
     "searchPlaceholder": "Zoek notities of voer een opdracht uit. Probeer tag: · path: · task:",
     "sectionCommands": "Opdrachten",
     "sectionNotes": "Notities",
-    "untitledNote": "Naamloos",
     "resultsLabel": "Opdrachten en notities",
     "pin": "Vastmaken aan linker lint",
     "unpin": "Losmaken van linker lint",
@@ -654,9 +608,6 @@
       "togglePreview": {
         "label": "Voorvertoning naast elkaar in-/uitschakelen"
       },
-      "findInNote": {
-        "label": "Zoeken in notitie"
-      },
       "findReplace": {
         "label": "Zoeken en vervangen in notitie"
       },
@@ -744,6 +695,7 @@
       "exportVaultMarkdown": {
         "label": "Kluis exporteren als Markdown…"
       },
+      "findInNote": {},
       "foldAll": {
         "label": "Alles inklappen"
       },
@@ -828,6 +780,9 @@
       "unfoldAll": {
         "label": "Alles uitklappen"
       },
+      "showCalendar": {
+        "label": "De agenda openen"
+      },
       "openThisWeekNote": {
         "label": "Notitie van deze week openen"
       },
@@ -877,11 +832,9 @@
     "hotkeys": {
       "command": {
         "bold": "Vet",
-        "closeTab": "Tabblad sluiten",
         "cycleHeadingLevel": "Kopniveau doorlopen",
         "cycleTabs": "Tabbladen doorlopen",
         "deleteWorkspace": "Werkruimte verwijderen",
-        "findInNote": "Zoeken in notitie",
         "focusNextPane": "Volgend deelvenster focussen",
         "focusPrevPane": "Vorig deelvenster focussen",
         "foldAll": "Alles inklappen",
@@ -891,12 +844,10 @@
         "italic": "Cursief",
         "navigateBack": "Terug navigeren",
         "navigateForward": "Vooruit navigeren",
-        "newNote": "Nieuwe notitie",
         "openSettings": "Instellingen openen",
         "outdent": "Uitspringen",
         "paletteToggle": "Opdrachtpalet openen",
         "redo": "Opnieuw uitvoeren",
-        "renameWorkspace": "Werkruimte hernoemen",
         "saveWorkspaceAs": "Werkruimte opslaan als",
         "selectAllScoped": "Alles selecteren (binnen bereik)",
         "selectNextOccurrence": "Volgende voorkomen selecteren",
@@ -913,6 +864,7 @@
         "toggleTaskList": "Takenlijst aan/uit",
         "undo": "Ongedaan maken",
         "unfoldAll": "Alles uitklappen",
+        "showCalendar": "De agenda openen",
         "cycleRegion": "Focus tussen gebieden laten wisselen",
         "focusEditorRegion": "Focus op editor",
         "focusRightPanelRegion": "Focus op rechterpaneel",
@@ -923,7 +875,6 @@
       "invalidChordReason": "Voeg een modifier toe (⌘, Ctrl of Alt). Een toets op zichzelf kan geen sneltoets zijn."
     },
     "picker": {
-      "vaultRoot": "Kluishoofdmap",
       "moveNoteTitle": "Notitie naar map verplaatsen",
       "moveNotePlaceholder": "Kies een map…",
       "noFolders": "Nog geen mappen",
@@ -945,6 +896,68 @@
     },
     "back": "Terug",
     "continue": "Doorgaan",
+    "phraseWordsProgress": "{{filled}} van {{total}} woorden",
+    "clear": "Wissen",
+    "untitled": "Naamloos",
+    "done": "Klaar",
+    "rename": "Hernoemen",
+    "remove": "Verwijderen",
+    "edit": "Bewerken",
+    "export": "Exporteren",
+    "copy": "Kopiëren",
+    "loading": "Laden…",
+    "tasks": "Taken",
+    "priority": "Prioriteit",
+    "today": "Vandaag",
+    "thisnote": "Deze notitie",
+    "nomatches": "Geen overeenkomsten",
+    "allnotes": "Alle notities",
+    "untitlednote": "Naamloze notitie",
+    "vaultroot": "Kluiswortel",
+    "clearsearch": "Zoekopdracht wissen",
+    "tryagain": "Opnieuw proberen",
+    "anothervaultoperationisinprogresswaitforittofinishthentryagain": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het daarna opnieuw.",
+    "closetab": "Tabblad sluiten",
+    "emptytrash": "Prullenbak legen",
+    "findinnote": "Zoeken in notitie",
+    "newfolder": "Nieuwe map",
+    "newnote": "Nieuwe notitie",
+    "renameworkspace": "Werkruimte hernoemen",
+    "notnow": "Niet nu",
+    "versionhistory": "Versiegeschiedenis",
+    "duedate": "Vervaldatum",
+    "nodate": "Geen datum",
+    "movetotrash": "Naar de prullenbak verplaatsen",
+    "thevaultislockedunlockitthentryagain": "De kluis is vergrendeld. Ontgrendel hem en probeer het daarna opnieuw.",
+    "showinfolder": "In map tonen",
+    "untitledview": "Naamloze weergave",
+    "choosefolder": "Map kiezen…",
+    "untitledtemplate": "Naamloos sjabloon",
+    "justnow": "zojuist",
+    "nonotesmatchthisview": "Geen notities komen overeen met deze weergave",
+    "novalue": "Geen waarde",
+    "masterpassword": "Hoofdwachtwoord",
+    "recoveryphrase": "Herstelzin",
+    "unexpectederrorpleasetryagain": "Onverwachte fout. Probeer het opnieuw.",
+    "vaultfilenotfoundpleaserestarttheapp": "Kluisbestand niet gevonden. Start de app opnieuw.",
+    "vaultfileisunreadablerestorefromabackup": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
+    "restorefrombackup": "Herstellen vanuit back-up",
+    "deviceonly": "Alleen op dit apparaat",
+    "accountnumber": "Accountnummer",
+    "changepassword": "Wachtwoord wijzigen",
+    "couldnotsavethissetting": "Kon deze instelling niet opslaan.",
+    "periodicnotes": "Periodieke notities",
+    "thisdevice": "Dit apparaat",
+    "thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue": "De code is veranderd terwijl je keek. Vergelijk beide schermen opnieuw. Als hij blijft veranderen, stop dan en ga niet verder.",
+    "waitingforapproval": "Wacht op goedkeuring",
+    "youridentitycode": "Je identiteitscode",
+    "keepit": "Bewaar hem",
+    "youridentity": "Je identiteit",
+    "forgetthisidentityonthisdevice": "Deze identiteit op dit apparaat vergeten",
+    "noinvitationsyet": "Nog geen uitnodigingen.",
+    "createanidentity": "Een identiteit aanmaken",
+    "confirmyourphrase": "Bevestig je zin",
+    "registerthisidentity": "Deze identiteit registreren",
     "skipToContent": "Ga naar inhoud"
   },
   "deviceRevoked": {
@@ -967,7 +980,6 @@
         "noticeContainerChanged": "Gecomprimeerd naar {{format}}: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "Annuleren",
         "confirm": "Omzetten",
         "skipped": "overgeslagen: {{note}}",
         "subtitle_one": "1 verwijzing wordt herschreven. Controleer voordat je doorgaat.",
@@ -1041,7 +1053,6 @@
       },
       "lightbox": {
         "close": "Voorbeeld sluiten",
-        "export": "Exporteren",
         "exportAria": "Bijlage exporteren",
         "imagePreview": "Afbeeldingsvoorbeeld",
         "pdfFallback": "PDF",
@@ -1053,27 +1064,21 @@
       "menu": {
         "actionsAria": "Bijlageacties"
       },
-      "pdf": {
-        "loading": "Laden…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "De bestandskiezer kon niet worden geopend."
       },
       "progress": {
         "encrypting": "Versleutelen…",
-        "importing": "Importeren…",
-        "loading": "Laden…"
+        "importing": "Importeren…"
       },
       "recording": {
         "barAria": "Spraaknotitie opnemen",
-        "cancel": "Annuleren",
         "noAudio": "Geen audio gedetecteerd. Controleer je microfoon.",
         "saving": "Opslaan…",
         "stop": "Stoppen"
       },
       "rename": {
-        "cancel": "Annuleren",
-        "confirm": "Hernoemen",
         "title": "Bijlage hernoemen"
       },
       "summary": {
@@ -1114,9 +1119,6 @@
           "seek": "Verschuiven"
         },
         "menu": {
-          "export": "Exporteren",
-          "remove": "Verwijderen",
-          "rename": "Hernoemen",
           "reveal": "Tonen in bibliotheek",
           "transcribe": "Transcriberen",
           "customSize": "Aangepaste grootte…",
@@ -1177,7 +1179,6 @@
         "bug": "Bug",
         "caution": "Voorzichtig",
         "danger": "Gevaar",
-        "done": "Klaar",
         "error": "Fout",
         "example": "Voorbeeld",
         "failure": "Mislukt",
@@ -1205,8 +1206,7 @@
         "linksTo": "Linkt naar {{count}}",
         "linksTo_one": "Linkt naar {{count}}",
         "linksTo_other": "Linkt naar {{count}}",
-        "outgoingEmpty": "Deze notitie linkt nog nergens naartoe.",
-        "untitled": "Naamloos"
+        "outgoingEmpty": "Deze notitie linkt nog nergens naartoe."
       },
       "barItems": {
         "graph": "Grafiek",
@@ -1306,7 +1306,7 @@
           "insert": "Invoegen in notitie",
           "noAnswer": "Geen antwoord. Probeer het anders te formuleren.",
           "newChat": "Nieuw gesprek",
-          "unavailableHint": "Deze build van Myne is gecompileerd zonder lokale AI, dus hier kan niets draaien. Geen enkele instelling verandert dat — daar is een build met AI voor nodig.",
+          "unavailableHint": "Deze build van Myne is gecompileerd zonder lokale AI, dus hier kan niets draaien. Geen enkele instelling verandert dat; daar is een build met AI voor nodig.",
           "offHint": "Lokale AI staat uit. Schakel deze in via Instellingen → Developer → AI.",
           "send": "Verzenden",
           "statusNoModel": "Geen provider",
@@ -1320,38 +1320,23 @@
           "truncated": "De eerste {{count}} tekens zijn samengevat.",
           "you": "Jij",
           "history": "Geschiedenis",
-          "historyCancel": "Annuleren",
           "historyDelete": "Verwijderen",
           "historyDeleteBody": "Dit verwijdert het gesprek van elk apparaat bij de volgende verbinding. Dit kan niet ongedaan worden gemaakt.",
           "historyError": "Gesprekken konden niet worden geladen. Probeer het opnieuw.",
-          "historyProposalNewNote": "Nieuwe notitie",
-          "historyRename": "Hernoemen",
           "historyTitle": "Chatgeschiedenis",
           "historyDeleteTitle": "Gesprek verwijderen",
           "persistWarning": "Opslaan in de kluis is mislukt. Je berichten staan hier nog en worden opnieuw geprobeerd.",
           "memory": "Geheugen",
-          "memoryPopoverTitle": "Wat de assistent onthoudt",
-          "memoryPopoverEmpty": "Nog niets onthouden.",
-          "memoryPopoverDelete": "Verwijderen",
-          "memoryPopoverDeleted": "Vermelding overal verwijderd.",
-          "memoryPopoverDeleteFailed": "De vermelding kon niet worden verwijderd.",
-          "memoryPopoverEntryFailed": "Deze vermelding kon niet worden gelezen. Hij staat er nog; verwijder hem hier of verbeter hem in Instellingen.",
-          "memoryPopoverLoadFailed": "Herinneringen konden niet worden geladen. Er is niets gewijzigd.",
-          "memoryPopoverRetry": "Opnieuw proberen",
-          "memoryPopoverSettings": "Beheren in Instellingen",
-          "memoryPopoverClose": "Sluiten",
           "seedCard": {
             "title": "Wil je dat Myne je kluis leert kennen?",
             "body": "Hij kan de structuur van je notities één keer lezen en een paar geheugenitems opbouwen. Je beoordeelt elke regel voordat er iets wordt opgeslagen.",
-            "action": "Myne je kluis leren",
-            "dismiss": "Nu niet"
+            "action": "Myne je kluis leren"
           },
           "copied": "Gekopieerd",
           "copyAnswer": "Het antwoord kopiëren",
           "copyFailed": "Kon niet kopiëren",
           "copyYourMessage": "Je bericht kopiëren",
           "emptyTitle": "Vraag over je notities",
-          "noticeSettingsCta": "AI-instellingen openen",
           "viewDiff": "Wijzigingen bekijken",
           "revertRun": "Deze uitvoering terugdraaien",
           "diffTitle": "Voorgestelde wijzigingen",
@@ -1365,8 +1350,7 @@
           "statusKeyRejected": "Sleutel geweigerd",
           "statusOutOfCredit": "Tegoed op",
           "statusRefused": "Geweigerd",
-          "statusNotWorking": "Werkt niet",
-          "historyRetry": "Opnieuw proberen"
+          "statusNotWorking": "Werkt niet"
         },
         "allHidden": "Alle tabbladen zijn verborgen. Klik met de rechtermuisknop om ze te herstellen.",
         "outline": {
@@ -1401,15 +1385,12 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "Naam werkruimte",
-        "renameConfirm": "Hernoemen",
-        "renameTitle": "Werkruimte hernoemen",
         "saveAsTitle": "Werkruimte opslaan als",
         "saveConfirm": "Opslaan"
       },
       "workspaceSwitcher": {
         "defaultName": "Werkruimte",
         "renameItemLabel": "Werkruimte {{name}} hernoemen",
-        "renameTitle": "Werkruimte hernoemen",
         "saveCurrentAs": "Huidige opslaan als…",
         "switchLabel": "Werkruimte wisselen",
         "toggleTitle": "Werkruimte: {{name}}"
@@ -1433,14 +1414,12 @@
     "noteActions": {
       "buttonLabel": "Notitieacties",
       "convertFailed": "Kon niet wijzigen wat deze notitie is, dus hij is ongewijzigd gebleven.",
-      "rename": "Hernoemen",
       "move": "Naar map verplaatsen…",
       "duplicate": "Dupliceren",
       "convertToTemplate": "Omzetten naar sjabloon",
       "convertToNote": "Omzetten naar notitie",
       "turnedIntoTemplate": "Omgezet naar sjabloon",
       "convertedToNote": "Omgezet naar notitie",
-      "versionHistory": "Versiegeschiedenis",
       "trash": "Naar prullenbak verplaatsen",
       "openInNewWindow": "Openen in nieuw venster"
     },
@@ -1449,9 +1428,7 @@
       "defaultBadge": "code"
     },
     "drawingEmbed": {
-      "done": "Klaar",
       "edit": "Tekening {{name}} bewerken",
-      "editAction": "Bewerken",
       "empty": "Lege tekening: klik om te tekenen",
       "open": "Openen",
       "rename": "Tekening hernoemen"
@@ -1466,8 +1443,6 @@
       "matchCase": "Hoofdlettergevoelig",
       "matchCount": "{{current}} van {{total}}",
       "nextMatch": "Volgende overeenkomst",
-      "noMatches": "Geen overeenkomsten",
-      "placeholder": "Zoeken in notitie",
       "previousMatch": "Vorige overeenkomst",
       "replaceAll": "Alles vervangen",
       "replaceAllCount": "Alles vervangen ({{total}})",
@@ -1498,7 +1473,6 @@
       "propertiesLabel": "Eigenschappen",
       "removeListItemAriaLabel": "{{item}} verwijderen",
       "titleAriaLabel": "Notitietitel",
-      "titlePlaceholder": "Naamloos",
       "managedField": "Myne schrijft dit veld"
     },
     "mermaid": {
@@ -1513,11 +1487,9 @@
       "panLeft": "Naar links schuiven",
       "panRight": "Naar rechts schuiven",
       "edit": "Diagrambron bewerken",
-      "editText": "Bewerken",
       "expand": "Diagram uitklappen",
       "expandText": "Uitklappen",
-      "expandClose": "Uitgeklapt diagram sluiten",
-      "expandCloseText": "Sluiten"
+      "expandClose": "Uitgeklapt diagram sluiten"
     },
     "slash": {
       "aiContinue": "Doorschrijven (AI)",
@@ -1531,7 +1503,6 @@
       "day": "Dag",
       "divider": "Scheidingslijn",
       "drawing": "Tekening",
-      "due": "Vervaldatum",
       "heading1": "Kop 1",
       "heading2": "Kop 2",
       "heading3": "Kop 3",
@@ -1541,7 +1512,6 @@
       "link": "Link",
       "now": "Nu",
       "numberedList": "Genummerde lijst",
-      "priority": "Prioriteit",
       "quote": "Citaat",
       "repeat": "Herhaling",
       "table": "Tabel",
@@ -1592,19 +1562,15 @@
       "title": {
         "due": "Vervaldatum",
         "repeat": "Herhaling",
-        "priority": "Prioriteit",
         "remind": "Herinnering"
       },
       "invalidRemind": "Myne kan deze datum niet lezen, dus je krijgt geen herinnering.",
       "addTime": "Tijd toevoegen",
-      "clear": "Wissen",
       "dateGrid": "Kies een datum",
       "dateNext": "Volgende maand",
       "datePrev": "Vorige maand",
-      "today": "Vandaag",
       "tomorrow": "Morgen",
       "selectField": "Selecteer een veld om toe te voegen",
-      "noDate": "Geen datum",
       "removeTime": "Tijd verwijderen",
       "timeHour": "Uur",
       "timeMeridiem": "AM of PM",
@@ -1613,6 +1579,7 @@
     "toolbar": {
       "apply": "Toepassen",
       "exportImageTitle": "Selectie exporteren als afbeelding",
+      "label": "Opmaak",
       "customize": {
         "bold": "Vet",
         "bulletList": "Opsommingslijst",
@@ -1650,7 +1617,8 @@
         "brown": "Bruin",
         "grey": "Grijs",
         "indigo": "Indigo",
-        "remove": "Markering verwijderen"
+        "remove": "Markering verwijderen",
+        "colours": "Markeringskleur"
       },
       "urlPlaceholder": "Plak link-URL"
     },
@@ -1699,7 +1667,6 @@
         "embed": "Insluiten: {{label}}"
       },
       "convert": {
-        "cancel": "Annuleren",
         "choiceClause_one": " · voor {{count}} is een keuze nodig.",
         "choiceClause_other": " · voor {{count}} is een keuze nodig.",
         "chooseTarget": "Kies doel…",
@@ -1746,15 +1713,12 @@
     },
     "nav": {
       "dailyNote": "Dagelijkse notitie",
-      "openToday": "Vandaag openen",
-      "allNotes": "Alle notities"
+      "openToday": "Vandaag openen"
     },
     "list": {
       "searchPlaceholder": "Notities zoeken",
-      "clearSearch": "Zoekopdracht wissen",
       "viewNoteCount_one": "{{count}} notitie in “{{name}}”",
       "viewNoteCount_other": "{{count}} notities in “{{name}}”",
-      "edit": "Bewerken",
       "trashEmpty": "De prullenbak is leeg",
       "archiveEmpty": "Geen gearchiveerde notities",
       "noMatchingNotes": "Geen overeenkomende notities",
@@ -1771,10 +1735,8 @@
       "wordCount_one": "{{count}} woord · {{minutes}} min leestijd",
       "wordCount_other": "{{count}} woorden · {{minutes}} min leestijd",
       "moveToFolder": "Naar map verplaatsen…",
-      "moveToTrash": "Naar prullenbak verplaatsen",
       "copied": "Gekopieerd ✓",
-      "copyToClipboard": "Kopiëren naar klembord",
-      "versionHistory": "Versiegeschiedenis"
+      "copyToClipboard": "Kopiëren naar klembord"
     },
     "purge": {
       "body": "Hiermee wordt de notitie definitief van dit apparaat verwijderd. Dit kan niet ongedaan worden gemaakt."
@@ -1793,8 +1755,7 @@
       "body": "Kies een notitie uit de lijst of begin een nieuwe."
     },
     "readingBar": {
-      "editNote": "Notitie bewerken",
-      "edit": "Bewerken"
+      "editNote": "Notitie bewerken"
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} gekoppelde notitie",
@@ -1828,9 +1789,7 @@
       "emptyState": "Nog geen opgeslagen weergaven. Maak er een om je notities te filteren op tag, map of tekst.",
       "editView": "Weergave bewerken"
     },
-    "sheet": {
-      "done": "Klaar"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "Kluizen"
     },
@@ -1839,7 +1798,6 @@
       "notesCount_one": "Notities · {{count}}",
       "notesCount_other": "Notities · {{count}}"
     },
-    "untitledNote": "Naamloze notitie",
     "commandPalette": {
       "searchPlaceholder": "Notities zoeken of een opdracht uitvoeren…",
       "noMatches": "Geen overeenkomende opdrachten of notities."
@@ -1876,7 +1834,6 @@
     "meeting": {
       "ai": {
         "cancelled": "Gestopt. Er is niets aan de notitie toegevoegd.",
-        "close": "Sluiten",
         "discard": "Weggooien",
         "failed": "De AI-pass is mislukt. Het transcript is ongewijzigd.",
         "generate": "Genereren",
@@ -1901,7 +1858,6 @@
         "title": "Vergadering-AI"
       },
       "barAria": "Vergaderingssessie",
-      "cancel": "Annuleren",
       "chunksMissing": "Een deel van de vergadering is niet overgedragen, dus de notitie heeft een gat. De audio die is aangekomen, staat er nog.",
       "clipFailed": "Een deel van de vergadering kon niet worden opgeslagen. De rest staat nog in de notitie.",
       "machineNotice": "Dit is een machinaal transcript van de vergadering en kan fouten bevatten.",
@@ -1940,8 +1896,7 @@
         "pdfPayloadMissing": "De export werd onderbroken. Als de kluis is vergrendeld, ontgrendel hem dan en probeer het opnieuw.",
         "pdfRenderTimeout": "Het renderen van de notitie duurde te lang, dus er is niets geëxporteerd.",
         "pdfWindowCreateFailed": "Het exportvenster kon niet worden geopend, dus er is niets geëxporteerd.",
-        "targetExists": "Er bestaat al een bestand met die naam op de bestemming.",
-        "vaultLocked": "De kluis is vergrendeld. Ontgrendel hem en probeer het opnieuw."
+        "targetExists": "Er bestaat al een bestand met die naam op de bestemming."
       },
       "flow": {
         "couldNotRead": "Deze notitie kon niet worden gelezen.",
@@ -1953,11 +1908,9 @@
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
-        "filterPlainText": "Platte tekst",
-        "showInFolder": "Tonen in map"
+        "filterPlainText": "Platte tekst"
       },
       "modal": {
-        "cancel": "Annuleren",
         "export": "Exporteren…",
         "includeAttachments_one": "{{count}} bijlage opnemen",
         "includeAttachments_other": "{{count}} bijlagen opnemen",
@@ -1968,12 +1921,10 @@
       }
     },
     "egress": {
-      "cancel": "Annuleren",
       "confirm": "Downloaden",
       "title": "Dit bestand downloaden"
     },
     "pdf": {
-      "cancel": "Annuleren",
       "continue": "Doorgaan…",
       "title": "Exporteren als PDF"
     },
@@ -1982,7 +1933,6 @@
       "errors": {
         "attachmentCorrupt": "Een bijlage waarnaar een notitie verwijst kon niet worden gelezen, dus er is niets geëxporteerd.",
         "attachmentMissing": "Een bijlage waarnaar een notitie verwijst ontbreekt, dus er is niets geëxporteerd.",
-        "authOperationInProgress": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
         "cancelled": "Export geannuleerd. Er is niets op de bestemming achtergebleven.",
         "cannotDecrypt": "Een notitie kon niet worden gelezen, dus er is niets geëxporteerd.",
         "destinationAlreadyExists": "Er bestaat al iets op die locatie. Kies een lege plek voor de export.",
@@ -1991,7 +1941,6 @@
         "invalidVaultMeta": "De metadata van de kluis kon niet worden gelezen, dus er is niets geëxporteerd.",
         "ioWriteDefault": "De export kon niet worden geschreven.",
         "joinFailure": "Export is onverwacht mislukt. Er is niets op de bestemming achtergebleven.",
-        "vaultLocked": "De kluis is vergrendeld. Ontgrendel hem en probeer het opnieuw.",
         "vaultNotFound": "Geen kluis gevonden om te exporteren."
       },
       "flow": {
@@ -2012,12 +1961,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "Annuleren",
         "cancelling": "Annuleren…",
         "title": "Exporteren…"
       },
       "setup": {
-        "cancel": "Annuleren",
         "choose": "Kiezen…",
         "chooseFolder": "Een map kiezen…",
         "destinationLabel": "Bestemming",
@@ -2031,8 +1978,6 @@
         "title": "Kluis exporteren als Markdown"
       },
       "summary": {
-        "done": "Klaar",
-        "showInFolder": "Tonen in map",
         "title": "Export voltooid"
       }
     }
@@ -2068,8 +2013,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Annuleren",
-      "close": "Sluiten",
       "count_one": "{{count}} notitie",
       "count_other": "{{count}} notities",
       "delete": "Verwijderen",
@@ -2080,14 +2023,12 @@
       "folderDeleteBody_other": "“{{name}}” en de {{count}} notities erin",
       "folderDeleteConfirm_one": "{{count}} notitie naar de prullenbak verplaatsen?",
       "folderDeleteConfirm_other": "{{count}} notities naar de prullenbak verplaatsen?",
-      "folderDeleteConfirmCta": "Naar prullenbak verplaatsen",
       "folderDeleteError": "Kon de notities van die map niet naar de prullenbak verplaatsen. Probeer het opnieuw.",
       "folderDeleteTitle": "Deze map naar de prullenbak verplaatsen?",
       "folderDeleteWarning": "Ze gaan naar de prullenbak. Je kunt ze altijd herstellen. Definitief verwijderen is een aparte stap.",
       "restore": "Herstellen",
       "restoreError": "Die notitie kon niet worden hersteld. Probeer het opnieuw.",
-      "title": "Archief",
-      "untitled": "Naamloos"
+      "title": "Archief"
     },
     "cardMenu": {
       "copyLink": "Link kopiëren",
@@ -2115,10 +2056,8 @@
       "none": "Geen"
     },
     "deleteConfirm": {
-      "cancel": "Annuleren",
       "delete": "Verwijderen",
       "title": "Deze notitie verwijderen?",
-      "untitled": "Naamloos",
       "warning": "Dit kan niet ongedaan worden gemaakt."
     },
     "example": {
@@ -2147,7 +2086,6 @@
     "filterBuilder": {
       "addCondition": "Voorwaarde toevoegen",
       "addFilterGroup": "Filtergroep toevoegen",
-      "cancel": "Annuleren",
       "combinator": {
         "all": "alle",
         "any": "een van de"
@@ -2193,6 +2131,7 @@
       "unsettledSave": "Een geopende notitie is nog niet klaar met opslaan, dus de map is ongemoeid gelaten. Probeer het opnieuw zodra dat klaar is.",
       "renameFailed": "Kon de map niet hernoemen, dus die is ongewijzigd gebleven.",
       "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Elke keer dat je ontgrendelt, verschijnt er weer een lege map onder de oude naam; die verwijderen is veilig en verandert verder niets. De map opnieuw hernoemen ruimt hem niet op.",
+      "mcpScopeRewriteFailed": "De map is hernoemd, maar de mappen waar een externe AI-verbinding buiten wordt gehouden konden niet worden bijgewerkt. Als je deze map buiten de goedkeuring van een verbinding had gelaten, kan die verbinding hem nu mogelijk lezen. Open Instellingen, AI, Externe toegang en controleer de mappen die per verbinding buiten beschouwing blijven.",
       "folderListFull": "Myne kan een beperkt aantal mappen onthouden, en die lijst is vol. Deze map werkt gewoon, maar hij verdwijnt zodra de laatste notitie eruit gaat. Een map verwijderen die je niet meer nodig hebt, maakt weer ruimte.",
       "folderNotRemembered": "De map is aangemaakt, maar Myne kon hem niet vastleggen. Hij verdwijnt zodra de laatste notitie eruit gaat, en bij de volgende ontgrendeling is hij weg als hij dan nog leeg is. Hem opnieuw aanmaken is veilig.",
       "attachmentFolderRewriteFailed": "De map is hernoemd, maar de bestanden die erin stonden zijn niet mee verhuisd. Ze noemen nog de oude map, dus ze ontbreken in de bibliotheekboom en bij een agent die deze map krijgt. Verplaats ze opnieuw met de hand vanuit Bijlagen, of hernoem de map terug en daarna nog eens."
@@ -2224,7 +2163,6 @@
         "heading": "Kleurgroepen",
         "namePlaceholder": "Naamloze regel",
         "rowLabel": "{{name}}, groep {{index}} van {{total}}. Alt plus de pijl omhoog of omlaag herschikt hem.",
-        "editRuleButton": "Bewerken",
         "derivedMakeEditable": "Deze bewerkbaar maken",
         "derivedMakeEditableFailed": "Die groepen konden niet worden opgeslagen. Probeer het opnieuw.",
         "derivedNote_one": "De grafiek is gekleurd op tag: {{count}} groep, afgeleid van je tags. Hij wordt pas opgeslagen als je hem bewerkbaar maakt.",
@@ -2245,7 +2183,6 @@
       "refreshTitle": "De kluis is gewijzigd: bouw de grafiek opnieuw op",
       "settings": {
         "appearanceHeading": "Vormgeving",
-        "closeTitle": "Sluiten",
         "forceCenter": "Middelpuntkracht",
         "forceLinkDistance": "Linkafstand",
         "forceLinkStrength": "Linksterkte",
@@ -2269,27 +2206,19 @@
       "relayoutTitle": "Grafiek vanaf nul opnieuw indelen",
       "showingCount_one": "{{count}} notitie weergegeven",
       "showingCount_other": "{{count}} notities weergegeven",
-      "untitledNote": "Naamloze notitie",
       "viewGraph": "Grafiek",
       "viewList": "Lijst",
       "viewToggleAriaLabel": "Kies de grafiekafbeelding of de lijst met zijn notities"
     },
     "import": {
-      "base": {
-        "untitledView": "Naamloze weergave"
-      },
+      "base": {},
       "modal": {
-        "cancel": "Annuleren",
         "cancelledNotImported": "{{count}} niet geïmporteerd",
         "cancelledNotImported_one": "{{count}} niet geïmporteerd",
         "cancelledNotImported_other": "{{count}} niet geïmporteerd",
         "cancelling": "Annuleren…",
-        "chooseFolder": "Map kiezen…",
-        "close": "Sluiten",
         "closeAriaLabel": "Sluiten",
         "copied": "Gekopieerd",
-        "copy": "Kopiëren",
-        "done": "Klaar",
         "errorBody": "De import kon niet worden voltooid. Alle al geïmporteerde notities zijn bewaard en je kunt ze veilig houden of verwijderen.",
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Map",
@@ -2362,10 +2291,8 @@
         "statFoldersNotKept": "Mappen niet behouden"
       },
       "offer": {
-        "body": "Breng je bestaande notities naar Myne. Elke notitie wordt versleuteld zodra die wordt geïmporteerd. Niets verlaat dit apparaat en je originele bestanden blijven precies waar ze zijn.",
-        "chooseFolder": "Map kiezen…",
+        "body": "Breng je bestaande notities naar Myne. Elke notitie wordt versleuteld zodra die wordt geïmporteerd, en je originele bestanden blijven precies waar ze zijn.",
         "laterHint": "Je kunt later altijd importeren via Instellingen → Opslag.",
-        "notNow": "Niet nu",
         "title": "Je notities importeren?"
       },
       "picker": {
@@ -2492,12 +2419,8 @@
       "mergeAnyway": "Toch samenvoegen",
       "newDrawingHere": "Nieuwe tekening hier",
       "newDrawingMenu": "Nieuwe tekening",
-      "newFolder": "Nieuwe map",
       "newFolderInPlaceholder": "Nieuwe map in {{path}}",
-      "newFolderPlaceholder": "Nieuwe map",
-      "newNote": "Nieuwe notitie",
       "newNoteHere": "Nieuwe notitie hier",
-      "newNoteMenu": "Nieuwe notitie",
       "newSubfolder": "Nieuwe submap",
       "newViewTitle": "Nieuwe weergave",
       "noteMovedToTrash": "Notitie naar prullenbak verplaatst",
@@ -2509,19 +2432,16 @@
       "openToSide": "Naast elkaar openen",
       "removeFolderNote": "Mapnotitie verwijderen",
       "removeFromFavorites": "Uit favorieten verwijderen",
-      "rename": "Hernoemen",
       "setAsFolderNote": "Instellen als mapnotitie",
       "trash": "Prullenbak",
       "trashBulkError": "De notities konden niet naar de prullenbak worden verplaatst.",
       "trashConfirmBulkBody_one": "{{count}} notitie wordt naar de prullenbak verplaatst.",
       "trashConfirmBulkBody_other": "{{count}} notities worden naar de prullenbak verplaatst.",
       "trashConfirmBulkWarning": "Je kunt ze later herstellen vanuit de prullenbak.",
-      "trashConfirmConfirm": "Naar prullenbak verplaatsen",
       "trashConfirmTitle": "Naar prullenbak verplaatsen?",
       "trashConfirmWarning": "Je kunt het later herstellen vanuit de prullenbak.",
       "trashSingleError": "De notitie kon niet naar de prullenbak worden verplaatst.",
       "undo": "Ongedaan maken",
-      "vaultRoot": "Kluiswortel",
       "viewSettingsTitle": "Weergave-instellingen",
       "imported_one": "1 notitie geïmporteerd in deze map",
       "imported_other": "{{count}} notities geïmporteerd in deze map",
@@ -2532,32 +2452,25 @@
       "moveFolderTo": "Map verplaatsen naar…",
       "treeLabel": "Notities en mappen",
       "selectionAnnouncement": "{{title}} geselecteerd",
-      "untitled": "Naamloos",
       "search": "Zoeken"
     },
     "newFromTemplate": {
-      "back": "Terug",
       "blankNote": "Lege notitie",
       "createNote": "Notitie maken",
       "createFirstTemplate": "Een sjabloon maken",
       "manageTemplates": "Sjablonen beheren",
       "emptyState": "Je hebt nog geen sjablonen gemaakt.",
       "listLabel": "Sjablonen",
-      "loading": "Laden…",
       "nameLabel": "Naam voor de notitie (op basis van “{{templateName}}”)",
-      "namePlaceholder": "Naamloos",
       "nameStepTitle": "Geef deze notitie een naam",
-      "pickStepTitle": "Nieuwe notitie op basis van sjabloon",
-      "untitledTemplate": "Naamloos sjabloon"
+      "pickStepTitle": "Nieuwe notitie op basis van sjabloon"
     },
     "newTab": {
-      "createNote": "Nieuwe notitie",
       "createDrawing": "Nieuwe tekening",
       "noNotesYet": "Nog geen notities.",
       "recent": "Ga verder waar je bleef",
       "searchAriaLabel": "Notities en opdrachten zoeken",
       "searchPlaceholder": "Notities en opdrachten zoeken…",
-      "untitled": "Naamloos",
       "createFromTemplate": "Op basis van sjabloon",
       "kindCommand": "Opdracht",
       "kindNote": "Notitie",
@@ -2568,6 +2481,7 @@
         "graph": "Grafiek",
         "tasks": "Taken",
         "today": "Vandaag",
+        "calendar": "Agenda",
         "home": "Home"
       },
       "placesLabel": "Ga naar",
@@ -2576,15 +2490,13 @@
     "pane": {
       "graphTab": "Grafiek",
       "tasksTab": "Taken",
-      "loading": "Laden…",
-      "untitledView": "Naamloze weergave",
       "agentTab": "Agent",
+      "calendarTab": "Agenda",
       "homeTab": "Home"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dagen geleden",
       "hoursAgo": "{{h}} u geleden",
-      "justNow": "zojuist",
       "minutesAgo": "{{m}} min geleden",
       "oneWeekAgo": "1 week geleden",
       "weeksAgo": "{{w}} weken geleden",
@@ -2603,7 +2515,6 @@
       "taskBadgeTitle": "Taaknotitie",
       "unsyncedLabel": "Nog niet op de server",
       "unsyncedTitle": "De laatste wijzigingen van deze notitie staan alleen op dit apparaat",
-      "untitled": "Naamloos",
       "untitledDrawing": "Naamloze tekening"
     },
     "savedView": {
@@ -2615,7 +2526,6 @@
       "editing": "Bewerken",
       "editingEllipsis": "Bewerken…",
       "editingTitle": "Bewerken: automatisch opslaan staat klaar",
-      "justNow": "zojuist",
       "retry": "Opnieuw proberen",
       "saved": "Opgeslagen",
       "savedRelative": "Opgeslagen {{rel}}",
@@ -2627,39 +2537,33 @@
       "savingEllipsis": "Opslaan…"
     },
     "snapshotFailed": {
-      "dismiss": "Sluiten",
       "message": "Er kon geen momentopname worden opgeslagen. Je notitie is opgeslagen, maar de versiegeschiedenis kan onvolledig zijn (de schijf is mogelijk vol)."
     },
     "snapshots": {
-      "cancel": "Annuleren",
       "changeCount_one": "{{count}} wijziging sinds deze momentopname",
       "changeCount_other": "{{count}} wijzigingen sinds deze momentopname",
       "changeCountPrev_one": "{{count}} wijziging ten opzichte van de vorige momentopname",
       "changeCountPrev_other": "{{count}} wijzigingen ten opzichte van de vorige momentopname",
-      "close": "Sluiten",
       "compareAgainstLabel": "Vergelijken met",
       "compareCurrent": "Huidige notitie",
       "comparePrevious": "Vorige momentopname",
       "confirmBody": "Je huidige notitie wordt eerst als momentopname opgeslagen, zodat je dit ongedaan kunt maken.",
       "confirmTitle": "Deze momentopname herstellen?",
       "decrypting": "Ontsleutelen…",
-      "emptyState": "",
+      "emptyState": "Nog geen momentopnamen. Momentopnamen worden automatisch opgeslagen terwijl je bewerkt, ongeveer 7 dagen bewaard, en definitief verwijderd zodra de notitie definitief wordt verwijderd.",
       "errorCannotDecrypt": "Deze momentopname kon niet worden ontsleuteld.",
       "errorGeneric": "Er is iets misgegaan. Probeer het opnieuw.",
       "errorIo": "Er is een schijffout opgetreden. De schijf is mogelijk vol of niet beschrijfbaar.",
       "errorNotFound": "Die momentopname is niet meer beschikbaar.",
       "errorStorageAccess": "Geen toegang tot de momentopnameopslag van de kluis.",
       "errorVaultLocked": "De kluis is vergrendeld. Ontgrendel hem om momentopnamen te bekijken.",
-      "justNow": "zojuist",
       "listLabel": "Lijst met momentopnamen",
-      "loading": "Laden…",
       "noPrevious": "Dit is de vroegste momentopname. Er is niets daarvóór om mee te vergelijken.",
       "restore": "Herstellen",
       "restoreCta": "Deze momentopname herstellen",
       "restoredStatus": "Hersteld. De versie die je had, is als momentopname opgeslagen.",
       "selectPlaceholder": "Selecteer een momentopname om te zien wat er sindsdien is gewijzigd.",
       "title": "Momentopnamen",
-      "untitled": "Naamloos",
       "deviceFallback": "Apparaat {{code}}",
       "unknownAuthor": "Onbekend apparaat"
     },
@@ -2672,14 +2576,10 @@
       "pinned": "Vastgezet",
       "pinnedTitle": "Vastgezet: maak los om te sluiten",
       "unpin": "Losmaken",
-      "untitled": "Naamloos",
-      "closeTabMenuItem": "Tabblad sluiten",
       "moveLeft": "Naar links verplaatsen",
       "moveRight": "Naar rechts verplaatsen"
     },
     "tagBrowser": {
-      "cancel": "Annuleren",
-      "clear": "Wissen",
       "combineTagsWith": "Tags combineren met",
       "filtering": "Filteren…",
       "modeAll": "Alle",
@@ -2695,19 +2595,15 @@
       "saveAsView": "Opslaan als weergave",
       "searchPlaceholder": "Tags zoeken…",
       "title": "Tags",
-      "untitled": "Naamloos",
       "viewNamePlaceholder": "Naam weergave"
     },
     "trash": {
-      "close": "Sluiten",
       "count_one": "{{count}} notitie",
       "count_other": "{{count}} notities",
       "delete": "Verwijderen",
       "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
-      "empty": "Prullenbak legen",
       "emptyConfirmBody_one": "{{count}} notitie wordt definitief verwijderd.",
       "emptyConfirmBody_other": "{{count}} notities worden definitief verwijderd.",
-      "emptyConfirmCta": "Prullenbak legen",
       "emptyConfirmTitle": "Prullenbak legen?",
       "emptyPartialFailure_one": "{{count}} notitie kon niet worden verwijderd en blijft in de prullenbak.",
       "emptyPartialFailure_other": "{{count}} notities konden niet worden verwijderd en blijven in de prullenbak.",
@@ -2717,8 +2613,7 @@
       "purgeConfirmTitle": "Definitief verwijderen?",
       "restore": "Herstellen",
       "restoreError": "Die notitie kon niet worden hersteld. Probeer het opnieuw.",
-      "title": "Prullenbak",
-      "untitled": "Naamloos"
+      "title": "Prullenbak"
     },
     "unlinkedMentions": {
       "empty": "Geen niet-gelinkte vermeldingen.",
@@ -2727,8 +2622,7 @@
       "linkTooltip": "Deze vermelding linken aan {{title}}",
       "refresh": "Vermeldingen zijn mogelijk gewijzigd: vernieuwen",
       "searching": "Zoeken…",
-      "thisNote": "deze notitie",
-      "untitled": "Naamloos"
+      "thisNote": "deze notitie"
     },
     "unsettledSave": "Een geopende notitie is nog niet klaar met opslaan, dus er is niets gewijzigd. Probeer het opnieuw zodra dat klaar is.",
     "views": {
@@ -2775,11 +2669,9 @@
         "renameLane": "Baan {{lane}} hernoemen",
         "newLaneName": "Nieuwe baannaam",
         "saveLaneName": "Baannaam opslaan",
-        "cancelLaneRename": "Annuleren",
         "lanesNotSaved": "De kaarten zijn verplaatst, maar de volgorde van de banen kon niet worden opgeslagen.",
         "laneOrderRestored": "De volgorde van de banen is terug.",
         "laneOrderRestoreFailed": "De volgorde van de banen kon niet worden hersteld.",
-        "cancel": "Annuleren",
         "archiveFailed": "De notitie kon niet worden gearchiveerd.",
         "trashFailed": "De notitie kon niet naar de prullenbak worden verplaatst.",
         "noGroupBy": "Dit bord heeft geen baaneigenschap. Kies in de weergave-instellingen een eigenschap om op te groeperen."
@@ -2787,17 +2679,11 @@
       "cards": {
         "changeCover": "Omslag wijzigen",
         "changeCoverImage": "Omslagafbeelding wijzigen",
-        "empty": "Geen notities komen overeen met deze weergave",
-        "noValue": "Geen waarde",
         "setCover": "Omslag instellen",
-        "setCoverImage": "Omslagafbeelding instellen",
-        "untitled": "Naamloos"
+        "setCoverImage": "Omslagafbeelding instellen"
       },
       "empty": "Nog geen weergaven. Sla de huidige notitielijst op als weergave.",
-      "list": {
-        "empty": "Geen notities komen overeen met deze weergave",
-        "noValue": "Geen waarde"
-      },
+      "list": {},
       "import": {
         "approveAction": "v{{version}} goedkeuren",
         "approveFailed": "Die goedkeuring kon niet worden opgeslagen.",
@@ -2809,7 +2695,6 @@
         "armRefusedHeading": "{{name}} is niet geïmporteerd",
         "armSameVersionDifferent": "Het bestand zegt v{{version}}, dezelfde versie als deze kluis, maar de inhoud verschilt. Dat is ofwel een andere auteur die de id hergebruikt, of een bestand dat na ondertekening is gewijzigd, dus hij wordt geweigerd.",
         "armUpdate": "Dit vervangt {{name}}: deze kluis heeft v{{stored}}, het bestand is v{{incoming}}.",
-        "close": "Sluiten",
         "filterName": "Weergave-manifest",
         "idleBody": "Een weergavebestand is één opgeslagen weergave die iemand heeft geëxporteerd. Myne controleert hem eerst en laat je zien wat hij selecteert en leest voordat er iets wordt opgeslagen.",
         "importAction": "Weergave importeren",
@@ -2835,7 +2720,6 @@
       "manager": {
         "approve": "Goedkeuren",
         "approvedState": "Goedgekeurd op dit apparaat",
-        "close": "Sluiten",
         "deleteFailed": "Die weergave kon niet worden verwijderd.",
         "deleteLabel": "Weergave {{name}} verwijderen",
         "emptyBody": "Een weergave die je opslaat vanuit de notitielijst, of die iemand je stuurt, verschijnt hier.",
@@ -2852,18 +2736,14 @@
         "editFilter": "Filter bewerken…",
         "moveDown": "Omlaag verplaatsen",
         "moveUp": "Omhoog verplaatsen",
-        "rename": "Hernoemen",
         "viewSettings": "Weergave-instellingen…"
       },
       "newView": "Nieuwe weergave",
       "noMatch": "Geen weergaven komen overeen met je zoekopdracht.",
       "searchPlaceholder": "Weergaven zoeken…",
       "table": {
-        "empty": "Geen notities komen overeen met deze weergave",
-        "name": "Naam",
-        "noValue": "Geen waarde"
-      },
-      "untitledView": "Naamloze weergave"
+        "name": "Naam"
+      }
     },
     "viewSettings": {
       "aspect": {
@@ -2873,7 +2753,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (breed)"
       },
-      "cancel": "Annuleren",
       "cardSize": "Kaartgrootte",
       "cardSizeValue": "{{size}} px",
       "columns": "Kolommen",
@@ -3033,7 +2912,6 @@
       "confirmLabel": "Hoofdwachtwoord bevestigen",
       "defaultEmptyCaption": "Kies iets dat je kunt onthouden. Het kan niet worden gereset.",
       "mismatch": "Wachtwoorden komen niet overeen.",
-      "passwordLabel": "Hoofdwachtwoord",
       "suggestPassword": "Wachtwoord voorstellen",
       "tooShort": "Gebruik minstens {{n}} tekens."
     },
@@ -3051,8 +2929,6 @@
   },
   "migrate": {
     "intro": "Werk deze kluis bij naar de nieuwe indeling. Je notities worden dan automatisch tussen apparaten samengevoegd. Hierbij krijgt de hele kluis nieuwe sleutels; de oude kopie blijft op dit apparaat staan totdat je bevestigt.",
-    "passwordLabel": "Hoofdwachtwoord",
-    "phraseLabel": "Herstelzin",
     "phraseHelp": "Vereist: je nieuwe sleutels worden met deze zin omhuld, zodat herstel blijft werken. Voer al je herstelwoorden in.",
     "submit": "Migreren",
     "migrating": "Migreren…",
@@ -3079,11 +2955,8 @@
     "errors": {
       "cancelledVaultLocked": "Herstel geannuleerd: de kluis was vergrendeld.",
       "operationInProgress": "Er is een bewerking bezig. Even geduld.",
-      "unexpected": "Onverwachte fout. Probeer het opnieuw.",
-      "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op.",
       "openAsImportSource": "Deze kluis wordt op dit moment door een import gelezen. Rond die import af of annuleer hem, en herstel daarna deze kluis."
     },
-    "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
     "genericError": "Er is iets misgegaan. Probeer het opnieuw.",
     "weakPassword": "Wachtwoord moet minstens {{min}} tekens bevatten.",
     "setPasswordError": "Kon je nieuwe wachtwoord niet instellen. Probeer het opnieuw.",
@@ -3092,7 +2965,7 @@
     "restoreVaultHeader": "Een kluis herstellen",
     "accountTitle": "Voer je accountnummer in",
     "accountLead": "Vind dit waar je je herstelzin hebt opgeslagen. Het identificeert de kluis die je wilt herstellen.",
-    "accountInvalid": "Ongeldig accountnummer — controleer het en voer het opnieuw in.",
+    "accountInvalid": "Ongeldig accountnummer: controleer het en voer het opnieuw in.",
     "accountOptionalHint": "Heb je het niet? Laat dit leeg en ga door. Je herstelzin van 24 woorden is alles wat je nodig hebt.",
     "paste": "Plakken",
     "phraseGridHint": "Typ elk woord, of plak alle 24 tegelijk om het raster te vullen.",
@@ -3177,8 +3050,6 @@
     }
   },
   "restore": {
-    "backLabel": "Terug",
-    "cancelLabel": "Terug",
     "collision": {
       "body": "Een kluis uit deze back-up bestaat al op dit apparaat. Je kunt beide houden: de herstelde kopie verschijnt als aparte kluis in je kluislijst. Of je herstelt nu en verwijdert daarna zelf de bestaande kluis uit de kluislijst. Bij verwijderen moet je DELETE typen, en dat heeft alleen zin nadat je hebt bevestigd dat de herstelde kluis opent.",
       "keepBoth": "Beide houden",
@@ -3186,14 +3057,13 @@
     },
     "damaged": {
       "body": "Het back-upbestand is beschadigd, dus er is niets hersteld. Als dit je enige kopie is, kan herstel de intacte notities terughalen en precies opsommen wat niet kon worden gelezen. Het resultaat wordt altijd als gedeeltelijk herstel aangeduid.",
-      "close": "Sluiten",
       "salvage": "Intacte notities terughalen…"
     },
     "error": {
       "tryAnotherFile": "Probeer een ander bestand"
     },
     "pick": {
-      "body": "Kies een <code>.myne-backup</code>-bestand. De back-up wordt geverifieerd voordat er iets wordt hersteld; de herstelde kluis ontgrendel je met het wachtwoord of de herstelzin van die kluis, net als bij ontgrendelen.",
+      "body": "Kies een <code>.myne-backup</code>-bestand. De back-up wordt geverifieerd voordat er iets wordt hersteld; de herstelde kluis ontgrendel je met het wachtwoord van die kluis, precies zoals bij ontgrendelen.",
       "chooseFile": "Back-upbestand kiezen…",
       "corruptedSuffix": "Je huidige kluis blijft onaangeroerd: de back-up wordt eerst als aparte kluis hersteld."
     },
@@ -3207,9 +3077,7 @@
       "restored": "Kluis hersteld.",
       "versionHistory": "Vermeldingen in versiegeschiedenis: {{n}}"
     },
-    "title": "Herstellen vanuit back-up",
     "working": {
-      "cancel": "Annuleren",
       "restoringProgress": "Herstellen… {{done}} van {{total}}",
       "verifying": "Back-up verifiëren…",
       "verifyingProgress": "Back-up verifiëren… {{done}} van {{total}}"
@@ -3220,7 +3088,6 @@
       "buildChannelDevelopment": "Ontwikkelversie",
       "buildLabel": "Build",
       "buildChannelLabel": "Buildkanaal",
-      "buildChannelStable": "Stabiel",
       "developerModeHelper": "Toont de geavanceerde instellingen die Myne standaard uit het zicht houdt: die waarbij je het pad verlaat waar Myne voor instaat, en het gereedschap voor gevorderden dat de meeste mensen nooit nodig hebben. Uitschakelen verbergt ze alleen weer. Wat je hebt aangezet blijft aan, en je zet het uit bij de betreffende instelling zelf.",
       "developerModeLabel": "Ontwikkelaarsmodus",
       "legalLabel": "Juridisch",
@@ -3231,9 +3098,8 @@
       "tagline": "Pre-alpha",
       "threatModelHelper": "Open het openbare dreigingsmodeldocument in je browser.",
       "threatModelLabel": "Dreigingsmodel",
-      "version": "Versie",
       "dev": "Dev",
-      "updateAutoCheckHelper": "Myne downloadt een klein ondertekend bestand van myne.md om te zien of er een nieuwere versie bestaat, en laat het je dan weten. Het stuurt je huidige versie en platform, en niets anders. Je kunt nog steeds handmatig controleren met de knop hierboven.",
+      "updateAutoCheckHelper": "Myne downloadt een klein ondertekend bestand van myne.md om te zien of er een nieuwere versie bestaat, en laat het je dan weten. Het stuurt je huidige versie en platform, en niets anders.",
       "updateAutoCheckLabel": "Automatisch op updates controleren",
       "updateAvailable": "Versie {{version}} is beschikbaar.",
       "updateChannelBeta": "Bèta",
@@ -3243,8 +3109,9 @@
       "updateChecking": "Controleren…",
       "updateFailed": "Kon niet op updates controleren. Er wordt later opnieuw geprobeerd.",
       "updateHelper": "Myne verifieert elke update tegen een offline releasesleutel voordat die wordt geïnstalleerd. De controle vraagt downloads.myne.md naar de nieuwste versie, waarbij alleen je versie en platform worden verstuurd (en je IP, dat die origin niet logt); nooit je notities of account.",
-      "updateIdle": "Ondertekende updates, opgehaald van downloads.myne.md wanneer je controleert.",
+      "updateIdle": "Nog niet gecontroleerd.",
       "updateInstallButton": "Opnieuw opstarten om bij te werken",
+      "updateFlushFailed": "Niet elke open notitie kon worden opgeslagen, dus Myne is niet opnieuw opgestart om bij te werken. Probeer het zo meteen opnieuw.",
       "updateLabel": "Updates",
       "updateUpToDate": "Je hebt de nieuwste versie.",
       "developerModeInline": "Toont de instellingen die Myne standaard uit het zicht houdt.",
@@ -3253,6 +3120,10 @@
       "diagnosticLogError": "Myne kon die instelling niet wijzigen.",
       "diagnosticLogReadError": "Myne kon de instelling voor diagnostische logboekregistratie niet lezen, dus die wordt als uit getoond.",
       "diagnosticBlockLabel": "Rapportdetails",
+      "diagnosticsIntro": "Wat Myne nu over dit apparaat weet. Er wordt niets verzonden; jij bepaalt wat je deelt.",
+      "diagnosticsReading": "Lezen…",
+      "diagnosticCopied": "Gekopieerd",
+      "diagnosticsLogNote": "Op dit apparaat is geen logbestand dat dit blok kan overdragen: het opgeslagen diagnoselogboek is een functie van de desktopapp.",
       "diagnosticCopy": "Diagnostiek kopiëren",
       "diagnosticCopyDone": "Diagnostiek gekopieerd",
       "diagnosticCopyFailed": "Kon niet kopiëren. Selecteer de tekst hierboven en kopieer die handmatig.",
@@ -3281,7 +3152,6 @@
       "updateBlocked": "Myne kon de update vanaf hier niet starten, dus er is niets geïnstalleerd. Probeer het zo opnieuw."
     },
     "vault": {
-      "changePasswordButton": "Wachtwoord wijzigen",
       "changePasswordError": {
         "invalidCredentialOrVault": "Verkeerd huidig wachtwoord of het kluisbestand is beschadigd.",
         "ioError": "Schijffout, probeer het opnieuw.",
@@ -3293,13 +3163,9 @@
         "vaultNotUnlocked": "Ontgrendel deze kluis voordat je het wachtwoord wijzigt."
       },
       "changePasswordHeading": "Wachtwoord wijzigen",
-      "changePasswordHelper": "Vervang je hoofdwachtwoord terwijl je dezelfde kluis houdt. Je herstelzin blijft hetzelfde.",
+      "changePasswordHelper": "Vervang je hoofdwachtwoord terwijl je dezelfde kluis houdt. Er verandert verder niets aan de kluis.",
       "dangerZoneHeading": "Gevarenzone",
-      "dangerZoneHelper": "Verwijder deze kluis en alle notities definitief. Dit kan niet ongedaan worden gemaakt. De herstelzin herstelt de kluis niet.",
       "localEraseHeading": "Deze browser",
-      "localEraseHelper": "Wis de kopie die Myne van je kluis in deze browser bewaart. Je account en alles wat al is gesynchroniseerd, blijven op de server staan.",
-      "localEraseButton": "Afmelden en de kopie van deze browser wissen…",
-      "deleteVaultButton": "Kluis verwijderen…",
       "vaultLabelEyebrow": "KLUISLABEL",
       "vaultLabelHelper": "Een naam voor deze kluis, te zien in de kluiswisselaar in de app en in de kluiskiezer bij het opstarten, vóór je ontgrendelt. Versleuteld opgeslagen in de kluis; verlaat je apparaat nooit in platte tekst.",
       "vaultLabelPlaceholder": "Een label toevoegen…",
@@ -3307,17 +3173,15 @@
       "vaultLabelSave": "Opslaan",
       "vaultIconLabel": "PICTOGRAM",
       "vaultIconDefault": "Standaard (woordmerk)",
-      "renamedToast": "Kluis hernoemd",
       "renameError": "Kon de kluis niet hernoemen",
       "newPasswordMismatch": "Nieuwe wachtwoorden komen niet overeen.",
       "samePassword": "Het nieuwe wachtwoord is hetzelfde als het huidige wachtwoord.",
       "passwordChangedToast": "Wachtwoord gewijzigd",
-      "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
       "genericChangeError": "Er is iets misgegaan. Probeer het opnieuw.",
       "renameHelper": "Wordt getoond in de kluiswisselaar. Versleuteld opgeslagen in deze kluis; laat leeg om het te wissen.",
       "newPasswordPlaceholder": "Minstens 12 tekens",
       "reenterNewPassword": "Nieuw wachtwoord opnieuw invoeren",
-      "changePasswordFootnote": "Dit maakt snel ontgrendelen ongeldig. Je herstelzin blijft ongewijzigd.",
+      "changePasswordFootnote": "Dit maakt snel ontgrendelen ongeldig. Je identiteitszin blijft ongewijzigd.",
       "changing": "Wijzigen…",
       "memberVaultNotice": "Dit is een gedeelde kluis. Hij heeft geen kluiswachtwoord. Gebruik Gedeelde kluis ontgrendelen bij Privacy om een wachtwoord of PIN toe te voegen.",
       "topics": {
@@ -3329,14 +3193,14 @@
       },
       "format": {
         "heading": "Kluisformaat",
-        "intro": "Deze kluis gebruikt nog steeds zijn eigen herstelzin. Upgraden verplaatst hem naar je identiteitszin, zodat één zin elke kluis die je bezit herstelt.",
-        "cta": "Upgraden naar herstel met één zin",
+        "intro": "Deze kluis gebruikt nog steeds zijn eigen herstelzin. Upgraden stelt hem buiten gebruik, zodat deze kluis alleen met zijn wachtwoord opent. Je identiteitszin herstelt nog steeds wie je bent op een nieuw apparaat, en hij opent geen enkele kluis.",
+        "cta": "Mijn kluiszin buiten gebruik stellen",
         "confirm": "Mijn kluiszin buiten gebruik stellen en upgraden",
-        "cancel": "Mijn kluiszin voor nu houden",
+        "cancel": "Mijn kluiszin houden",
         "running": "Upgraden…",
-        "warningPhrase": "Je opgeslagen kluis-herstelzin opent deze kluis niet meer. Je kluiswachtwoord werkt nog steeds, en je identiteitszin wordt de weg terug.",
+        "warningPhrase": "Je opgeslagen kluis-herstelzin opent deze kluis niet meer, en er komt niets voor in de plaats: vanaf dan opent de kluis alleen met zijn wachtwoord, dus een vergeten wachtwoord betekent een verloren kluis.",
         "warningDevices": "Elk apparaat dat je gebruikt, moet eerst worden bijgewerkt. Een oudere versie kan deze kluis niet meer openen zodra de upgrade is gesynchroniseerd.",
-        "done": "Deze kluis gebruikt nu je identiteitszin (geüpgraded van {{from}}).",
+        "done": "Deze kluis opent nu alleen met zijn wachtwoord (geüpgraded van {{from}}). Je opgeslagen kluiszin werkt niet meer.",
         "error": {
           "migrationRequired": "Deze kluis is nog in het oude v0.1-formaat. Voltooi eerst de kluisupgrade in de synchronisatie-instellingen.",
           "personRequired": "Dit apparaat heeft nog geen identiteit. Maak eerst je identiteit aan en kom dan terug.",
@@ -3345,7 +3209,7 @@
           "notOwner": "Dit is een gedeelde kluis. Alleen de eigenaar kan het formaat wijzigen.",
           "notUnlocked": "Open de kluis voordat je het formaat upgradet.",
           "inProgress": "Er loopt een andere beveiligingsbewerking. Probeer het zo meteen opnieuw.",
-          "alreadyUpgraded": "Deze kluis gebruikt al je identiteitszin.",
+          "alreadyUpgraded": "Deze kluis opent al alleen met zijn wachtwoord.",
           "generic": "De upgrade is niet voltooid. Er is niets gewijzigd.",
           "sharedVault": "Deze kluis is gedeeld met iemand anders. Herstel met één zin is voor een kluis die alleen jij bezit, omdat het omgaan met gedeelde leden dat nog niet ondersteunt."
         }
@@ -3370,6 +3234,7 @@
         "light": "Licht",
         "system": "Systeem"
       },
+      "themeCustomOverride": "{{name}} is actief en heeft voorrang op deze keuzes.",
       "themeHelper": "Wissel tussen lichte en donkere thema's, of volg de systeemvoorkeur.",
       "themeLabel": "Thema",
       "themeOptionAria": "Thema {{label}}",
@@ -3397,7 +3262,10 @@
         "theme": "Thema en accent",
         "sidebar": "In de zijbalk",
         "customisation": "Aanpassing"
-      }
+      },
+      "homeZoneLabel": "Thuis-tijdzone",
+      "homeZoneHelper": "Wordt naast de tijd van een gebeurtenis getoond, als tweede klok. Dit apparaat staat in {zone}. Niets hiervan wordt in je notities geschreven.",
+      "homeZoneUnknown": "Dat is geen tijdzone die dit apparaat herkent, dus er wordt geen tweede klok getoond."
     },
     "archive": {
       "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map, dearchiveert elke gearchiveerde map en verbergt de archiefknoppen. Het geldt voor de hele kluis, op elk apparaat.",
@@ -3409,8 +3277,7 @@
       "label": "Afbeeldingen comprimeren bij importeren",
       "helper": "Verkleint geplakte of neergezette afbeeldingen voordat ze worden versleuteld en opgeslagen, zodat je kluis, back-ups en synchronisatie kleiner blijven. Dit is onomkeerbaar: het originele bestand wordt niet bewaard.",
       "helperScopeEveryDevice": "Geldt voor de hele kluis, op elk apparaat.",
-      "helperScopeNotHere": "Geldt voor de hele kluis, maar niet in deze browser: afbeeldingen die je hier toevoegt, worden precies opgeslagen zoals ze zijn.",
-      "errorSaveSetting": "Kon deze instelling niet opslaan."
+      "helperScopeNotHere": "Geldt voor de hele kluis, maar niet in deze browser: afbeeldingen die je hier toevoegt, worden precies opgeslagen zoals ze zijn."
     },
     "transcription": {
       "label": "Spraak-naar-tekst",
@@ -3420,15 +3287,11 @@
     "attachmentOcr": {
       "label": "Zoeken in afbeeldingen en gescande documenten",
       "helper": "Leest tekst uit afbeeldingsbijlagen en gescande PDF's op dit apparaat, zodat zoeken ze op hun inhoud kan vinden. Er wordt niets geüpload. Dit uitschakelen stopt de extractie op de achtergrond; al geëxtraheerde tekst blijft behouden.",
-      "errorSaveSetting": "Kon deze instelling niet opslaan.",
       "processing_one": "1 bijlage lezen…",
-      "processing_other": "{{count}} bijlagen lezen…",
-      "draftUse": "De tekst die dit leest, wordt ook aangeboden als concept dat je aan een notitie kunt toevoegen. Een notitie synchroniseert versleuteld zoals elke andere.",
-      "mobileDeviceLocal": "Deze geldt per apparaat: hij bepaalt wat deze telefoon indexeert, dus je andere apparaten houden hun eigen keuze."
+      "processing_other": "{{count}} bijlagen lezen…"
     },
     "autoBackup": {
       "backupFolder": "Back-upmap",
-      "chooseFolder": "Map kiezen…",
       "chooseFolderDialogTitle": "Kies een map voor automatische back-ups",
       "frequency": "Frequentie",
       "frequencyAriaLabel": "Back-upfrequentie",
@@ -3447,14 +3310,12 @@
       "title": "Automatische back-ups"
     },
     "changePassword": {
-      "cancel": "Annuleren",
       "checkingStrength": "Sterkte controleren…",
       "strengthUnavailable": "De sterktecontrole kon niet laden, dus alleen de minimumlengte wordt gecontroleerd.",
       "confirmLabel": "Nieuw wachtwoord bevestigen",
       "currentLabel": "Huidig wachtwoord",
       "mismatch": "Wachtwoorden komen niet overeen.",
       "newLabel": "Nieuw wachtwoord",
-      "submit": "Wachtwoord wijzigen",
       "submitting": "Wachtwoord wijzigen…",
       "title": "Wachtwoord wijzigen",
       "tooShort": "Gebruik minstens {{n}} tekens."
@@ -3482,7 +3343,7 @@
     "cliAccess": {
       "label": "Terminaltoegang",
       "helperOff": "Uit. De opdracht `myne` kan niets in deze kluis lezen of wijzigen.",
-      "helperOn": "Aan zolang deze kluis ontgrendeld is. Elk programma dat onder jouw account draait, kan er notities mee lezen, doorzoeken en aanmaken. Myne kan je terminal niet van een script onderscheiden en controleert niets behalve dat de deur openstaat. Er wordt nooit om je wachtwoord gevraagd, de toegang sluit zodra de kluis vergrendelt, en notities verwijderen kan niet.",
+      "helperOn": "Aan zolang deze kluis ontgrendeld is. Myne kan je terminal niet van een script onderscheiden en controleert niets behalve dat de deur openstaat. Er wordt nooit om je wachtwoord gevraagd, de toegang sluit zodra de kluis vergrendelt, en notities verwijderen kan niet.",
       "lastUsedNever": "Niet gebruikt sinds deze kluis is ontgrendeld.",
       "lastUsedJustNow": "Zojuist voor het laatst gebruikt.",
       "lastUsedMinutesAgo": "Laatst gebruikt {{count}} min geleden.",
@@ -3505,7 +3366,7 @@
     },
     "clipperInstall": {
       "error": "Kon de instelling voor de browserclipper niet bijwerken.",
-      "helper": "Registreer de native-messaging-host zodat de Myne-browserextensie clips naar deze app kan sturen. Standaard aan; schakel uit om deze te verwijderen.",
+      "helper": "Laat de Myne-browserextensie clips naar deze app sturen.",
       "label": "Browserclipper"
     },
     "customThemes": {
@@ -3547,7 +3408,6 @@
       "folderSearchPlaceholder": "Mappen zoeken…",
       "searchEmpty": "Geen sjablonen komen overeen.",
       "searchPlaceholder": "Sjablonen zoeken…",
-      "untitledTemplate": "Naamloos sjabloon",
       "sectionDaily": "Dagelijkse notities",
       "sectionWeekly": "Wekelijkse notities",
       "sectionMonthly": "Maandelijkse notities",
@@ -3572,16 +3432,13 @@
       "periodTemplateAriaLabel": "Sjabloon voor {{period}} notities",
       "sectionPeriodic": "Periodieke notities",
       "periodSwitcherAriaLabel": "Type periodieke notitie",
-      "blockLabel": "Periodieke notities",
       "mobilePeriodAriaLabel": "Notitieperiode",
       "mobileSaveGlyph": "✓",
       "mobileSaveLabel": "Opslaan",
       "mobileSharedNotice": "Deze instellingen zijn gedeeld: een wijziging hier bereikt je andere apparaten, en dezelfde waarde die op een computer is ingesteld, komt hier aan."
     },
     "deleteVault": {
-      "cancel": "Annuleren",
       "caseSensitiveHint": "Hoofdlettergevoelig. Typ het woord exact om verwijderen mogelijk te maken.",
-      "continue": "Doorgaan",
       "copyPrimary": "Hiermee verwijder je deze kluis en elke notitie erin definitief. De actie kan niet ongedaan worden gemaakt en je herstelzin herstelt de gegevens niet.",
       "copySecondary": "De kluissleutels worden uit het geheugen gewist voordat de bestanden worden verwijderd; eventuele achtergebleven ciphertext op de schijf blijft onherstelbare, met Argon2id ingepakte ruis.",
       "keychainNote": "Wanneer de verwijdering voltooid is, vraagt Myne je systeemsleutelbos ook om de biometrische ontgrendelsleutel te verwijderen die het voor deze kluis heeft opgeslagen, op de platformen waar het er een opslaat.",
@@ -3606,7 +3463,8 @@
       "vaultPath": "Kluispad: {{path}}",
       "deleteError": "Kon de kluis niet volledig verwijderen. Probeer het opnieuw.",
       "warning": "Hiermee worden deze kluis en al haar notities definitief van dit apparaat verwijderd. Dit kan niet ongedaan worden gemaakt.",
-      "deleteButton": "Deze kluis verwijderen"
+      "deleteButton": "Deze kluis verwijderen",
+      "detailsLabel": "Meer over het verwijderen van deze kluis"
     },
     "files": {
       "newNote": {
@@ -3626,13 +3484,11 @@
         "label": "Standaardbestand om te openen",
         "noteLabel": "Notitie om te openen bij opstarten",
         "notePlaceholder": "Selecteer een notitie…",
-        "optionEmpty": "Nieuwe notitie",
         "optionLast": "Laatst geopend",
         "optionSpecific": "Specifieke notitie",
         "saveError": "Kon de opstartinstelling niet opslaan.",
         "searchEmpty": "Geen notities gevonden.",
-        "searchPlaceholder": "Notities zoeken…",
-        "untitledNote": "Naamloos"
+        "searchPlaceholder": "Notities zoeken…"
       },
       "sections": {
         "notes": "Notities en mappen",
@@ -3642,17 +3498,17 @@
     "focusMode": {
       "dimAria": "Inactieve regels dimmen",
       "dimHelper": "Dim in de focusmodus (⇧⌘F) elke regel behalve de regel die je bewerkt.",
-      "dimLabel": "Focusmodus · inactieve regels dimmen",
+      "dimLabel": "Inactieve regels dimmen",
       "off": "Uit",
       "on": "Aan",
       "saveError": "De focusmodus-instelling kon niet worden opgeslagen.",
       "typewriterAria": "Typemachinescroll",
       "typewriterHelper": "Houd in de focusmodus (⇧⌘F) de actieve regel verticaal gecentreerd terwijl je typt.",
-      "typewriterLabel": "Focusmodus · typemachinescroll"
+      "typewriterLabel": "Typemachinescroll",
+      "typewriterHelperMobile": "Houd de cursor verticaal gecentreerd"
     },
     "hotkeys": {
       "addBindingAria": "Een sneltoets toevoegen voor {{command}}",
-      "cancel": "Annuleren",
       "capturePrompt": "Druk op een toets…",
       "conflictIndicator": "⚠ conflict",
       "conflictTitle": "Ook gebruikt door {{commands}}",
@@ -3726,20 +3582,21 @@
       "on": "Aan"
     },
     "toolbarCustomize": {
+      "errorLoad": "Kon je huidige werkbalkindeling niet lezen, dus deze rijen zijn alleen-lezen totdat je dit paneel opnieuw opent.",
       "errorSave": "Kon de werkbalkindeling niet opslaan.",
       "helper": "Kies welke opmaakknoppen op de selectiewerkbalk verschijnen en in welke volgorde.",
       "label": "Werkbalkknoppen",
+      "lastShownHint": "Houd er minstens één",
+      "lastHiddenHint": "Houd er minstens één verborgen",
       "moveDown": "Omlaag verplaatsen",
-      "moveUp": "Omhoog verplaatsen",
-      "pendingHint": "Binnenkort beschikbaar"
+      "moveUp": "Omhoog verplaatsen"
     },
     "ai": {
-      "autoTagHelper": "Wanneer je even stopt met typen, leest een klein model op je apparaat de notitie en stelt bovenaan tags voor. Er wordt niets toegevoegd totdat je een suggestie accepteert.",
+      "autoTagHelper": "Wanneer je even stopt met typen, leest een klein model op je apparaat de notitie en stelt bovenaan tags voor. Er wordt niets toegevoegd totdat je een suggestie accepteert, tenzij je de rij hieronder aanzet.",
       "autoTagLabel": "Tags automatisch voorstellen",
-      "autoTagUnavailable": "Er is nog geen tagmodel geïnstalleerd. Download het één keer via Instellingen, AI, en de schakelaar gaat vanzelf aan zodra het is geïnstalleerd.",
+      "autoTagUnavailable": "Er is nog geen tagmodel geïnstalleerd. Zet de schakelaar aan bij Instellingen, AI, zodra dat wel zo is.",
       "consent": {
         "accept": "Mijn notities naar {{provider}} sturen",
-        "cancel": "Annuleren",
         "cannotVerifyLabel": "Wat Myne niet kan controleren",
         "revokeLabel": "Hoe je dit ongedaan maakt",
         "scopeLabel": "Voor welke apparaten dit geldt",
@@ -3794,13 +3651,13 @@
       "modelNone": "Geen bestand geselecteerd",
       "modelSaveFailed": "Kon het modelpad niet opslaan (het moet buiten je kluis liggen).",
       "modelTranscriptionLabel": "Spraak-naar-tekstmodel (transcriptie)",
-      "modelsHelper": "Wijs het bestand toe dat elke rol gebruikt wanneer het ergens anders vandaan komt dan de geverifieerde lijst hierboven: open een link om er een in je browser op te halen en kies hem hier. Een model draait op je apparaat; heb je in plaats daarvan een provider aangewezen, dan antwoordt die provider.",
+      "modelsHelper": "Wijs het bestand toe dat elke rol gebruikt wanneer het ergens anders vandaan komt dan de geverifieerde lijst hierboven. Een model draait op je apparaat; heb je in plaats daarvan een provider aangewezen, dan antwoordt die provider.",
       "providerHelper": "In plaats van hier een model te draaien, kan Myne een verzoek sturen naar een dienst die jij aanwijst. Je notities verlaten dit apparaat zodra dat gebeurt. “Geen” is de standaard en betekent dat er met geen enkele dienst contact wordt gemaakt.",
       "providerKeyAdd": "plak je API-sleutel",
       "providerKeyLabel": "API-sleutel",
       "providerKeyNone": "Er is geen sleutel opgeslagen, dus er kan nog niets worden verzonden.",
       "providerKeyRevoke": "Deze sleutel verwijderen",
-      "providerKeyReplace": "plak een nieuwe sleutel om de opgeslagen sleutel te vervangen",
+      "providerKeyReplace": "Sleutel vervangen",
       "providerKeyStored": "Er is een sleutel opgeslagen. Myne laat die nooit meer aan je zien. Plak een nieuwe om hem te vervangen.",
       "providerActive": "Antwoordt nu: {{name}}",
       "providerLabel": "Externe provider",
@@ -3830,7 +3687,7 @@
       "mobileRevokeHelper": "Verwijdert de aanbieder, de sleutel en de goedkeuring van deze telefoon in één keer, en laat precies de toestand achter alsof het nooit is ingesteld. Andere apparaten blijven werken totdat je het daar ook verwijdert.",
       "mobileApproveLabel": "Verzenden op deze telefoon goedkeuren",
       "mobileApproveHelper": "De aanbieder en de sleutel komen van een ander apparaat. Vanaf deze telefoon wordt niets verzonden totdat je leest wat er verzonden wordt en het hier goedkeurt.",
-      "historyBudgetHelper": "Hoeveel van het recente gesprek elk verzoek meeneemt, in tekens. Laat leeg voor de standaardwaarde. Een groter getal laat de AI langere gesprekken volgen en stuurt er meer van mee: bij een aanbieder die niet op dit apparaat draait, verlaat daarmee bij elke stap van een run meer van je tekst het apparaat.",
+      "historyBudgetHelper": "Laat leeg voor de standaardwaarde. Een groter getal laat de AI langere gesprekken volgen en stuurt er meer van mee: bij een provider die niet op dit apparaat draait, verlaat daarmee bij elke stap van een uitvoering meer van je tekst het apparaat.",
       "historyBudgetLabel": "Gesprek dat bij elk verzoek wordt meegestuurd",
       "meetingPromptHelper": "De instructie die de AI-pass voor vergaderingen gebruikt om een transcript in secties te verdelen. Laat hem leeg voor de ingebouwde standaard. Hij vervangt de standaarduitvoerindeling, dus als je hem instelt, vraag dan zelf om de secties die je wilt.",
       "meetingPromptLabel": "Prompt voor vergaderingsamenvatting",
@@ -3838,7 +3695,6 @@
       "groupAdvanced": "Geavanceerd",
       "excludedPickLabel": "Een map toevoegen om buiten te sluiten",
       "excludedPickPlaceholder": "Kies een map…",
-      "modelShowInFolder": "In map tonen",
       "modelShowLocation": "De locatie van {{name}} tonen",
       "downloadsLabel": "Modellen downloaden",
       "downloadsHelper": "Haalt een model op van de eigen origin van Myne. Het wordt voordat het wordt gebruikt gecontroleerd tegen een vingerafdruk die in de app is ingebouwd, dus een gemanipuleerde download wordt geweigerd. Er wordt niets opgehaald tenzij je klikt.",
@@ -3848,10 +3704,8 @@
       "downloadNotInstalled": "Niet geïnstalleerd",
       "downloadReinstall": "Downloaden",
       "downloadInstall": "Downloaden",
-      "modelRemove": "Verwijderen",
       "downloading": "Downloaden…",
       "downloadingPercent": "Downloaden… {{percent}}%",
-      "downloadCancel": "Annuleren",
       "downloadFailed": "De download is niet voltooid.",
       "downloadFailedChecksum": "De download kwam niet overeen met zijn vingerafdruk en is geweigerd. Probeer het opnieuw.",
       "sideloadDisclosure": "In de ontwikkelaarsmodus kun je Myne ook naar een zelf verkregen modelbestand laten wijzen. Een bestand dat je ergens anders vandaan haalt, wordt niet door Myne gecontroleerd, dus gebruik alleen een bestand dat je vertrouwt.",
@@ -3868,14 +3722,13 @@
       "excludedFoldersEmpty": "Er is nog niets uitgesloten, dus AI kan elke map in deze kluis lezen.",
       "excludedFoldersAdd": "Toevoegen",
       "excludedFoldersAddLabel": "Map om van AI uit te sluiten",
-      "excludedFoldersRemove": "Verwijderen",
       "excludedFoldersRemoveLabel": "{{folder}} niet langer van AI uitsluiten",
       "excludedFoldersMonotoneNotice": "Een uitsluiting die op een van je apparaten is toegevoegd, blijft staan totdat je hem overal verwijdert: verwijderingen hier reizen niet mee, dus een map die je andere apparaten nog uitsluiten, komt bij de volgende synchronisatie terug.",
       "catalogueOpen": "Een model downloaden",
       "catalogueColModel": "Model",
       "catalogueColState": "Status",
       "providerInline": "Je notities verlaten dit apparaat zodra je een dienst aanwijst.",
-      "providerChooseHelper": "Een model kan op dit apparaat draaien, of Myne kan een verzoek sturen naar een dienst die jij aanwijst. Je notities verlaten dit apparaat zodra dat gebeurt. “Op dit apparaat” is de standaard en betekent dat er met geen enkele dienst contact wordt gemaakt.",
+      "providerChooseHelper": "Een model kan op dit apparaat draaien, of Myne kan een verzoek sturen naar een dienst die jij aanwijst. “Op dit apparaat” is de standaard en betekent dat er met geen enkele dienst contact wordt gemaakt.",
       "providerChooseLabel": "Provider kiezen",
       "providerKeySave": "Deze sleutel opslaan",
       "providerOnDevice": "Op dit apparaat",
@@ -3890,56 +3743,90 @@
       "externalAccess": {
         "label": "Externe toegang",
         "helperOff": "Uit. Geen AI-hulpmiddel kan deze kluis bereiken via `myne-mcp`.",
-        "explanationShared": "Dit is dezelfde schakelaar als Instellingen, CLI, terminaltoegang. Eén deur, twee ingangen: `myne` wordt door jou aangestuurd, en `myne-mcp` door welk AI-hulpmiddel je ook configureert.",
-        "explanationLabel": "De naam van een verbinding is een label, geen wachtwoord. Myne kan het ene programma niet van het andere onderscheiden dat onder je account draait, en controleert niets anders dan of de deur open staat.",
-        "explanationDevice": "Goedkeuringen worden op dit apparaat opgeslagen. Een tweede computer of telefoon begint zonder en moet opnieuw worden gevraagd.",
+        "helperOn": "Aan zolang deze kluis ontgrendeld is. Myne kan niet zien wat een verbonden hulpmiddel doet met wat het leest.",
+        "empty": "Nog geen verbinding",
         "outsideMyne": "Wat een verbonden hulpmiddel met wat het leest doet, ligt buiten Myne: het draait op deze computer, heeft eigen netwerktoegang, en Myne kan niet zien waar het iets heen stuurt.",
+        "infoOneDoor": "Eén deur, twee manieren naar binnen: dezelfde schakelaar opent de terminalclient `myne`, die jij bestuurt, en `myne-mcp`, die het hulpmiddel dat je instelt bestuurt.",
+        "infoNotACredential": "Een verbindingsnaam bepaalt wat met wie wordt gedeeld, niet wie er vraagt: elk programma dat onder jouw account draait kan elke naam gebruiken.",
+        "infoBudget": "Lezen is per verbinding begroot binnen een meeschuivend tijdvenster, en de teller staat in het geheugen: Myne afsluiten wist hem. Het is een vertraging, geen slot.",
+        "accessLabel": "Mappen die deze verbinding mag gebruiken",
+        "accessNothing": "Nog geen",
         "readFailed": "Kon de verbindingslijst zojuist niet lezen. Myne heeft je niet verteld dat er niets is goedgekeurd.",
         "retry": "Probeer opnieuw",
         "readSummary": "Mag {{count}} notities lezen in {{folders}} mappen.",
         "readSummary_one": "Mag {{count}} notitie lezen in {{folders}} mappen.",
         "readSummary_other": "Mag {{count}} notities lezen in {{folders}} mappen.",
-        "writeNone": "Mag niets schrijven. Deze build geeft alleen leestoegang.",
+        "readNothing": "Leest niets: elke map blijft buiten beschouwing.",
+        "wholeVault": "Leest de hele kluis: geen enkele map blijft buiten beschouwing.",
+        "writeNone": "Schrijft nergens.",
+        "writeSummary": "Schrijft in {{folders}}.",
+        "toolsAll": "Elk hulpmiddel is beschikbaar.",
+        "toolsOff": "{{count}} hulpmiddelen uit: {{verbs}}.",
+        "toolsOff_one": "{{count}} hulpmiddel uit: {{verbs}}.",
+        "toolsOff_other": "{{count}} hulpmiddelen uit: {{verbs}}.",
         "whenLine": "Goedgekeurd {{approved}}. Laatst gebruikt {{used}}.",
         "whenLineNever": "Goedgekeurd {{approved}}. Sindsdien niet gebruikt.",
         "revoke": "Intrekken",
         "revokeFailed": "Kon die verbinding niet intrekken. Het kan nog lezen wat het was toegewezen.",
-        "snippetToggle": "Installatiefragment",
-        "snippetHelper": "Plak dit in de MCP-configuratie van je AI-hulpmiddel. De naam moet overeenkomen met de verbinding hierboven, want daarop is de goedkeuring gebaseerd.",
+        "editExclusions": "Wijzigen wat het mag gebruiken",
         "rootFolder": "Hoofdmap van de kluis",
-        "addConnection": "Een verbinding goedkeuren",
-        "dialogTitleNew": "Een verbinding goedkeuren",
-        "dialogTitle": "{{name}} opnieuw goedkeuren",
+        "requestsTitle": "Wacht op jou",
+        "requestLineWrite": "{{connection}} wil schrijven in {{folder}}.",
+        "requestLineWriteTyped": "{{connection}} wil schrijven in {{folder}}: \"{{summary}}\"",
+        "requestLineRead": "{{connection}} wil {{folder}} lezen.",
+        "requestAccept": "Toestaan",
+        "requestDismiss": "Negeren",
+        "requestAccepted": "{{connection}} mag {{folder}} nu gebruiken.",
+        "requestStale": "Die aanvraag geldt niet meer. Er is niets gewijzigd.",
+        "requestFailed": "Kon niet over die aanvraag beslissen. Er is niets gewijzigd.",
+        "addConnection": "Een verbinding toevoegen",
+        "step1Title": "Hulpmiddel",
+        "step2Title": "Instellen",
+        "step3Title": "Toegang",
+        "step1Question": "Welk hulpmiddel maakt verbinding?",
+        "otherClientsDetail": "de onbewerkte opdracht",
+        "otherClientsHelper": "Elke MCP-client kan deze opdracht uitvoeren. Geef hem de verbindingsnaam die je hieronder instelt.",
+        "configPath": "Voeg dit toe aan {{path}} en start het hulpmiddel daarna opnieuw.",
         "nameLabel": "Verbindingsnaam",
-        "namePlaceholder": "claude-desktop",
-        "nameHelper": "De naam die je client stuurt. Het is een label, geen wachtwoord: elk programma op deze computer kan elke naam gebruiken die het wil, dus dit bepaalt wat met wie wordt gedeeld, niet wie er vraagt.",
-        "nameReserved": "Die naam is gereserveerd: een client die zonder naam is geconfigureerd, komt binnen als `unnamed-client`, dus die goedkeuren zou elke niet-geconfigureerde client goedkeuren.",
-        "nameEmpty": "Een verbinding heeft een naam nodig, want daarop is de toekenning gebaseerd.",
-        "countsPending": "Bezig met bepalen wat dat omvat…",
-        "countsNotes": "Deelt {{count}} notities in {{folders}} mappen.",
-        "countsNotes_one": "Deelt {{count}} notitie in {{folders}} mappen.",
-        "countsNotes_other": "Deelt {{count}} notities in {{folders}} mappen.",
-        "countsExcluded_one": "{{count}} map uitgesloten.",
-        "countsExcluded_other": "{{count}} mappen uitgesloten.",
+        "nameClaim": "Een label, geen wachtwoord: elk programma op deze machine kan elke naam gebruiken die het wil.",
+        "clientToolsNote": "{{name}} kan ook filteren welke hulpmiddelen het gebruikt. Dat is gemak: wat dit scherm toestaat, is wat Myne afdwingt.",
+        "copySnippet": "De configuratie kopiëren",
+        "back": "Terug",
+        "next": "Volgende",
         "excludeLabel": "Weglaten",
-        "excludePlaceholder": "Niets weggelaten",
-        "excludeSearch": "Zoek een map",
-        "excludeEmpty": "Geen map komt overeen.",
-        "excludeHelper": "Een map die je weglaat, wordt niet gedeeld, en alles erin ook niet. Je kiest uit alle mappen in deze kluis, dus dit is de enige plek waar de hele kluis op tafel ligt.",
         "approve": "Goedkeuren",
-        "grantRefused": "Deze toekenning paste niet in het instellingenbudget van de kluis. Er is niets veranderd. Herroep een verbinding die je niet meer gebruikt en probeer opnieuw.",
         "grantFailed": "Kon de goedkeuring niet opslaan. Er is niets veranderd.",
         "verb": {
+          "note_search": "Notities doorzoeken",
+          "note_read": "Een notitie lezen",
+          "vault_list": "Mappen opvragen",
+          "vault_state": "Kluisoverzicht",
+          "note_create": "Een notitie aanmaken",
+          "note_append": "Aan een notitie toevoegen",
+          "note_set_field": "Een notitieveld instellen",
+          "note_move": "Een notitie verplaatsen",
+          "note_edit": "Een notitie bewerken",
           "attachment_list": "Bestanden opvragen",
           "attachment_read": "De tekst van een bestand lezen",
           "calendar_read": "De agenda lezen",
           "view_list": "Opgeslagen weergaven opvragen"
         },
+        "emptyBody": "Door er een goed te keuren, mag een hulpmiddel dat je hebt geïnstalleerd deze kluis lezen, zonder de mappen die je buiten beschouwing laat.",
+        "trademarks": "Myne is niet verbonden aan, goedgekeurd door of gesponsord door een van deze hulpmiddelen. Namen en logo's zijn eigendom van hun respectieve eigenaren.",
         "wholeVaultLabel": "De hele kluis lezen en schrijven",
         "excludeNothing": "Niets buiten gelaten",
+        "scopeLineAll": "Elke bestaande map is leesbaar en beschrijfbaar, tenzij je hem hieronder buiten beschouwing laat. Een map die je later aanmaakt is leesbaar, maar niet beschrijfbaar totdat je hem noemt.",
+        "writeRestore": "Een schrijfactie bewaart een herstelpunt dat je kunt terugdraaien.",
         "scopeLine": "Bereikt {{count}} notities in {{folders}} mappen, en kan alles daarin wijzigen.",
+        "scopeLine_one": "Bereikt {{count}} notitie in {{folders}} mappen, en kan alles wijzigen in de mappen die je noemt.",
+        "scopeLine_other": "Bereikt {{count}} notities in {{folders}} mappen, en kan alles wijzigen in de mappen die je noemt.",
+        "findFolder": "Een map zoeken",
+        "noFolderMatches": "Geen map komt overeen.",
+        "toolsLabel": "Hulpmiddelen",
+        "toolUnavailable": "niet in deze build",
         "toolsNote": "Lezen is begroot: tot {{count}} notities per {{minutes}} minuten.",
         "needsReapproval": "Goedgekeurd door een oudere versie, onder de omgekeerde regel. Deze build leest er niets voor tot je opnieuw goedkeurt.",
+        "approveAgain": "Opnieuw goedkeuren",
         "scopeLineWords": "Bereikt de mappen die je noemt, en kan alles daarin wijzigen."
       },
       "autoApplyLabel": "Voorgestelde tags automatisch toepassen",
@@ -3964,7 +3851,7 @@
       "residualPayment": "Als je voor gehoste synchronisatie betaalt, kunnen de betaling en je account nog steeds aan jou worden gekoppeld. Tor verandert waar de verbinding vandaan komt, niet het betalingsspoor.",
       "residualScope": "Op desktop dekt dit je synchronisatieverkeer en je verzoeken aan een externe AI-provider. Mobiel heeft nog geen Tor-routering, dus de providerverzoeken daarvan gaan rechtstreeks. Niets anders op dit apparaat gaat via Tor.",
       "residualsToggle": "Wat dit niet verbergt",
-      "torHelper": "Verbergt je IP-adres en locatie voor de synchronisatieserver, en verbergt voor je netwerk en je internetprovider met welke server je synchroniseert (en, op desktop, welke AI-provider je bereikt). Zij kunnen nog steeds zien dat dit apparaat verbinding maakt met Tor. Het maakt je niet anoniem voor Myne, en verbergt niet voor de server wat je synchroniseert of wanneer.",
+      "torHelper": "Op desktop verbergt dit ook welke AI-provider je bereikt. Iedereen die het netwerk in de gaten houdt kan nog steeds zien dat dit apparaat verbinding maakt met Tor. Het maakt je niet anoniem voor Myne, en verbergt niet voor de server wat je synchroniseert of wanneer.",
       "torLabel": "Synchronisatie en desktop-AI via Tor leiden",
       "torInline": "Verbergt je IP-adres en locatie voor de synchronisatieserver, en verbergt voor je netwerk en je internetprovider met welke server je synchroniseert."
     },
@@ -3993,13 +3880,11 @@
       "autoLockSearchPlaceholder": "Tijdsduren zoeken…",
       "hideVaultNamesLabel": "Kluisnamen verbergen op het vergrendelscherm",
       "hideVaultNamesHelper": "Op een apparaat met een bruikbare sleutelhanger toont de kluiskiezer de naam van een kluis zodra dit apparaat hem heeft ontgrendeld. Met deze optie aan toont elke kluis in plaats daarvan een tijdelijke aanduiding zoals Kluis 2, en dat nummer blijft bij de kluis, hoe de lijst ook wordt geordend.",
-      "hideVaultNamesErases": "Als je dit aanzet, worden de sleutels vernietigd die de hier opgeslagen namen leesbaar maken, zodat die namen op dit apparaat niet meer te herstellen zijn, en er wordt geen nieuwe naam meer weggeschreven zolang dit aan blijft.",
-      "hideVaultNamesResidue": "Het kan geen eerder gemaakte kopie bereiken: een volledige systeemback-up, een schijfkopie of elke andere kopie van deze schijf op systeemniveau die is gemaakt terwijl de namen zichtbaar waren, bevat zowel de opgeslagen namen als hun sleutels.",
       "hideVaultNamesUnavailable": "In deze installatie van de app kan Myne geen kluisnamen opslaan, dus worden ze hier niet opgeslagen en kan deze optie niet worden aangezet. De kiezer toont al voor elke kluis een tijdelijke aanduiding.",
       "hideVaultNamesErrorRead": "Kon de huidige instelling niet lezen. Gebruik de schakelaar om die opnieuw in te stellen.",
       "hideVaultNamesErrorSave": "Kon de instelling niet opslaan, dus die is ongewijzigd. Als je hem aanzette, zijn sommige opgeslagen namen mogelijk al vernietigd; zet hem opnieuw aan om dat af te ronden.",
       "hideVaultNamesErrorErase": "Eén opgeslagen naam kon niet worden vernietigd. De instelling staat daarom nog uit, in plaats van te beweren dat er iets gewist is wat niet gebeurd is. Probeer het opnieuw.",
-      "screenCaptureHelperOff": "Bescherming geldt altijd vóór ontgrendeling. Na ontgrendeling volgt het deze voorkeur.",
+      "screenCaptureHelperOff": "Uit op dit apparaat, zowel voor als na het ontgrendelen. Zet het hier weer aan, of vanaf het vergrendelscherm met het toetsenbord.",
       "screenCaptureHelperOn": "Werkt op Windows 10 (mei 2020-update) en later. macOS en Linux bieden hiervoor geen systeem-API, dus daar kan opname niet worden geblokkeerd.",
       "screenCaptureLabel": "Bescherming tegen schermopname",
       "screenCaptureSubtitle": "Schermafbeeldingen en schermopname blokkeren",
@@ -4049,27 +3934,12 @@
       "setPin": "Pincode instellen",
       "setupHelper": "Touch ID is alleen voor macOS en momenteel experimenteel (in afwachting van hardwareverificatie). Een pincode werkt overal.",
       "title": "Snel ontgrendelen",
-      "useTouchId": "Touch ID gebruiken",
-      "pinTooShort": "PIN moet minstens 6 cijfers bevatten.",
-      "pinMismatch": "PINs komen niet overeen.",
-      "pinOnToast": "Snel ontgrendelen met PIN staat aan",
       "setupError": "Kon snel ontgrendelen niet instellen.",
-      "turnedOffToast": "Snel ontgrendelen uitgeschakeld",
       "turnOffError": "Kon snel ontgrendelen niet uitschakelen",
-      "biometricOnToast": "Snel ontgrendelen met {{method}} staat aan",
       "biometricUnavailable": "{{method}} is niet beschikbaar op dit apparaat.",
-      "warningBanner": "Slechts een gemaksslot. Met een pincode is je wachtwoord na een herstart opnieuw vereist; een vingerafdruk- of gezichtscontrole werkt ook na een herstart.",
-      "biometricToggleSubtitle": "Ontgrendelen met {{method}} na automatisch vergrendelen",
-      "pinOnLead": "Snel ontgrendelen met PIN staat ",
-      "pinOnEmphasis": "aan",
-      "pinOnRest": ". Nadat de kluis automatisch is vergrendeld, kun je er weer in met je pincode in plaats van het volledige wachtwoord (alleen tijdens deze app-sessie). Een koude start vereist altijd het volledige wachtwoord.",
-      "turnOffPin": "PIN uitschakelen",
       "pinSetupHelper": "Stel een pincode van 6+ cijfers in om na automatisch vergrendelen snel opnieuw te ontgrendelen. De pincode versleutelt een sleutel die alleen op dit apparaat bestaat: die verlaat dit apparaat nooit en komt nooit in de buurt van je herstelzin.",
       "pinReplacesBiometric": " Het instellen van een PIN vervangt ontgrendelen met {{method}}.",
-      "pinPlaceholder6": "Minstens 6 cijfers",
-      "confirmPin": "PIN bevestigen",
-      "reenterPin": "PIN opnieuw invoeren",
-      "setupButton": "Snel ontgrendelen instellen",
+      "useBiometric": "{{method}} gebruiken",
       "errorBiometricAuthFailed": "Touch ID kon niet worden ingesteld. Zorg dat er een vingerafdruk is geregistreerd in Systeeminstellingen, of gebruik in plaats daarvan een PIN.",
       "biometricAuthFailed": "{{method}} kon niet worden ingesteld. Zorg dat het is ingeschakeld in de instellingen van je apparaat, of gebruik in plaats daarvan een PIN."
     },
@@ -4118,7 +3988,7 @@
       "mobileUnavailable": "Spellingcontrole is nog niet beschikbaar op deze telefoon: er is geen woordenboek op dit apparaat, dus de editor hier kan niets onderstrepen. Zet het in plaats daarvan aan vanaf je computer."
     },
     "storage": {
-      "backupHelper": "Back-ups blijven precies zo versleuteld als je kluis, in één geverifieerd .myne-backup-bestand. Herstellen werkt met het wachtwoord of de herstelzin van die kluis, net als bij ontgrendelen.",
+      "backupHelper": "Back-ups blijven precies zo versleuteld als je kluis, in één geverifieerd .myne-backup-bestand. Herstellen werkt met het wachtwoord van die kluis, precies zoals bij ontgrendelen.",
       "backupLabel": "Back-up",
       "backUpVault": "Back-up van kluis maken…",
       "exportAction": "Exporteren…",
@@ -4128,14 +3998,10 @@
       "importHelper": "Haal notities binnen uit Obsidian, Notion, Evernote, HTML-bestanden of een CSV. Alles wordt direct geïmporteerd en versleuteld; je originele bestanden blijven onaangeroerd.",
       "importLabel": "Importeren",
       "importObsidian": "Notities importeren…",
-      "locationHelper": "Elke kluis is een map met versleutelde bestanden onder dit pad. Gebruik liever de knop Back-up hieronder dan handmatige kopieën. Die verifieert het geschreven bestand.",
-      "openInFiles": "Openen in Bestanden",
       "webLocationHelper": "Je notities staan in de opslag die deze browser voor deze site bijhoudt en die de browser zelf beheert. Er is geen map om te openen. Als je de gegevens van deze site wist, verdwijnt de lokale kopie; omdat deze client synchroniseert, wordt die bij opnieuw aanmelden weer gedownload.",
       "webLocationLabel": "Waar je notities worden opgeslagen",
-      "pathUnavailable": "Pad niet beschikbaar",
       "restoreBackup": "Herstellen vanuit back-up…",
       "sections": {
-        "location": "Waar de kluis staat",
         "backup": "Back-up en herstel",
         "transfer": "Importeren en exporteren"
       }
@@ -4172,6 +4038,8 @@
     "data": {
       "exported_one": "{{count}} notitie geëxporteerd → {{label}}",
       "exported_other": "{{count}} notities geëxporteerd → {{label}}",
+      "exportedChoose_one": "{{count}} notitie geëxporteerd. Kies waar je een kopie wilt opslaan.",
+      "exportedChoose_other": "{{count}} notities geëxporteerd. Kies waar je een kopie wilt opslaan.",
       "exportNeedsApp": "Exporteren vereist de app (niet de browservoorvertoning).",
       "exportFailed": "Kon de kluis niet exporteren.",
       "exportToMarkdown": "Exporteren naar Markdown",
@@ -4184,7 +4052,6 @@
       "vaultName": "Kluisnaam",
       "approveDevice": "Apparaat goedkeuren"
     },
-    "done": "Klaar",
     "sectionOptions": "Opties",
     "footerTagline": "myne · versleuteld op dit apparaat · opensource",
     "editor": {
@@ -4199,18 +4066,11 @@
         "heading": "Pa's wijze lynx",
         "bullet1": "Sexy qua lijf, doch bang voor het zwempak",
         "bullet2": "Filmquiz bracht knappe ex-yogi van de wijs",
-        "spellCaption": "Spellingcontrole",
-        "spellSample": "gebeurdt",
         "dateTime": "Datum en tijd",
         "toolbar": "Werkbalk",
-        "task": "Taken",
         "taskSampleOpen": "Verstuur het kwartaalrapport",
         "taskSampleDone": "De locatie reserveren"
       },
-      "defaultView": "Standaardweergave",
-      "typewriter": "Typemachine-scrollen",
-      "typewriterSubtitle": "Houd de cursor verticaal gecentreerd",
-      "enableArchiving": "Archiveren inschakelen",
       "taskChipColor": {
         "accent": "Accent",
         "danger": "Rood",
@@ -4225,7 +4085,8 @@
         "label": "Prioriteit alleen pictogram"
       },
       "topics": {
-        "periodic": "Periodieke notities"
+        "periodic": "Periodieke notities",
+        "calendar": "Agenda"
       }
     },
     "search": {
@@ -4327,16 +4188,26 @@
       "time24": "24-uurs",
       "time12": "12-uurs",
       "zoneLabel": "Tijdzone",
-      "zoneHelper": "Welke zone bepaalt wat als vandaag telt, en dus welke notitie je dagelijkse, wekelijkse en maandelijkse notities openen. Laat leeg om dit apparaat te volgen. De keuze geldt per apparaat: geen enkel ander apparaat overschrijft hem, dus een afwijkende instelling kan dit apparaat op een andere dag zetten dan je andere apparaten. Tijden die je in een notitie schrijft, worden nooit gewijzigd; 09:00 blijft overal 09:00.",
+      "zoneHelper": "Laat leeg om dit apparaat te volgen. De keuze geldt per apparaat: geen enkel ander apparaat overschrijft hem, dus een afwijkende instelling kan dit apparaat op een andere dag zetten dan je andere apparaten. Tijden die je in een notitie schrijft, worden nooit gewijzigd; 09:00 blijft overal 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kent die tijdzone niet. Gebruik een naam als Europe/Berlin.",
       "errorSave": "Kon die instelling niet opslaan.",
       "zoneInline": "Welke zone bepaalt wat als vandaag telt, en dus welke notitie je dagelijkse, wekelijkse en maandelijkse notities openen."
     },
+    "calendar": {
+      "anchorLabel": "Tijd voor herinneringen van hele dagen",
+      "anchorHelper": "Hoe laat de herinnering van een gebeurtenis van een hele dag afgaat. Een gebeurtenis met een tijd rekent in plaats daarvan terug vanaf zijn eigen begin.",
+      "coloursLabel": "Agendakleuren",
+      "coloursHelper": "Elke agenda wordt getekend in de kleur die je kiest. Kleuren komen uit het thema, dus van thema wisselen schildert de agenda opnieuw.",
+      "coloursEmpty": "Nog geen enkele agenda heeft een kleur. Voeg er hieronder een toe, of geef een gebeurtenis een agendanaam en die verschijnt hier.",
+      "newNameLabel": "Naam van de nieuwe agenda",
+      "newNamePlaceholder": "Werk",
+      "addColour": "Toevoegen",
+      "saveFailed": "Kon die instelling niet opslaan. Je kluis is niet gewijzigd."
+    },
     "folderNotes": {
       "label": "Mapnotities",
-      "helper": "Laat een notitie fungeren als index van zijn map: hij opent bij het dubbelklikken op de map, en maplinks zoals [[Projecten/]] wijzen ernaar. Standaard uit. Uit verbergt de knoppen die mapnotities maken en toont bestaande als gewone notities; er verandert niets op schijf, dus aanzetten herstelt ze exact.",
-      "errorSaveSetting": "Deze instelling kon niet worden opgeslagen.",
+      "helper": "Standaard uit. Uitzetten verbergt de knoppen die mapnotities maken en toont bestaande mapnotities als gewone notities; er verandert niets op schijf, dus weer aanzetten herstelt ze exact.",
       "inline": "Laat een notitie fungeren als de index van zijn map: hij opent bij het dubbelklikken op de map, en maplinks zoals [[Projecten/]] wijzen ernaar."
     },
     "ribbonCustomize": {
@@ -4350,7 +4221,7 @@
       "searchEmpty": "Geen overeenkomende opdrachten.",
       "searchPlaceholder": "Opdrachten zoeken…",
       "searchResultsLabel": "Overeenkomende opdrachten",
-      "showHelper": "Toon het linker lint op dit apparaat.",
+      "showHelper": "Alleen op dit apparaat.",
       "showLabel": "Linker lint tonen",
       "emptyTitle": "Nog niets vastgemaakt"
     },
@@ -4358,11 +4229,8 @@
       "heading": "Wat de assistent onthoudt",
       "helper": "Feiten die de AI van het werken met jou heeft geleerd. Ze schrijft ze zelf (maximaal één per run); jij ziet en kunt elke vermelding corrigeren. Vermeldingen synchroniseren met je andere apparaten en blijven versleuteld.",
       "empty": "Vermeldingen verschijnen hier wanneer de assistent tijdens een run iets leert.",
-      "editLabel": "Bewerken",
       "deleteLabel": "Verwijderen",
       "save": "Opslaan",
-      "cancel": "Annuleren",
-      "cancelLabel": "Annuleren",
       "saveFailed": "De vermelding kon niet worden opgeslagen.",
       "deleteFailed": "De vermelding kon niet worden verwijderd.",
       "entryUnreadable": "Deze vermelding kon niet worden gelezen. Hij staat er nog; verwijder hem hier of verbeter hem in Instellingen.",
@@ -4380,21 +4248,19 @@
       "personalitySavedToast": "Stemvoorkeuren bijgewerkt.",
       "personalitySaveFailed": "De stemvoorkeuren konden niet worden opgeslagen.",
       "loadFailed": "Herinneringen of stemvoorkeuren konden niet worden geladen. Er is niets gewijzigd.",
-      "retryLabel": "Opnieuw proberen",
       "seed": {
-        "rowTitle": "Leer Myne je kluis kennen",
         "rowHelper": "Bouw herinneringen uit je notities, met een beoordeling van elke regel voordat hij wordt opgeslagen.",
         "rowSeeded": "Aangemaakt op {{date}} · {{count}} items",
-        "start": "Leer Myne je kluis kennen",
         "rebuild": "Opnieuw opbouwen",
         "rebuildConfirm": "De seed van {{date}} ({{count}} items) vervangen?",
         "title": "Leer Myne je kluis kennen",
         "candidatesTitle": "Bekijk wat Myne heeft geleerd",
-        "close": "Sluiten",
         "loading": "Je kluis lezen…",
         "scopeIntro": "Myne leest eerst de vorm van je kluis: notitietitels, mappen en tags. Hij vraagt alleen om notitietekst als hij die nodig heeft, en nooit om bijlagen.",
         "provider": "Provider: {{provider}}",
         "estimatedChars": "Ongeveer {{chars}} tekens",
+        "excluded_one": "{{count}} notitie buiten beschouwing gelaten omdat de map ervan van AI is uitgesloten",
+        "excluded_other": "{{count}} notities buiten beschouwing gelaten omdat hun map van AI is uitgesloten",
         "showPayload": "Toon precies wat wordt verzonden",
         "hidePayload": "Payload verbergen",
         "consentLabel": "Verstuur deze opzet naar {{provider}} (ongeveer {{chars}} tekens). Ik begrijp dat de provider deze ontvangt.",
@@ -4432,7 +4298,7 @@
         },
         "phases": {
           "projecting": "De vorm van je kluis lezen…",
-          "asking": "Het model om thema's vragen…",
+          "asking": "Het model om geheugenvermeldingen vragen…",
           "reading": "De notities lezen die het model vroeg…",
           "finalizing": "De items schrijven…",
           "working": "Bezig…"
@@ -4443,9 +4309,9 @@
         "removeConfirm": "Alle items uit deze seed verwijderen?",
         "removedToast": "Items uit je kluis verwijderd.",
         "rowStale": "Kluis veranderd sinds deze seed",
-        "providerLocalName": "Provider: on this device",
-        "countNotes_one": "{{count}} note",
-        "countNotes_other": "{{count}} notes",
+        "providerLocalName": "Provider: op dit apparaat",
+        "countNotes_one": "{{count}} notitie",
+        "countNotes_other": "{{count}} notities",
         "countFolders_one": "{{count}} folder",
         "countFolders_other": "{{count}} folders",
         "countTags_one": "{{count}} tag",
@@ -4459,24 +4325,23 @@
       "vaultsLabel": "Kluizen in dit account",
       "vaultsHelper": "De kluizen die dit apparaat onder de naam hierboven groepeert. Groeperen is een organisatorische keuze per apparaat, dus het maakt geen deel uit van de inhoud van een kluis en reist er niet mee.",
       "vaultsHelperShort": "Groepering blijft op dit apparaat en reist niet mee met een kluis.",
-      "vaultsCount_one": "{{count}} kluizen",
+      "vaultsCount_one": "{{count}} kluis",
       "vaultsCount_other": "{{count}} kluizen",
       "vaultCorrupted": "De metadata van deze kluis kon niet worden gelezen",
       "vaultUnreadable": "Niet gelezen op dit apparaat",
-      "vaultDeviceOnly": "Alleen op dit apparaat",
       "currentVault": "Deze kluis",
       "unknownVault": "Een andere kluis op dit apparaat",
       "numberLabel": "Accountnummer",
       "numberHelper": "Het nummer van je identiteit, niet van een kluis. Afgeleid van je identiteitszin, dus het kan niet verloren gaan en hoeft niet te worden bewaard. Het is geen geheim; gebruik het voor support of voor een overdracht aan een serverbeheerder.",
       "numberUnavailable": "Kon het accountnummer op dit apparaat niet lezen. Open Instellingen opnieuw om het nog eens te proberen.",
       "numberEmpty": "Geen identiteit op dit apparaat. Voeg er een toe of herstel er een in Sync om een accountnummer te krijgen.",
-      "numberCopy": "Kopiëren",
       "numberCopied": "Accountnummer gekopieerd",
       "numberCopyFailed": "Kon het accountnummer niet kopiëren",
       "copyAccountNumber": "Accountnummer kopiëren",
       "standaloneHelper": "Deze kluis is op dit apparaat niet onder een account gegroepeerd, dus staat hij op zichzelf. Groeperen is per apparaat: een ander apparaat kan hem binnen een account tonen.",
       "unresolvedHelper": "Bepalen welke kluis open is…",
       "devicesNote": "Apparaten, leden van gedeelde kluizen en je identiteit beheer je bij Synchronisatie.",
+      "noStoreHelper": "Dit apparaat heeft geen sleutelopslag van het besturingssysteem, dus het kan de accountgroepering niet bewaren. Kluizen openen hier afzonderlijk, en een ander apparaat kan ze samen tonen.",
       "groupingError": "Kon de accountgroepering op dit apparaat niet lezen. Er is niets gewijzigd.",
       "sections": {
         "grouping": "Dit account"
@@ -4489,14 +4354,12 @@
       "openFilesRemain": "Bestanden met niet-opgeslagen wijzigingen zijn nog open. Los ze op en zet dit daarna weer uit."
     },
     "memberPassword": {
-      "reminder": "Je hebt op dit apparaat nog geen snel ontgrendelen, dus deze kluis vraagt elke keer om je herstelzin.",
-      "reminderDismiss": "Niet nu",
+      "reminder": "Stel er een in zodat dit apparaat de kluis opnieuw kan openen.",
       "title": "Gedeelde kluis ontgrendelen",
       "helperConfigured": "Deze gedeelde kluis opent met {{method}}, opgeslagen op dit apparaat.",
-      "helperNotConfigured": "Stel een wachtwoord of PIN in zodat je niet elke keer je herstelzin opnieuw hoeft in te typen.",
+      "helperNotConfigured": "Stel een wachtwoord of PIN in zodat dit apparaat de kluis opnieuw kan openen. Zonder dat heb je hier een nieuwe uitnodiging van de eigenaar nodig om hem weer te openen.",
       "set": "Instellen",
       "change": "Wijzigen",
-      "remove": "Verwijderen",
       "label": "Kluiswachtwoord",
       "methodPassword": "een wachtwoord",
       "methodPin": "een PIN",
@@ -4505,8 +4368,8 @@
       "useBiometric": "Touch ID gebruiken",
       "pinLabel": "Kluis-PIN",
       "pinPlaceholder": "PIN, minstens {{count}} cijfers",
-      "setupHelper": "Minstens {{count}} tekens. Alleen op dit apparaat opgeslagen; je herstelzin opent de kluis nog steeds overal.",
-      "pinSetupHelper": "Minstens {{count}} cijfers. Alleen op dit apparaat opgeslagen; je herstelzin opent de kluis nog steeds overal.",
+      "setupHelper": "Minstens {{count}} tekens. Alleen op dit apparaat opgeslagen. Als je het vergeet, heeft dit apparaat een nieuwe uitnodiging van de kluiseigenaar nodig.",
+      "pinSetupHelper": "Minstens {{count}} cijfers. Alleen op dit apparaat opgeslagen. Als je ze vergeet, heeft dit apparaat een nieuwe uitnodiging van de kluiseigenaar nodig.",
       "errorTooShort": "Gebruik minstens {{count}} tekens/cijfers.",
       "errorGeneric": "Kon het aanmeldgegeven niet instellen. Probeer het opnieuw."
     },
@@ -4588,23 +4451,21 @@
       "emptyTitle": "Geen conflicten"
     },
     "deviceJoinQr": {
-      "accountLabel": "Accountnummer",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "Kon de QR niet maken. Probeer het opnieuw.",
       "generate": "QR maken",
       "hint": "Plak je accountnummer om een QR te maken die je telefoon kan scannen. Die vult de server en het accountnummer voor je in.",
       "invalidAccount": "Dat lijkt geen geldig accountnummer.",
       "notConfigured": "Stel eerst een synchronisatieserver in en maak daarna een QR.",
-      "scanWithApp": "Scannen met de iOS-app",
+      "scanWithApp": "Scannen met de mobiele app",
       "title": "Een apparaat toevoegen met een QR"
     },
     "devices": {
       "approve": "Goedkeuren",
       "awaitingApproval_one": "{{count}} apparaat wacht op goedkeuring",
       "awaitingApproval_other": "{{count}} apparaten wachten op goedkeuring",
-      "loading": "Laden…",
       "noDevices": "Nog geen andere apparaten",
-      "notEnrolled": "Dit apparaat is nog niet verbonden. Als je het zojuist hebt toegevoegd, wacht dan op goedkeuring vanaf een ander apparaat; voeg het anders toe via het formulier “Een apparaat toevoegen” hierboven.",
+      "notEnrolled": "Dit apparaat is nog niet aangemeld. Als je het zojuist hebt toegevoegd, wacht dan op goedkeuring van een apparaat dat al op je account staat; meld het anders aan met “Dit apparaat aanmelden”.",
       "platform": {
         "android": "Android-telefoon",
         "androidTablet": "Android-tablet",
@@ -4616,15 +4477,12 @@
         "web": "Browser",
         "windows": "Windows-pc"
       },
-      "remove": "Verwijderen",
       "removedElsewhere": "Dit apparaat is op een ander apparaat uit je account verwijderd.",
-      "rename": "Hernoemen",
       "renameFailed": "Kon die naam niet opslaan. Probeer het opnieuw.",
       "renameLabel": "Apparaatnaam",
       "resetAndReAdd": "Dit apparaat opnieuw instellen en opnieuw toevoegen",
       "resetSyncOnThisDevice": "Synchronisatie op dit apparaat opnieuw instellen",
       "shortName": "Apparaat {{hex}}",
-      "thisDevice": "Dit apparaat",
       "reasonUnreachable": "de server antwoordde niet",
       "reasonUnexpected": "een onverwachte fout",
       "reasonRejected": "de server weigerde de aanmelding van dit apparaat",
@@ -4638,7 +4496,6 @@
       "verifyMatch": "Ze komen overeen",
       "verifyMismatch": "Ze komen niet overeen",
       "verifyPending": "Deze code verschijnt zodra het nieuwe apparaat zijn eerste synchronisatie voltooit.",
-      "verifyChanged": "De code is veranderd terwijl je keek. Vergelijk beide schermen opnieuw. Als hij blijft veranderen, stop dan en ga niet verder.",
       "verifySyncing": "Synchroniseren…",
       "verifyTitle": "Verifieer het nieuwe apparaat",
       "verifyAction": "Code vergelijken",
@@ -4665,7 +4522,6 @@
       "invitePlaceholder": "De code die de beheerder van de server je gaf"
     },
     "enroll": {
-      "accountNumberLabel": "Accountnummer",
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Verbinden…",
       "credentialTypeAria": "Type aanmeldgegeven",
@@ -4683,69 +4539,26 @@
         "inviteCodeRequired": "Deze server accepteert nieuwe accounts alleen met een uitnodigingscode. Voer de code in die de beheerder je gaf."
       },
       "mode": {
-        "password": "Wachtwoord",
-        "recovery": "Herstelzin"
+        "password": "Wachtwoord"
       },
       "passwordLabel": "Wachtwoord",
       "recoveryPhraseHint": "Voer je herstelzin van 24 woorden in.",
-      "recoveryPhraseLabel": "Herstelzin",
       "signInWith": "Aanmelden met",
       "submit": "Dit apparaat toevoegen",
       "wordAria": "Woord {{number}}"
     },
     "join": {
-      "accountLabel": "Accountnummer",
       "cancel": "Annuleren",
-      "error": "Dit apparaat kon niet worden toegevoegd. Controleer de server-URL, het accountnummer en het wachtwoord, en of de server bereikbaar is.",
-      "help": "Meld je aan met je accountnummer en wachtwoord. Dit apparaat synchroniseert je notities zodra een bestaand apparaat het goedkeurt. Er is geen herstelzin nodig.",
-      "passwordLabel": "Wachtwoord",
       "serverLabel": "Synchronisatieserver",
-      "serverPlaceholder": "https://your-server.example",
       "sasMatch": "Ze komen overeen, doorgaan",
-      "sasMismatch": "Ze komen niet overeen, verwijder dit apparaat",
-      "submit": "Apparaat toevoegen",
       "submitting": "Toevoegen…",
-      "title": "Dit apparaat aan een account toevoegen",
-      "verifyBody": "Controleer of deze code overeenkomt met die op het apparaat waarvandaan je hebt goedgekeurd.",
-      "verifyChanged": "De code is veranderd terwijl je keek. Vergelijk beide schermen opnieuw. Als hij blijft veranderen, stop dan en ga niet verder.",
       "verifyTitle": "Verifieer dit apparaat",
-      "waitingHint": "Houd dit venster open. Zodra het is goedgekeurd, verschijnt hier een verificatiecode om te vergelijken met je andere apparaat.",
-      "waitingTitle": "Wachten op goedkeuring",
-      "personListFailed": "Je bent op dit account, maar het ophalen van de kluizen is niet voltooid, dus er worden er nog geen getoond. Probeer het opnieuw, of open dit scherm later opnieuw.",
-      "personListRetry": "Haal de kluizen opnieuw op",
-      "sasAbortFailed": "Kon dit apparaat niet loskoppelen. Het is nog steeds aangemeld bij die server, dus behandel het als niet-vertrouwd: open Instellingen → Synchronisatie en verwijder het daar. Je notities zijn niet verwijderd.",
-      "backToWaiting": "Terug naar wachten",
-      "codeBody": "Plak de code die het andere apparaat toont. Een code van een identiteit voegt dit apparaat toe aan dat hele account.",
-      "codeContinue": "Doorgaan",
-      "codeExpired": "Die code is verlopen. Vraag het andere apparaat een nieuwe te tonen.",
-      "codeInvalid": "Dat is geen Myne-koppelcode.",
-      "codeLabel": "Koppelcode",
-      "codeMemberUnsupported": "Die code is voor een gedeelde kluis. Voeg dit apparaat in plaats daarvan toe via het identiteitsscherm, waar de kluis onder je uitnodigingen verschijnt.",
-      "codeOpen": "Ik heb een koppelcode",
-      "codeTitle": "Voeg dit apparaat toe met een code",
-      "personMismatch": "Die code is voor een andere identiteit dan de zin die je hebt ingevoerd. Controleer beide en probeer het opnieuw.",
-      "personPendingBody": "Een van je andere apparaten moet dit goedkeuren. Totdat dat gebeurt, kan dit apparaat geen enkele kluis van het account openen.",
-      "personPendingHint": "Wachten op goedkeuring. Dit rondt zichzelf af zodra het andere apparaat goedkeurt.",
-      "personPendingPhraseAgain": "Dit apparaat is opnieuw gestart voordat de goedkeuring arriveerde, dus de zin is nogmaals nodig.",
-      "personPendingPhraseCta": "Voer de zin opnieuw in",
-      "personPendingTitle": "Wachten op goedkeuring",
-      "personPhraseBody": "De code noemde de identiteit; de 24 woorden bewijzen het. Dit apparaat vraagt om het eigen wachtwoord van elke kluis wanneer je hem opent.",
-      "personPhraseSubmit": "Voeg dit apparaat toe",
-      "personPhraseTitle": "Voer je identiteitszin in",
-      "errorPhrase": "Kon dit apparaat niet toevoegen. Controleer de server-URL, het accountnummer en de herstelzin, en of de server bereikbaar is.",
-      "modePassword": "Mijn wachtwoord",
-      "modePhrase": "Mijn herstelzin",
-      "noDeviceBody": "Geen ander apparaat om dit apparaat goed te keuren? Je kunt het in plaats daarvan bevestigen met je herstelzin.",
-      "phraseEscapeBody": "Je herstelzin is de volledige sleutel tot dit account, dus die bevestigt dit apparaat zonder goedkeuring van een ander apparaat. Het wachtwoord dat je zojuist hebt gebruikt, blijft gelden.",
-      "phraseTitle": "Bevestigen met je herstelzin",
-      "phraseWarning": "Je herstelzin is de volledige sleutel tot dit account, dus dit apparaat wordt toegevoegd zonder goedkeuring van een ander apparaat. Gebruik hem alleen als je geen ander apparaat hebt om mee goed te keuren. Hierna stel je een nieuw wachtwoord in.",
-      "usePhrase": "Mijn herstelzin gebruiken",
-      "back": "Terug"
+      "sasAbortFailed": "Kon dit apparaat niet loskoppelen. Het is nog steeds aangemeld bij die server, dus behandel het als niet-vertrouwd: open Instellingen → Synchronisatie en verwijder het daar. Je notities zijn niet verwijderd."
     },
     "panel": {
       "addDevice": {
         "helper": "Meld je op een nieuw apparaat aan met je accountnummer en wachtwoord of herstelzin. Een apparaat blijft in afwachting totdat een bestaand apparaat het goedkeurt.",
-        "label": "Een apparaat toevoegen"
+        "label": "Dit apparaat aanmelden"
       },
       "awaitingApproval": {
         "label": "Wacht op goedkeuring"
@@ -4759,7 +4572,6 @@
         "helper": "Eén goedkeuring schrijft een apparaat in op je account. Hij ziet daarna elke kluis die je bezit, en elke kluis opent nog steeds met zijn eigen wachtwoord."
       },
       "recovered": {
-        "close": "Sluiten",
         "decrypting": "Ontsleutelen…",
         "deleteConfirmTitle": "Deze herstelde notitie verwijderen?",
         "deleteConfirmWarning": "Hiermee verwijder je definitief de enige kopie die op dit apparaat wordt bewaard. Dit kan niet ongedaan worden gemaakt.",
@@ -4777,7 +4589,16 @@
       },
       "status": {
         "helper": "Myne synchroniseert je versleutelde notities tussen je apparaten. De server bewaart alleen ciphertext die hij niet kan lezen.",
-        "label": "Synchronisatiestatus"
+        "label": "Synchronisatiestatus",
+        "authorityIdentityClosed": "Synchronisatie hervat zodra je je identiteit op dit apparaat opent",
+        "authorityKeyMissing": "Synchronisatie hervat zodra je je identiteit opent en dit apparaat is hersteld",
+        "authorityNoHeadContext": "Dit apparaat kan te weinig van de kluis lezen om ervoor te ondertekenen. Je aanmeldgegevens zijn niet het probleem.",
+        "authorityNoDeviceId": "Dit apparaat heeft nog geen eigen identiteit, dus de kluis kan het niet benoemen.",
+        "authorityNoKeyAtRest": "Dit apparaat heeft geen ondertekeningssleutel. Open je identiteit op dit apparaat om er een in te stellen.",
+        "authorityKeyUnreadable": "De ondertekeningssleutel van dit apparaat is aanwezig, maar de systeemsleutelopslag wilde hem niet lezen. Een herstart lost dat meestal op, en tot dan werkt je identiteit openen wel.",
+        "authorityNoBindingRow": "De ondertekeningssleutel van dit apparaat is nog niet in de kluis gepubliceerd. Open je identiteit op dit apparaat om hem te publiceren.",
+        "authorityRowNamesDifferentKey": "De registratie van dit apparaat in de kluis noemt een andere sleutel dan de sleutel die hier is opgeslagen. Open je identiteit op dit apparaat om dat te herstellen.",
+        "authorityRowUnverified": "De registratie van dit apparaat in de kluis klopt niet. Open je identiteit op dit apparaat om hem opnieuw te ondertekenen."
       },
       "usage": {
         "helper": "Hoeveel versleutelde gegevens dit account op de server bewaart en hoeveel apparaten zijn aangemeld.",
@@ -4789,7 +4610,6 @@
         "label": "Identiteit",
         "helper": "Met een identiteit kunnen mensen je voor een kluis uitnodigen, en kan één identiteit meerdere kluizen bezitten.",
         "cta": "Een identiteit toevoegen",
-        "codeLabel": "Je identiteitscode",
         "lockedHelper": "Dit apparaat bevat een identiteit. Die is vergrendeld voor deze sessie; ontgrendel hem met je herstelzin om synchronisatie en uitnodigingen te ondertekenen.",
         "unregisteredHelper": "Deze identiteit bestaat alleen op dit apparaat. Registreren schrijft hem naar je synchronisatieserver, waardoor een uitnodiging je kan bereiken.",
         "unlockedHelper": "Dit apparaat bevat een identiteit, ontgrendeld voor deze sessie."
@@ -4802,7 +4622,7 @@
       "sections": {
         "account": "Account",
         "server": "Server",
-        "devices": "Aangemelde apparaten"
+        "devices": "Apparaten op je account"
       }
     },
     "reconcile": {
@@ -4812,8 +4632,7 @@
       "restoredToast": "Hersteld als nieuwe notitie."
     },
     "stale": {
-      "body": "Myne heeft de synchronisatieserver al enkele dagen niet bereikt. Je notities worden op dit apparaat opgeslagen, maar er is niets weggegaan, dus dit is de enige kopie. Open Instellingen → Synchronisatie om te zien waarom.",
-      "dismiss": "Sluiten"
+      "body": "Myne heeft de synchronisatieserver al enkele dagen niet bereikt. Je notities worden op dit apparaat opgeslagen, maar er is niets weggegaan, dus dit is de enige kopie. Open Instellingen → Synchronisatie om te zien waarom."
     },
     "status": {
       "awaitingApproval": "Wacht op goedkeuring",
@@ -4824,7 +4643,7 @@
       "errorFrozen": "Account bevroren: uploads gepauzeerd",
       "errorDeviceRevoked": "Dit apparaat is uit je account verwijderd",
       "errorStorageFull": "Opslag vol: synchronisatie gepauzeerd",
-      "errorQuota": "Opslag vol: uploads gepauzeerd",
+      "errorQuota": "Opslag vol: uploaden gepauzeerd",
       "errorRateLimited": "Synchronisatie afgeremd: nieuwe poging volgt",
       "errorTooLarge": "Een bestand is te groot om te uploaden",
       "loading": "Synchronisatiestatus…",
@@ -4835,8 +4654,11 @@
       "syncing": "Synchroniseren…",
       "syncNow": "Nu synchroniseren",
       "errorIdentityLocked": "Ontgrendel je identiteit om te synchroniseren",
+      "uploadsBlocked": "Uploaden gepauzeerd: dit apparaat kan de kluiskop niet ondertekenen",
       "errorTls": "Kon de HTTPS-verbinding met de synchronisatieserver niet verifiëren",
-      "unlockIdentityCta": "Identiteit ontgrendelen"
+      "unlockIdentityCta": "Identiteit ontgrendelen",
+      "errorDeviceKeyMissing": "De ondertekeningssleutel die dit apparaat heeft gepubliceerd is er niet, dus synchronisatie kan niet draaien",
+      "repairDeviceCta": "Dit apparaat herstellen"
     },
     "usage": {
       "devices": "Apparaten",
@@ -4851,6 +4673,7 @@
       "serverSection": "Server",
       "serverNotSet": "Niet ingesteld",
       "statusLabel": "Status",
+      "approvalCode": "De goedkeuringscode van dit apparaat",
       "hubHelp": "Synchronisatie houdt je notities op al je apparaten up-to-date. Alles wordt op dit apparaat versleuteld voordat het wordt verzonden. De server ziet je notities nooit.",
       "connectedTls": "Verbonden via TLS.",
       "connectedLocal": "Verbonden op je lokale netwerk.",
@@ -4865,7 +4688,6 @@
       "verifyBody": "Controleer of dezelfde code verschijnt op het apparaat dat je zojuist hebt goedgekeurd. Als deze overeenkomt, staan ze op je account. Zo niet, verwijder dan het apparaat.",
       "sasMismatch": "Ze komen niet overeen",
       "removeDeviceButton": "Apparaat verwijderen",
-      "keepDevice": "Behouden",
       "notEnrolledHelp": "Dit apparaat synchroniseert nog niet. Voeg het toe via het vorige scherm om je apparaten te zien.",
       "unauthenticated": "De toegang van dit apparaat is ingetrokken, waarschijnlijk verwijderd vanaf een ander apparaat.",
       "transportError": "Kon de synchronisatieserver niet bereiken. Controleer het serveradres en het HTTPS-certificaat.",
@@ -4893,16 +4715,15 @@
     },
     "memberRoster": {
       "loading": "Leden laden…",
-      "error": "De kuislijst kon niet worden gelezen.",
-      "hint": "Leden van deze kluis. Elke lid komt met eigen identiteit en inloggegevens.",
+      "error": "De ledenlijst van de kluis kon niet worden gelezen.",
+      "hint": "Leden van deze kluis. Elk lid komt met een eigen identiteit en eigen inloggegevens. Een apparaataantal is een bewering die dat lid heeft ondertekend, geen bewijs dat hij de machine bezit.",
       "empty": "Nodig iemand uit om deze kluis te delen. Diegene neemt deel met zijn of haar eigen identiteit.",
       "rotated": "Sleutel geroteerd",
       "keyChanged": "Sleutel gewijzigd. Verifieer met de eigenaar.",
-      "relinkConfirmed": "Herlijnen bevestigd door eigenaar",
+      "relinkConfirmed": "Opnieuw koppelen bevestigd door eigenaar",
       "ownerBadge": "Eigenaar",
       "memberBadge": "Lid",
       "invite": "Lid uitnodigen",
-      "remove": "Verwijderen",
       "removeConfirm": "{{name}} verwijderen? Zodra de sleutelrotatie voltooid is, verliezen ze toegang tot toekomstige wijzigingen. Dit kan niets wissen wat ze al hebben gekopieerd en roept niets terug vanaf hun apparaat of AI-provider.",
       "removalLimits": "Een lid verwijderen stopt alleen hun toegang tot toekomstige wijzigingen. Het kan niets wissen wat ze al hebben gekopieerd en roept niets terug vanaf hun apparaat of AI-provider.",
       "inviteReady": "Uitnodiging klaar voor {{fingerprint}}…",
@@ -4910,25 +4731,25 @@
       "invitationClaimed": "Geaccepteerd",
       "invitationPending": "Nog niet geaccepteerd",
       "invitationsFailed": "Je uitnodigingen konden niet worden geladen.",
-      "title": "Kuisleden",
+      "title": "Kluisleden",
       "personUnlock": "Lididentiteit ontgrendelen",
-      "personReady": "Lididentiteit ontgrendeld.",
+      "personReady": "Je identiteit is ontgrendeld voor deze sessie.",
       "ownerCodeHint": "Deel deze code met de persoon die je uitnodigt zodat hij kan verifiëren dat de kluis van jou is. Hij bevat alleen publieke informatie.",
-      "personLock": "Lididentiteit vergrendelen",
+      "personLock": "Identiteit vergrendelen",
       "personError": "Die zin opende geen lididentiteit.",
       "inviteHint": "Plak de identiteitscode van het uitgenodigde lid (vanaf zijn identiteitspagina).",
-      "inviteCodeLabel": "Lid-identiteitscode",
       "untitledVault": "Naamloze kluis",
       "inviteFailed": "De uitnodiging kon niet worden aangemaakt.",
       "inviteNotOnServer": "Deze kluis staat nog niet op je synchronisatieserver. Publiceer hem, en registreer je identiteit, nodig daarna opnieuw uit.",
       "removeFailed": "Het lid kon niet worden verwijderd.",
       "youBadge": "Jij",
+      "deviceCount_one": "{{count}} apparaatclaim",
+      "deviceCount_other": "{{count}} apparaatclaims",
+      "deviceClaimsUnverified_one": "Eén apparaatclaim kon niet worden geverifieerd: het lid dat erin wordt genoemd heeft hem niet ondertekend.",
+      "deviceClaimsUnverified_other": "{{count}} apparaatclaims konden niet worden geverifieerd: het lid dat in elke claim wordt genoemd heeft hem niet ondertekend.",
       "nameUnverified": "Naam niet geverifieerd",
       "nameLabel": "Je weergavenaam",
-      "nameEdit": "Hernoemen",
       "nameSave": "Opslaan",
-      "nameClear": "Wissen",
-      "nameCancel": "Annuleren",
       "nameErrorEmpty": "Voer een naam in, of gebruik Wissen om de jouwe te verwijderen.",
       "nameErrorTooLong": "Die naam is te lang.",
       "nameErrorUnreadable": "De naamopslag kon op dit apparaat niet worden gelezen. Er is niets opgeslagen.",
@@ -4937,7 +4758,6 @@
       "nameErrorGeneric": "Kon je naam niet opslaan. Probeer het opnieuw.",
       "nameInviteCta": "Een naam instellen",
       "noInvitations": "Nog geen uitnodigingen verstuurd.",
-      "identityHeading": "Je identiteit",
       "membersHeading": "Leden",
       "emptyTitle": "Nog geen leden",
       "personUnlockOpen": "Ontgrendelen",
@@ -4947,16 +4767,12 @@
       "shareConfirmBody": "Iemand uitnodigen maakt van deze kluis een gedeelde kluis: hij krijgt een groupsleutel, en mensen die je uitnodigt openen de inhoud ermee. Deze wijziging is permanent en er is geen weg terug naar een kluis voor één gebruiker. Ga verder om te kiezen wie je uitnodigt.",
       "shareConfirmCta": "Delen en uitnodigen",
       "shareFailed": "Kon het delen van deze kluis niet starten.",
-      "identityForgetCta": "Deze identiteit op dit apparaat vergeten",
       "identityForgetCheckbox": "Ik begrijp dat deze identiteit van dit apparaat wordt verwijderd.",
       "identityForgetConfirm": "Identiteit vergeten",
-      "identityForgetCancel": "Bewaren",
-      "identityForgetWarning": "Dit verwijdert de identiteit alleen van dit apparaat. Het serveraccount en elke kluis die het bezit of waaraan het is toegetreden, blijven ongemoeid, en je kunt de identiteit met zijn 24-woordzin op een ander apparaat herstellen. Uitnodigingen en ledenlijstacties op dit apparaat vereisen dat hij opnieuw wordt ontgrendeld.",
       "identityForgetError": "Kon de identiteit niet vergeten. Probeer het opnieuw.",
       "invitationDeclined": "Afgewezen"
     },
     "deviceBindings": {
-      "title": "Apparaten en leden",
       "errorLocked": "Ontgrendel de kluis om de apparaten ervan te lezen.",
       "errorUnshared": "Deze kluis is niet gedeeld, dus bevat hij geen apparaatbindingen.",
       "errorNoDeviceId": "Dit apparaat is niet aan je account toegevoegd, dus het heeft geen apparaatidentiteit om zich onder op te eisen.",
@@ -4968,8 +4784,7 @@
       "title": "Kies een weergavenaam",
       "body": "Zo zullen de andere leden van deze kluis je in de ledenlijst zien. Je vingerafdruk blijft ernaast staan, en je kunt de naam later wijzigen.",
       "label": "Je weergavenaam",
-      "checking": "Je naam controleren…",
-      "save": "Doorgaan"
+      "checking": "Je naam controleren…"
     },
     "memberJoinQr": {
       "error": "Kon de code niet maken.",
@@ -4981,7 +4796,7 @@
       "stepIdentity": "Open Myne op je andere apparaat en kies “Ik heb al een identiteit”.",
       "stepJoin": "Deze gedeelde kluis staat klaar bij je uitnodigingen. Open hem om toe te treden.",
       "stepPhrase": "Voer daar je herstelzin van 24 woorden in.",
-      "title": "Je eigen apparaat toevoegen"
+      "title": "Je tweede apparaat aanmelden"
     },
     "personJoinQr": {
       "title": "Voeg een apparaat toe aan je identiteit",
@@ -5002,11 +4817,8 @@
       "folder": "Map",
       "insert": "Invoegen",
       "noDueDate": "Geen vervaldatum",
-      "priority": "Prioriteit",
       "sort": "Sorteren op",
-      "sortDue": "Vervaldatum",
       "sortPath": "Notitie",
-      "sortPriority": "Prioriteit",
       "status": "Status",
       "statusDone": "Voltooid",
       "statusTodo": "Niet voltooid",
@@ -5021,7 +4833,6 @@
     },
     "filter": {
       "overdue": "Achterstallig",
-      "today": "Vandaag",
       "upcoming": "Aankomend"
     },
     "noteTitle": "Taken in deze notitie",
@@ -5044,12 +4855,10 @@
       "untitled": "Naamloze taak",
       "editFields": "Taakvelden bewerken"
     },
-    "title": "Taken",
     "axis": {
       "due": "Vervaldatum",
       "folder": "Map",
       "note": "Notitie",
-      "priority": "Prioriteit",
       "sort": "Sorteren",
       "status": "Status",
       "tag": "Tag"
@@ -5057,9 +4866,7 @@
     "due": {
       "any": "Elke datum",
       "later": "Later",
-      "none": "Geen datum",
-      "overdue": "Overdue",
-      "today": "Vandaag",
+      "overdue": "Achterstallig",
       "upcoming": "Binnenkort"
     },
     "filters": {
@@ -5076,30 +4883,22 @@
       "medium": "Midden"
     },
     "section": {
-      "done": "Klaar",
       "later": "Later",
-      "none": "Geen datum",
-      "overdue": "Overdue",
-      "today": "Vandaag",
+      "overdue": "Achterstallig",
       "upcoming": "Binnenkort"
     },
     "sort": {
-      "due": "Vervaldatum",
       "dueDesc": "Vervaldatum, nieuwste eerst",
-      "note": "Notitie",
-      "priority": "Prioriteit"
+      "note": "Notitie"
     },
     "status": {
       "all": "Alle",
-      "done": "Klaar",
       "undone": "Open"
     },
     "view": {
       "allFolders": "Alle mappen",
-      "allNotes": "Alle notities",
       "anyPriority": "Elke prioriteit",
-      "anyTag": "Elke tag",
-      "untitled": "Naamloos"
+      "anyTag": "Elke tag"
     },
     "search": {
       "label": "Taken zoeken",
@@ -5113,9 +4912,7 @@
       "emptyBody": "Maak een sjabloon om een notitieskelet te hergebruiken: een vergadernotitie, een dagelijks logboek, een leesnotitie. Kies er een wanneer je een nieuwe notitie maakt.",
       "emptyTitle": "Nog geen sjablonen",
       "listLabel": "Sjablonen",
-      "loading": "Laden…",
       "newTemplate": "Nieuw sjabloon",
-      "newTemplateName": "Naamloos sjabloon",
       "removeFromTemplates": "Uit sjablonen verwijderen",
       "removeRowLabel": "{{name}} uit sjablonen verwijderen (notitie blijft behouden)",
       "title": "Notitiesjablonen",
@@ -5127,7 +4924,6 @@
     "newAction": "Nieuw",
     "emptyAfter": " om een herbruikbaar notitiesjabloon te maken en er vervolgens notities mee te beginnen (en kies er een als sjabloon voor je dagelijkse notitie in Instellingen).",
     "use": "Gebruiken",
-    "edit": "Bewerken",
     "deleteConfirm": "Dit sjabloon verwijderen?",
     "convertToNote": "Omzetten naar notitie"
   },
@@ -5135,8 +4931,6 @@
     "apply": "Thema toepassen",
     "applying": "Toepassen…",
     "byAuthor": "Volgens deze link is dit van {{author}}",
-    "cancel": "Annuleren",
-    "close": "Sluiten",
     "collision": {
       "keepBoth": "Beide houden en installeren als “{{name}}”",
       "question": "Je hebt al een thema met de naam “{{name}}”.",
@@ -5159,7 +4953,6 @@
   },
   "unlock": {
     "backToPicker": "Kies een andere kluis",
-    "continue": "Doorgaan",
     "decrypting": "Ontsleutelen…",
     "deleteLink": "Zowel wachtwoord als herstelzin kwijt? Verwijder de kluis en begin opnieuw",
     "memberRemoveLink": "Verwijder deze kluis van dit apparaat",
@@ -5167,8 +4960,6 @@
       "alreadyUnlocked": "De kluis is al ontgrendeld.",
       "inProgress": "Er is een bewerking bezig.",
       "kdfMemoryExceedsHost": "Deze kluis heeft {{required}} MiB geheugen nodig om te openen, meer dan deze browser kan geven ({{available}} MiB). Er is niets mis met de kluis; open hem in de Myne-desktopapp.",
-      "unexpected": "Onverwachte fout. Probeer het opnieuw.",
-      "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op.",
       "vaultUpgraded": "Deze kluis is bijgewerkt naar een nieuwere indeling die deze versie van Myne nog niet ondersteunt. Er is niets mis met je gegevens. Werk Myne bij naar de nieuwste versie om hem te openen.",
       "openAsImportSource": "Deze kluis wordt op dit moment door een import gelezen. Rond die import af of annuleer hem, en ontgrendel daarna deze kluis."
     },
@@ -5183,8 +4974,8 @@
       "wrongCredential": "Onjuist. Nog {{remaining}} poging(en) over.",
       "showPin": "PIN tonen",
       "hidePin": "PIN verbergen",
-      "waitingForTouchId": "Waiting for Touch ID…",
-      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
+      "waitingForTouchId": "Wachten op Touch ID…",
+      "waitingForTouchIdHint": "Beantwoord de systeemvraag om te ontgrendelen. Verschijnt er geen vraag, gebruik dan in plaats daarvan je wachtwoord."
     },
     "recoveryInterruptedBanner": "De herstelprocedure werd onderbroken. Stel eerst een nieuw wachtwoord in.",
     "recoveryInterruptedBody": "Stel eerst een nieuw wachtwoord in en verzegel daarna je kluis opnieuw.",
@@ -5199,7 +4990,6 @@
       "metaChangedExternally": "De kluis is in een andere sessie gewijzigd. Ontgrendel opnieuw."
     },
     "title": "Ontgrendel je kluis",
-    "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
     "unlockFailedGeneric": "Kon niet ontgrendelen. Probeer het opnieuw.",
     "biometricTooManyAttempts": "Te veel {{biometric}}-pogingen. Gebruik je wachtwoord.",
     "pinIncorrect_one": "Onjuiste PIN. Nog {{count}} poging over.",
@@ -5226,16 +5016,12 @@
     "deletePartialError": "Sommige bestanden konden niet worden verwijderd. De kluis is niet meer bruikbaar. Ga door om opnieuw te beginnen.",
     "failClosedEyebrow": "Kan kluis niet openen",
     "restoreHint": "Herstellen vanuit een back-up is nog niet beschikbaar op mobiel.",
-    "memberHint": "Deze kluis is met je gedeeld. Ontgrendel hem met je eigen herstelzin.",
     "memberSubtitle": "Open deze gedeelde kluis.",
-    "memberPhraseLabel": "Herstelzin",
+    "memberNoCredential": "Deze gedeelde kluis is op een ander apparaat ingesteld. Om hem hier te openen, accepteer je een nieuwe uitnodiging van de kluiseigenaar: dit apparaat heeft er geen wachtwoord voor, en de herstelzin ontgrendelt een gedeelde kluis niet meer.",
     "memberSubmit": "Ontgrendelen",
-    "memberError": "Die zin opende deze gedeelde kluis niet.",
     "memberPasswordHint": "Deze kluis is met je gedeeld. Ontgrendel hem met het wachtwoord dat je op dit apparaat hebt ingesteld.",
     "memberPasswordLabel": "Kluiswachtwoord",
     "memberPasswordError": "Dat wachtwoord opende deze gedeelde kluis niet.",
-    "memberUsePhrase": "In plaats daarvan je herstelzin gebruiken",
-    "memberUseFast": "In plaats daarvan snel ontgrendelen gebruiken",
     "memberPinHint": "Deze kluis is met je gedeeld. Ontgrendel hem met de PIN die je op dit apparaat hebt ingesteld.",
     "memberPinLabel": "Kluis-PIN",
     "memberPinPlaceholder": "Kluis-PIN (minstens {{count}} cijfers)",
@@ -5245,6 +5031,7 @@
     "restoreCta": "Herstellen vanuit een back-up",
     "ioErrorHint": "Probeer het opnieuw, of open Myne opnieuw.",
     "identityPhraseLink": "Gebruik je identiteitszin",
+    "passwordOnlyNote": "Deze kluis opent alleen met zijn wachtwoord. Er is geen herstelzin voor.",
     "identityPhrase": {
       "title": "Ontgrendel met je identiteitszin",
       "body": "Deze kluis opent met zijn wachtwoord of met je identiteitszin. Als je een aparte kluisherstelzin voor hem hebt opgeslagen, is die ingetrokken en opent hij niet meer. Hem openen met de 24 woorden die je voor je identiteit hebt opgeschreven, ontgrendelt ook je identiteit voor deze sessie, zodat synchronisatie zonder tweede prompt werkt.",
@@ -5261,13 +5048,11 @@
   "vault": {
     "ioBanner": {
       "cannotRead": "Kan het kluisbestand niet lezen.",
-      "notFound": "Kluisbestand niet gevonden. Start de app opnieuw op.",
       "permissionDenied": "Geen toestemming om het kluisbestand te openen. Controleer de bestandsrechten."
     }
   },
   "vaultCreation": {
     "briefing": {
-      "back": "Terug",
       "continue": "Doorgaan naar het aanmaken van de kluis",
       "eyebrow": "Nieuwe kluis",
       "heading": "Voordat je je kluis aanmaakt",
@@ -5284,15 +5069,14 @@
           "why": "Je wachtwoord is de invoer voor de sleutel die je notities ontsleutelt. Het verlaat dit apparaat nooit, en niets op onze servers kan het reproduceren. Dat houdt je notities privé, en daarom kunnen we het niet voor je resetten."
         },
         "phrase-backup": {
-          "ackLabel": "Ik begrijp dat mijn herstelzin de enige back-up is.",
-          "statement": "Je herstelzin is je enige back-up.",
-          "why": "Als je je wachtwoord vergeet, is de herstelzin van 24 woorden de enige manier om weer binnen te komen. {{lostBothSecrets}} Schrijf de zin op en bewaar hem op een veilige plek."
+          "ackLabel": "Ik begrijp dat niets anders me weer in deze kluis krijgt.",
+          "statement": "Bewaar wat Myne je ook laat zien. Niets anders krijgt je er weer in.",
+          "why": "Een kluis die is aangemaakt terwijl je identiteit ontgrendeld was, opent alleen met zijn wachtwoord: je identiteitszin bewijst wie je bent op een nieuw apparaat, en hij opent geen kluis. Een kluis die is aangemaakt op een apparaat zonder identiteit heeft in plaats daarvan een herstelzin van 24 woorden, en dan is die zin de enige weg terug. {{lostBothSecrets}} Schrijf op wat deze procedure je toont en bewaar het op een veilige plek."
         }
       },
       "why": "Waarom?"
     },
     "confirm": {
-      "back": "Terug",
       "heading": "Bevestig je herstelzin",
       "intro": "Typ de woorden op deze vier posities om te controleren of je ze hebt opgeslagen.",
       "mismatch": "Komt niet overeen met woord {{pos}}.",
@@ -5314,31 +5098,24 @@
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "Probeer het opnieuw.",
         "title": "Accountnummer ongeldig"
       },
       "aeadFailure": {
-        "body": "Probeer het opnieuw.",
         "title": "Versleuteling mislukt"
       },
       "csprng": {
-        "body": "Probeer het opnieuw.",
         "title": "Kon geen veilige willekeurige gegevens genereren"
       },
       "invalidPassword": {
-        "body": "Probeer het opnieuw.",
         "title": "Ongeldig wachtwoord"
       },
       "invalidVaultMeta": {
-        "body": "Probeer het opnieuw.",
         "title": "Fout in kluisindeling"
       },
       "ioOther": {
-        "body": "Probeer het opnieuw.",
         "title": "Kon de kluis niet opslaan"
       },
       "joinFailure": {
-        "body": "Probeer het opnieuw.",
         "title": "Er is iets misgegaan"
       },
       "kdfFailure": {
@@ -5350,7 +5127,6 @@
         "title": "Niet genoeg schijfruimte"
       },
       "notFound": {
-        "body": "Probeer het opnieuw.",
         "title": "Kluismap ontbreekt"
       },
       "passwordTooShort": {
@@ -5398,7 +5174,6 @@
         "title": "Kluis aanmaken afbreken?"
       },
       "genericError": {
-        "body": "Probeer het opnieuw.",
         "title": "Er is iets misgegaan"
       },
       "provisionFailed": {
@@ -5407,17 +5182,14 @@
       }
     },
     "password": {
-      "back": "Terug",
       "heading": "Kies een hoofdwachtwoord",
       "helperLead": "Myne slaat je wachtwoord of herstelzin niet op.",
-      "submit": "Herstelzin genereren",
-      "eyebrowLabel": "Hoofdwachtwoord"
+      "submit": "Herstelzin genereren"
     },
     "phrase": {
       "clipboardNotCleared": "Je browser laat Myne je klembord daarna niet wissen, dus die 24 woorden blijven daarop staan tot je iets anders kopieert. Plak ze in je wachtwoordmanager en kopieer daarna iets anders.",
       "copied": "Gekopieerd. Myne wist het na 30 seconden, ook als je verdergaat, zolang de app blijft draaien.",
       "copiedNoAutoClear": "Gekopieerd. Myne kan je klembord hier niet wissen, dus de woorden blijven erop staan tot je iets anders kopieert.",
-      "copy": "Kopiëren",
       "extensionNotice": "Browserextensies met toegang tot deze site kunnen lezen wat er op deze pagina staat. Als je niet van elke extensie in dit profiel zeker bent, gebruik dan de desktop-app of een schoon browserprofiel voor deze stap.",
       "copyFailed": "Kon niet kopiëren. Gebruik in plaats daarvan “Opslaan als bestand”.",
       "downloadStarted": "Naar de downloads van je browser gestuurd. Controleer of het bestand is aangekomen: je browser bepaalt waar het terechtkomt, en Myne kan niet zien of dat gebeurd is.",
@@ -5428,42 +5200,31 @@
       "sessionOnlyNotice": "Deze browser bewaart je zin niet na een herladen, dus je wordt opnieuw om de 24 woorden gevraagd. Bewaar ze op een veilige plek."
     },
     "ready": {
-      "backedUp": "Back-up gemaakt",
-      "backingUp": "Back-up maken…",
-      "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "De back-up is niet voltooid. Er is geen bestand achtergelaten. Je kunt op elk moment een back-up maken via Instellingen → Opslag.",
-      "backupFilterName": "Myne-back-up",
-      "backUpNow": "Nu een back-up maken",
       "body": "Je notities zijn versleuteld en op dit apparaat opgeslagen. Bewaar je wachtwoord en herstelkit op een veilige plek: ze zijn de enige weg terug naar binnen.",
       "decrypting": "Ontsleutelen…",
       "done": "Kluis openen",
-      "heading": "Je kluis is klaar",
-      "showFolder": "Kluismap tonen"
+      "heading": "Je kluis is klaar"
     },
     "sessionLost": {
       "startOver": "Opnieuw beginnen"
     },
     "kit": {
-      "accountFor": "Accountnummer — wanneer je een ander apparaat toevoegt",
-      "back": "Terug",
+      "accountFor": "Accountnummer: wanneer je een ander apparaat toevoegt",
       "continue": "Ik heb dit opgeslagen, zin bevestigen",
       "copied": "De kit staat op je klembord. Myne wist het na 30 seconden, ook als je verdergaat, zolang de app blijft draaien.",
       "copiedNoAutoClear": "Gekopieerd. Myne kan je klembord hier niet wissen, dus de kit blijft erop staan tot je iets anders kopieert.",
-      "copy": "Kopiëren",
       "copyFailed": "Kon niet kopiëren. Gebruik in plaats daarvan “Herstelkit opslaan”.",
       "documentTitle": "Myne-herstelkit",
       "downloadStarted": "Naar de downloads van je browser gestuurd. Controleer of de kit is aangekomen: je browser bepaalt waar het bestand terechtkomt, en Myne kan niet zien of dat gebeurd is.",
       "eyebrowLabel": "Herstelkit",
       "heading": "Sla je herstelkit op",
       "intro": "Het bestand dat je op het punt staat op te slaan is precies dit. Het wordt één keer getoond.",
-      "phraseFor": "Herstelzin — als je je wachtwoord vergeet",
+      "phraseFor": "Herstelzin: als je je wachtwoord vergeet",
       "save": "Herstelkit opslaan",
       "saveFailed": "Kon het bestand niet opslaan. Kopieer in plaats daarvan de kit, of schrijf beide delen op.",
       "savedToFile": "Opgeslagen. Het is een bestand met platte tekst dat beide geheimen bevat, dus bewaar het op een plek waar alleen jij het kunt lezen."
     },
     "name": {
-      "back": "Terug",
-      "continue": "Doorgaan",
       "eyebrowLabel": "Geef je kluis een naam",
       "heading": "Hoe zullen we deze kluis noemen?",
       "helper": "De naam wordt versleuteld met de kluis opgeslagen. Op dit apparaat wordt hij vóór het ontgrendelen getoond in de kluiskiezer bij het opstarten, dus iedereen die dat scherm kan zien, kan hem lezen; verberg kluisnamen in Instellingen om dat uit te zetten. Je kunt hem later wijzigen.",
@@ -5474,13 +5235,10 @@
   },
   "vaultPicker": {
     "createAnother": "Nog een kluis aanmaken",
-    "deviceOnly": "Alleen op dit apparaat",
     "heading": "Kies een kluis",
-    "joinDevice": "Dit apparaat aan een account toevoegen",
     "loading": "Je kluizen laden…",
     "noneLoaded": "Er konden nu geen kluizen worden geladen.",
     "openedRelative": "geopend {{rel}}",
-    "restoreFromBackup": "Herstellen vanuit back-up",
     "subline": "Je hebt meer dan één kluis op dit apparaat. Kies er een om te ontgrendelen.",
     "vaultFallback": "Kluis {{n}}",
     "accountError": "De accountgroepering kon op dit apparaat niet worden gelezen.",
@@ -5500,7 +5258,6 @@
       "errors": {
         "cancelledVaultLocked": "Herstel geannuleerd: de kluis was vergrendeld.",
         "operationInProgress": "Er is een bewerking bezig. Even geduld.",
-        "unexpected": "Onverwachte fout. Probeer het opnieuw.",
         "weakPassword": "Het nieuwe wachtwoord moet minstens 12 tekens lang zijn."
       },
       "eyebrow": "Herstel · Nieuw wachtwoord",
@@ -5522,8 +5279,7 @@
       "accountInvalid": "Ongeldig accountnummer. Controleer het en probeer het opnieuw.",
       "accountLabel": "Accountnummer (optioneel)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (optioneel)",
-      "body": "Kies de kluis die je wilt herstellen met je herstelzin van 24 woorden. Je kunt ook je accountnummer typen om er direct naartoe te gaan.",
-      "cancel": "Annuleren",
+      "body": "Kies de kluis die je wilt herstellen. Een kluis die nog zijn eigen herstelzin heeft, kan met die 24 woorden worden hersteld; een kluis die dat niet heeft, zegt dat wanneer je hem kiest. Je kunt ook je accountnummer typen om er direct naartoe te gaan.",
       "checking": "Controleren…",
       "loadFailed": "Er konden nu geen kluizen worden geladen.",
       "loading": "Je kluizen laden…",
@@ -5545,8 +5301,6 @@
   "vaultSwitcher": {
     "chipFallback": "Kluis",
     "createAnother": "Nog een kluis aanmaken",
-    "deviceOnly": "Alleen op dit apparaat",
-    "joinDevice": "Dit apparaat aan een account toevoegen",
     "switching": "wisselen…",
     "switchVaultLabel": "Kluis wisselen",
     "vaultFallback": "Kluis {{n}}"
@@ -5602,15 +5356,16 @@
     "heroLine2": "alleen van",
     "heroLine3": "jou zijn.",
     "lede": "Markdown, versleuteld op dit apparaat voordat het het ooit verlaat. Geen account-e-mail. Geen servers die er ook maar een woord van kunnen lezen.",
-    "residueBanner": "Achtergebleven bestanden van een onderbroken verwijdering ({{n}}). Ruim ze op voordat je een kluis aanmaakt.",
+    "residueBanner": "Achtergebleven bestanden van een onderbroken verwijdering ({{n}}). Ze zijn al onleesbaar, dus opruimen verwijdert ze alleen van dit apparaat.",
+    "residueGated": "Er staat hier nog een kluismap die dit apparaat niet kan openen ({{n}}). Als je die al hebt verwijderd, is dit het deel dat het verwijderen niet kon afronden.",
+    "residueGatedDelete": "Definitief verwijderen",
+    "residueGatedHint": "Typ DELETE om te bevestigen",
     "cleanUpFiles": "Achtergebleven bestanden opruimen",
     "connect": "Verbinden met mijn account",
     "tagline": "Versleutelde markdown-notities. Geen e-mailadres bij het aanmelden.",
     "startAction": "Maak je identiteit en kluis aan",
     "startBody": "Begin opnieuw op dit apparaat: een nieuwe identiteit, dan de kluis die erbij hoort.",
-    "restoreTitle": "Herstellen vanuit back-up",
     "restoreBody": "Open een .myne-backup-bestand dat je eerder hebt opgeslagen.",
-    "joinTitle": "Dit apparaat aan een account toevoegen",
     "joinBody": "Gebruik een kluis die je al op een ander apparaat hebt.",
     "invitedTitle": "Ik ben uitgenodigd voor een kluis",
     "invitedBody": "Stel de identiteit in waarvoor de uitnodiging bestemd was. Je hebt geen eigen kluis nodig.",
@@ -5689,28 +5444,15 @@
     "accountError": "De accountgroepering kon op dit apparaat niet worden gelezen."
   },
   "join": {
-    "transportError": "Kon die synchronisatieserver niet bereiken. Controleer het adres en je verbinding en probeer het opnieuw.",
-    "passwordPlaceholder": "Je kluiswachtwoord",
     "waitingHint": "Houd dit scherm open. Zodra het is goedgekeurd, verschijnt hier een verificatiecode om te vergelijken met je andere apparaat.",
     "verifyBody": "Controleer of deze code dezelfde is als die op het apparaat waarvandaan je hebt goedgekeurd.",
-    "verifyChanged": "De code is veranderd terwijl je keek. Vergelijk beide schermen opnieuw. Als hij blijft veranderen, stop dan en ga niet verder.",
     "removing": "Verwijderen…",
     "sasMismatch": "Ze komen niet overeen, verwijder dit apparaat",
-    "title": "Verbinden met je account",
-    "lead": "Voer je accountgegevens in om je notities naar dit apparaat te halen. Alles blijft end-to-end versleuteld.",
-    "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Controleer dit nummer nog eens. Het lijkt niet te kloppen.",
-    "approvalHint": "Je notities verschijnen zodra je dit apparaat goedkeurt vanaf een apparaat dat je account al heeft.",
-    "connectingSubtitle": "Je account wordt opgehaald en je kluis wordt ontgrendeld op dit apparaat.",
     "qr": {
-      "confirmAccount": "Account",
-      "confirmServer": "Server",
-      "confirmTitle": "Dit apparaat toevoegen?",
-      "continue": "Doorgaan",
       "expired": "Deze QR is verlopen. Toon een nieuwe op je andere apparaat en scan opnieuw.",
       "invalid": "Dat is geen QR van een Myne-apparaat.",
+      "legacyAccount": "Deze code hoort bij een ouder accounttype. Vraag de eigenaar van de kluis om een uitnodiging.",
       "newerVersion": "Deze QR komt van een nieuwere versie van Myne. Werk de app bij en probeer het opnieuw.",
-      "scan": "QR scannen",
       "scanFailed": "Kon niet scannen. Probeer het opnieuw of voer je gegevens handmatig in.",
       "scanUnavailable": "Scannen is niet beschikbaar op dit apparaat. Voer je gegevens hieronder in."
     }
@@ -5723,7 +5465,7 @@
     "phraseCopied": "Gekopieerd. Het blijft op dit apparaat en het systeem verwijdert het na 30 seconden.",
     "phraseCopyFailed": "Kon niet kopiëren. Gebruik in plaats daarvan “Opslaan in bestand”.",
     "savedToFile": "Opgeslagen in {{label}}",
-    "savedToShareSheet": "Opgeslagen in Myne, waar bestandsbeheer van het systeem er niet bij kan. Het is een bestand met platte tekst, dus als je het deelmenu gebruikt om een kopie op een plek te zetten waar je wel bij kunt, kies dan een plek waar alleen jij het kunt lezen en geen cloudopslag. Tik opnieuw op Opslaan als je het menu hebt gesloten.",
+    "savedToShareSheet": "Opgeslagen in Myne, waar geen enkele bestandsbeheerder bij kan. Het is een bestand met platte tekst, dus als het systeem je vroeg waar je een kopie wilde neerzetten en je een plek hebt gekozen, kies dan een plek waar alleen jij bij kunt in plaats van een cloudschijf. Tik opnieuw op Opslaan om het aanbod terug te halen.",
     "savedFileWritten": "Opgeslagen in Myne. Het is een bestand met platte tekst, dus bewaar elke kopie die je maakt op een plek waar alleen jij het kunt lezen. Dit apparaat heeft niet gemeld waar het bestand te bereiken is, dus ga ervan uit dat het alleen vanuit de app bereikbaar is totdat je dat hebt gecontroleerd.",
     "saveFileError": "Kon het bestand niet opslaan.",
     "stepLabel": "Een kluis aanmaken · {{current}} van {{total}}",
@@ -5736,7 +5478,6 @@
     "showSecondHalf": "Woorden 13-24 tonen",
     "saveToFile": "Opslaan in bestand",
     "writtenThemDown": "Ik heb ze opgeschreven",
-    "typebackTitle": "Bevestig je herstelzin",
     "typebackLead": "Voer deze vier woorden in uit de herstelzin die je zojuist hebt opgeslagen.",
     "wordMismatch": "Komt niet overeen met woord #{{pos}}",
     "backToPhrase": "Terug naar herstelzin",
@@ -5747,8 +5488,7 @@
     "unlockingSubtitle": "Je kluis wordt geopend.",
     "readyTitle": "Je kluis is klaar",
     "readyBody": "Alles wat je vanaf hier schrijft, wordt op dit apparaat versleuteld voordat het wordt opgeslagen of gesynchroniseerd.",
-    "openVault": "Kluis openen",
-    "backUpNow": "Nu een back-up maken"
+    "openVault": "Kluis openen"
   },
   "web": {
     "openElsewhere": {
@@ -5796,6 +5536,15 @@
       }
     }
   },
+  "approvalWait": {
+    "approversIntro": "Deze apparaten kunnen dit apparaat goedkeuren:",
+    "noApprovers": "Geen ander apparaat op dit account kan het nu goedkeuren. Open Myne op een apparaat dat al toegang heeft en kom daarna hier terug.",
+    "pendingStartOver": "Opnieuw beginnen met een ander account",
+    "sasMatch": "Ze komen overeen, doorgaan",
+    "sasMismatch": "Ze komen niet overeen",
+    "verifyBody": "Controleer of deze code op beide apparaten dezelfde is voordat je verdergaat. Is dat niet zo, stop dan: er is iets mis met de verbinding, niet met je wachtwoord.",
+    "verifyTitle": "Vergelijk deze code"
+  },
   "screenCaptureEscape": {
     "disableBody": "Bescherming tegen schermopname vraagt het besturingssysteem om dit venster buiten schermafbeeldingen en schermopnamen te houden. Ze werkt op Windows 10 (mei 2020-update) en later; macOS en Linux bieden hiervoor geen systeem-API, dus daar kan opname niet worden geblokkeerd. Waar ze wel werkt, houdt ze het venster onder meer verborgen voor software voor extern bureaublad en voor schermvergroters, en daarom bestaat deze uitweg.",
     "disableConfirm": "Bescherming uitschakelen",
@@ -5811,7 +5560,6 @@
     "savedForNextLaunch": "Opgeslagen. In deze sessie blijft de bescherming uit omdat de sessie is gestart met --disable-screen-capture-protection, dus ze komt terug de volgende keer dat je Myne zonder die optie opent."
   },
   "identitySetup": {
-    "doneCta": "Klaar",
     "error": "De identiteit kon niet worden ingesteld. Probeer het opnieuw.",
     "intro": "Met een identiteit kunnen mensen een uitnodiging aan jou richten voordat je een kluis hebt. Het maakt geen kluis aan en bewaart geen notities.",
     "pending": "Dit apparaat wacht tot een ander apparaat op de account het goedkeurt.",
@@ -5819,9 +5567,7 @@
     "recoverCta": "Identiteit herstellen",
     "recoverIntro": "Herstelzin van de identiteit",
     "recovered": "Identiteit hersteld.",
-    "title": "Een identiteit aanmaken",
     "errorAlreadyHeld": "Dit apparaat bevat al een identiteit. Herstel hem met zijn herstelzin, of vergeet hem en maak een nieuwe aan.",
-    "forgetCancel": "Bewaren",
     "forgetConfirm": "Vergeten en nieuwe aanmaken",
     "forgetCta": "Deze identiteit vergeten en een nieuwe aanmaken",
     "forgetWarning": "Dit wist de identiteit die op dit apparaat staat. Als je de herstelzin van 24 woorden niet hebt opgeschreven, is hij weg: dit apparaat verliest de toegang tot elke kluis die hij bezit of waaraan hij is toegetreden, totdat je hem met die zin herstelt. Ga alleen verder als je het zeker weet.",
@@ -5834,10 +5580,7 @@
     "recoverTitle": "Ik heb er al een",
     "recoverHint": "Herstel hem op dit apparaat met zijn herstelzin van 24 woorden.",
     "recoverAction": "Herstellen",
-    "back": "Terug",
-    "phraseTitle": "Sla je identiteitszin op",
-    "phraseContinue": "Doorgaan",
-    "confirmTitle": "Bevestig je zin"
+    "phraseTitle": "Sla je identiteitszin op"
   },
   "personIdentityCode": {
     "copy": "Identiteitscode kopiëren",
@@ -5852,8 +5595,6 @@
     "invitesLoading": "Uitnodigingen controleren…",
     "invitesPending": "Dit apparaat wacht op goedkeuring. Uitnodigingen verschijnen hier zodra een ander apparaat van jou het goedkeurt.",
     "invitesUnregistered": "Deze identiteit is nog niet geregistreerd bij een synchronisatieserver, dus geen uitnodiging kan hem bereiken.",
-    "noInvites": "Nog geen uitnodigingen.",
-    "subtitle": "Je hebt een identiteit op dit apparaat, dus mensen kunnen je uitnodigen voor een kluis. Je hoeft er geen aan te maken om te worden uitgenodigd.",
     "accept": "Accepteren",
     "acceptHint": "Plak de identiteitscode van de eigenaar (die deelt hij wanneer hij je uitnodigt).",
     "acceptOwnerCodeLabel": "Eigenaar-identiteitscode",
@@ -5862,7 +5603,6 @@
     "acceptError": "De uitnodiging kon niet worden geaccepteerd.",
     "shareCodeHeading": "Jouw uitnodigingscode",
     "shareCodeHint": "Deel deze code met wie je uitnodigt. Hij bevat alleen publieke informatie (je identiteits-id en publieke sleutels), nooit je zin.",
-    "title": "Jouw identiteit",
     "acceptPasswordNote": "Kies een wachtwoord voor dit apparaat. Het staat los van het wachtwoord van de kluiseigenaar en van je herstelzin: het ontgrendelt deze kluis op dit apparaat, en je zin blijft de draagbare manier om er weer in te komen.",
     "acceptErrorNotFound": "Deze uitnodiging is niet meer beschikbaar. Misschien is hij al gebruikt of ingetrokken. Vraag de eigenaar een nieuwe uitnodiging te sturen.",
     "acceptErrorNotEnrolled": "Dit apparaat is niet de identiteit waaraan deze uitnodiging was gericht. Open de identiteit waarnaar de uitnodiging is gestuurd en accepteer daarna.",
@@ -5873,7 +5613,7 @@
     "join": "Aan dit apparaat toevoegen",
     "joinHint": "Deze kluis is al gedeeld met je identiteit. Voer je herstelzin in om hem op dit apparaat te installeren.",
     "joinPhraseLabel": "Je herstelzin",
-    "joinPasswordNote": "Kies een wachtwoord voor dit apparaat. Het staat los van het wachtwoord van de kluiseigenaar: het ontgrendelt deze kluis hier, en je herstelzin blijft de draagbare manier om er weer in te komen.",
+    "joinPasswordNote": "Kies een wachtwoord voor dit apparaat. Het staat los van het wachtwoord van de kluiseigenaar, en het is de enige manier om deze kluis op dit apparaat te openen: raak je het kwijt, vraag de eigenaar dan om een nieuwe uitnodiging.",
     "joinSubmit": "Toevoegen en ontgrendelen",
     "joinError": "De kluis kon niet aan dit apparaat worden toegevoegd.",
     "joinErrorAlreadyHeld": "Dit apparaat bevat deze kluis al, dus er is niets toe te voegen. Open de kluis die je hier al hebt.",
@@ -5882,14 +5622,9 @@
     "joinErrorNotConfigured": "Synchronisatie is niet ingesteld op dit apparaat. Stel je synchronisatieserver in en probeer het daarna opnieuw.",
     "joinErrorUnauthenticated": "Je identiteit is niet aangemeld op dit apparaat. Ontgrendel je identiteit en probeer het opnieuw.",
     "joinErrorTransport": "Kon de synchronisatieserver niet bereiken, of deze kluis is daar nog niet gepubliceerd. Controleer je verbinding en probeer het opnieuw.",
-    "forgetCancel": "Bewaren",
     "forgetCheckbox": "Ik begrijp dat deze identiteit van dit apparaat wordt verwijderd.",
     "forgetConfirm": "Identiteit vergeten",
-    "forgetCta": "Deze identiteit op dit apparaat vergeten",
     "forgetError": "Kon de identiteit niet vergeten. Probeer het opnieuw.",
-    "forgetWarning": "Dit verwijdert de identiteit alleen van dit apparaat. Het serveraccount en elke kluis die het bezit of waaraan het is toegetreden, blijven ongemoeid, en je kunt de identiteit met zijn 24-woordzin op een ander apparaat herstellen. Als je die zin niet hebt opgeslagen, kan dit apparaat hem niet herstellen.",
-    "registerCta": "Deze identiteit registreren",
-    "registerContinue": "Doorgaan",
     "registerSubmit": "Registreren",
     "registerError": "Kon niet registreren. Controleer de zin en het serveradres en probeer het opnieuw.",
     "registerServerLabel": "Synchronisatieserveradres",
@@ -5898,7 +5633,6 @@
     "registerInviteCodeLabel": "Serveruitnodigingscode",
     "registerInviteCodeHint": "Alleen als je server erom vraagt.",
     "registerServerError": "Die server was niet bereikbaar. Controleer het adres en probeer het opnieuw. Je woorden staan er nog.",
-    "accountNumberHeading": "Accountnummer",
     "accountNumberHint": "Afgeleid van je identiteitszin, dus hij kan niet verloren gaan, en hij is geen geheim. Gebruik hem voor support of voor een overdracht aan een serverbeheerder.",
     "copyAccountNumber": "Accountnummer kopiëren",
     "registerPhraseLabel": "Je identiteitszin, 24 woorden",
@@ -5927,7 +5661,6 @@
     },
     "download": "Downloaden",
     "downloading": "Downloaden…",
-    "cancel": "Annuleren",
     "complete": "Klaar",
     "retry": "Opnieuw proberen",
     "skip": "Overslaan",
@@ -5950,7 +5683,6 @@
     },
     "deeplink": {
       "body": "Het staat buiten elke kluis, dus Myne versleutelt het niet.",
-      "cancel": "Annuleren",
       "confirm": "Openen",
       "failed": "Het bestand kon niet worden geopend. Het is misschien verplaatst of gewijzigd.",
       "title": "Dit lokale bestand openen?"
@@ -5971,7 +5703,6 @@
     "unsaved": "Niet-opgeslagen wijzigingen"
   },
   "update": {
-    "banner": {},
     "notice": {
       "available": "Myne {{version}} is beschikbaar.",
       "consequence": "Bijwerken vergrendelt je kluis en start Myne opnieuw op. Je open notities worden eerst opgeslagen.",
@@ -5983,41 +5714,39 @@
       "confirmTitle": "Myne bijwerken en opnieuw opstarten?",
       "confirmBody": "Je kluis wordt vergrendeld en Myne wordt opnieuw opgestart. Downloaden en installeren kan een paar minuten duren bij een langzame verbinding.",
       "confirmPrimary": "Kluis vergrendelen en bijwerken",
-      "cancel": "Annuleren",
       "pill": "Update beschikbaar"
     },
     "updating": {
       "eyebrow": "Bijwerken",
-      "heading": "Myne bijwerken",
       "version": "Versie {{version}}",
-      "caption": "De nieuwe versie downloaden en installeren.",
-      "hint": "Myne start vanzelf opnieuw op zodra dit klaar is. Laat het venster openstaan."
+      "progressLabel": "Voortgang van de update",
+      "bytes": "{{done}} gedownload",
+      "bytesOfTotal": "{{done}} van {{total}}"
+    },
+    "phase": {
+      "starting": "Voorbereiden",
+      "downloading": "Downloaden",
+      "verifying": "Verifiëren",
+      "installing": "Installeren"
     },
     "failed": {
-      "eyebrow": "Update niet voltooid",
       "heading": "De update is niet voltooid",
       "caption": "Myne {{version}} draait nog en je notities zijn ongemoeid.",
-      "hint": "Opnieuw proberen begint de download vanaf het begin.",
-      "retry": "Opnieuw proberen",
       "back": "Terug naar ontgrendelen",
       "manual": "Als het blijft gebeuren, download de nieuwe versie dan van myne.md en installeer haar met de hand. De app die je nu hebt blijft onaangeroerd."
     }
   },
   "identityFlow": {
-    "title": "Een identiteit aanmaken",
-    "lead": "Met een identiteit kunnen mensen je voor een kluis uitnodigen, en kan één identiteit veel kluizen bezitten. Er is een synchronisatieserver nodig om je versleutelde notities te bewaren en je te bereiken.",
-    "start": "Een identiteit aanmaken",
-    "skip": "Niet nu, alleen dit apparaat gebruiken",
-    "back": "Terug",
-    "serverUnreachable": "Kon die server niet bereiken. Controleer het adres en probeer het opnieuw.",
-    "createFailed": "Kon de identiteit niet aanmaken. Controleer de synchronisatieserver en probeer het opnieuw.",
-    "server": {
-      "title": "Kies een synchronisatieserver",
-      "lead": "Je notities blijven op dit apparaat versleuteld voordat ze het verlaten. De server bewaart alleen ciphertext.",
-      "urlLabel": "Serveradres",
-      "connect": "Verbinden",
-      "connecting": "Verbinden…"
+    "fork": {
+      "lead": "Zet de identiteit die je al hebt op dit apparaat, of begin een nieuwe.",
+      "words": "Mijn 24 woorden invoeren",
+      "wordsBody": "De identiteitszin die je hebt opgeslagen toen je hem aanmaakte. Het is geen kluiszin.",
+      "code": "De code van mijn andere apparaat scannen",
+      "codeBody": "Een apparaat dat je identiteit al heeft toont een code; dit apparaat voegt zich bij het account en wacht op de goedkeuring ervan."
     },
+    "forget": {},
+    "lead": "Met een identiteit kunnen mensen je voor een kluis uitnodigen, en kan één identiteit veel kluizen bezitten. Er is een synchronisatieserver nodig om je versleutelde notities te bewaren en je te bereiken.",
+    "createFailed": "Kon de identiteit niet aanmaken. Controleer de synchronisatieserver en probeer het opnieuw.",
     "held": {
       "title": "Er staat al een identiteit op dit apparaat",
       "lead": "Dit apparaat bevat al een identiteit. Als je hem vergeet, verliest dit apparaat de toegang tot elke kluis die hij bezit of waaraan hij is toegetreden, totdat je hem met zijn 24-woordzin herstelt. Als je die zin niet hebt opgeslagen, kan hij niet worden hersteld.",
@@ -6036,17 +5765,15 @@
       "typebackLead": "Voer deze vier woorden uit de identiteitszin in die je zojuist hebt opgeslagen.",
       "wordNumber": "Woord #{{position}}",
       "wordMismatch": "Dat komt niet overeen met woord #{{pos}}.",
-      "continue": "Doorgaan"
+      "registerCta": "Opslaan en registreren",
+      "registerLater": "Later",
+      "registerHint": "Registreren voegt deze identiteit toe aan {{server}}, de synchronisatieserver die dit apparaat al gebruikt, zodat mensen je kunnen uitnodigen en je kluizen kunnen synchroniseren. Met Later blijft hij alleen op dit apparaat, en de identiteitspagina kan hem dan alsnog registreren."
     },
+    "typeback": {},
     "home": {
-      "title": "Je identiteit",
       "lead": "Mensen kunnen je voor een kluis uitnodigen. Je hoeft geen kluis te bezitten om te worden uitgenodigd.",
-      "codeLabel": "Je identiteitscode",
       "invitesHeading": "Uitnodigingen",
-      "noInvites": "Nog geen uitnodigingen.",
       "inviteHint": "Open deze uitnodiging vanuit de kluiskiezer om met je identiteitszin toe te treden.",
-      "forgetHeading": "Dit apparaat",
-      "forget": "Deze identiteit op dit apparaat vergeten",
       "forgetCheckbox": "Ik begrijp dat deze identiteit van dit apparaat wordt verwijderd. Het serveraccount blijft bestaan en de zin herstelt hem.",
       "vaultHeading": "Je kluizen",
       "vaultHint": "Je identiteit kan zoveel kluizen bezitten als je wilt. Elke kluis heeft een eigen wachtwoord.",
@@ -6054,21 +5781,31 @@
       "registerHint": "Deze identiteit is nog niet geregistreerd, dus niemand kan je uitnodigen en er wordt niets gesynchroniseerd."
     },
     "register": {
-      "title": "Deze identiteit registreren",
-      "open": "Deze identiteit registreren",
       "cta": "Registreren",
       "working": "Registreren…",
       "failed": "Kon deze identiteit niet registreren. Hij blijft op dit apparaat en je kunt het opnieuw proberen."
     },
     "personJoin": {
+      "inviteLabel": "Uitnodigingscode",
+      "inviteHint": "Alleen als je server er een vraagt. De meeste servers laten een apparaat dat het account al heeft binnen.",
       "title": "Deze telefoon aan je account toevoegen",
       "lead": "Typ de 24 woorden van het account waar deze code vandaan komt. Een bestaand apparaat keurt deze telefoon daarna goed, dus een woordenreeks alleen kan er geen toevoegen.",
       "phraseLabel": "Identiteitszin",
       "cta": "Deze telefoon toevoegen",
       "working": "Deze telefoon toevoegen…",
       "mismatch": "Die woorden horen bij een andere identiteit dan deze code.",
+      "error": {
+        "held": "Dit apparaat bevat al een andere identiteit, dus het kan deze niet verzegelen. Vergeet die eerst op dit apparaat en voeg deze daarna opnieuw toe.",
+        "inviteRequired": "Je server neemt nieuwe accounts alleen aan met een uitnodigingscode. Typ de code die je hebt gekregen en probeer het opnieuw.",
+        "inviteInvalid": "Die uitnodigingscode komt niet overeen met de code die je server verwacht.",
+        "deviceLimit": "Je account heeft zijn apparaatlimiet bereikt. Verwijder een apparaat op een apparaat dat het account al heeft en probeer het daarna opnieuw.",
+        "alreadyInstalled": "Dit apparaat is al tot dat account toegelaten. Open het in plaats van het opnieuw toe te voegen.",
+        "awaitingApproval": "Dit apparaat is toegevoegd en wacht op goedkeuring op een apparaat dat je account al heeft.",
+        "accountFrozen": "Je server heeft dit account bevroren. Niets wat je hier typt verandert dat; neem contact op met wie de server beheert.",
+        "notConfigured": "Stel eerst het serveradres in en voeg daarna dit apparaat toe.",
+        "transport": "Kon je server niet bereiken. Je identiteit is ongewijzigd; probeer het opnieuw zodra de verbinding terug is."
+      },
       "failed": "Dat heeft deze telefoon niet toegevoegd. Controleer de woorden en probeer het opnieuw.",
-      "pendingTitle": "Wachten op goedkeuring",
       "pendingLead": "Deze telefoon is toegevoegd en wacht. Keur hem goed op een apparaat dat je account al heeft, en dit scherm voltooit zichzelf.",
       "pendingHint": "Hier is niets te doen totdat het andere apparaat goedkeurt.",
       "sessionEnded": "Het wachten eindigde toen de app sloot. Voer je 24 woorden opnieuw in om door te gaan.",
@@ -6076,7 +5813,11 @@
       "finishingTitle": "Dit apparaat afronden",
       "finishingLead": "Deze telefoon is toegevoegd aan je account. De kluizen worden nu opgehaald; elke kluis vraagt nog om een eigen wachtwoord.",
       "listFailed": "Deze telefoon is toegevoegd, maar de kluizen van je account zijn niet aangekomen. Controleer je verbinding en probeer het opnieuw.",
-      "listRetry": "Kluizen opnieuw ophalen"
+      "listRetry": "Kluizen opnieuw ophalen",
+      "noVaults": "Deze telefoon is toegevoegd, maar geen van je kluizen kon erop worden gezet. Open dit account op een apparaat dat er al een heeft en probeer het daarna opnieuw.",
+      "vaultsNoneOnServer": "Je account heeft nog geen kluizen op de server. Een kluis verschijnt hier zodra het apparaat dat hem heeft hem heeft gepubliceerd.",
+      "vaultsNotHere_one": "{{count}} kluis van dit account kon niet op deze telefoon worden gezet. Open dit account nog een keer om het opnieuw te proberen.",
+      "vaultsNotHere_other": "{{count}} kluizen van dit account konden niet op deze telefoon worden gezet. Open dit account nog een keer om het opnieuw te proberen."
     },
     "unlock": {
       "title": "Je identiteit ontgrendelen",
@@ -6094,18 +5835,190 @@
       "working": "Herstellen…",
       "failed": "Kon geen identiteit op dit apparaat herstellen. Controleer de 24 woorden en probeer het opnieuw."
     },
-    "typeback": {
-      "title": "Bevestig je zin"
-    },
     "joinFromQr": {
       "notFound": "Deze code verwijst naar een kluis die niet bij je uitnodigingen op dit apparaat staat. Vraag de kluiseigenaar de uitnodiging opnieuw naar deze identiteit te sturen."
     }
   },
   "calendar": {
+    "view": {
+      "label": "Agendaweergave",
+      "month": "Maand",
+      "week": "Week",
+      "day": "Dag",
+      "agenda": "Lijst"
+    },
+    "allDay": "Hele dag",
+    "untitled": "Naamloze gebeurtenis",
+    "locked": "Ontgrendel de kluis om de agenda te zien.",
+    "loadFailed": "De agenda kon niet worden gelezen. Je kluis is niet gewijzigd.",
+    "capture": {
+      "on": "Een gebeurtenis toevoegen op {{date}}"
+    },
+    "unreadable": {
+      "heading_one": "{{count}} gebeurtenis kon niet worden gelezen",
+      "heading_other": "{{count}} gebeurtenissen konden niet worden gelezen",
+      "start-missing": "hij heeft geen begin",
+      "start-unreadable": "zijn begin is geen datum die deze app kan lezen",
+      "end-unreadable": "zijn einde is geen datum die deze app kan lezen",
+      "end-before-start": "hij eindigt voordat hij begint",
+      "end-time-without-start-time": "hij heeft een eindtijd en geen begintijd",
+      "calendar-unreadable": "de naam van zijn agenda is niet bruikbaar"
+    },
+    "agendaRange": "De komende {{days}} dagen",
+    "prev": "Vorige",
+    "next": "Volgende",
+    "today": "Vandaag",
+    "more": "+{{count}} meer",
+    "weekday": {
+      "monday": "ma",
+      "tuesday": "di",
+      "wednesday": "wo",
+      "thursday": "do",
+      "friday": "vr",
+      "saturday": "za",
+      "sunday": "zo"
+    },
+    "resize": "{{title}} vergroten of verkleinen",
+    "refused": {
+      "value-changed": "Die gebeurtenis is op een ander apparaat gewijzigd. De agenda toont waar de notitie zegt dat hij is.",
+      "start-missing": "Die notitie heeft geen begintijd meer, dus hij staat niet in de agenda.",
+      "base-mismatch": "De notitie is gewijzigd terwijl de agenda aan het schrijven was. Er is niets overschreven."
+    },
+    "weekdayLong": {
+      "monday": "maandag",
+      "tuesday": "dinsdag",
+      "wednesday": "woensdag",
+      "thursday": "donderdag",
+      "friday": "vrijdag",
+      "saturday": "zaterdag",
+      "sunday": "zondag"
+    },
     "form": {
+      "title": "Nieuwe gebeurtenis",
+      "openNote": "Notitie openen",
+      "eventTitle": "Titel van de gebeurtenis",
+      "starts": "Begint",
+      "startDate": "Begindatum",
+      "startTime": "Begintijd, of de hele dag",
+      "ends": "Eindigt",
+      "endDate": "Einddatum, of leeg laten voor één dag",
+      "endTime": "Eindtijd",
+      "addEnd": "Een einde toevoegen",
+      "clearEnd": "Het einde verwijderen",
+      "allDay": "Hele dag",
+      "timed": "Op een tijdstip",
+      "endBeforeStart": "De gebeurtenis kan niet eindigen voordat hij begint. Wijzig de einddatum.",
+      "repeat": "Herhaalt",
+      "repeatNever": "Nooit",
+      "repeatInterval": "Elke",
+      "repeatWeekdays": "Op een weekdag",
+      "repeatDayOfMonth": "Op een dag van de maand",
+      "repeatCount": "Hoeveel",
+      "repeatUnit": "Per hoelang",
+      "repeatWeekday": "Weekdag",
+      "repeatDay": "Dag van de maand",
+      "repeatLastDay": "De laatste dag",
+      "repeatOrdinal": "Welke",
+      "decrease": "{{label}} verlagen",
+      "increase": "{{label}} verhogen",
+      "remindLabel": "Herinneren",
+      "remind": "Herinner me, hoogstens {{days}} dagen van tevoren",
+      "remindNone": "Geen herinnering",
+      "leadBeyondHorizon": "Een herinnering reikt hoogstens {{days}} dagen vooruit. Kies een kortere aanlooptijd.",
+      "titleRequired": "Geef de gebeurtenis een titel.",
+      "save": "Gebeurtenis opslaan",
+      "unit": {
+        "day": "Dagen",
+        "week": "Weken",
+        "month": "Maanden",
+        "year": "Jaren"
+      },
+      "ordinal": {
+        "first": "Eerste",
+        "second": "Tweede",
+        "third": "Derde",
+        "fourth": "Vierde",
+        "last": "Laatste"
+      },
+      "lead": {
+        "10m": "10 minuten van tevoren",
+        "30m": "30 minuten van tevoren",
+        "1h": "1 uur van tevoren",
+        "2h": "2 uur van tevoren",
+        "1d": "1 dag van tevoren",
+        "2d": "2 dagen van tevoren",
+        "7d": "1 week van tevoren",
+        "1m": "1 minuut van tevoren"
+      },
+      "noTime": "Geen tijd",
+      "hour": "Uur",
+      "minute": "Minuut",
+      "editTitle": "Gebeurtenis bewerken",
+      "calendarLabel": "Agenda",
+      "noCalendar": "Geen agenda",
       "calendarPlaceholder": "Geef een agenda een naam, bijvoorbeeld Persoonlijk",
       "calendarRequired": "Geef de gebeurtenis een agenda. Die bepaalt de kleur van de gebeurtenis en dat is wat deze weergave kan uitzetten."
     },
+    "occurrenceOf": "Eén keer uit een reeks, op {{date}}",
+    "occurrence": {
+      "thisIsOne": "Dit is één keer uit een reeks, op {{date}}. Om het te wijzigen, bewerk je de reeks of voeg je een eenmalige gebeurtenis op deze dag toe.",
+      "editSeries": "De reeks bewerken",
+      "addOneOff": "Een eenmalige gebeurtenis op deze dag toevoegen",
+      "skip": "Deze keer annuleren",
+      "retime": "Deze keer begint om",
+      "retimeHint": "Alleen deze dag verandert. De rest van de reeks houdt zijn eigen tijd.",
+      "retimeSave": "De tijd wijzigen"
+    },
+    "import": "Een .ics-bestand importeren",
+    "export": "Exporteren als .ics",
+    "imported": "{{count}} gebeurtenissen uit {{filename}} geïmporteerd",
+    "importRefused": {
+      "too-large": "Dat bestand is groter dan Myne leest (1 MiB). Alleen een agendabestand van die omvang is een hele kluis, geen planning.",
+      "malformed-property": "Dat bestand is geen .ics-agenda: een regel is nog NAAM:waarde nog NAAM;param:waarde.",
+      "unreadable-start": "Dat bestand bevat een begintijd die Myne niet kan lezen, dus er is niets geïmporteerd.",
+      "unknown-zone": "Dat bestand noemt een tijdzone die dit apparaat niet kent, dus er is niets geïmporteerd.",
+      "value-shape-mismatch": "Dat bestand markeert een gebeurtenis als datum en geeft hem ook een tijd, dus er is niets geïmporteerd.",
+      "unreadable-rule": "Dat bestand herhaalt volgens een regel die Myne niet ondersteunt, dus er is niets geïmporteerd.",
+      "missing-start": "Dat bestand heeft een gebeurtenis zonder begintijd, en een gebeurtenis zonder begin is geen plek in een agenda.",
+      "no-events": "Dat bestand bevat geen gebeurtenissen."
+    },
+    "exported": "{{count}} gebeurtenissen naar {{filename}} geschreven",
+    "exportFailed": "Kon dat .ics-bestand niet schrijven.",
+    "exportEmpty": "Er staat nog niets in de agenda om te exporteren.",
+    "importedSkipped": "{{count}} gebeurtenissen uit {{filename}} geïmporteerd, en {{skipped}} overgeslagen die deze kluis al heeft",
+    "title": "Agenda",
+    "close": "De agenda sluiten",
+    "noEvents": "Niets op deze dag",
+    "conflict": "overlapt een andere gebeurtenis",
+    "composer": {
+      "title": "Nieuwe gebeurtenis",
+      "titleLabel": "Wat is het?",
+      "start": "Begint",
+      "end": "Eindigt (optioneel)",
+      "badTime": "Een tijd schrijf je als 09:00, 24-uurs.",
+      "create": "Aan de agenda toevoegen",
+      "cancel": "Annuleren",
+      "createFailed": "De gebeurtenis kon niet worden opgeslagen.",
+      "repeatNever": "Eenmalig",
+      "repeatDaily": "Dagelijks",
+      "repeatWeekly": "Wekelijks",
+      "repeatMonthly": "Maandelijks",
+      "remindNone": "Geen herinnering",
+      "calendarLabel": "Agenda (een naam)",
+      "refused": "Deze gebeurtenis is elders gewijzigd, dus er is niets opgeslagen. Open hem opnieuw.",
+      "date": "Datum",
+      "badDate": "Gebruik YYYY-MM-DD."
+    },
+    "skipFailed": "Die keer kon niet worden geannuleerd. Hij staat nog in de agenda.",
+    "taskRow": "Een taak die op {date} vervalt",
+    "composeOn": "Een gebeurtenis toevoegen op {date}",
+    "calendarsToggle": "Getoonde agenda's",
+    "calendarsToggleHelper": "Vink er een uit om die uit deze weergave te halen. Er wordt niets verwijderd.",
     "calendarsToggleFailed": "Die agenda is niet omgezet. Hij is gebleven zoals hij was."
+  },
+  "identityForget": {
+    "body": "Dit verwijdert de identiteit alleen van dit apparaat. Het serveraccount en elke kluis die hij bezit of waaraan hij is toegetreden blijven ongemoeid, en je kunt de identiteit met zijn herstelzin van 24 woorden op een ander apparaat herstellen.",
+    "savedPhraseTail": "Als je die zin niet hebt opgeslagen, kan dit apparaat hem niet herstellen.",
+    "rosterTail": "Uitnodigingen en ledenacties op dit apparaat vragen er weer om dat hij ontgrendeld is."
   }
 }

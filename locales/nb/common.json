@@ -1,41 +1,14 @@
 {
-  "accountBootstrap": {
-    "accountMismatch": "Denne nettleseren inneholder allerede hvelvet til en annen konto. Åpne det, eller logg ut og slett denne nettleserens kopi først.",
-    "changeAccount": "Bruk et annet kontonummer",
-    "continue": "Fortsett",
-    "hint": "Skriv inn hovedpassordet for denne kontoen. Myne henter hvelvet ditt og registrerer denne nettleseren som en enhet på kontoen.",
-    "noEndpoint": "Denne kopien av Myne har ingen synkroniseringsserver konfigurert, så den får ikke tak i hvelvet ditt. Ta kontakt med den som drifter denne kopien.",
-    "passwordLabel": "Hovedpassord",
-    "approversIntro": "Disse enhetene kan godkjenne denne:",
-    "noApprovers": "Ingen annen enhet på denne kontoen kan godkjenne den akkurat nå. Åpne Myne på en enhet som allerede har tilgang, og kom deretter tilbake hit.",
-    "pendingStartOver": "Start på nytt med en annen konto",
-    "pendingTitle": "Venter på godkjenning",
-    "sasMatch": "De stemmer, fortsett",
-    "sasMismatch": "De stemmer ikke",
-    "verifyBody": "Sjekk at denne koden er den samme på begge enhetene før du fortsetter. Hvis den ikke er det, stopp: noe er galt med tilkoblingen, ikke med passordet ditt.",
-    "verifyChanged": "Koden endret seg mens du så på. Sammenlign begge skjermene på nytt. Hvis den fortsetter å endre seg, stopp og ikke fortsett.",
-    "verifyTitle": "Sammenlign denne koden",
-    "title": "Logg inn på hvelvet ditt",
-    "working": "Setter opp…"
-  },
-  "accountEntry": {
-    "createAccount": "Jeg har ikke en konto ennå. Opprett en.",
-    "checkFailed": "Kunne ikke sjekke det kontonummeret. Prøv igjen.",
-    "checking": "Sjekker…",
-    "continue": "Fortsett",
-    "hint": "Det ser slik ut: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Kontrolleres her på enheten din. Ingenting sendes ennå.",
-    "invalid": "Det kontonummeret er ikke gyldig. Sjekk det og prøv igjen.",
-    "title": "Skriv inn kontonummeret ditt"
-  },
   "agent": {
     "composer": {
       "placeholder": "Spør AI-en…",
       "scopeLabel": "Arbeider med",
-      "scopeOpenNote": "Dette notatet",
       "scopeCount_one": "{{count}} notat",
       "scopeCount_other": "{{count}} notater",
       "scopeCountUnavailable": "Hvor mange notater den mappen inneholder kunne ikke sjekkes akkurat nå.",
       "startFailed": "Agenten kunne ikke starte.",
+      "modelCannotEdit": "Denne modellen kan ikke gjøre endringene agentmodus trenger. Velg en modell som kan det, i Innstillinger, AI.",
+      "stillWorking": "Agenten arbeider fortsatt med det siste steget. Vent til det er ferdig, og send deretter på nytt.",
       "autoApplyFailed": "Endringene kunne ikke brukes automatisk. Ingenting ble skrevet; åpne gjennomgangen for å bruke dem selv.",
       "permissionLabel": "Når kjøringen er ferdig",
       "permissionAsk": "Gjennomgå først",
@@ -49,7 +22,6 @@
       "checking": "Sjekker",
       "unsupportedProvisional": "Den beståttgrensen er ennå ikke målt på tvers av modeller, så den kan være strengere eller mildere enn den bør være.",
       "scopeNone": "ingen notat åpent, så det er ingenting å jobbe med ennå",
-      "scopeAllVault": "Alle notater",
       "scopeQuestion": "Hva agenten kan lese",
       "scopeFolders": "Mapper",
       "scopeApplies": "Gjelder neste melding. Papirkurv-, arkiv- og malnotater er alltid utelatt.",
@@ -70,7 +42,13 @@
       "confirm_one": "Legg ved {{count}} fil",
       "confirm_other": "Legg ved {{count}} filer",
       "remove": "Fjern {{name}}",
-      "noText": "{{name}} har ingen tekst agenten kan lese. Bare filer hvis tekst kunne hentes ut kan legges ved."
+      "noText": "{{name}} har ingen tekst agenten kan lese. Bare filer hvis tekst kunne hentes ut kan legges ved.",
+      "fromDevice": "Ta et bilde eller velg en fil",
+      "readingDevice": "Leser på denne enheten…",
+      "deviceOnly": "Lest på denne enheten, aldri lagret",
+      "deviceUnsupported": "{{name}} er ikke en fil agenten kan lese. Bilder, PDF-er og ren tekst fungerer.",
+      "deviceFailed": "Den filen kunne ikke leses. Ingenting ble sendt.",
+      "readingInProgress": "Fullfør fillesingen først, og lim deretter inn på nytt."
     },
     "progress": {
       "working": "Arbeider",
@@ -108,7 +86,6 @@
     "review": {
       "title": "Gjennomgå endringer",
       "statusWaiting": "Venter på godkjenningen din",
-      "close": "Lukk",
       "scopeTotal_one": "{{count}} notat i omfanget",
       "scopeTotal_other": "{{count}} notater i omfanget",
       "noChanges": "Agenten foreslo ingen endringer.",
@@ -178,8 +155,6 @@
       "undoFailed": "Kjøringen kunne ikke angres.",
       "undoReport": "{{reverted}} notater gjenopprettet. {{kept}} notater som kjøringen opprettet ble stående.",
       "alreadyApplied": "Brukt",
-      "untitledNote": "Notat uten tittel",
-      "vaultRoot": "Hvelvrot",
       "newNotesHeading_one": "{{count}} nytt notat",
       "newNotesHeading_other": "{{count}} nye notater",
       "createdCount_one": "{{count}} notat opprettet.",
@@ -245,7 +220,6 @@
       "loading": "Laster samtaler…",
       "modeLabel": "Hvilke samtaler",
       "modeVault": "Alle",
-      "modeNote": "Dette notatet",
       "renamedAnnouncement": "Nytt navn: {{name}}",
       "deletedAnnouncement": "Samtalen er slettet",
       "loadFailed": "Samtalene dine kunne ikke lastes akkurat nå.",
@@ -261,7 +235,6 @@
       "titleSaveFailed": "Tittelen kunne ikke lagres.",
       "searchLabel": "Søk i samtaler",
       "searchPlaceholder": "Søk i samtaler…",
-      "noMatchTitle": "Ingen treff",
       "noMatchBody": "Ingen samtale samsvarer med «{{query}}». Tøm søket for å se alle.",
       "emptyBody": "Samtaler du starter, vises her.",
       "menu": "Samtalehandlinger",
@@ -293,9 +266,7 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "Avbryt",
       "cleaning": "Rydder opp…",
-      "close": "Lukk",
       "completeTitle": "Opprydding fullført",
       "deleteCta": "Slett {{count}} ubrukte",
       "deleteCta_one": "Slett {{count}} ubrukt",
@@ -315,16 +286,13 @@
       "willBeReclaimed": "{{size}} blir frigjort."
     },
     "coverPicker": {
-      "close": "Lukk",
       "dropHint": "Slipp et bilde for å bruke det som omslag.",
       "empty": "Ingen bilder i dette hvelvet ennå. Last opp ett, eller dra et bilde hit.",
-      "loading": "Laster…",
       "removeCover": "Fjern omslag",
       "title": "Velg et omslagsbilde",
       "upload": "Last opp"
     },
     "deleteDialog": {
-      "cancel": "Avbryt",
       "confirmPrompt": "Slette dette vedlegget permanent? Dette kan ikke angres.",
       "delete": "Slett",
       "deleting": "Sletter…",
@@ -332,8 +300,7 @@
       "notUsed": "Ikke brukt i noe notat.",
       "stillUsed_one": "Det brukes fortsatt i {{count}} notat. Sletting etterlater en plassholder der det var bygd inn:",
       "stillUsed_other": "Det brukes fortsatt i {{count}} notater. Sletting etterlater en plassholder der det var bygd inn:",
-      "title": "Slett vedlegg",
-      "untitled": "Uten tittel"
+      "title": "Slett vedlegg"
     },
     "library": {
       "actionsAriaLabel": "Vedleggshandlinger",
@@ -351,7 +318,6 @@
       "colUsedIn": "Brukt i",
       "decrypting": "Dekrypterer vedlegg…",
       "clearSearchAriaLabel": "Tøm søket",
-      "emptyClearSearch": "Tøm søket",
       "emptyImportHint": "Filer du legger til i et notat, beholdes i hvelvet ditt, kryptert på denne enheten før de sendes noe sted. Importer én for å komme i gang.",
       "emptyLoadError": "Kunne ikke lese vedleggskatalogen",
       "emptyNoAttachments": "Ingen vedlegg ennå",
@@ -364,9 +330,7 @@
       "importing": "Importerer…",
       "listView": "Listevisning",
       "menuDelete": "Slett",
-      "menuExport": "Eksporter",
       "menuPreview": "Forhåndsvis",
-      "menuRename": "Endre navn",
       "menuTranscribe": "Transkriber",
       "menuViewTranscription": "Vis transkripsjon",
       "noUnusedNotice": "Ingen ubrukte vedlegg å rydde opp i.",
@@ -402,8 +366,6 @@
       "emptyFilteredBody": "Ingenting her samsvarer med typefilteret som er valgt. Tøm det for å se hele biblioteket igjen.",
       "emptyFilteredBodyQuery": "Ingenting i biblioteket samsvarer",
       "emptyLoadErrorBody": "Katalogen er kryptert med hvelvet ditt, så dette er vanligvis en avbrutt lesing og ikke tapte data. Prøv igjen; hvis det fortsetter å feile, er notatene dine og filene deres uendret.",
-      "emptyRetry": "Prøv igjen",
-      "transcriptCopy": "Kopier",
       "transcriptCopied": "Transkripsjonen er kopiert.",
       "transcriptCopyFailed": "Kunne ikke kopiere transkripsjonen.",
       "transcriptEmpty": "Ingen tale ble funnet i dette opptaket.",
@@ -435,8 +397,7 @@
       "play": "Spill av"
     },
     "usedInNotesPopover": {
-      "empty": "Ikke brukt i noe notat.",
-      "untitled": "Uten tittel"
+      "empty": "Ikke brukt i noe notat."
     },
     "needsApp": "Opprydding av vedlegg krever appen.",
     "noUnused": "Ingen ubrukte vedlegg: hver fil er referert til.",
@@ -468,7 +429,6 @@
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
         "cancelled": "Sikkerhetskopiering avbrutt. Ingen fil ble igjen.",
         "invalidDestination": "Den målmappen kan ikke brukes.",
         "ioGeneric": "Kunne ikke skrive sikkerhetskopifilen.",
@@ -481,7 +441,6 @@
         "unknown": "Sikkerhetskopien feilet av en grunn Myne ikke kunne identifisere. Regn ikke med noen fil på destinasjonen; prøv igjen."
       },
       "restore": {
-        "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
         "cancelled": "Gjenoppretting avbrutt. Ingenting ble endret.",
         "damagedBackup": "Sikkerhetskopifilen er skadet.",
         "futureVersionBackup": "Denne sikkerhetskopien ble laget av en nyere versjon av Myne. Oppdater Myne, og gjenopprett den deretter.",
@@ -496,20 +455,17 @@
       }
     },
     "export": {
-      "cancel": "Avbryt",
-      "close": "Lukk",
       "copying": "Kopierer {{done}} av {{total}}…",
       "preparing": "Forbereder…",
       "successToast": "Sikkerhetskopi verifisert og lagret.",
       "title": "Sikkerhetskopier hvelv",
       "verifying": "Verifiserer {{done}} av {{total}}…",
-      "phraseNotSubstitute": "En sikkerhetskopi alene får deg ikke inn igjen hvis du mister passordet."
+      "phraseNotSubstitute": "En sikkerhetskopi alene får deg ikke inn igjen hvis du mister passordet: filen inneholder notatene dine, ikke passordet eller identitetsfrasen din."
     }
   },
   "clipper": {
     "pairing": {
       "accept": "Godta",
-      "close": "Lukk",
       "codeAriaLabel": "Paringskode",
       "intro": "Bekreft at denne koden samsvarer med den som vises i utvidelsen, og velg deretter Godta for å pare.",
       "reject": "Avvis",
@@ -525,7 +481,6 @@
     "matchedInAttachment": "i vedlegg",
     "matchedInAttachmentTitle": "Søket samsvarte inne i en fil som er innebygd i dette notatet",
     "matchedInBody": "↳ treff i brødteksten",
-    "noMatches": "Ingen treff",
     "operatorHint": "Tab for å fullføre",
     "operators": {
       "tag": "Notater med en etikett",
@@ -538,7 +493,6 @@
     "searchPlaceholder": "Søk i notater eller kjør en kommando. Prøv tag: · path: · task:",
     "sectionCommands": "Kommandoer",
     "sectionNotes": "Notater",
-    "untitledNote": "Uten tittel",
     "resultsLabel": "Kommandoer og notater",
     "pin": "Fest til venstre linje",
     "unpin": "Løsne fra venstre linje",
@@ -654,9 +608,6 @@
       "togglePreview": {
         "label": "Slå av/på forhåndsvisning side ved side"
       },
-      "findInNote": {
-        "label": "Finn i notat"
-      },
       "findReplace": {
         "label": "Finn og erstatt i notat"
       },
@@ -744,6 +695,7 @@
       "exportVaultMarkdown": {
         "label": "Eksporter hvelv som Markdown…"
       },
+      "findInNote": {},
       "foldAll": {
         "label": "Fold sammen alle"
       },
@@ -828,6 +780,9 @@
       "unfoldAll": {
         "label": "Fold ut alle"
       },
+      "showCalendar": {
+        "label": "Åpne kalenderen"
+      },
       "openThisWeekNote": {
         "label": "Åpne denne ukens notat"
       },
@@ -877,11 +832,9 @@
     "hotkeys": {
       "command": {
         "bold": "Fet",
-        "closeTab": "Lukk fane",
         "cycleHeadingLevel": "Bla gjennom overskriftsnivå",
         "cycleTabs": "Bla gjennom faner",
         "deleteWorkspace": "Slett arbeidsområde",
-        "findInNote": "Finn i notat",
         "focusNextPane": "Fokuser neste rute",
         "focusPrevPane": "Fokuser forrige rute",
         "foldAll": "Fold sammen alle",
@@ -891,12 +844,10 @@
         "italic": "Kursiv",
         "navigateBack": "Gå tilbake",
         "navigateForward": "Gå fremover",
-        "newNote": "Nytt notat",
         "openSettings": "Åpne innstillinger",
         "outdent": "Reduser innrykk",
         "paletteToggle": "Åpne kommandopalett",
         "redo": "Gjør om",
-        "renameWorkspace": "Gi nytt navn til arbeidsområde",
         "saveWorkspaceAs": "Lagre arbeidsområde som",
         "selectAllScoped": "Merk alt (avgrenset)",
         "selectNextOccurrence": "Merk neste forekomst",
@@ -913,6 +864,7 @@
         "toggleTaskList": "Slå oppgaveliste av/på",
         "undo": "Angre",
         "unfoldAll": "Fold ut alle",
+        "showCalendar": "Åpne kalenderen",
         "cycleRegion": "Bytt fokus mellom områder",
         "focusEditorRegion": "Fokuser på redigeringsprogram",
         "focusRightPanelRegion": "Fokuser på høyre panel",
@@ -923,7 +875,6 @@
       "invalidChordReason": "Legg til en modifikatortast (⌘, Ctrl eller Alt). En tast alene kan ikke være en snarvei."
     },
     "picker": {
-      "vaultRoot": "Hvelvrot",
       "moveNoteTitle": "Flytt notat til mappe",
       "moveNotePlaceholder": "Velg en mappe…",
       "noFolders": "Ingen mapper ennå",
@@ -945,6 +896,68 @@
     },
     "back": "Tilbake",
     "continue": "Fortsett",
+    "phraseWordsProgress": "{{filled}} av {{total}} ord",
+    "clear": "Tøm",
+    "untitled": "Uten navn",
+    "done": "Ferdig",
+    "rename": "Gi nytt navn",
+    "remove": "Fjern",
+    "edit": "Rediger",
+    "export": "Eksporter",
+    "copy": "Kopier",
+    "loading": "Laster…",
+    "tasks": "Oppgaver",
+    "priority": "Prioritet",
+    "today": "I dag",
+    "thisnote": "Dette notatet",
+    "nomatches": "Ingen treff",
+    "allnotes": "Alle notater",
+    "untitlednote": "Notat uten navn",
+    "vaultroot": "Hvelvrot",
+    "clearsearch": "Tøm søket",
+    "tryagain": "Prøv igjen",
+    "anothervaultoperationisinprogresswaitforittofinishthentryagain": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv deretter igjen.",
+    "closetab": "Lukk fanen",
+    "emptytrash": "Tøm papirkurven",
+    "findinnote": "Finn i notatet",
+    "newfolder": "Ny mappe",
+    "newnote": "Nytt notat",
+    "renameworkspace": "Gi arbeidsområdet nytt navn",
+    "notnow": "Ikke nå",
+    "versionhistory": "Versjonshistorikk",
+    "duedate": "Forfallsdato",
+    "nodate": "Ingen dato",
+    "movetotrash": "Flytt til papirkurven",
+    "thevaultislockedunlockitthentryagain": "Hvelvet er låst. Lås det opp, og prøv deretter igjen.",
+    "showinfolder": "Vis i mappen",
+    "untitledview": "Visning uten navn",
+    "choosefolder": "Velg mappe…",
+    "untitledtemplate": "Mal uten navn",
+    "justnow": "akkurat nå",
+    "nonotesmatchthisview": "Ingen notater passer i denne visningen",
+    "novalue": "Ingen verdi",
+    "masterpassword": "Hovedpassord",
+    "recoveryphrase": "Gjenopprettingsfrase",
+    "unexpectederrorpleasetryagain": "Uventet feil. Prøv igjen.",
+    "vaultfilenotfoundpleaserestarttheapp": "Hvelvfilen ble ikke funnet. Start appen på nytt.",
+    "vaultfileisunreadablerestorefromabackup": "Hvelvfilen kan ikke leses. Gjenopprett fra en sikkerhetskopi.",
+    "restorefrombackup": "Gjenopprett fra sikkerhetskopi",
+    "deviceonly": "Bare denne enheten",
+    "accountnumber": "Kontonummer",
+    "changepassword": "Endre passord",
+    "couldnotsavethissetting": "Kunne ikke lagre denne innstillingen.",
+    "periodicnotes": "Periodiske notater",
+    "thisdevice": "Denne enheten",
+    "thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue": "Koden endret seg mens du så på. Sammenlign begge skjermene på nytt. Hvis den fortsetter å endre seg, stopp og ikke fortsett.",
+    "waitingforapproval": "Venter på godkjenning",
+    "youridentitycode": "Din identitetskode",
+    "keepit": "Ta vare på den",
+    "youridentity": "Identiteten din",
+    "forgetthisidentityonthisdevice": "Glem denne identiteten på denne enheten",
+    "noinvitationsyet": "Ingen invitasjoner ennå.",
+    "createanidentity": "Opprett en identitet",
+    "confirmyourphrase": "Bekreft frasen din",
+    "registerthisidentity": "Registrer denne identiteten",
     "skipToContent": "Hopp til innhold"
   },
   "deviceRevoked": {
@@ -967,7 +980,6 @@
         "noticeContainerChanged": "Komprimert til {{format}}: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "Avbryt",
         "confirm": "Konverter",
         "skipped": "hoppet over: {{note}}",
         "subtitle_one": "1 referanse blir skrevet om. Se gjennom før du bekrefter.",
@@ -1041,7 +1053,6 @@
       },
       "lightbox": {
         "close": "Lukk forhåndsvisning",
-        "export": "Eksporter",
         "exportAria": "Eksporter vedlegg",
         "imagePreview": "Forhåndsvisning av bilde",
         "pdfFallback": "PDF",
@@ -1053,27 +1064,21 @@
       "menu": {
         "actionsAria": "Vedleggshandlinger"
       },
-      "pdf": {
-        "loading": "Laster…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "Kunne ikke åpne filvelgeren."
       },
       "progress": {
         "encrypting": "Krypterer…",
-        "importing": "Importerer…",
-        "loading": "Laster…"
+        "importing": "Importerer…"
       },
       "recording": {
         "barAria": "Tar opp talenotat",
-        "cancel": "Avbryt",
         "noAudio": "Ingen lyd registrert. Sjekk mikrofonen.",
         "saving": "Lagrer…",
         "stop": "Stopp"
       },
       "rename": {
-        "cancel": "Avbryt",
-        "confirm": "Endre navn",
         "title": "Endre navn på vedlegg"
       },
       "summary": {
@@ -1114,9 +1119,6 @@
           "seek": "Spol"
         },
         "menu": {
-          "export": "Eksporter",
-          "remove": "Fjern",
-          "rename": "Endre navn",
           "reveal": "Vis i biblioteket",
           "transcribe": "Transkriber",
           "customSize": "Egendefinert størrelse…",
@@ -1177,7 +1179,6 @@
         "bug": "Feil",
         "caution": "Forsiktig",
         "danger": "Fare",
-        "done": "Fullført",
         "error": "Feil",
         "example": "Eksempel",
         "failure": "Mislykket",
@@ -1205,8 +1206,7 @@
         "linksTo": "Lenker til {{count}}",
         "linksTo_one": "Lenker til {{count}}",
         "linksTo_other": "Lenker til {{count}}",
-        "outgoingEmpty": "Dette notatet lenker ikke til noe ennå.",
-        "untitled": "Uten tittel"
+        "outgoingEmpty": "Dette notatet lenker ikke til noe ennå."
       },
       "barItems": {
         "graph": "Graf",
@@ -1306,7 +1306,7 @@
           "insert": "Sett inn i notat",
           "noAnswer": "Ingen svar. Prøv å omformulere.",
           "newChat": "Ny samtale",
-          "unavailableHint": "Dette bygget av Myne er kompilert uten lokal AI, så ingenting her kan kjøre. Ingen innstilling endrer det — det krever et bygg med AI inkludert.",
+          "unavailableHint": "Dette bygget av Myne er kompilert uten lokal AI, så ingenting her kan kjøre. Ingen innstilling endrer det: det krever et bygg med AI inkludert.",
           "offHint": "Lokal AI er av. Slå den på i Innstillinger → Utvikler → AI.",
           "send": "Send",
           "statusNoModel": "Ingen leverandør",
@@ -1320,38 +1320,23 @@
           "truncated": "Oppsummerte de første {{count}} tegnene.",
           "you": "Du",
           "history": "Historikk",
-          "historyCancel": "Avbryt",
           "historyDelete": "Slett",
           "historyDeleteBody": "Dette sletter samtalen fra hver enhet neste gang den kobler til. Dette kan ikke angres.",
           "historyError": "Kunne ikke laste samtaler. Prøv igjen.",
-          "historyProposalNewNote": "Nytt notat",
-          "historyRename": "Gi nytt navn",
           "historyTitle": "Chathistorikk",
           "historyDeleteTitle": "Slett samtale",
-          "persistWarning": "Lagring til vaulten feilet. Meldingene dine er fortsatt her og vil bli forsøkt på nytt.",
+          "persistWarning": "Lagring til hvelvet feilet. Meldingene dine er fortsatt her og vil bli forsøkt på nytt.",
           "memory": "Hukommelse",
-          "memoryPopoverTitle": "Hva assistenten husker",
-          "memoryPopoverEmpty": "Ingenting husket ennå.",
-          "memoryPopoverDelete": "Slett",
-          "memoryPopoverDeleted": "Oppføring fjernet overalt.",
-          "memoryPopoverDeleteFailed": "Oppføringen kunne ikke slettes.",
-          "memoryPopoverEntryFailed": "Kunne ikke lese denne oppføringen. Den er fortsatt lagret; slett den her eller rett den i Innstillinger.",
-          "memoryPopoverLoadFailed": "Kunne ikke laste minner. Ingenting ble endret.",
-          "memoryPopoverRetry": "Prøv igjen",
-          "memoryPopoverSettings": "Administrer i Innstillinger",
-          "memoryPopoverClose": "Lukk",
           "seedCard": {
             "title": "Vil du at Myne skal kjenne hvelvet ditt?",
             "body": "Den kan lese formen på notatene dine én gang og bygge noen minneoppføringer. Du gjennomgår hver linje før noe lagres.",
-            "action": "Lær Myne hvelvet ditt",
-            "dismiss": "Ikke nå"
+            "action": "Lær Myne hvelvet ditt"
           },
           "copied": "Kopiert",
           "copyAnswer": "Kopier svaret",
           "copyFailed": "Kunne ikke kopiere",
           "copyYourMessage": "Kopier meldingen din",
           "emptyTitle": "Spør om notatene dine",
-          "noticeSettingsCta": "Åpne AI-innstillinger",
           "viewDiff": "Vis endringer",
           "revertRun": "Angre denne kjøringen",
           "diffTitle": "Foreslåtte endringer",
@@ -1365,8 +1350,7 @@
           "statusKeyRejected": "Nøkkel avvist",
           "statusOutOfCredit": "Tom for kreditt",
           "statusRefused": "Avvist",
-          "statusNotWorking": "Virker ikke",
-          "historyRetry": "Prøv igjen"
+          "statusNotWorking": "Virker ikke"
         },
         "allHidden": "Alle faner er skjult. Høyreklikk for å gjenopprette.",
         "outline": {
@@ -1401,15 +1385,12 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "Navn på arbeidsområde",
-        "renameConfirm": "Endre navn",
-        "renameTitle": "Gi nytt navn til arbeidsområde",
         "saveAsTitle": "Lagre arbeidsområde som",
         "saveConfirm": "Lagre"
       },
       "workspaceSwitcher": {
         "defaultName": "Arbeidsområde",
         "renameItemLabel": "Gi nytt navn til arbeidsområde {{name}}",
-        "renameTitle": "Gi nytt navn til arbeidsområde",
         "saveCurrentAs": "Lagre gjeldende som…",
         "switchLabel": "Bytt arbeidsområde",
         "toggleTitle": "Arbeidsområde: {{name}}"
@@ -1433,14 +1414,12 @@
     "noteActions": {
       "buttonLabel": "Notathandlinger",
       "convertFailed": "Kunne ikke endre hva dette notatet er, så det er uendret.",
-      "rename": "Endre navn",
       "move": "Flytt til mappe…",
       "duplicate": "Dupliser",
       "convertToTemplate": "Gjør om til mal",
       "convertToNote": "Konverter til notat",
       "turnedIntoTemplate": "Gjort om til mal",
       "convertedToNote": "Konvertert til notat",
-      "versionHistory": "Versjonshistorikk",
       "trash": "Flytt til papirkurven",
       "openInNewWindow": "Åpne i nytt vindu"
     },
@@ -1449,9 +1428,7 @@
       "defaultBadge": "kode"
     },
     "drawingEmbed": {
-      "done": "Ferdig",
       "edit": "Rediger tegningen {{name}}",
-      "editAction": "Rediger",
       "empty": "Tom tegning: klikk for å tegne",
       "open": "Åpne",
       "rename": "Gi tegningen nytt navn"
@@ -1466,8 +1443,6 @@
       "matchCase": "Skill mellom store og små bokstaver",
       "matchCount": "{{current}} av {{total}}",
       "nextMatch": "Neste treff",
-      "noMatches": "Ingen treff",
-      "placeholder": "Finn i notat",
       "previousMatch": "Forrige treff",
       "replaceAll": "Erstatt alle",
       "replaceAllCount": "Erstatt alle ({{total}})",
@@ -1498,7 +1473,6 @@
       "propertiesLabel": "Egenskaper",
       "removeListItemAriaLabel": "Fjern {{item}}",
       "titleAriaLabel": "Notattittel",
-      "titlePlaceholder": "Uten tittel",
       "managedField": "Myne skriver dette feltet"
     },
     "mermaid": {
@@ -1513,11 +1487,9 @@
       "panLeft": "Forskøv venstre",
       "panRight": "Forskøv høyre",
       "edit": "Rediger diagramkilde",
-      "editText": "Rediger",
       "expand": "Utvid diagram",
       "expandText": "Utvid",
-      "expandClose": "Lukk utvidet diagram",
-      "expandCloseText": "Lukk"
+      "expandClose": "Lukk utvidet diagram"
     },
     "slash": {
       "aiContinue": "Fortsett å skrive (AI)",
@@ -1531,7 +1503,6 @@
       "day": "Dag",
       "divider": "Skillelinje",
       "drawing": "Tegning",
-      "due": "Forfallsdato",
       "heading1": "Overskrift 1",
       "heading2": "Overskrift 2",
       "heading3": "Overskrift 3",
@@ -1541,7 +1512,6 @@
       "link": "Lenke",
       "now": "Nå",
       "numberedList": "Nummerert liste",
-      "priority": "Prioritet",
       "quote": "Sitat",
       "repeat": "Gjentakelse",
       "table": "Tabell",
@@ -1592,19 +1562,15 @@
       "title": {
         "due": "Forfallsdato",
         "repeat": "Gjentakelse",
-        "priority": "Prioritet",
         "remind": "Påminnelse"
       },
       "invalidRemind": "Myne kan ikke lese denne datoen, så du får ingen påminnelse.",
       "addTime": "Legg til tid",
-      "clear": "Tøm",
       "dateGrid": "Velg en dato",
       "dateNext": "Neste måned",
       "datePrev": "Forrige måned",
-      "today": "I dag",
       "tomorrow": "I morgen",
       "selectField": "Velg et felt å legge til",
-      "noDate": "Ingen dato",
       "removeTime": "Fjern tid",
       "timeHour": "Time",
       "timeMeridiem": "AM eller PM",
@@ -1613,6 +1579,7 @@
     "toolbar": {
       "apply": "Bruk",
       "exportImageTitle": "Eksporter utvalget som bilde",
+      "label": "Formatering",
       "customize": {
         "bold": "Fet",
         "bulletList": "Punktliste",
@@ -1650,7 +1617,8 @@
         "brown": "Brun",
         "grey": "Grå",
         "indigo": "Indigo",
-        "remove": "Fjern utheving"
+        "remove": "Fjern utheving",
+        "colours": "Uthevingsfarge"
       },
       "urlPlaceholder": "Lim inn lenke-URL"
     },
@@ -1699,7 +1667,6 @@
         "embed": "Bygg inn: {{label}}"
       },
       "convert": {
-        "cancel": "Avbryt",
         "choiceClause_one": " · {{count}} trenger et valg.",
         "choiceClause_other": " · {{count}} trenger et valg.",
         "chooseTarget": "Velg mål…",
@@ -1746,15 +1713,12 @@
     },
     "nav": {
       "dailyNote": "Dagsnotat",
-      "openToday": "Åpne i dag",
-      "allNotes": "Alle notater"
+      "openToday": "Åpne i dag"
     },
     "list": {
       "searchPlaceholder": "Søk i notater",
-      "clearSearch": "Tøm søk",
       "viewNoteCount_one": "{{count}} notat i «{{name}}»",
       "viewNoteCount_other": "{{count}} notater i «{{name}}»",
-      "edit": "Rediger",
       "trashEmpty": "Papirkurven er tom",
       "archiveEmpty": "Ingen arkiverte notater",
       "noMatchingNotes": "Ingen samsvarende notater",
@@ -1771,10 +1735,8 @@
       "wordCount_one": "{{count}} ord · {{minutes}} min lesing",
       "wordCount_other": "{{count}} ord · {{minutes}} min lesing",
       "moveToFolder": "Flytt til mappe…",
-      "moveToTrash": "Flytt til papirkurven",
       "copied": "Kopiert ✓",
-      "copyToClipboard": "Kopier til utklippstavle",
-      "versionHistory": "Versjonshistorikk"
+      "copyToClipboard": "Kopier til utklippstavle"
     },
     "purge": {
       "body": "Dette fjerner notatet fra denne enheten for godt. Dette kan ikke angres."
@@ -1793,8 +1755,7 @@
       "body": "Velg et notat fra listen, eller start et nytt."
     },
     "readingBar": {
-      "editNote": "Rediger notat",
-      "edit": "Rediger"
+      "editNote": "Rediger notat"
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} koblet notat",
@@ -1828,9 +1789,7 @@
       "emptyState": "Ingen lagrede visninger ennå. Opprett en for å filtrere notatene dine etter etikett, mappe eller tekst.",
       "editView": "Rediger visning"
     },
-    "sheet": {
-      "done": "Ferdig"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "Hvelv"
     },
@@ -1839,7 +1798,6 @@
       "notesCount_one": "Notater · {{count}}",
       "notesCount_other": "Notater · {{count}}"
     },
-    "untitledNote": "Notat uten tittel",
     "commandPalette": {
       "searchPlaceholder": "Søk i notater eller kjør en kommando…",
       "noMatches": "Ingen kommandoer eller notater samsvarer."
@@ -1876,7 +1834,6 @@
     "meeting": {
       "ai": {
         "cancelled": "Stoppet. Ingenting ble lagt til i notatet.",
-        "close": "Lukk",
         "discard": "Forkast",
         "failed": "AI-gjennomkjøringen mislyktes. Transkripsjonen er uendret.",
         "generate": "Generer",
@@ -1901,7 +1858,6 @@
         "title": "Møte-AI"
       },
       "barAria": "Møteøkt",
-      "cancel": "Avbryt",
       "chunksMissing": "En del av møtet ble ikke overført, så notatet har et hull. Lyden som kom frem, er fortsatt der.",
       "clipFailed": "En del av møtet kunne ikke lagres. Resten er fortsatt i notatet.",
       "machineNotice": "Dette er en maskinell transkripsjon av møtet og kan inneholde feil.",
@@ -1940,8 +1896,7 @@
         "pdfPayloadMissing": "Eksporten ble avbrutt. Hvis hvelvet ble låst, lås det opp og prøv igjen.",
         "pdfRenderTimeout": "Notatet tok for lang tid å gjengi, så ingenting ble eksportert.",
         "pdfWindowCreateFailed": "Eksportvinduet kunne ikke åpnes, så ingenting ble eksportert.",
-        "targetExists": "En fil med det navnet finnes allerede på målet.",
-        "vaultLocked": "Hvelvet er låst. Lås det opp, og prøv igjen."
+        "targetExists": "En fil med det navnet finnes allerede på målet."
       },
       "flow": {
         "couldNotRead": "Dette notatet kunne ikke leses.",
@@ -1953,11 +1908,9 @@
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
-        "filterPlainText": "Ren tekst",
-        "showInFolder": "Vis i mappe"
+        "filterPlainText": "Ren tekst"
       },
       "modal": {
-        "cancel": "Avbryt",
         "export": "Eksporter…",
         "includeAttachments_one": "Inkluder {{count}} vedlegg",
         "includeAttachments_other": "Inkluder {{count}} vedlegg",
@@ -1968,12 +1921,10 @@
       }
     },
     "egress": {
-      "cancel": "Avbryt",
       "confirm": "Last ned",
       "title": "Last ned denne filen"
     },
     "pdf": {
-      "cancel": "Avbryt",
       "continue": "Fortsett…",
       "title": "Eksporter som PDF"
     },
@@ -1982,7 +1933,6 @@
       "errors": {
         "attachmentCorrupt": "Et vedlegg det vises til i et notat kunne ikke leses, så ingenting ble eksportert.",
         "attachmentMissing": "Et vedlegg det vises til i et notat mangler, så ingenting ble eksportert.",
-        "authOperationInProgress": "En annen hvelvoperasjon pågår. Vent til den er ferdig, og prøv igjen.",
         "cancelled": "Eksport avbrutt. Ingenting ble igjen på målet.",
         "cannotDecrypt": "Et notat kunne ikke leses, så ingenting ble eksportert.",
         "destinationAlreadyExists": "Noe finnes allerede på det stedet. Velg et nytt sted for eksporten.",
@@ -1991,7 +1941,6 @@
         "invalidVaultMeta": "Hvelvets metadata kunne ikke leses, så ingenting ble eksportert.",
         "ioWriteDefault": "Kunne ikke skrive eksporten.",
         "joinFailure": "Eksport mislyktes uventet. Ingenting ble igjen på målet.",
-        "vaultLocked": "Hvelvet er låst. Lås det opp, og prøv igjen.",
         "vaultNotFound": "Fant ingen hvelv å eksportere."
       },
       "flow": {
@@ -2012,12 +1961,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "Avbryt",
         "cancelling": "Avbryter…",
         "title": "Eksporterer…"
       },
       "setup": {
-        "cancel": "Avbryt",
         "choose": "Velg…",
         "chooseFolder": "Velg en mappe…",
         "destinationLabel": "Mål",
@@ -2031,8 +1978,6 @@
         "title": "Eksporter hvelv som Markdown"
       },
       "summary": {
-        "done": "Fullført",
-        "showInFolder": "Vis i mappe",
         "title": "Eksport fullført"
       }
     }
@@ -2068,8 +2013,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Avbryt",
-      "close": "Lukk",
       "count_one": "{{count}} notat",
       "count_other": "{{count}} notater",
       "delete": "Slett",
@@ -2080,14 +2023,12 @@
       "folderDeleteBody_other": "«{{name}}» og dens {{count}} notater",
       "folderDeleteConfirm_one": "Flytte {{count}} notat til papirkurven?",
       "folderDeleteConfirm_other": "Flytte {{count}} notater til papirkurven?",
-      "folderDeleteConfirmCta": "Flytt til papirkurven",
       "folderDeleteError": "Kunne ikke flytte notatene i den mappen til papirkurven. Prøv igjen.",
       "folderDeleteTitle": "Flytte denne mappen til papirkurven?",
       "folderDeleteWarning": "De flyttes til papirkurven. Gjenopprett dem når som helst. Permanent sletting er et eget steg.",
       "restore": "Gjenopprett",
       "restoreError": "Kunne ikke gjenopprette det notatet. Prøv igjen.",
-      "title": "Arkiv",
-      "untitled": "Uten tittel"
+      "title": "Arkiv"
     },
     "cardMenu": {
       "copyLink": "Kopier lenke",
@@ -2115,10 +2056,8 @@
       "none": "Ingen"
     },
     "deleteConfirm": {
-      "cancel": "Avbryt",
       "delete": "Slett",
       "title": "Slette dette notatet?",
-      "untitled": "Uten tittel",
       "warning": "Dette kan ikke angres."
     },
     "example": {
@@ -2147,7 +2086,6 @@
     "filterBuilder": {
       "addCondition": "Legg til betingelse",
       "addFilterGroup": "Legg til filtergruppe",
-      "cancel": "Avbryt",
       "combinator": {
         "all": "alle",
         "any": "én av"
@@ -2193,6 +2131,7 @@
       "unsettledSave": "Et åpent notat er ikke ferdig med å lagre, så mappen ble latt i fred. Prøv igjen når den er ferdig.",
       "renameFailed": "Kunne ikke gi mappen nytt navn, så den er uendret.",
       "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. En tom mappe dukker opp igjen under det gamle navnet hver gang du låser opp; det er trygt å slette den, og ingenting annet endres. Å gi mappen nytt navn igjen fjerner den ikke.",
+      "mcpScopeRewriteFailed": "Mappen fikk nytt navn, men mappene som en ekstern AI-tilkobling holdes ute fra, kunne ikke oppdateres. Hvis du hadde utelatt denne mappen fra godkjenningen til en tilkobling, kan den nå være lesbar for den tilkoblingen. Åpne Innstillinger, AI, Ekstern tilgang og kontroller mappene som er utelatt for hver tilkobling.",
       "folderListFull": "Myne kan huske et begrenset antall mapper, og den listen er full. Denne mappen virker fortsatt, men den forsvinner når det siste notatet forlater den. Å slette en mappe du ikke trenger lenger, gir plass.",
       "folderNotRemembered": "Mappen ble opprettet, men Myne kunne ikke registrere den. Den forsvinner når det siste notatet forlater den, og den er borte ved neste opplåsing hvis den fortsatt er tom. Det er trygt å opprette den på nytt.",
       "attachmentFolderRewriteFailed": "Mappen fikk nytt navn, men filene som lå i den flyttet ikke med. De viser fortsatt til den gamle mappen, så de mangler i bibliotektreet og hos en agent som har fått mappen. Flytt dem igjen for hånd fra Vedlegg, eller gi mappen det gamle navnet tilbake og deretter nytt navn igjen."
@@ -2224,7 +2163,6 @@
         "heading": "Fargegrupper",
         "namePlaceholder": "Regel uten tittel",
         "rowLabel": "{{name}}, gruppe {{index}} av {{total}}. Alt pluss opp- eller nedpilen ordner den på nytt.",
-        "editRuleButton": "Rediger",
         "derivedMakeEditable": "Gjør disse redigerbare",
         "derivedMakeEditableFailed": "Disse gruppene kunne ikke lagres. Prøv igjen.",
         "derivedNote_one": "Grafen farges etter tag: {{count}} gruppe, avledet av taggene dine. Den lagres ikke før du gjør den redigerbar.",
@@ -2245,7 +2183,6 @@
       "refreshTitle": "Hvelvet er endret: bygg grafen på nytt",
       "settings": {
         "appearanceHeading": "Utseende",
-        "closeTitle": "Lukk",
         "forceCenter": "Senterdrag",
         "forceLinkDistance": "Lenkeavstand",
         "forceLinkStrength": "Lenkestyrke",
@@ -2269,27 +2206,19 @@
       "relayoutTitle": "Legg grafen opp på nytt fra bunnen",
       "showingCount_one": "Viser {{count}} notat",
       "showingCount_other": "Viser {{count}} notater",
-      "untitledNote": "Notat uten tittel",
       "viewGraph": "Graf",
       "viewList": "Liste",
       "viewToggleAriaLabel": "Velg grafbildet eller en liste over notatene dens"
     },
     "import": {
-      "base": {
-        "untitledView": "Visning uten tittel"
-      },
+      "base": {},
       "modal": {
-        "cancel": "Avbryt",
         "cancelledNotImported": "{{count}} ikke importert",
         "cancelledNotImported_one": "{{count}} ikke importert",
         "cancelledNotImported_other": "{{count}} ikke importert",
         "cancelling": "Avbryter…",
-        "chooseFolder": "Velg mappe…",
-        "close": "Lukk",
         "closeAriaLabel": "Lukk",
         "copied": "Kopiert",
-        "copy": "Kopier",
-        "done": "Fullført",
         "errorBody": "Importen kunne ikke fullføres. Alle notater som allerede ble importert, er beholdt og er trygge å beholde eller slette.",
         "flagDetail": "{{kind}} «{{segment}}» {{reason}}.",
         "flagKindFolder": "Mappe",
@@ -2362,10 +2291,8 @@
         "statFoldersNotKept": "Mapper ikke beholdt"
       },
       "offer": {
-        "body": "Hent dine eksisterende notater inn i Myne. Hvert enkelt krypteres etter hvert som det importeres. Ingenting forlater denne enheten, og originalfilene dine forblir nøyaktig der de er.",
-        "chooseFolder": "Velg mappe…",
+        "body": "Hent dine eksisterende notater inn i Myne. Hvert enkelt krypteres etter hvert som det importeres, og originalfilene dine forblir nøyaktig der de er.",
         "laterHint": "Du kan alltid importere senere fra Innstillinger → Lagring.",
-        "notNow": "Ikke nå",
         "title": "Importere notatene dine?"
       },
       "picker": {
@@ -2492,12 +2419,8 @@
       "mergeAnyway": "Slå sammen likevel",
       "newDrawingHere": "Ny tegning her",
       "newDrawingMenu": "Ny tegning",
-      "newFolder": "Ny mappe",
       "newFolderInPlaceholder": "Ny mappe i {{path}}",
-      "newFolderPlaceholder": "Ny mappe",
-      "newNote": "Nytt notat",
       "newNoteHere": "Nytt notat her",
-      "newNoteMenu": "Nytt notat",
       "newSubfolder": "Ny undermappe",
       "newViewTitle": "Ny visning",
       "noteMovedToTrash": "Notat flyttet til papirkurven",
@@ -2509,19 +2432,16 @@
       "openToSide": "Åpne ved siden av",
       "removeFolderNote": "Fjern mappenotat",
       "removeFromFavorites": "Fjern fra favoritter",
-      "rename": "Endre navn",
       "setAsFolderNote": "Angi som mappenotat",
       "trash": "Papirkurv",
       "trashBulkError": "Kunne ikke flytte notatene til papirkurven.",
       "trashConfirmBulkBody_one": "{{count}} notat blir flyttet til papirkurven.",
       "trashConfirmBulkBody_other": "{{count}} notater blir flyttet til papirkurven.",
       "trashConfirmBulkWarning": "Du kan gjenopprette dem fra papirkurven senere.",
-      "trashConfirmConfirm": "Flytt til papirkurven",
       "trashConfirmTitle": "Flytt til papirkurven?",
       "trashConfirmWarning": "Du kan gjenopprette det fra papirkurven senere.",
       "trashSingleError": "Kunne ikke flytte notatet til papirkurven.",
       "undo": "Angre",
-      "vaultRoot": "Hvelvrot",
       "viewSettingsTitle": "Visningsinnstillinger",
       "imported_one": "Importerte 1 notat til denne mappen",
       "imported_other": "Importerte {{count}} notater til denne mappen",
@@ -2532,32 +2452,25 @@
       "moveFolderTo": "Flytt mappe til…",
       "treeLabel": "Notater og mapper",
       "selectionAnnouncement": "Valgt {{title}}",
-      "untitled": "Uten tittel",
       "search": "Søk"
     },
     "newFromTemplate": {
-      "back": "Tilbake",
       "blankNote": "Tomt notat",
       "createNote": "Opprett notat",
       "createFirstTemplate": "Opprett en mal",
       "manageTemplates": "Administrer maler",
       "emptyState": "Du har ikke opprettet noen maler ennå.",
       "listLabel": "Maler",
-      "loading": "Laster…",
       "nameLabel": "Navn på notatet (fra «{{templateName}}»)",
-      "namePlaceholder": "Uten tittel",
       "nameStepTitle": "Gi dette notatet et navn",
-      "pickStepTitle": "Nytt notat fra mal",
-      "untitledTemplate": "Mal uten tittel"
+      "pickStepTitle": "Nytt notat fra mal"
     },
     "newTab": {
-      "createNote": "Nytt notat",
       "createDrawing": "Ny tegning",
       "noNotesYet": "Ingen notater ennå.",
       "recent": "Fortsett der du slapp",
       "searchAriaLabel": "Søk i notater og kommandoer",
       "searchPlaceholder": "Søk i notater og kommandoer…",
-      "untitled": "Uten tittel",
       "createFromTemplate": "Fra mal",
       "kindCommand": "Kommando",
       "kindNote": "Notat",
@@ -2568,6 +2481,7 @@
         "graph": "Graf",
         "tasks": "Oppgaver",
         "today": "I dag",
+        "calendar": "Kalender",
         "home": "Hjem"
       },
       "placesLabel": "Gå til",
@@ -2576,15 +2490,13 @@
     "pane": {
       "graphTab": "Graf",
       "tasksTab": "Oppgaver",
-      "loading": "Laster…",
-      "untitledView": "Visning uten tittel",
       "agentTab": "Agent",
+      "calendarTab": "Kalender",
       "homeTab": "Hjem"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dager siden",
       "hoursAgo": "{{h}} t siden",
-      "justNow": "akkurat nå",
       "minutesAgo": "{{m}} min siden",
       "oneWeekAgo": "1 uke siden",
       "weeksAgo": "{{w}} uker siden",
@@ -2603,7 +2515,6 @@
       "taskBadgeTitle": "Oppgavenotat",
       "unsyncedLabel": "Ikke på serveren ennå",
       "unsyncedTitle": "De siste endringene i dette notatet finnes bare på denne enheten",
-      "untitled": "Uten tittel",
       "untitledDrawing": "Tegning uten tittel"
     },
     "savedView": {
@@ -2615,7 +2526,6 @@
       "editing": "Redigerer",
       "editingEllipsis": "Redigerer…",
       "editingTitle": "Redigerer: autolagring er klar",
-      "justNow": "akkurat nå",
       "retry": "Prøv igjen",
       "saved": "Lagret",
       "savedRelative": "Lagret {{rel}}",
@@ -2627,39 +2537,33 @@
       "savingEllipsis": "Lagrer…"
     },
     "snapshotFailed": {
-      "dismiss": "Lukk",
       "message": "Kunne ikke lagre et øyeblikksbilde. Notatet ditt er lagret, men versjonshistorikken kan være ufullstendig (disken kan være full)."
     },
     "snapshots": {
-      "cancel": "Avbryt",
       "changeCount_one": "{{count}} endring siden dette øyeblikksbildet",
       "changeCount_other": "{{count}} endringer siden dette øyeblikksbildet",
       "changeCountPrev_one": "{{count}} endring fra forrige øyeblikksbilde",
       "changeCountPrev_other": "{{count}} endringer fra forrige øyeblikksbilde",
-      "close": "Lukk",
       "compareAgainstLabel": "Sammenlign med",
       "compareCurrent": "Gjeldende notat",
       "comparePrevious": "Forrige øyeblikksbilde",
       "confirmBody": "Det nåværende notatet ditt lagres som et øyeblikksbilde først, så du kan angre dette.",
       "confirmTitle": "Gjenopprette dette øyeblikksbildet?",
       "decrypting": "Dekrypterer…",
-      "emptyState": "",
+      "emptyState": "Ingen øyeblikksbilder ennå. Øyeblikksbilder lagres automatisk mens du redigerer, beholdes i omtrent 7 dager, og er borte for godt når notatet slettes permanent.",
       "errorCannotDecrypt": "Dette øyeblikksbildet kunne ikke dekrypteres.",
       "errorGeneric": "Noe gikk galt. Prøv igjen.",
       "errorIo": "Det oppstod en diskfeil. Disken kan være full eller skrivebeskyttet.",
       "errorNotFound": "Det øyeblikksbildet er ikke lenger tilgjengelig.",
       "errorStorageAccess": "Kunne ikke få tilgang til hvelvets øyeblikksbildelagring.",
       "errorVaultLocked": "Hvelvet er låst. Lås det opp for å se øyeblikksbilder.",
-      "justNow": "akkurat nå",
       "listLabel": "Liste over øyeblikksbilder",
-      "loading": "Laster…",
       "noPrevious": "Dette er det eldste øyeblikksbildet. Det finnes ingenting før det å sammenligne med.",
       "restore": "Gjenopprett",
       "restoreCta": "Gjenopprett dette øyeblikksbildet",
       "restoredStatus": "Gjenopprettet. Versjonen du hadde, er lagret som et øyeblikksbilde.",
       "selectPlaceholder": "Velg et øyeblikksbilde for å forhåndsvise hva som har endret seg siden da.",
       "title": "Øyeblikksbilder",
-      "untitled": "Uten tittel",
       "deviceFallback": "Enhet {{code}}",
       "unknownAuthor": "Ukjent enhet"
     },
@@ -2672,14 +2576,10 @@
       "pinned": "Festet",
       "pinnedTitle": "Festet: løsne for å lukke",
       "unpin": "Løsne",
-      "untitled": "Uten tittel",
-      "closeTabMenuItem": "Lukk fane",
       "moveLeft": "Flytt til venstre",
       "moveRight": "Flytt til høyre"
     },
     "tagBrowser": {
-      "cancel": "Avbryt",
-      "clear": "Tøm",
       "combineTagsWith": "Kombiner etiketter med",
       "filtering": "Filtrerer…",
       "modeAll": "Alle",
@@ -2695,19 +2595,15 @@
       "saveAsView": "Lagre som visning",
       "searchPlaceholder": "Søk i etiketter…",
       "title": "Etiketter",
-      "untitled": "Uten tittel",
       "viewNamePlaceholder": "Visningsnavn"
     },
     "trash": {
-      "close": "Lukk",
       "count_one": "{{count}} notat",
       "count_other": "{{count}} notater",
       "delete": "Slett",
       "deleteError": "Kunne ikke slette det notatet. Prøv igjen.",
-      "empty": "Tøm papirkurven",
       "emptyConfirmBody_one": "{{count}} notat blir slettet permanent.",
       "emptyConfirmBody_other": "{{count}} notater blir slettet permanent.",
-      "emptyConfirmCta": "Tøm papirkurven",
       "emptyConfirmTitle": "Tømme papirkurven?",
       "emptyPartialFailure_one": "{{count}} notat kunne ikke slettes og blir liggende i papirkurven.",
       "emptyPartialFailure_other": "{{count}} notater kunne ikke slettes og blir liggende i papirkurven.",
@@ -2717,8 +2613,7 @@
       "purgeConfirmTitle": "Slette permanent?",
       "restore": "Gjenopprett",
       "restoreError": "Kunne ikke gjenopprette det notatet. Prøv igjen.",
-      "title": "Papirkurv",
-      "untitled": "Uten tittel"
+      "title": "Papirkurv"
     },
     "unlinkedMentions": {
       "empty": "Ingen ukoblede omtaler.",
@@ -2727,8 +2622,7 @@
       "linkTooltip": "Koble denne omtalen til {{title}}",
       "refresh": "Omtaler kan ha endret seg: oppdater",
       "searching": "Søker…",
-      "thisNote": "dette notatet",
-      "untitled": "Uten tittel"
+      "thisNote": "dette notatet"
     },
     "unsettledSave": "Et åpent notat er ikke ferdig med å lagre, så ingenting ble endret. Prøv igjen når den er ferdig.",
     "views": {
@@ -2775,11 +2669,9 @@
         "renameLane": "Gi kolonnen {{lane}} nytt navn",
         "newLaneName": "Nytt kolonnenavn",
         "saveLaneName": "Lagre kolonnenavn",
-        "cancelLaneRename": "Avbryt",
         "lanesNotSaved": "Kortene flyttet seg, men kolonnerekkefølgen kunne ikke lagres.",
         "laneOrderRestored": "Kolonnerekkefølgen er tilbake.",
         "laneOrderRestoreFailed": "Kolonnerekkefølgen kunne ikke gjenopprettes.",
-        "cancel": "Avbryt",
         "archiveFailed": "Notatet kunne ikke arkiveres.",
         "trashFailed": "Notatet kunne ikke flyttes til papirkurven.",
         "noGroupBy": "Denne tavlen har ingen kolonneegenskap. Velg en egenskap å gruppere etter i visningsinnstillinger."
@@ -2787,17 +2679,11 @@
       "cards": {
         "changeCover": "Endre omslag",
         "changeCoverImage": "Endre omslagsbilde",
-        "empty": "Ingen notater samsvarer med denne visningen",
-        "noValue": "Ingen verdi",
         "setCover": "Angi omslag",
-        "setCoverImage": "Angi omslagsbilde",
-        "untitled": "Uten tittel"
+        "setCoverImage": "Angi omslagsbilde"
       },
       "empty": "Ingen visninger ennå. Lagre den gjeldende notatlisten som en visning.",
-      "list": {
-        "empty": "Ingen notater samsvarer med denne visningen",
-        "noValue": "Ingen verdi"
-      },
+      "list": {},
       "import": {
         "approveAction": "Godkjenn v{{version}}",
         "approveFailed": "Den godkjenningen kunne ikke lagres.",
@@ -2809,7 +2695,6 @@
         "armRefusedHeading": "{{name}} ble ikke importert",
         "armSameVersionDifferent": "Filen sier v{{version}}, samme versjon som dette hvelvet har, men innholdet skiller seg. Det er enten en annen forfatter som gjenbruker id-en eller en fil endret etter den ble godkjent, så den avvises.",
         "armUpdate": "Dette erstatter {{name}}: dette hvelvet har v{{stored}}, filen er v{{incoming}}.",
-        "close": "Lukk",
         "filterName": "Visningsmanifest",
         "idleBody": "En visningsfil er én lagret visning noen eksporterte. Myne sjekker den først og viser deg hva den velger og leser før noe lagres.",
         "importAction": "Importer visning",
@@ -2835,7 +2720,6 @@
       "manager": {
         "approve": "Godkjenn",
         "approvedState": "Godkjent på denne enheten",
-        "close": "Lukk",
         "deleteFailed": "Den visningen kunne ikke slettes.",
         "deleteLabel": "Slett {{name}}",
         "emptyBody": "En visning du lagrer fra notatlisten, eller en noen sender deg, vises her.",
@@ -2852,18 +2736,14 @@
         "editFilter": "Rediger filter…",
         "moveDown": "Flytt ned",
         "moveUp": "Flytt opp",
-        "rename": "Endre navn",
         "viewSettings": "Visningsinnstillinger…"
       },
       "newView": "Ny visning",
       "noMatch": "Ingen visninger samsvarer med søket.",
       "searchPlaceholder": "Søk i visninger…",
       "table": {
-        "empty": "Ingen notater samsvarer med denne visningen",
-        "name": "Navn",
-        "noValue": "Ingen verdi"
-      },
-      "untitledView": "Visning uten tittel"
+        "name": "Navn"
+      }
     },
     "viewSettings": {
       "aspect": {
@@ -2873,7 +2753,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (bredt)"
       },
-      "cancel": "Avbryt",
       "cardSize": "Kortstørrelse",
       "cardSizeValue": "{{size}} px",
       "columns": "Kolonner",
@@ -3033,7 +2912,6 @@
       "confirmLabel": "Bekreft hovedpassord",
       "defaultEmptyCaption": "Velg noe du kan huske. Det kan ikke nullstilles.",
       "mismatch": "Passordene samsvarer ikke.",
-      "passwordLabel": "Hovedpassord",
       "suggestPassword": "Foreslå passord",
       "tooShort": "Bruk minst {{n}} tegn."
     },
@@ -3051,8 +2929,6 @@
   },
   "migrate": {
     "intro": "Oppgrader dette hvelvet til det nye formatet. Notatene dine får automatisk sammenslåing på tvers av enheter. Hele hvelvet får nye nøkler; den gamle kopien beholdes på denne enheten til du bekrefter.",
-    "passwordLabel": "Hovedpassord",
-    "phraseLabel": "Gjenopprettingsfrase",
     "phraseHelp": "Påkrevd: de nye nøklene dine pakkes inn under denne frasen, slik at gjenoppretting fortsatt virker. Skriv inn alle gjenopprettingsordene dine.",
     "submit": "Migrer",
     "migrating": "Migrerer…",
@@ -3079,11 +2955,8 @@
     "errors": {
       "cancelledVaultLocked": "Gjenoppretting avbrutt: hvelvet ble låst.",
       "operationInProgress": "En operasjon pågår. Vent litt.",
-      "unexpected": "Uventet feil. Prøv igjen.",
-      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt.",
       "openAsImportSource": "En import leser dette hvelvet akkurat nå. Fullfør eller avbryt den importen, og gjenopprett så dette hvelvet."
     },
-    "vaultUnreadable": "Hvelvfilen kan ikke leses. Gjenopprett fra en sikkerhetskopi.",
     "genericError": "Noe gikk galt. Vennligst prøv igjen.",
     "weakPassword": "Passordet må ha minst {{min}} tegn.",
     "setPasswordError": "Kunne ikke angi det nye passordet ditt. Vennligst prøv igjen.",
@@ -3092,7 +2965,7 @@
     "restoreVaultHeader": "Gjenopprett et hvelv",
     "accountTitle": "Skriv inn kontonummeret ditt",
     "accountLead": "Finn dette der du lagret gjenopprettingsfrasen din. Det identifiserer hvelvet som skal gjenopprettes.",
-    "accountInvalid": "Ugyldig kontonummer — vennligst sjekk og skriv inn på nytt.",
+    "accountInvalid": "Ugyldig kontonummer. Sjekk det og skriv det inn på nytt.",
     "accountOptionalHint": "Har du det ikke? La dette stå tomt og fortsett. Den 24-ords gjenopprettingsfrasen din er alt du trenger.",
     "paste": "Lim inn",
     "phraseGridHint": "Skriv inn hvert ord, eller lim inn alle 24 samtidig for å fylle rutenettet.",
@@ -3177,8 +3050,6 @@
     }
   },
   "restore": {
-    "backLabel": "Tilbake",
-    "cancelLabel": "Tilbake",
     "collision": {
       "body": "Et hvelv fra denne sikkerhetskopien finnes allerede på denne enheten. Du kan beholde begge: den gjenopprettede kopien vises som et separat hvelv i hvelvlisten din. Eller du kan gjenopprette nå og deretter fjerne det eksisterende hvelvet fra hvelvlisten selv. Du blir bedt om å skrive DELETE, og det gir bare mening etter at du har bekreftet at det gjenopprettede hvelvet lar seg åpne.",
       "keepBoth": "Behold begge",
@@ -3186,14 +3057,13 @@
     },
     "damaged": {
       "body": "Sikkerhetskopifilen er skadet, så ingenting ble gjenopprettet. Hvis dette er den eneste kopien du har, kan berging gjenopprette de intakte notatene og liste opp nøyaktig hva som ikke kunne leses. Resultatet merkes alltid som en delvis gjenoppretting.",
-      "close": "Lukk",
       "salvage": "Berg intakte notater…"
     },
     "error": {
       "tryAnotherFile": "Prøv en annen fil"
     },
     "pick": {
-      "body": "Velg en <code>.myne-backup</code>-fil. Sikkerhetskopien verifiseres før noe gjenopprettes; det gjenopprettede hvelvet låses opp med dette hvelvets passord eller gjenopprettingsfrase, akkurat som ved opplåsing.",
+      "body": "Velg en <code>.myne-backup</code>-fil. Sikkerhetskopien verifiseres før noe gjenopprettes; det gjenopprettede hvelvet låses opp med dette hvelvets passord, akkurat som ved opplåsing.",
       "chooseFile": "Velg sikkerhetskopifil…",
       "corruptedSuffix": "Det nåværende hvelvet ditt berøres ikke: sikkerhetskopien gjenopprettes som et separat hvelv først."
     },
@@ -3207,9 +3077,7 @@
       "restored": "Hvelv gjenopprettet.",
       "versionHistory": "Oppføringer i versjonshistorikk: {{n}}"
     },
-    "title": "Gjenopprett fra sikkerhetskopi",
     "working": {
-      "cancel": "Avbryt",
       "restoringProgress": "Gjenoppretter… {{done}} av {{total}}",
       "verifying": "Verifiserer sikkerhetskopi…",
       "verifyingProgress": "Verifiserer sikkerhetskopi… {{done}} av {{total}}"
@@ -3220,7 +3088,6 @@
       "buildChannelDevelopment": "Utviklingsbygg",
       "buildLabel": "Bygg",
       "buildChannelLabel": "Byggkanal",
-      "buildChannelStable": "Stabil",
       "developerModeHelper": "Viser de avanserte innstillingene Myne holder unna som standard: de der du forlater stien Myne går god for, og verktøyene for viderekomne som de fleste aldri trenger. Å slå det av skjuler dem bare igjen. Det du har slått på, forblir på, og du slår det av der kontrollen for det er.",
       "developerModeLabel": "Utviklermodus",
       "legalLabel": "Juridisk",
@@ -3231,9 +3098,8 @@
       "tagline": "Pre-alfa",
       "threatModelHelper": "Åpne det offentlige trusselmodelldokumentet i nettleseren din.",
       "threatModelLabel": "Trusselmodell",
-      "version": "Versjon",
       "dev": "Dev",
-      "updateAutoCheckHelper": "Myne laster ned en liten signert fil fra myne.md for å se om det finnes en nyere versjon, og gir deg beskjed. Den sender gjeldende versjon og plattform, og ingenting annet. Du kan fortsatt sjekke manuelt med knappen ovenfor.",
+      "updateAutoCheckHelper": "Myne laster ned en liten signert fil fra myne.md for å se om det finnes en nyere versjon, og gir deg beskjed. Den sender gjeldende versjon og plattform, og ingenting annet.",
       "updateAutoCheckLabel": "Se etter oppdateringer automatisk",
       "updateAvailable": "Versjon {{version}} er tilgjengelig.",
       "updateChannelBeta": "Beta",
@@ -3243,8 +3109,9 @@
       "updateChecking": "Sjekker…",
       "updateFailed": "Kunne ikke se etter oppdateringer. Det prøves igjen senere.",
       "updateHelper": "Myne verifiserer hver oppdatering mot en offline utgivelsesnøkkel før den installeres. Sjekken spør downloads.myne.md om den nyeste versjonen og sender bare versjonen og plattformen din (og IP-adressen din, som det opphavet ikke logger); aldri notatene dine eller kontoen din.",
-      "updateIdle": "Signerte oppdateringer, hentet fra downloads.myne.md når du sjekker.",
+      "updateIdle": "Ikke sjekket ennå.",
       "updateInstallButton": "Start på nytt for å oppdatere",
+      "updateFlushFailed": "Kunne ikke lagre alle åpne notater, så Myne startet ikke på nytt for å oppdatere. Prøv igjen om et øyeblikk.",
       "updateLabel": "Oppdateringer",
       "updateUpToDate": "Du har den nyeste versjonen.",
       "developerModeInline": "Viser innstillingene Myne holder unna som standard.",
@@ -3253,6 +3120,10 @@
       "diagnosticLogError": "Myne kunne ikke endre den innstillingen.",
       "diagnosticLogReadError": "Myne kunne ikke lese innstillingen for diagnostisk logging, så den vises som av.",
       "diagnosticBlockLabel": "Rapportdetaljer",
+      "diagnosticsIntro": "Hva Myne vet om denne enheten akkurat nå. Ingenting sendes noe sted; du bestemmer hva du deler.",
+      "diagnosticsReading": "Leser…",
+      "diagnosticCopied": "Kopiert",
+      "diagnosticsLogNote": "Det finnes ingen loggfil på denne enheten som denne blokken kan overlevere: den lagrede diagnostikkloggen er en funksjon i skrivebordsappen.",
       "diagnosticCopy": "Kopier diagnostikk",
       "diagnosticCopyDone": "Diagnostikken er kopiert",
       "diagnosticCopyFailed": "Kunne ikke kopiere. Merk teksten ovenfor og kopier den manuelt.",
@@ -3281,7 +3152,6 @@
       "updateBlocked": "Myne kunne ikke starte oppdateringen herfra, så ingenting ble installert. Prøv igjen om litt."
     },
     "vault": {
-      "changePasswordButton": "Endre passord",
       "changePasswordError": {
         "invalidCredentialOrVault": "Feil nåværende passord eller hvelvfilen er skadet.",
         "ioError": "Diskfeil, prøv igjen.",
@@ -3293,13 +3163,9 @@
         "vaultNotUnlocked": "Lås opp dette hvelvet før du endrer passord."
       },
       "changePasswordHeading": "Endre passord",
-      "changePasswordHelper": "Roter hovedpassordet ditt mens du beholder samme hvelv. Gjenopprettingsfrasen forblir den samme.",
+      "changePasswordHelper": "Roter hovedpassordet ditt mens du beholder samme hvelv. Ingenting annet ved hvelvet endres.",
       "dangerZoneHeading": "Faresone",
-      "dangerZoneHelper": "Sletter dette hvelvet og alle notater permanent. Kan ikke angres. Gjenopprettingsfrasen vil ikke gjenopprette hvelvet.",
       "localEraseHeading": "Denne nettleseren",
-      "localEraseHelper": "Slett Myne's kopi av hvelvet ditt fra denne nettleseren. Kontoen din og alt som allerede er synkronisert blir på serveren.",
-      "localEraseButton": "Logg ut og slett denne nettleserens kopi…",
-      "deleteVaultButton": "Slett hvelv…",
       "vaultLabelEyebrow": "HVELVETIKETT",
       "vaultLabelHelper": "Et navn for dette hvelvet, vist i appens velger og på oppstartens hvelvvelger før du låser opp. Lagret kryptert i hvelvet; forlater aldri enheten din i klartekst.",
       "vaultLabelPlaceholder": "Legg til en etikett…",
@@ -3307,17 +3173,15 @@
       "vaultLabelSave": "Lagre",
       "vaultIconLabel": "IKON",
       "vaultIconDefault": "Standard (ordmerke)",
-      "renamedToast": "Hvelv omdøpt",
       "renameError": "Kunne ikke gi hvelvet nytt navn",
       "newPasswordMismatch": "De nye passordene stemmer ikke overens.",
       "samePassword": "Nytt passord er likt det nåværende passordet.",
       "passwordChangedToast": "Passord endret",
-      "vaultUnreadable": "Hvelvfilen er uleselig. Gjenopprett fra en sikkerhetskopi.",
       "genericChangeError": "Noe gikk galt. Prøv igjen.",
       "renameHelper": "Vises i hvelvvelgeren. Lagret kryptert i dette hvelvet; la stå tomt for å tømme.",
       "newPasswordPlaceholder": "Minst 12 tegn",
       "reenterNewPassword": "Skriv inn nytt passord på nytt",
-      "changePasswordFootnote": "Dette ugyldiggjør hurtigopplåsing. Gjenopprettingsfrasen din er uendret.",
+      "changePasswordFootnote": "Dette ugyldiggjør hurtigopplåsing. Identitetsfrasen din er uendret.",
       "changing": "Endrer…",
       "memberVaultNotice": "Dette er et delt hvelv. Det har ingen hvelvpassord. Bruk Delthvelv-opplåsing i Personvern for å legge til et passord eller PIN.",
       "topics": {
@@ -3329,14 +3193,14 @@
       },
       "format": {
         "heading": "Hvelvformat",
-        "intro": "Dette hvelvet bruker fortsatt sin egen gjenopprettingsfrase. Oppgradering flytter det til identitetsfrasen din, slik at én frase gjenoppretter alle hvelvene du eier.",
-        "cta": "Oppgrader til en-frase-gjenoppretting",
+        "intro": "Dette hvelvet bruker fortsatt sin egen gjenopprettingsfrase. Oppgradering trekker den tilbake, så dette hvelvet åpnes bare med passordet sitt. Identitetsfrasen din gjenoppretter fortsatt hvem du er på en ny enhet, og den åpner ikke noe hvelv.",
+        "cta": "Trekk tilbake hvelvfrasen min",
         "confirm": "Trekk tilbake hvelvfrasen og oppgrader",
-        "cancel": "Behold hvelvfrasen min foreløpig",
+        "cancel": "Behold hvelvfrasen min",
         "running": "Oppgraderer…",
-        "warningPhrase": "Din lagrede hvelvgjenopprettingsfrase vil slutte å åpne dette hvelvet. Hvelvpassordet ditt virker fortsatt, og identitetsfrasen din blir veien tilbake inn.",
+        "warningPhrase": "Din lagrede gjenopprettingsfrase for hvelvet vil slutte å åpne dette hvelvet, og ingenting erstatter den: fra da av åpnes hvelvet bare med passordet sitt, så et glemt passord betyr et tapt hvelv.",
         "warningDevices": "Alle enheter du bruker må oppdateres først. En eldre versjon kan ikke åpne dette hvelvet når oppgraderingen synkroniseres.",
-        "done": "Dette hvelvet bruker nå identitetsfrasen din (oppgradert fra {{from}}).",
+        "done": "Dette hvelvet åpnes nå bare med passordet sitt (oppgradert fra {{from}}). Den lagrede hvelvfrasen din virker ikke lenger.",
         "error": {
           "migrationRequired": "Dette hvelvet er fortsatt i det gamle v0.1-formatet. Fullfør hvelvoppgraderingen i Synk-innstillinger først.",
           "personRequired": "Denne enheten har ingen identitet ennå. Opprett identiteten din først, og kom deretter tilbake.",
@@ -3345,7 +3209,7 @@
           "notOwner": "Dette er et delt hvelv. Bare eieren kan endre formatet.",
           "notUnlocked": "Åpne hvelvet før du oppgraderer formatet.",
           "inProgress": "En annen sikkerhetsoperasjon kjører. Prøv igjen om et øyeblikk.",
-          "alreadyUpgraded": "Dette hvelvet bruker allerede identitetsfrasen din.",
+          "alreadyUpgraded": "Dette hvelvet åpnes allerede bare med passordet sitt.",
           "generic": "Oppgraderingen fullførte ikke. Ingenting ble endret.",
           "sharedVault": "Dette hvelvet er delt med noen andre. En-frase-gjenoppretting er for et hvelv bare du eier, fordi delt medlemshåndtering ikke støtter det ennå."
         }
@@ -3370,6 +3234,7 @@
         "light": "Lyst",
         "system": "System"
       },
+      "themeCustomOverride": "{{name}} er aktiv og overstyrer disse valgene.",
       "themeHelper": "Bytt mellom lyst og mørkt tema, eller følg systeminnstillingen.",
       "themeLabel": "Tema",
       "themeOptionAria": "{{label}}-tema",
@@ -3397,7 +3262,10 @@
         "theme": "Tema og aksent",
         "sidebar": "I sidefeltet",
         "customisation": "Tilpasning"
-      }
+      },
+      "homeZoneLabel": "Hjemtidssone",
+      "homeZoneHelper": "Vises ved siden av tidspunktet til en hendelse, som en ekstra klokke. Denne enheten er i {zone}. Ingenting her skrives inn i notatene dine.",
+      "homeZoneUnknown": "Det er ikke en tidssone denne enheten kjenner igjen, så ingen ekstra klokke vises."
     },
     "archive": {
       "helper": "La notater flyttes til et arkiv, holdt utenfor hovedlisten. Slår du dette av, gjenopprettes alle arkiverte notater til sine mapper, alle arkiverte mapper fjernes fra arkivet, og arkivkontrollene skjules. Det gjelder hele hvelvet, på alle enheter.",
@@ -3409,8 +3277,7 @@
       "label": "Komprimer bilder ved import",
       "helper": "Krymper bilder du limer inn eller slipper, før de krypteres og lagres, slik at hvelvet, sikkerhetskopiene og synkroniseringen holder seg mindre. Dette kan ikke reverseres: originalfilen beholdes ikke.",
       "helperScopeEveryDevice": "Gjelder hele hvelvet, på alle enheter.",
-      "helperScopeNotHere": "Gjelder hele hvelvet, men ikke i denne nettleseren: bilder som legges til her, lagres nøyaktig slik de er.",
-      "errorSaveSetting": "Kunne ikke lagre denne innstillingen."
+      "helperScopeNotHere": "Gjelder hele hvelvet, men ikke i denne nettleseren: bilder som legges til her, lagres nøyaktig slik de er."
     },
     "transcription": {
       "label": "Tale-til-tekst",
@@ -3420,15 +3287,11 @@
     "attachmentOcr": {
       "label": "Søk inne i bilder og skannede dokumenter",
       "helper": "Leser tekst ut av bildevedlegg og skannede PDF-er på denne enheten, slik at søket kan finne dem etter innholdet. Ingenting lastes opp. Slår du dette av, stopper uttrekkingen i bakgrunnen; tekst som allerede er trukket ut, beholdes.",
-      "errorSaveSetting": "Kunne ikke lagre denne innstillingen.",
       "processing_one": "Leser 1 vedlegg…",
-      "processing_other": "Leser {{count}} vedlegg…",
-      "draftUse": "Teksten den leser tilbys også som et utkast du kan legge til et notat. Et notat synkroniseres kryptert som ethvert annet.",
-      "mobileDeviceLocal": "Denne gjelder per enhet: den avgjør hva denne telefonen indekserer, så de andre enhetene dine beholder sitt eget valg."
+      "processing_other": "Leser {{count}} vedlegg…"
     },
     "autoBackup": {
       "backupFolder": "Sikkerhetskopimappe",
-      "chooseFolder": "Velg mappe…",
       "chooseFolderDialogTitle": "Velg en mappe for automatiske sikkerhetskopier",
       "frequency": "Hyppighet",
       "frequencyAriaLabel": "Hyppighet for sikkerhetskopiering",
@@ -3447,14 +3310,12 @@
       "title": "Automatiske sikkerhetskopier"
     },
     "changePassword": {
-      "cancel": "Avbryt",
       "checkingStrength": "Kontrollerer styrke…",
       "strengthUnavailable": "Styrkesjekken kunne ikke laste, så kun minimumslengden sjekkes.",
       "confirmLabel": "Bekreft nytt passord",
       "currentLabel": "Nåværende passord",
       "mismatch": "Passordene samsvarer ikke.",
       "newLabel": "Nytt passord",
-      "submit": "Endre passord",
       "submitting": "Endrer passord…",
       "title": "Endre passord",
       "tooShort": "Bruk minst {{n}} tegn."
@@ -3482,7 +3343,7 @@
     "cliAccess": {
       "label": "Terminaltilgang",
       "helperOff": "Av. Kommandoen `myne` kan verken lese eller endre noe i dette hvelvet.",
-      "helperOn": "På så lenge dette hvelvet er låst opp. Ethvert program som kjører under brukerkontoen din, kan lese, søke i og opprette notater gjennom den. Myne kan ikke skille terminalen din fra et skript, og sjekker ikke noe utover at døren står åpen. Den ber aldri om passordet ditt, lukkes i det øyeblikket hvelvet låses, og kan ikke slette notater.",
+      "helperOn": "På så lenge dette hvelvet er låst opp. Myne kan ikke skille terminalen din fra et skript, og sjekker ikke noe utover at døren står åpen. Den ber aldri om passordet ditt, lukkes i det øyeblikket hvelvet låses, og kan ikke slette notater.",
       "lastUsedNever": "Ikke brukt siden dette hvelvet ble låst opp.",
       "lastUsedJustNow": "Sist brukt akkurat nå.",
       "lastUsedMinutesAgo": "Sist brukt for {{count}} min siden.",
@@ -3505,7 +3366,7 @@
     },
     "clipperInstall": {
       "error": "Kunne ikke oppdatere innstillingen for nettleserklipper.",
-      "helper": "Registrer native messaging-verten slik at Myne-nettleserutvidelsen kan sende klipp til denne appen. På som standard; slå av for å fjerne den.",
+      "helper": "Lar Myne-nettleserutvidelsen sende klipp til denne appen.",
       "label": "Nettleserklipper"
     },
     "customThemes": {
@@ -3547,7 +3408,6 @@
       "folderSearchPlaceholder": "Søk i mapper…",
       "searchEmpty": "Ingen maler samsvarer.",
       "searchPlaceholder": "Søk i maler…",
-      "untitledTemplate": "Mal uten tittel",
       "sectionDaily": "Daglige notater",
       "sectionWeekly": "Ukentlige notater",
       "sectionMonthly": "Månedlige notater",
@@ -3572,16 +3432,13 @@
       "periodTemplateAriaLabel": "Mal for {{period}} notater",
       "sectionPeriodic": "Periodiske notater",
       "periodSwitcherAriaLabel": "Periodisk notattype",
-      "blockLabel": "Periodiske notater",
       "mobilePeriodAriaLabel": "Notatperiode",
       "mobileSaveGlyph": "✓",
       "mobileSaveLabel": "Lagre",
       "mobileSharedNotice": "Disse innstillingene deles: en endring her når de andre enhetene dine, og samme verdi satt på en datamaskin kommer hit."
     },
     "deleteVault": {
-      "cancel": "Avbryt",
       "caseSensitiveHint": "Skiller mellom store og små bokstaver. Skriv ordet nøyaktig for å aktivere sletting.",
-      "continue": "Fortsett",
       "copyPrimary": "Dette sletter permanent dette hvelvet og hvert notat i det. Handlingen kan ikke angres, og gjenopprettingsfrasen din gjenoppretter ikke dataene.",
       "copySecondary": "Hvelvnøklene nullstilles fra minnet før filene fjernes; eventuell foreldreløs chiffertekst som blir igjen på disken, forblir ugjenopprettelig Argon2id-pakket søppel.",
       "keychainNote": "Når slettingen er fullført, ber Myne også systemets nøkkelring om å slette den biometriske opplåsningsnøkkelen den lagret for dette hvelvet, på plattformer der den lagrer en.",
@@ -3606,7 +3463,8 @@
       "vaultPath": "Hvelvbane: {{path}}",
       "deleteError": "Kunne ikke slette hvelvet fullstendig. Vennligst prøv igjen.",
       "warning": "Dette sletter dette hvelvet og alle notatene i det permanent fra denne enheten. Dette kan ikke angres.",
-      "deleteButton": "Slett dette hvelvet"
+      "deleteButton": "Slett dette hvelvet",
+      "detailsLabel": "Mer om å slette dette hvelvet"
     },
     "files": {
       "newNote": {
@@ -3626,13 +3484,11 @@
         "label": "Standardfil som skal åpnes",
         "noteLabel": "Notat som skal åpnes ved oppstart",
         "notePlaceholder": "Velg et notat…",
-        "optionEmpty": "Nytt notat",
         "optionLast": "Sist åpnet",
         "optionSpecific": "Bestemt notat",
         "saveError": "Kunne ikke lagre oppstartsinnstillingen.",
         "searchEmpty": "Ingen notater funnet.",
-        "searchPlaceholder": "Søk i notater…",
-        "untitledNote": "Uten tittel"
+        "searchPlaceholder": "Søk i notater…"
       },
       "sections": {
         "notes": "Notater og mapper",
@@ -3642,17 +3498,17 @@
     "focusMode": {
       "dimAria": "Demp inaktive linjer",
       "dimHelper": "I fokusmodus (⇧⌘F), demp alle linjer unntatt den du redigerer.",
-      "dimLabel": "Fokusmodus · demp inaktive linjer",
+      "dimLabel": "Demp inaktive linjer",
       "off": "Av",
       "on": "På",
       "saveError": "Kunne ikke lagre fokusmodusinnstillingen.",
       "typewriterAria": "Skrivemaskinrulling",
       "typewriterHelper": "I fokusmodus (⇧⌘F), hold den aktive linjen vertikalt sentrert mens du skriver.",
-      "typewriterLabel": "Fokusmodus · skrivemaskinrulling"
+      "typewriterLabel": "Skrivemaskinrulling",
+      "typewriterHelperMobile": "Hold markøren loddrett midtstilt"
     },
     "hotkeys": {
       "addBindingAria": "Legg til en snarvei for {{command}}",
-      "cancel": "Avbryt",
       "capturePrompt": "Trykk på en tast…",
       "conflictIndicator": "⚠ konflikt",
       "conflictTitle": "Brukes også av {{commands}}",
@@ -3726,20 +3582,21 @@
       "on": "På"
     },
     "toolbarCustomize": {
+      "errorLoad": "Kunne ikke lese verktøylinjeoppsettet du har nå, så disse radene er skrivebeskyttet til du åpner dette panelet på nytt.",
       "errorSave": "Kunne ikke lagre verktøylinjeoppsettet.",
       "helper": "Velg hvilke formateringsknapper som vises på utvalgsverktøylinjen, og rekkefølgen deres.",
       "label": "Verktøylinjeknapper",
+      "lastShownHint": "Behold minst én",
+      "lastHiddenHint": "Behold minst én skjult",
       "moveDown": "Flytt ned",
-      "moveUp": "Flytt opp",
-      "pendingHint": "Kommer snart"
+      "moveUp": "Flytt opp"
     },
     "ai": {
       "autoTagHelper": "Når du slutter å skrive, leser en liten modell på enheten din notatet og foreslår tagger øverst i det. Ingenting legges til før du godtar et forslag, med mindre du slår på raden under.",
       "autoTagLabel": "Foreslå etiketter automatisk",
-      "autoTagUnavailable": "Ingen etikettmodell er installert ennå. Last den ned én gang fra Innstillinger, AI, og bryteren slår seg på av seg selv når den er installert.",
+      "autoTagUnavailable": "Ingen etikettmodell er installert ennå. Slå bryteren på i Innstillinger, AI, når den er det.",
       "consent": {
         "accept": "Send notatene mine til {{provider}}",
-        "cancel": "Avbryt",
         "cannotVerifyLabel": "Hva Myne ikke kan sjekke",
         "revokeLabel": "Slik angrer du dette",
         "scopeLabel": "Hvilke enheter dette gjelder",
@@ -3794,13 +3651,13 @@
       "modelNone": "Ingen fil valgt",
       "modelSaveFailed": "Kunne ikke lagre modellstien (den må være utenfor hvelvet ditt).",
       "modelTranscriptionLabel": "Tale-til-tekst-modell (transkribering)",
-      "modelsHelper": "Tildel filen hver rolle bruker når den kommer fra et annet sted enn den verifiserte listen ovenfor: åpne en lenke for å hente en i nettleseren din, og velg den deretter her. En modell kjører på enheten din; hvis du i stedet har oppgitt en leverandør, er det den leverandøren som svarer.",
+      "modelsHelper": "Tildel filen hver rolle bruker når den kommer fra et annet sted enn den verifiserte listen ovenfor. En modell kjører på enheten din; hvis du i stedet har oppgitt en leverandør, er det den leverandøren som svarer.",
       "providerHelper": "I stedet for å kjøre en modell her kan Myne sende en forespørsel til en tjeneste du oppgir. Notatene dine forlater denne enheten når det skjer. «Ingen» er standardvalget og betyr at ingen tjeneste kontaktes i det hele tatt.",
       "providerKeyAdd": "lim inn API-nøkkelen din",
       "providerKeyLabel": "API-nøkkel",
       "providerKeyNone": "Ingen nøkkel er lagret, så ingenting kan sendes ennå.",
       "providerKeyRevoke": "Fjern denne nøkkelen",
-      "providerKeyReplace": "lim inn en ny nøkkel for å erstatte den lagrede",
+      "providerKeyReplace": "Erstatt nøkkelen",
       "providerKeyStored": "En nøkkel er lagret. Myne viser den aldri igjen. Lim inn en ny for å erstatte den.",
       "providerActive": "Svarer nå: {{name}}",
       "providerLabel": "Ekstern leverandør",
@@ -3830,7 +3687,7 @@
       "mobileRevokeHelper": "Fjerner leverandøren, nøkkelen og denne telefonens godkjenning samlet, og etterlater nøyaktig tilstanden fra før noe var satt opp. Andre enheter fortsetter å virke til du fjerner det der også.",
       "mobileApproveLabel": "Godkjenn sending på denne telefonen",
       "mobileApproveHelper": "Leverandøren og nøkkelen kom fra en annen enhet. Ingenting sendes fra denne telefonen før du leser hva som sendes og godkjenner det her.",
-      "historyBudgetHelper": "Hvor mye av den nylige samtalen hver forespørsel tar med seg, i tegn. La feltet stå tomt for standardverdien. Et større tall lar KI-en følge lengre samtaler og sender mer av dem: hos en leverandør som ikke er på denne enheten betyr det mer av teksten din som forlater den, ved hvert steg i en kjøring.",
+      "historyBudgetHelper": "La feltet stå tomt for standardverdien. Et større tall lar KI-en følge lengre samtaler og sender mer av dem: hos en leverandør som ikke er på denne enheten betyr det mer av teksten din som forlater den, ved hvert steg i en kjøring.",
       "historyBudgetLabel": "Samtale som sendes med hver forespørsel",
       "meetingPromptHelper": "Instruksen møte-AI-gjennomkjøringen bruker for å gjøre en transkripsjon om til avsnitt. La den stå tom for å bruke den innebygde standarden. Den erstatter standardformatet for utdata, så hvis du angir den, må du selv be om avsnittene du vil ha.",
       "meetingPromptLabel": "Ledetekst for møteoppsummering",
@@ -3838,7 +3695,6 @@
       "groupAdvanced": "Avansert",
       "excludedPickLabel": "Legg til en mappe som skal utelates",
       "excludedPickPlaceholder": "Velg en mappe…",
-      "modelShowInFolder": "Vis i mappe",
       "modelShowLocation": "Vis plasseringen til {{name}}",
       "downloadsLabel": "Last ned modeller",
       "downloadsHelper": "Hent en modell fra Mynes eget opphav. Den kontrolleres mot et fingeravtrykk som er innebygd i appen, før den brukes, så en manipulert nedlasting forkastes. Ingenting hentes med mindre du klikker.",
@@ -3848,10 +3704,8 @@
       "downloadNotInstalled": "Ikke installert",
       "downloadReinstall": "Last ned",
       "downloadInstall": "Last ned",
-      "modelRemove": "Fjern",
       "downloading": "Laster ned…",
       "downloadingPercent": "Laster ned… {{percent}} %",
-      "downloadCancel": "Avbryt",
       "downloadFailed": "Nedlastingen ble ikke fullført.",
       "downloadFailedChecksum": "Nedlastingen samsvarte ikke med fingeravtrykket sitt og ble forkastet. Prøv igjen.",
       "sideloadDisclosure": "Utviklermodus lar deg også peke Myne mot en modellfil du har skaffet selv. En fil du laster ned fra andre steder, kontrolleres ikke av Myne, så bruk bare en du stoler på.",
@@ -3868,14 +3722,13 @@
       "excludedFoldersEmpty": "Ingenting er utelatt ennå, så AI kan lese hver mappe i dette hvelvet.",
       "excludedFoldersAdd": "Legg til",
       "excludedFoldersAddLabel": "Mappe å utelate fra AI",
-      "excludedFoldersRemove": "Fjern",
       "excludedFoldersRemoveLabel": "Slutt å utelate {{folder}} fra AI",
       "excludedFoldersMonotoneNotice": "En utelatelse lagt til på en av enhetene dine, blir stående til du fjerner den overalt: fjerninger her overføres ikke, så en mappe de andre enhetene dine fortsatt utelater, kommer tilbake ved neste synkronisering.",
       "catalogueOpen": "Last ned en modell",
       "catalogueColModel": "Modell",
       "catalogueColState": "Tilstand",
       "providerInline": "Notatene dine forlater denne enheten så snart en tjeneste er oppgitt.",
-      "providerChooseHelper": "En modell kan kjøre på denne enheten, eller Myne kan sende en forespørsel til en tjeneste du oppgir. Notatene dine forlater denne enheten når det skjer. «På denne enheten» er standardvalget og betyr at ingen tjeneste kontaktes i det hele tatt.",
+      "providerChooseHelper": "En modell kan kjøre på denne enheten, eller Myne kan sende en forespørsel til en tjeneste du oppgir. «På denne enheten» er standardvalget og betyr at ingen tjeneste kontaktes i det hele tatt.",
       "providerChooseLabel": "Velg leverandør",
       "providerKeySave": "Lagre denne nøkkelen",
       "providerOnDevice": "På denne enheten",
@@ -3890,56 +3743,90 @@
       "externalAccess": {
         "label": "Ekstern tilgang",
         "helperOff": "Av. Ingen AI-verktøy kan nå dette hvelvet gjennom `myne-mcp`.",
-        "explanationShared": "Dette er den samme bryteren som Innstillinger, CLI, Terminaltilgang. Én dør, to veier inn: `myne` drives av deg, og `myne-mcp` drives av hvilket AI-verktøy du konfigurerer.",
-        "explanationLabel": "En tilkoblings navn er en etikett, ikke et passord. Myne kan ikke skille ett program fra et annet som kjører under kontoen din, og sjekker ingenting utover at døren er åpen.",
-        "explanationDevice": "Godkjenninger lagres på denne enheten. En annen datamaskin eller telefon starter uten noen og må spørres på nytt.",
+        "helperOn": "På så lenge dette hvelvet er låst opp. Myne kan ikke se hva et tilkoblet verktøy gjør med det det leser.",
+        "empty": "Ingen tilkobling ennå",
         "outsideMyne": "Hva et tilkoblet verktøy gjør med det det leser er utenfor Myne: det kjører på denne maskinen, har sin egen nettverkstilgang, og Myne kan ikke se hvor det sender noe.",
+        "infoOneDoor": "Én dør, to veier inn: den samme bryteren åpner `myne`-terminalklienten, som du styrer, og `myne-mcp`, som verktøyet du konfigurerer styrer.",
+        "infoNotACredential": "Et tilkoblingsnavn avgjør hva som deles med hvem, ikke hvem som spør: ethvert program som kjører som deg, kan bruke hvilket navn det vil.",
+        "infoBudget": "Leseoperasjoner budsjetteres per tilkobling i et glidende vindu, og antallet ligger i minnet: avslutter du Myne, nullstilles det. Det er en nedbremsing, ikke en lås.",
+        "accessLabel": "Mapper denne tilkoblingen kan bruke",
+        "accessNothing": "Ingen ennå",
         "readFailed": "Kunne ikke lese tilkoblingslisten akkurat nå. Myne har ikke fortalt deg at ingenting er godkjent.",
         "retry": "Prøv igjen",
-        "readSummary": "Kan lese {{count}} notater i {{folders}} mapper.",
-        "readSummary_one": "Kan lese {{count}} notat i {{folders}} mapper.",
-        "readSummary_other": "Kan lese {{count}} notater i {{folders}} mapper.",
-        "writeNone": "Kan skrive ingenting. Denne bygningen gir kun lesetilgang.",
+        "readSummary": "Leser {{count}} notater i {{folders}} mapper.",
+        "readSummary_one": "Leser {{count}} notat i {{folders}} mapper.",
+        "readSummary_other": "Leser {{count}} notater i {{folders}} mapper.",
+        "readNothing": "Leser ingenting: hver mappe er utelatt.",
+        "wholeVault": "Leser hele hvelvet: ingen mappe er utelatt.",
+        "writeNone": "Skriver ingen steder.",
+        "writeSummary": "Skriver i {{folders}}.",
+        "toolsAll": "Alle verktøy er tilgjengelige.",
+        "toolsOff": "{{count}} verktøy av: {{verbs}}.",
+        "toolsOff_one": "{{count}} verktøy av: {{verbs}}.",
+        "toolsOff_other": "{{count}} verktøy av: {{verbs}}.",
         "whenLine": "Godkjent {{approved}}. Sist brukt {{used}}.",
         "whenLineNever": "Godkjent {{approved}}. Ikke brukt siden.",
         "revoke": "Trekk tilbake",
         "revokeFailed": "Kunne ikke trekke tilbake den tilkoblingen. Den kan fortsatt lese det den ble tildelt.",
-        "snippetToggle": "Oppsettssnutt",
-        "snippetHelper": "Lim dette inn i AI-verktøyets MCP-konfigurasjon. Navnet må samsvare med tilkoblingen over, for det navnet er det godkjenningen nøkles på.",
+        "editExclusions": "Endre hva den kan bruke",
         "rootFolder": "Hvelvrot",
-        "addConnection": "Godkjenn en tilkobling",
-        "dialogTitleNew": "Godkjenn en tilkobling",
-        "dialogTitle": "Godkjenn {{name}} på nytt",
+        "requestsTitle": "Venter på deg",
+        "requestLineWrite": "{{connection}} vil skrive i {{folder}}.",
+        "requestLineWriteTyped": "{{connection}} vil skrive i {{folder}}: «{{summary}}»",
+        "requestLineRead": "{{connection}} vil lese {{folder}}.",
+        "requestAccept": "Tillat",
+        "requestDismiss": "Avvis",
+        "requestAccepted": "{{connection}} kan nå bruke {{folder}}.",
+        "requestStale": "Den forespørselen gjelder ikke lenger. Ingenting ble endret.",
+        "requestFailed": "Kunne ikke avgjøre den forespørselen. Ingenting ble endret.",
+        "addConnection": "Legg til en tilkobling",
+        "step1Title": "Verktøy",
+        "step2Title": "Oppsett",
+        "step3Title": "Tilgang",
+        "step1Question": "Hvilket verktøy kobler til?",
+        "otherClientsDetail": "den rå kommandoen",
+        "otherClientsHelper": "Enhver MCP-klient kan kjøre denne kommandoen. Gi den tilkoblingsnavnet du setter nedenfor.",
+        "configPath": "Legg dette til i {{path}}, og start deretter verktøyet på nytt.",
         "nameLabel": "Tilkoblingsnavn",
-        "namePlaceholder": "claude-desktop",
-        "nameHelper": "Navnet klienten sender. Det er en etikett, ikke et passord: ethvert program på denne maskinen kan bruke hvilket navn som helst, så dette bestemmer hva som deles med hvem, ikke hvem som spør.",
-        "nameReserved": "Det navnet er reservert: en klient konfigurert uten navn ankommer som `unnamed-client`, så å godkjenne det ville godkjent alle ukonfigurerte klienter.",
-        "nameEmpty": "En tilkobling trenger et navn, for det er det godkjenningen nøkles på.",
-        "countsPending": "Arbeider ut hva det dekker…",
-        "countsNotes": "Deler {{count}} notater i {{folders}} mapper.",
-        "countsNotes_one": "Deler {{count}} notat i {{folders}} mapper.",
-        "countsNotes_other": "Deler {{count}} notater i {{folders}} mapper.",
-        "countsExcluded_one": "{{count}} mappe utelatt.",
-        "countsExcluded_other": "{{count}} mapper utelatt.",
+        "nameClaim": "En etikett, ikke et passord: ethvert program på denne maskinen kan bruke hvilket navn det vil.",
+        "clientToolsNote": "{{name}} kan også filtrere hvilke verktøy den bruker. Det er en bekvemmelighet: det denne skjermen tillater, er det Myne håndhever.",
+        "copySnippet": "Kopier oppsettet",
+        "back": "Tilbake",
+        "next": "Neste",
         "excludeLabel": "La stå ute",
-        "excludePlaceholder": "Ingenting stått ute",
-        "excludeSearch": "Finn en mappe",
-        "excludeEmpty": "Ingen mappe passer.",
-        "excludeHelper": "En mappe du lar stå ute deles ikke, og heller ikke noe inni den. Du velger blant alle mapper i dette hvelvet, så dette er det eneste stedet hele hvelvet er på bordet.",
         "approve": "Godkjenn",
-        "grantRefused": "Denne godkjenningen ville ikke passe i hvelvets innstillingsbudsjett. Ingenting ble endret. Trekk tilbake en tilkobling du ikke lenger bruker, og prøv igjen.",
         "grantFailed": "Kunne ikke lagre godkjenningen. Ingenting ble endret.",
         "excludeNothing": "Ingenting holdt utenfor",
+        "scopeLineAll": "Hver eksisterende mappe er lesbar og skrivbar med mindre du utelater den nedenfor. En mappe du oppretter senere, er lesbar, men ikke skrivbar før du oppgir den.",
+        "writeRestore": "En skriving beholder et gjenopprettingspunkt du kan ta tilbake.",
         "needsReapproval": "Godkjent av en eldre versjon, under den motsatte regelen. Denne builden leser ingenting for den før du godkjenner på nytt.",
+        "approveAgain": "Godkjenn på nytt",
         "scopeLine": "Når {{count}} notater i {{folders}} mapper, og kan endre alt i dem.",
+        "scopeLine_one": "Når {{count}} notat i {{folders}} mapper, og kan endre alt i dem.",
+        "scopeLine_other": "Når {{count}} notater i {{folders}} mapper, og kan endre alt i dem.",
+        "findFolder": "Finn en mappe",
+        "noFolderMatches": "Ingen mappe samsvarer.",
+        "toolsLabel": "Verktøy",
+        "toolUnavailable": "ikke i dette bygget",
         "scopeLineWords": "Når mappene du oppgir, og kan endre alt i dem.",
         "toolsNote": "Lesing har et budsjett: opptil {{count}} notater per {{minutes}} minutter.",
         "verb": {
+          "note_search": "Søk i notater",
+          "note_read": "Les et notat",
+          "vault_list": "List opp mapper",
+          "vault_state": "Hvelvsammendrag",
+          "note_create": "Opprett et notat",
+          "note_append": "Legg til i et notat",
+          "note_set_field": "Sett et notatfelt",
+          "note_move": "Flytt et notat",
+          "note_edit": "Rediger et notat",
           "attachment_list": "List filer",
           "attachment_read": "Les teksten i en fil",
           "calendar_read": "Les kalenderen",
           "view_list": "List lagrede visninger"
         },
+        "emptyBody": "Å godkjenne én er det som lar et verktøy du har installert lese dette hvelvet, med unntak av mappene du utelater.",
+        "trademarks": "Myne er ikke tilknyttet, godkjent av eller sponset av noen av disse verktøyene. Navn og logoer tilhører sine respektive eiere.",
         "wholeVaultLabel": "Les og skriv hele hvelvet"
       },
       "autoApplyLabel": "Bruk foreslåtte tagger automatisk",
@@ -3964,7 +3851,7 @@
       "residualPayment": "Hvis du betaler for driftet synkronisering, kan betalingen og kontoen din fortsatt knyttes til deg. Tor endrer hvor tilkoblingen kommer fra, ikke betalingssporet.",
       "residualScope": "I skrivebordsappen dekker dette synkroniseringstrafikken din og forespørslene dine til eksterne AI-leverandører. Mobilappen har ennå ingen Tor-ruting, så leverandørforespørslene der går direkte. Ingenting annet på denne enheten går gjennom Tor.",
       "residualsToggle": "Hva dette ikke skjuler",
-      "torHelper": "Skjuler IP-adressen og posisjonen din for synkroniseringsserveren, og skjuler hvilken server du synkroniserer med (og, i skrivebordsappen, hvilken AI-leverandør du når) for nettverket ditt og internettleverandøren din. De kan fortsatt se at denne enheten kobler seg til Tor. Det gjør deg ikke anonym overfor Myne, og skjuler ikke hva du synkroniserer eller når, for serveren.",
+      "torHelper": "I skrivebordsappen skjuler dette også hvilken AI-leverandør du når. Alle som overvåker nettverket, kan fortsatt se at denne enheten kobler seg til Tor. Det gjør deg ikke anonym overfor Myne, og skjuler ikke hva du synkroniserer eller når, for serveren.",
       "torLabel": "Rut synkronisering og skrivebords-AI gjennom Tor",
       "torInline": "Skjuler IP-adressen og posisjonen din for synkroniseringsserveren, og skjuler hvilken server du synkroniserer med for nettverket ditt og internettleverandøren din."
     },
@@ -3973,7 +3860,7 @@
       "folderListFull": "Den mappelisten er full. Fjern en mappe fra den før du legger til en ny."
     },
     "reminders": {
-      "aria": "Vis oppgavepåminnelser på denne enheten",
+      "aria": "Oppgavepåminnelser på denne enheten",
       "exactAllow": "Tillat",
       "exactLabel": "Nøyaktig tidspunkt",
       "exactOn": "På",
@@ -3993,8 +3880,6 @@
       "autoLockSearchPlaceholder": "Søk i varigheter…",
       "hideVaultNamesLabel": "Skjul hvelvnavn på låseskjermen",
       "hideVaultNamesHelper": "På en enhet med en brukbar nøkkelring viser hvelvvelgeren navnet på et hvelv når denne enheten har låst det opp. Når dette er på, viser hvert hvelv i stedet en plassholder som Hvelv 2, og det nummeret følger hvelvet uansett hvordan listen sorteres om.",
-      "hideVaultNamesErases": "Å slå det på ødelegger nøklene som gjør de lagrede navnene lesbare, så disse navnene kan ikke gjenopprettes på denne enheten, og ingen flere navn skrives så lenge det står på.",
-      "hideVaultNamesResidue": "Det hjelper ikke mot en kopi som ble tatt tidligere: en sikkerhetskopi av hele systemet, et diskbilde eller enhver annen kopi av denne disken på systemnivå som ble laget mens navnene ble vist, inneholder både de lagrede navnene og nøklene til dem.",
       "hideVaultNamesUnavailable": "Myne kan ikke lagre hvelvnavn i denne kopien av appen, så den lagrer ingen her, og dette valget kan ikke slås på. Velgeren viser allerede en plassholder for hvert hvelv.",
       "hideVaultNamesErrorRead": "Kunne ikke lese den gjeldende innstillingen. Bruk bryteren for å sette den på nytt.",
       "hideVaultNamesErrorSave": "Kunne ikke lagre innstillingen, så den er uendret. Hvis du holdt på å slå den på, kan noen lagrede navn allerede være ødelagt; slå den på igjen for å fullføre.",
@@ -4049,27 +3934,12 @@
       "setPin": "Angi PIN-kode",
       "setupHelper": "Touch ID er kun for macOS og foreløpig eksperimentell (avventer maskinvareverifisering). PIN-kode fungerer overalt.",
       "title": "Rask opplåsing",
-      "useTouchId": "Bruk Touch ID",
-      "pinTooShort": "PIN-en må ha minst 6 sifre.",
-      "pinMismatch": "PIN-kodene er ikke like.",
-      "pinOnToast": "Hurtig opplåsing med PIN er på",
       "setupError": "Kunne ikke konfigurere hurtig opplåsing.",
-      "turnedOffToast": "Hurtig opplåsing er slått av",
       "turnOffError": "Kunne ikke slå av hurtig opplåsing",
-      "biometricOnToast": "Hurtig opplåsing med {{method}} er på",
       "biometricUnavailable": "{{method}} er ikke tilgjengelig på denne enheten.",
-      "warningBanner": "Kun en bekvemmelighetssperre. Med en PIN-kode kreves passordet ditt igjen etter en omstart; en kontroll av fingeravtrykk eller ansikt holder også etter en omstart.",
-      "biometricToggleSubtitle": "Lås opp med {{method}} etter automatisk låsing",
-      "pinOnLead": "Hurtig opplåsing med PIN er ",
-      "pinOnEmphasis": "på",
-      "pinOnRest": ". Etter at hvelvet låses automatisk, kan du låse opp igjen med PIN-koden din i stedet for hele passordet (kun i denne app-økten). En kaldstart krever alltid hele passordet.",
-      "turnOffPin": "Slå av PIN",
       "pinSetupHelper": "Angi en PIN på 6+ sifre for å låse opp raskt igjen etter automatisk låsing. PIN-en pakker inn en enhetslokal nøkkel: den forlater aldri denne enheten og berører aldri gjenopprettingsfrasen din.",
       "pinReplacesBiometric": " Å angi en PIN erstatter opplåsing med {{method}}.",
-      "pinPlaceholder6": "Minst 6 sifre",
-      "confirmPin": "Bekreft PIN",
-      "reenterPin": "Skriv inn PIN på nytt",
-      "setupButton": "Konfigurer hurtig opplåsing",
+      "useBiometric": "Bruk {{method}}",
       "errorBiometricAuthFailed": "Touch ID kunne ikke settes opp. Sørg for at et fingeravtrykk er registrert i Systeminnstillinger, eller bruk en PIN-kode i stedet.",
       "biometricAuthFailed": "{{method}} kunne ikke settes opp. Sørg for at det er slått på i enhetsinnstillingene dine, eller bruk en PIN-kode i stedet."
     },
@@ -4118,7 +3988,7 @@
       "mobileUnavailable": "Stavekontroll er ennå ikke tilgjengelig på denne telefonen: det finnes ingen ordliste på denne enheten, så redigeringsprogrammet her kan ikke understreke noe. Slå det på fra datamaskinen i stedet."
     },
     "storage": {
-      "backupHelper": "Sikkerhetskopier forblir nøyaktig like krypterte som hvelvet ditt, i én enkelt verifisert .myne-backup-fil. Gjenoppretting fungerer med dette hvelvets passord eller gjenopprettingsfrase, akkurat som ved opplåsing.",
+      "backupHelper": "Sikkerhetskopier forblir nøyaktig like krypterte som hvelvet ditt, i én enkelt verifisert .myne-backup-fil. Gjenoppretting fungerer med dette hvelvets passord, akkurat som ved opplåsing.",
       "backupLabel": "Sikkerhetskopi",
       "backUpVault": "Sikkerhetskopier hvelv…",
       "exportAction": "Eksporter…",
@@ -4128,14 +3998,10 @@
       "importHelper": "Hent inn notater fra Obsidian, Notion, Evernote, HTML-filer eller en CSV. Alt importeres og krypteres på stedet; originalfilene dine berøres ikke.",
       "importLabel": "Importer",
       "importObsidian": "Importer notater…",
-      "locationHelper": "Hvert hvelv er en mappe med krypterte filer under denne banen. Bruk heller Sikkerhetskopi-knappen nedenfor enn manuelle kopier: den verifiserer den skrevne filen.",
-      "openInFiles": "Åpne i Filer",
       "webLocationHelper": "Notatene dine ligger i denne nettleserens lagring for dette nettstedet, styrt av nettleseren. Det finnes ingen mappe å åpne. Sletter du dataene for dette nettstedet, forsvinner den lokale kopien; fordi denne klienten synkroniserer, lastes den ned igjen når du logger inn på nytt.",
       "webLocationLabel": "Hvor notatene dine lagres",
-      "pathUnavailable": "Bane utilgjengelig",
       "restoreBackup": "Gjenopprett fra sikkerhetskopi…",
       "sections": {
-        "location": "Hvor hvelvet ligger",
         "backup": "Sikkerhetskopi og gjenoppretting",
         "transfer": "Import og eksport"
       }
@@ -4172,6 +4038,8 @@
     "data": {
       "exported_one": "Eksporterte {{count}} notat → {{label}}",
       "exported_other": "Eksporterte {{count}} notater → {{label}}",
+      "exportedChoose_one": "Eksporterte {{count}} notat. Velg hvor du vil lagre en kopi.",
+      "exportedChoose_other": "Eksporterte {{count}} notater. Velg hvor du vil lagre en kopi.",
       "exportNeedsApp": "Eksport krever appen (ikke forhåndsvisningen i nettleseren).",
       "exportFailed": "Kunne ikke eksportere hvelvet.",
       "exportToMarkdown": "Eksporter til Markdown",
@@ -4184,7 +4052,6 @@
       "vaultName": "Hvelvnavn",
       "approveDevice": "Godkjenn enhet"
     },
-    "done": "Ferdig",
     "sectionOptions": "Alternativer",
     "footerTagline": "myne · kryptert på denne enheten · åpen kildekode",
     "editor": {
@@ -4196,21 +4063,14 @@
         "tasks": "Oppgaver"
       },
       "preview": {
-        "heading": "Høvdingens kjære squaw",
+        "heading": "Den raske brune reven",
         "bullet1": "Vår sære Zulu fra badeøya spilte jo whist og quickstep",
         "bullet2": "Jeg begynte å fortære en sandwich mens jeg kjørte taxi",
-        "spellCaption": "Stavekontroll",
-        "spellSample": "feilstavd",
         "dateTime": "Dato og klokkeslett",
         "toolbar": "Verktøylinje",
-        "task": "Oppgaver",
         "taskSampleOpen": "Send kvartalsrapporten",
         "taskSampleDone": "Bestill lokalet"
       },
-      "defaultView": "Standardvisning",
-      "typewriter": "Skrivemaskinrulling",
-      "typewriterSubtitle": "Hold markøren vertikalt sentrert",
-      "enableArchiving": "Aktiver arkivering",
       "taskChipColor": {
         "accent": "Aksent",
         "danger": "Rød",
@@ -4225,7 +4085,8 @@
         "label": "Kun ikon-prioritet"
       },
       "topics": {
-        "periodic": "Periodiske notater"
+        "periodic": "Periodiske notater",
+        "calendar": "Kalender"
       }
     },
     "search": {
@@ -4311,8 +4172,8 @@
         "plainFile": "klartekstfil fil editor markdown lokal disk utenfor hvelv klartekst åpne på stedet plain file editor markdown local disk outside vault plaintext open in place",
         "memberPassword": "delt hvelv passord medlem lås opp bli med frase shared vault password member unlock join phrase",
         "bar": "bunnlinje statuslinje indikatorer tilpass endre rekkefølge skjul vis verktøylinje bottom bar status bar indicators customize reorder hide show toolbar",
-        "vaultFormat": "hvelvformat oppgrader en-frase gjenoppretting trekk tilbake hvelv gjenopprettingsfrase migrer identitet",
-        "externalAccess": "ekstern tilgang MCP myne-mcp Claude Desktop klient tilkobling godkjenn omfang trekk tilbake",
+        "vaultFormat": "hvelvformat oppgrader trekk tilbake hvelv gjenopprettingsfrase bare passord migrer identitet",
+        "externalAccess": "ekstern tilgang MCP myne-mcp Claude Desktop Cursor VS Code Hermes klient tilkobling godkjenn omfang trekk tilbake verktøy budsjett",
         "diagnosticLog": "diagnostisk logg logging feilsøking krasj rapport feilrapport støtte"
       },
       "emptyBody": "Prøv et kortere ord, eller navnet på et panel."
@@ -4327,16 +4188,26 @@
       "time24": "24-timers",
       "time12": "12-timers",
       "zoneLabel": "Tidssone",
-      "zoneHelper": "Hvilken sone som avgjør hva som regnes som i dag, og dermed hvilket notat de daglige, ukentlige og månedlige notatene dine åpner. La feltet stå tomt for å følge denne enheten. Valget avgjøres per enhet: ingen annen enhet overskriver det, så en overstyring kan sette denne enheten på en annen dag enn de andre enhetene dine. Klokkeslett du skriver i et notat, endres aldri; 09:00 er 09:00 overalt.",
+      "zoneHelper": "La feltet stå tomt for å følge denne enheten. Valget avgjøres per enhet: ingen annen enhet overskriver det, så en overstyring kan sette denne enheten på en annen dag enn de andre enhetene dine. Klokkeslett du skriver i et notat, endres aldri; 09:00 er 09:00 overalt.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kjenner ikke den tidssonen. Bruk et navn som Europe/Berlin.",
       "errorSave": "Kunne ikke lagre den innstillingen.",
       "zoneInline": "Hvilken sone som avgjør hva som regnes som i dag, og dermed hvilket notat de daglige, ukentlige og månedlige notatene dine åpner."
     },
+    "calendar": {
+      "anchorLabel": "Påminnelsestid for heldagshendelser",
+      "anchorHelper": "Hvilket klokkeslett på dagen en påminnelse for en heldagshendelse utløses. En hendelse med klokkeslett teller i stedet tilbake fra sin egen start.",
+      "coloursLabel": "Kalenderfarger",
+      "coloursHelper": "Hver kalender tegnes i fargen du velger. Fargene kommer fra temaet, så når du bytter tema, males kalenderen også på nytt.",
+      "coloursEmpty": "Ingen kalender har en farge ennå. Legg til én nedenfor, eller gi en hendelse et kalendernavn, så vises den her.",
+      "newNameLabel": "Nytt kalendernavn",
+      "newNamePlaceholder": "Arbeid",
+      "addColour": "Legg til",
+      "saveFailed": "Kunne ikke lagre den innstillingen. Hvelvet ditt er ikke endret."
+    },
     "folderNotes": {
       "label": "Mappenotater",
-      "helper": "La et notat fungere som mappens indeks: det åpnes når du dobbeltklikker på mappen, og mappelenker som [[Projects/]] peker til det. Av som standard. Å slå det av skjuler knappene som oppretter mappenotater og viser eventuelle du allerede har som vanlige notater; det endrer ingenting på disken, så å slå det på igjen gjenoppretter dem nøyaktig.",
-      "errorSaveSetting": "Denne innstillingen kunne ikke lagres.",
+      "helper": "Av som standard. Å slå det av skjuler knappene som oppretter mappenotater og viser eventuelle du allerede har som vanlige notater; det endrer ingenting på disken, så å slå det på igjen gjenoppretter dem nøyaktig.",
       "inline": "La et notat fungere som mappens indeks: det åpnes når du dobbeltklikker på mappen, og mappelenker som [[Projects/]] peker til det."
     },
     "ribbonCustomize": {
@@ -4350,19 +4221,16 @@
       "searchEmpty": "Ingen samsvarende kommandoer.",
       "searchPlaceholder": "Søk etter kommandoer…",
       "searchResultsLabel": "Samsvarende kommandoer",
-      "showHelper": "Vis den venstre linjen på denne enheten.",
+      "showHelper": "Bare denne enheten.",
       "showLabel": "Vis venstre linje",
       "emptyTitle": "Ingenting festet ennå"
     },
     "memory": {
       "heading": "Hva assistenten husker",
-      "helper": "Fakta AI lærte av å jobbe med deg. Den skriver dem selv (minst én per kjøring); du ser og kan rette hver enkelt. Oppføringer synkroniseres til dine andre enheter og forblir krypterte.",
+      "helper": "Fakta AI lærte av å jobbe med deg. Den skriver dem selv (høyst én per kjøring); du ser og kan rette hver enkelt. Oppføringer synkroniseres til dine andre enheter og forblir krypterte.",
       "empty": "Oppføringer vises her når assistenten lærer noe under en kjøring.",
-      "editLabel": "Rediger",
       "deleteLabel": "Slett",
       "save": "Lagre",
-      "cancel": "Avbryt",
-      "cancelLabel": "Avbryt",
       "saveFailed": "Oppføringen kunne ikke lagres.",
       "deleteFailed": "Oppføringen kunne ikke slettes.",
       "entryUnreadable": "Kunne ikke lese denne oppføringen. Den er fortsatt lagret; slett den her eller rett den i Innstillinger.",
@@ -4374,27 +4242,25 @@
       "clearConfirm": "Fjern virkelig hver oppføring? Dette kan ikke angres.",
       "updatedAt": "Oppdatert {{val}}",
       "personalityLabel": "Dine stemmepreferanser",
-      "personalityHelper": "Én instruksjon per linje. Disse former hvordan assistenten skriver i hver kjøring: tone, lengde, språk. Lagres i vaulten og synkroniseres.",
+      "personalityHelper": "Én instruksjon per linje. Disse former hvordan assistenten skriver i hver kjøring: tone, lengde, språk. Lagres i hvelvet og synkroniseres.",
       "personalityPlaceholder": "Hold svarene korte, med konklusjonen først.",
       "personalitySaveLabel": "Lagre stemmepreferanser",
       "personalitySavedToast": "Stemmepreferanser oppdatert.",
       "personalitySaveFailed": "Stemmepreferansene kunne ikke lagres.",
       "loadFailed": "Kunne ikke laste minner eller stemmepreferanser. Ingenting ble endret.",
-      "retryLabel": "Prøv igjen",
       "seed": {
-        "rowTitle": "Lær Myne hvelvet ditt",
         "rowHelper": "Bygg minne fra notatene dine én gang, med gjennomgang av hver linje før det lagres.",
         "rowSeeded": "Opprettet {{date}} · {{count}} oppføringer",
-        "start": "Lær Myne hvelvet ditt",
         "rebuild": "Bygg på nytt",
         "rebuildConfirm": "Erstatt såingen fra {{date}} ({{count}} oppføringer)?",
         "title": "Lær Myne hvelvet ditt",
         "candidatesTitle": "Gjennomgå det Myne lærte",
-        "close": "Lukk",
         "loading": "Leser hvelvet ditt…",
         "scopeIntro": "Myne leser formen på hvelvet ditt først: notattitler, mapper og tagger. Det ber om notattekst bare hvis det trenger det, og aldri for vedlegg.",
         "provider": "Leverandør: {{provider}}",
         "estimatedChars": "Omtrent {{chars}} tegn",
+        "excluded_one": "{{count}} notat utelatt fordi mappen det ligger i er utelatt fra AI",
+        "excluded_other": "{{count}} notater utelatt fordi mappen de ligger i er utelatt fra AI",
         "showPayload": "Vis nøyaktig hva som sendes",
         "hidePayload": "Skjul nyttelasten",
         "consentLabel": "Send dette sammendraget til {{provider}} (omtrent {{chars}} tegn). Jeg forstår at leverandøren mottar det.",
@@ -4432,7 +4298,7 @@
         },
         "phases": {
           "projecting": "Leser hvelvets form…",
-          "asking": "Spør modellen om temaer…",
+          "asking": "Spør modellen om minneoppføringer…",
           "reading": "Leser notatene modellen ba om…",
           "finalizing": "Skriver oppføringene…",
           "working": "Arbeider…"
@@ -4443,13 +4309,13 @@
         "removeConfirm": "Fjerne alle oppføringer fra denne såingen?",
         "removedToast": "Oppføringer fra hvelvet ditt fjernet.",
         "rowStale": "Hvelvet har endret seg siden denne såingen",
-        "providerLocalName": "Provider: on this device",
-        "countNotes_one": "{{count}} note",
-        "countNotes_other": "{{count}} notes",
-        "countFolders_one": "{{count}} folder",
-        "countFolders_other": "{{count}} folders",
-        "countTags_one": "{{count}} tag",
-        "countTags_other": "{{count}} tags"
+        "providerLocalName": "Leverandør: på denne enheten",
+        "countNotes_one": "{{count}} notat",
+        "countNotes_other": "{{count}} notater",
+        "countFolders_one": "{{count}} mappe",
+        "countFolders_other": "{{count}} mapper",
+        "countTags_one": "{{count}} etikett",
+        "countTags_other": "{{count}} etiketter"
       },
       "emptyTitle": "Ingenting husket ennå",
       "count": "{{used}} av {{cap}}",
@@ -4457,26 +4323,25 @@
     },
     "account": {
       "vaultsLabel": "Hvelv i denne kontoen",
-      "vaultsHelper": "Hvelvene denne enheten grupperer sammen. Gruppering er et per-enhet organisasjonsvalg, så det er ikke en del av noe hvelvs innhold og følger ikke med det.",
+      "vaultsHelper": "Hvelvene denne enheten grupperer sammen. Gruppering er ikke en del av noe hvelvs innhold.",
       "vaultsHelperShort": "Gruppering blir på denne enheten og følger ikke med et hvelv.",
       "vaultsCount_one": "{{count}} hvelv",
       "vaultsCount_other": "{{count}} hvelv",
       "vaultCorrupted": "Dette hvelvets metadata kunne ikke leses",
       "vaultUnreadable": "Ikke lest på denne enheten",
-      "vaultDeviceOnly": "Bare enhet",
       "currentVault": "Dette hvelvet",
       "unknownVault": "Et annet hvelv på denne enheten",
       "numberLabel": "Kontonummer",
       "numberHelper": "Identitetens nummer, ikke et hvelvs. Avledet fra identitetsfrasen din, så det kan ikke mistes og trenger ingen lagring. Det er ikke en hemmelighet; bruk det for støtte eller for overlevering til en serveroperatør.",
       "numberUnavailable": "Kunne ikke lese kontonummeret på denne enheten. Åpne Innstillinger på nytt for å prøve igjen.",
       "numberEmpty": "Ingen identitet på denne enheten. Legg til eller gjenopprett en i Synk for å få et kontonummer.",
-      "numberCopy": "Kopier",
       "numberCopied": "Kontonummer kopiert",
       "numberCopyFailed": "Kunne ikke kopiere kontonummeret",
       "copyAccountNumber": "Kopier kontonummer",
       "standaloneHelper": "Dette hvelvet er ikke gruppert under en konto på denne enheten, så det står på egne ben. Gruppering er per enhet: en annen enhet kan vise det inni en.",
       "unresolvedHelper": "Arbeider ut hvilket hvelv som er åpent…",
       "devicesNote": "Enheter, delte hvelvmedlemmer og identiteten din administreres i Synk.",
+      "noStoreHelper": "Denne enheten har ingen nøkkelring i operativsystemet, så den kan ikke beholde kontogrupperingen. Hvelvene åpnes hver for seg her, og en annen enhet kan vise dem sammen.",
       "groupingError": "Kunne ikke lese konto-grupperingen på denne enheten. Ingenting ble endret.",
       "sections": {
         "grouping": "Denne kontoen"
@@ -4489,14 +4354,12 @@
       "openFilesRemain": "Filer med ulagrede endringer er fortsatt åpne. Ordne dem, og slå deretter dette av igjen."
     },
     "memberPassword": {
-      "reminder": "Du har ikke rask opplåsing på denne enheten ennå, så dette hvelvet ber om gjenopprettingsfrasen din hver gang.",
-      "reminderDismiss": "Ikke nå",
+      "reminder": "Angi ett så denne enheten kan åpne hvelvet igjen.",
       "title": "Opplåsing av delt hvelv",
       "helperConfigured": "Dette delte hvelvet åpnes med {{method}} lagret på denne enheten.",
-      "helperNotConfigured": "Angi et passord eller en PIN-kode så du slipper å skrive gjenopprettingsfrasen på nytt hver gang.",
+      "helperNotConfigured": "Angi et passord eller en PIN-kode så denne enheten kan åpne hvelvet igjen. Uten det krever det å åpne det her en ny invitasjon fra eieren.",
       "set": "Angi",
       "change": "Endre",
-      "remove": "Fjern",
       "label": "Hvelvpassord",
       "methodPassword": "et passord",
       "methodPin": "en PIN-kode",
@@ -4505,8 +4368,8 @@
       "useBiometric": "Bruk Touch ID",
       "pinLabel": "Hvelv-PIN",
       "pinPlaceholder": "PIN-kode, minst {{count}} sifre",
-      "setupHelper": "Minst {{count}} tegn. Lagres bare på denne enheten; gjenopprettingsfrasen din åpner fortsatt hvelvet hvor som helst.",
-      "pinSetupHelper": "Minst {{count}} sifre. Lagres bare på denne enheten; gjenopprettingsfrasen din åpner fortsatt hvelvet hvor som helst.",
+      "setupHelper": "Minst {{count}} tegn. Lagres bare på denne enheten. Hvis du glemmer det, trenger denne enheten en ny invitasjon fra hvelveieren.",
+      "pinSetupHelper": "Minst {{count}} sifre. Lagres bare på denne enheten. Hvis du glemmer den, trenger denne enheten en ny invitasjon fra hvelveieren.",
       "errorTooShort": "Bruk minst {{count}} tegn/sifre.",
       "errorGeneric": "Kunne ikke angi legitimasjonen. Prøv igjen."
     },
@@ -4588,21 +4451,19 @@
       "emptyTitle": "Ingen konflikter"
     },
     "deviceJoinQr": {
-      "accountLabel": "Kontonummer",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "Kunne ikke lage QR-koden. Prøv igjen.",
       "generate": "Lag QR",
       "hint": "Lim inn kontonummeret ditt for å lage en QR-kode telefonen din kan skanne. Den fyller inn server og kontonummer for deg.",
       "invalidAccount": "Det ser ikke ut som et gyldig kontonummer.",
       "notConfigured": "Konfigurer en synkroniseringsserver først, og lag deretter en QR-kode.",
-      "scanWithApp": "Skann med iOS-appen",
+      "scanWithApp": "Skann med mobilappen",
       "title": "Logg inn en annen enhet"
     },
     "devices": {
       "approve": "Godkjenn",
       "awaitingApproval_one": "{{count}} enhet venter på godkjenning",
       "awaitingApproval_other": "{{count}} enheter venter på godkjenning",
-      "loading": "Laster…",
       "noDevices": "Ingen andre enheter ennå",
       "notEnrolled": "Denne enheten er ikke logget inn ennå. Hvis du nettopp la den til, vent på godkjenning fra en enhet som allerede er på kontoen din; ellers logg den inn med «Logg inn denne enheten».",
       "platform": {
@@ -4616,15 +4477,12 @@
         "web": "Nettleser",
         "windows": "Windows-PC"
       },
-      "remove": "Fjern",
       "removedElsewhere": "Denne enheten ble fjernet fra kontoen din på en annen enhet.",
-      "rename": "Endre navn",
       "renameFailed": "Kunne ikke lagre det navnet. Prøv igjen.",
       "renameLabel": "Enhetsnavn",
       "resetAndReAdd": "Tilbakestill og legg til denne enheten på nytt",
       "resetSyncOnThisDevice": "Tilbakestill synkronisering på denne enheten",
       "shortName": "Enhet {{hex}}",
-      "thisDevice": "Denne enheten",
       "reasonUnreachable": "serveren svarte ikke",
       "reasonUnexpected": "en uventet feil",
       "reasonRejected": "serveren avviste innloggingen fra denne enheten",
@@ -4638,7 +4496,6 @@
       "verifyMatch": "De stemmer",
       "verifyMismatch": "De stemmer ikke",
       "verifyPending": "Denne koden vises når den nye enheten har fullført sin første synkronisering.",
-      "verifyChanged": "Koden endret seg mens du så på. Sammenlign begge skjermene på nytt. Hvis den fortsetter å endre seg, stopp og ikke fortsett.",
       "verifySyncing": "Synkroniserer…",
       "verifyTitle": "Verifiser den nye enheten",
       "verifyAction": "Sammenlign kode",
@@ -4665,7 +4522,6 @@
       "invitePlaceholder": "Koden du fikk av den som drifter serveren"
     },
     "enroll": {
-      "accountNumberLabel": "Kontonummer",
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Kobler til…",
       "credentialTypeAria": "Legitimasjonstype",
@@ -4683,64 +4539,21 @@
         "inviteCodeRequired": "Denne serveren godtar bare nye kontoer med en invitasjonskode. Skriv inn koden du fikk av den som drifter den."
       },
       "mode": {
-        "password": "Passord",
-        "recovery": "Gjenopprettingsfrase"
+        "password": "Passord"
       },
       "passwordLabel": "Passord",
       "recoveryPhraseHint": "Skriv inn den 24-ord lange gjenopprettingsfrasen din.",
-      "recoveryPhraseLabel": "Gjenopprettingsfrase",
       "signInWith": "Logg inn med",
       "submit": "Legg til denne enheten",
       "wordAria": "Ord {{number}}"
     },
     "join": {
-      "accountLabel": "Kontonummer",
       "cancel": "Avbryt",
-      "error": "Kunne ikke legge til denne enheten. Sjekk server-URL-en, kontonummeret og passordet, og at serveren er tilgjengelig.",
-      "help": "Logg inn med kontonummeret og passordet ditt. Denne enheten synkroniserer notatene dine så snart en eksisterende enhet godkjenner den. Ingen gjenopprettingsfrase nødvendig.",
-      "passwordLabel": "Passord",
       "serverLabel": "Synkroniseringsserver",
-      "serverPlaceholder": "https://your-server.example",
       "sasMatch": "De stemmer, fortsett",
-      "sasMismatch": "De stemmer ikke, fjern denne enheten",
-      "submit": "Legg til enhet",
       "submitting": "Legger til…",
-      "title": "Legg til denne enheten på en konto",
-      "verifyBody": "Sjekk at denne koden stemmer med den på enheten du godkjente fra.",
-      "verifyChanged": "Koden endret seg mens du så på. Sammenlign begge skjermene på nytt. Hvis den fortsetter å endre seg, stopp og ikke fortsett.",
       "verifyTitle": "Verifiser denne enheten",
-      "waitingHint": "Hold dette vinduet åpent. Når enheten er godkjent, vises en verifiseringskode her som du kan sammenligne med den andre enheten din.",
-      "waitingTitle": "Venter på godkjenning",
-      "personListFailed": "Du er på denne kontoen, men listing av hvelvene fullførte ikke, så ingen vises ennå. Prøv igjen, eller åpne denne skjermen senere.",
-      "personListRetry": "List hvelvene på nytt",
-      "sasAbortFailed": "Kunne ikke koble fra denne enheten. Den er fortsatt registrert hos den serveren, så behandle den som upålitelig: åpne Innstillinger → Synkronisering og fjern den der. Notatene dine ble ikke slettet.",
-      "backToWaiting": "Tilbake til ventingen",
-      "codeBody": "Lim inn koden den andre enheten viser. En kode fra en identitet legger til denne enheten på hele den kontoen.",
-      "codeContinue": "Fortsett",
-      "codeExpired": "Den koden er utløpt. Be den andre enheten vise en ny.",
-      "codeInvalid": "Det er ikke en Myne-join-kode.",
-      "codeLabel": "Join-kode",
-      "codeMemberUnsupported": "Den koden er for et delt hvelv. Legg til denne enheten fra identitetsskjermen i stedet, der hvelvet vises under invitasjonene dine.",
-      "codeOpen": "Jeg har en join-kode",
-      "codeTitle": "Legg til denne enheten med en kode",
-      "personMismatch": "Den koden er for en annen identitet enn frasen du skrev inn. Sjekk begge og prøv igjen.",
-      "personPendingBody": "En av dine andre enheter må godkjenne denne. Inntil den gjør det, kan ikke denne enheten åpne noen av kontoens hvelv.",
-      "personPendingHint": "Venter på godkjenning. Dette fullføres av seg selv når den andre enheten godkjenner.",
-      "personPendingPhraseAgain": "Denne enheten ble omstartet før godkjenningen ankom, så frasen trengs én gang til.",
-      "personPendingPhraseCta": "Skriv inn frasen på nytt",
-      "personPendingTitle": "Venter på godkjenning",
-      "personPhraseBody": "Koden nevnte identiteten; de 24 ordene beviser den. Denne enheten spør om hvert hvelvs eget passord når du åpner det.",
-      "personPhraseSubmit": "Legg til denne enheten",
-      "personPhraseTitle": "Skriv inn identitetsfrasen din",
-      "errorPhrase": "Kunne ikke legge til denne enheten. Sjekk server-URL-en, kontonummeret og gjenopprettingsfrasen, og at serveren er tilgjengelig.",
-      "modePassword": "Passordet mitt",
-      "modePhrase": "Gjenopprettingsfrasen min",
-      "noDeviceBody": "Ingen annen enhet til å godkjenne denne? Du kan bekrefte med gjenopprettingsfrasen din i stedet.",
-      "phraseEscapeBody": "Gjenopprettingsfrasen din er den fulle nøkkelen til denne kontoen, så den bekrefter denne enheten uten godkjenning fra en annen enhet. Du beholder passordet du nettopp brukte.",
-      "phraseTitle": "Bekreft med gjenopprettingsfrasen din",
-      "phraseWarning": "Gjenopprettingsfrasen din er den fulle nøkkelen til denne kontoen, så denne enheten legges til uten godkjenning fra en annen enhet. Bruk den bare hvis du ikke har noen annen enhet å godkjenne fra. Du angir et nytt passord etterpå.",
-      "usePhrase": "Bruk gjenopprettingsfrasen min",
-      "back": "Tilbake"
+      "sasAbortFailed": "Kunne ikke koble fra denne enheten. Den er fortsatt registrert hos den serveren, så behandle den som upålitelig: åpne Innstillinger → Synkronisering og fjern den der. Notatene dine ble ikke slettet."
     },
     "panel": {
       "addDevice": {
@@ -4759,7 +4572,6 @@
         "helper": "Én godkjenning signerer en enhet inn på kontoen din. Den ser da alle hvelvene du eier, og hvert hvelv åpnes fortsatt med sitt eget passord."
       },
       "recovered": {
-        "close": "Lukk",
         "decrypting": "Dekrypterer…",
         "deleteConfirmTitle": "Slette dette gjenopprettede notatet?",
         "deleteConfirmWarning": "Dette sletter permanent den eneste kopien som er beholdt på denne enheten. Dette kan ikke angres.",
@@ -4777,7 +4589,16 @@
       },
       "status": {
         "helper": "Myne synkroniserer de krypterte notatene dine på tvers av enhetene dine. Serveren lagrer bare chiffertekst den ikke kan lese.",
-        "label": "Synkroniseringsstatus"
+        "label": "Synkroniseringsstatus",
+        "authorityIdentityClosed": "Synkroniseringen fortsetter når du åpner identiteten din på denne enheten",
+        "authorityKeyMissing": "Synkroniseringen fortsetter når du åpner identiteten din og denne enheten er reparert",
+        "authorityNoHeadContext": "Denne enheten kan ikke lese nok av hvelvet til å signere for det. Det er ikke legitimasjonen din det er noe galt med.",
+        "authorityNoDeviceId": "Denne enheten har ingen egen identitet ennå, så hvelvet kan ikke navngi den.",
+        "authorityNoKeyAtRest": "Denne enheten har ingen signeringsnøkkel. Åpne identiteten din på denne enheten for å sette opp én.",
+        "authorityKeyUnreadable": "Signeringsnøkkelen til denne enheten finnes, men systemets nøkkelring ville ikke lese den. En omstart løser det vanligvis, og å åpne identiteten din fungerer inntil da.",
+        "authorityNoBindingRow": "Signeringsnøkkelen til denne enheten er ikke publisert i hvelvet ennå. Åpne identiteten din på denne enheten for å publisere den.",
+        "authorityRowNamesDifferentKey": "Hvelvets oppføring for denne enheten navngir en annen nøkkel enn den som er lagret her. Åpne identiteten din på denne enheten for å reparere den.",
+        "authorityRowUnverified": "Hvelvets oppføring for denne enheten stemmer ikke. Åpne identiteten din på denne enheten for å signere den på nytt."
       },
       "usage": {
         "helper": "Hvor mye kryptert data denne kontoen lagrer på serveren, og hvor mange enheter som er logget inn.",
@@ -4789,7 +4610,6 @@
         "label": "Identitet",
         "helper": "En identitet lar folk invitere deg til et hvelv, og lar én identitet eie flere hvelv.",
         "cta": "Legg til en identitet",
-        "codeLabel": "Identitetskoden din",
         "lockedHelper": "Denne enheten har en identitet. Den er låst for denne økten; lås den opp med gjenopprettingsfrasen din for å signere synkronisering og invitasjoner.",
         "unregisteredHelper": "Denne identiteten finnes bare på denne enheten. Registrering skriver den til synkroniseringsserveren din, som er det som lar en invitasjon nå deg.",
         "unlockedHelper": "Denne enheten har en identitet, låst opp for denne økten."
@@ -4812,8 +4632,7 @@
       "restoredToast": "Gjenopprettet som et nytt notat."
     },
     "stale": {
-      "body": "Myne har ikke nådd synkroniseringsserveren på flere dager. Notatene dine lagres på denne enheten, men ingenting har forlatt den, så dette er den eneste kopien. Åpne Innstillinger → Synkronisering for å se hvorfor.",
-      "dismiss": "Lukk"
+      "body": "Myne har ikke nådd synkroniseringsserveren på flere dager. Notatene dine lagres på denne enheten, men ingenting har forlatt den, så dette er den eneste kopien. Åpne Innstillinger → Synkronisering for å se hvorfor."
     },
     "status": {
       "awaitingApproval": "Venter på godkjenning",
@@ -4835,8 +4654,11 @@
       "syncing": "Synkroniserer…",
       "syncNow": "Synkroniser nå",
       "errorIdentityLocked": "Lås opp identiteten din for å synkronisere",
+      "uploadsBlocked": "Opplastinger satt på pause: denne enheten kan ikke signere hvelvets hode",
       "errorTls": "Kunne ikke verifisere HTTPS-tilkoblingen til synkroniseringsserveren",
-      "unlockIdentityCta": "Lås opp identiteten"
+      "unlockIdentityCta": "Lås opp identiteten",
+      "errorDeviceKeyMissing": "Signeringsnøkkelen denne enheten publiserte er ikke her, så synkroniseringen kan ikke kjøre",
+      "repairDeviceCta": "Reparer denne enheten"
     },
     "usage": {
       "devices": "Enheter",
@@ -4851,6 +4673,7 @@
       "serverSection": "Server",
       "serverNotSet": "Ikke angitt",
       "statusLabel": "Status",
+      "approvalCode": "Godkjenningskoden til denne enheten",
       "hubHelp": "Synkronisering holder notatene dine oppdatert på tvers av enheter. Alt krypteres på denne enheten før det sendes. Serveren ser aldri notatene dine.",
       "connectedTls": "Tilkoblet over TLS.",
       "connectedLocal": "Tilkoblet på det lokale nettverket ditt.",
@@ -4865,7 +4688,6 @@
       "verifyBody": "Sjekk at den samme koden vises på enheten du nettopp godkjente. Hvis den stemmer, er de på kontoen din. Hvis den ikke stemmer, fjern enheten.",
       "sasMismatch": "De stemmer ikke",
       "removeDeviceButton": "Fjern enhet",
-      "keepDevice": "Behold den",
       "notEnrolledHelp": "Denne enheten synkroniserer ikke ennå. Legg den til fra den forrige skjermen for å se enhetene dine.",
       "unauthenticated": "Denne enhetens tilgang ble opphevet, sannsynligvis fjernet fra en annen enhet.",
       "transportError": "Kunne ikke nå synkroniseringsserveren. Sjekk serveradressen og HTTPS-sertifikatet dens.",
@@ -4893,8 +4715,8 @@
     },
     "memberRoster": {
       "loading": "Laster medlemmer…",
-      "error": "Kunne ikke lese vault-medlemslisten.",
-      "hint": "Medlemmer av denne vaulten. Hver blir med med egen identitet og legitimasjon.",
+      "error": "Kunne ikke lese hvelvmedlemslisten.",
+      "hint": "Medlemmer av dette hvelvet. Hver blir med med egen identitet og legitimasjon. Et enhetsantall er en påstand medlemmet har signert, ikke bevis for at de eier maskinen.",
       "empty": "Inviter noen til å dele dette hvelvet. De blir med med sin egen identitet.",
       "rotated": "Nøkkel rotert",
       "keyChanged": "Nøkkel endret. Verifiser med eieren.",
@@ -4902,7 +4724,6 @@
       "ownerBadge": "Eier",
       "memberBadge": "Medlem",
       "invite": "Inviter medlem",
-      "remove": "Fjern",
       "removeConfirm": "Fjern {{name}}? Når nøkkelrotasjonen er fullført, mister de tilgang til fremtidige endringer. Dette kan ikke slette noe de allerede har kopiert, og det henter ikke innhold tilbake fra enheten deres eller AI-leverandøren deres.",
       "removalLimits": "Å fjerne et medlem stopper bare tilgangen deres til fremtidige endringer. Det kan ikke slette noe de allerede har kopiert, og det henter ikke innhold tilbake fra enheten deres eller AI-leverandøren deres.",
       "inviteReady": "Invitasjon klar for {{fingerprint}}…",
@@ -4910,25 +4731,25 @@
       "invitationClaimed": "Godtatt",
       "invitationPending": "Ikke godtatt ennå",
       "invitationsFailed": "Kunne ikke laste invitasjonene dine.",
-      "title": "Vault-medlemmer",
+      "title": "Hvelvmedlemmer",
       "personUnlock": "Lås opp medlemsidentitet",
       "personReady": "Identiteten din er låst opp for denne økten.",
-      "ownerCodeHint": "Del denne koden med personen du inviterer, så de kan verifisere at vaulten er din. Den inneholder bare offentlig informasjon.",
+      "ownerCodeHint": "Del denne koden med personen du inviterer, så de kan verifisere at hvelvet er ditt. Den inneholder bare offentlig informasjon.",
       "personLock": "Lås identitet",
       "personError": "Den frasen åpnet ikke en medlemsidentitet.",
       "inviteHint": "Lim inn den inviterte medlemmets identitetskode (fra identitetshjemmet deres).",
-      "inviteCodeLabel": "Identitetskoden din",
-      "untitledVault": "Vault uten tittel",
+      "untitledVault": "Hvelv uten navn",
       "inviteFailed": "Invitasjonen kunne ikke opprettes.",
       "inviteNotOnServer": "Dette hvelvet er ikke på synkroniseringsserveren din ennå. Publiser det, og registrer identiteten din, og inviter deretter på nytt.",
       "removeFailed": "Medlemmet kunne ikke fjernes.",
       "youBadge": "Du",
+      "deviceCount_one": "{{count}} enhetspåstand",
+      "deviceCount_other": "{{count}} enhetspåstander",
+      "deviceClaimsUnverified_one": "Én enhetspåstand kunne ikke verifiseres: medlemmet den navngir, signerte den ikke.",
+      "deviceClaimsUnverified_other": "{{count}} enhetspåstander kunne ikke verifiseres: medlemmet hver av dem navngir, signerte dem ikke.",
       "nameUnverified": "Navn ikke verifisert",
       "nameLabel": "Visningsnavnet ditt",
-      "nameEdit": "Endre navn",
       "nameSave": "Lagre",
-      "nameClear": "Tøm",
-      "nameCancel": "Avbryt",
       "nameErrorEmpty": "Skriv inn et navn, eller bruk Tøm for å fjerne ditt.",
       "nameErrorTooLong": "Det navnet er for langt.",
       "nameErrorUnreadable": "Navnelageret kunne ikke leses på denne enheten. Ingenting ble lagret.",
@@ -4937,7 +4758,6 @@
       "nameErrorGeneric": "Kunne ikke lagre navnet ditt. Prøv igjen.",
       "nameInviteCta": "Angi et navn",
       "noInvitations": "Ingen invitasjoner sendt ennå.",
-      "identityHeading": "Identiteten din",
       "membersHeading": "Medlemmer",
       "emptyTitle": "Ingen medlemmer ennå",
       "personUnlockOpen": "Lås opp",
@@ -4947,16 +4767,12 @@
       "shareConfirmBody": "Å invitere noen gjør dette hvelvet til et delt hvelv: det får en gruppenøkkel, og folk du inviterer åpner innholdet med den. Denne endringen er permanent, og det finnes ingen vei tilbake til et hvelv for én bruker. Fortsett for å velge hvem du vil invitere.",
       "shareConfirmCta": "Del og inviter",
       "shareFailed": "Kunne ikke begynne å dele dette hvelvet.",
-      "identityForgetCta": "Glem denne identiteten på denne enheten",
       "identityForgetCheckbox": "Jeg forstår at denne identiteten fjernes fra denne enheten.",
       "identityForgetConfirm": "Glem identiteten",
-      "identityForgetCancel": "Behold den",
-      "identityForgetWarning": "Dette fjerner identiteten bare fra denne enheten. Serverkontoen og ethvert hvelv den eier eller har blitt med i, berøres ikke, og du kan gjenopprette identiteten med den 24 ord lange frasen på en annen enhet. Invitasjoner og medlemslistehandlinger på denne enheten vil trenge den låst opp igjen.",
       "identityForgetError": "Kunne ikke glemme identiteten. Prøv igjen.",
       "invitationDeclined": "Avslått"
     },
     "deviceBindings": {
-      "title": "Enheter og medlemmer",
       "errorLocked": "Lås opp hvelvet for å lese enhetene.",
       "errorUnshared": "Dette hvelvet er ikke delt, så det har ingen enhetstilknytninger.",
       "errorNoDeviceId": "Denne enheten er ikke lagt til kontoen din, så den har ingen enhetsidentitet å gjøre krav på seg selv under.",
@@ -4968,8 +4784,7 @@
       "title": "Velg et visningsnavn",
       "body": "Slik vil de andre medlemmene av dette hvelvet se deg i medlemslisten. Fingeravtrykket ditt står ved siden av, og du kan endre navnet senere.",
       "label": "Visningsnavnet ditt",
-      "checking": "Sjekker navnet ditt…",
-      "save": "Fortsett"
+      "checking": "Sjekker navnet ditt…"
     },
     "memberJoinQr": {
       "error": "Kunne ikke lage koden.",
@@ -5002,11 +4817,8 @@
       "folder": "Mappe",
       "insert": "Sett inn",
       "noDueDate": "Ingen forfallsdato",
-      "priority": "Prioritet",
       "sort": "Sorter etter",
-      "sortDue": "Forfallsdato",
       "sortPath": "Notat",
-      "sortPriority": "Prioritet",
       "status": "Status",
       "statusDone": "Fullført",
       "statusTodo": "Ikke fullført",
@@ -5021,7 +4833,6 @@
     },
     "filter": {
       "overdue": "Forfalt",
-      "today": "I dag",
       "upcoming": "Kommende"
     },
     "noteTitle": "Oppgaver i dette notatet",
@@ -5044,12 +4855,10 @@
       "untitled": "Oppgave uten tittel",
       "editFields": "Rediger oppgavefelt"
     },
-    "title": "Oppgaver",
     "axis": {
       "due": "Forfall",
       "folder": "Mappe",
       "note": "Notat",
-      "priority": "Prioritet",
       "sort": "Sorter",
       "status": "Status",
       "tag": "Tagg"
@@ -5057,9 +4866,7 @@
     "due": {
       "any": "Enhver dato",
       "later": "Senere",
-      "none": "Ingen dato",
       "overdue": "Forfalt",
-      "today": "I dag",
       "upcoming": "Kommende"
     },
     "filters": {
@@ -5076,30 +4883,22 @@
       "medium": "Middels"
     },
     "section": {
-      "done": "Ferdig",
       "later": "Senere",
-      "none": "Ingen dato",
       "overdue": "Forfalt",
-      "today": "I dag",
       "upcoming": "Kommende"
     },
     "sort": {
-      "due": "Forfallsdato",
       "dueDesc": "Forfallsdato, senest først",
-      "note": "Notat",
-      "priority": "Prioritet"
+      "note": "Notat"
     },
     "status": {
       "all": "Alle",
-      "done": "Ferdig",
       "undone": "Åpen"
     },
     "view": {
       "allFolders": "Alle mapper",
-      "allNotes": "Alle notater",
       "anyPriority": "Enhver prioritet",
-      "anyTag": "Enhver tagg",
-      "untitled": "Uten tittel"
+      "anyTag": "Enhver tagg"
     },
     "search": {
       "label": "Søk i oppgaver",
@@ -5113,9 +4912,7 @@
       "emptyBody": "Opprett en mal for å gjenbruke et notatskjelett: et møtenotat, en daglig logg, et lesenotat. Velg en når du lager et nytt notat.",
       "emptyTitle": "Ingen maler ennå",
       "listLabel": "Maler",
-      "loading": "Laster…",
       "newTemplate": "Ny mal",
-      "newTemplateName": "Mal uten tittel",
       "removeFromTemplates": "Fjern fra maler",
       "removeRowLabel": "Fjern {{name}} fra maler (beholder notatet)",
       "title": "Notatmaler",
@@ -5127,7 +4924,6 @@
     "newAction": "Ny",
     "emptyAfter": " for å opprette en gjenbrukbar notatmal, og start deretter notater fra den (og velg en som dagsnotatmal i Innstillinger).",
     "use": "Bruk",
-    "edit": "Rediger",
     "deleteConfirm": "Slette denne malen?",
     "convertToNote": "Konverter til notat"
   },
@@ -5135,8 +4931,6 @@
     "apply": "Bruk tema",
     "applying": "Tar i bruk…",
     "byAuthor": "Denne lenken sier at den er laget av {{author}}",
-    "cancel": "Avbryt",
-    "close": "Lukk",
     "collision": {
       "keepBoth": "Behold begge og installer som «{{name}}»",
       "question": "Du har allerede et tema som heter «{{name}}».",
@@ -5159,7 +4953,6 @@
   },
   "unlock": {
     "backToPicker": "Velg et annet hvelv",
-    "continue": "Fortsett",
     "decrypting": "Dekrypterer…",
     "deleteLink": "Mistet både passord og gjenopprettingsfrase? Slett hvelvet og start på nytt",
     "memberRemoveLink": "Fjern dette hvelvet fra denne enheten",
@@ -5167,8 +4960,6 @@
       "alreadyUnlocked": "Hvelvet er allerede låst opp.",
       "inProgress": "En operasjon pågår.",
       "kdfMemoryExceedsHost": "Dette hvelvet trenger {{required}} MiB minne for å åpnes, mer enn denne nettleseren kan gi det ({{available}} MiB). Det er ingenting galt med hvelvet; åpne det i Myne-skrivebordsappen.",
-      "unexpected": "Uventet feil. Prøv igjen.",
-      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt.",
       "vaultUpgraded": "Dette hvelvet ble oppgradert til et nyere format som denne versjonen av Myne ikke støtter ennå. Dataene dine er i orden. Oppdater Myne til nyeste versjon for å åpne det.",
       "openAsImportSource": "En import leser dette hvelvet akkurat nå. Fullfør eller avbryt den importen, og lås så opp dette hvelvet."
     },
@@ -5183,8 +4974,8 @@
       "wrongCredential": "Feil. {{remaining}} forsøk igjen.",
       "showPin": "Vis PIN",
       "hidePin": "Skjul PIN",
-      "waitingForTouchId": "Waiting for Touch ID…",
-      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
+      "waitingForTouchId": "Venter på Touch ID…",
+      "waitingForTouchIdHint": "Svar på systemforespørselen for å låse opp. Hvis ingen forespørsel vises, bruk passordet ditt i stedet."
     },
     "recoveryInterruptedBanner": "Gjenopprettingsflyten ble avbrutt. Angi et nytt passord først.",
     "recoveryInterruptedBody": "Angi et nytt passord først, og forsegl deretter hvelvet på nytt.",
@@ -5199,7 +4990,6 @@
       "metaChangedExternally": "Hvelvet ble endret i en annen økt. Lås opp igjen."
     },
     "title": "Lås opp hvelvet ditt",
-    "vaultUnreadable": "Hvelvfilen kan ikke leses. Gjenopprett fra en sikkerhetskopi.",
     "unlockFailedGeneric": "Kunne ikke låse opp. Vennligst prøv igjen.",
     "biometricTooManyAttempts": "For mange {{biometric}}-forsøk. Bruk passordet ditt.",
     "pinIncorrect_one": "Feil PIN. {{count}} forsøk igjen.",
@@ -5226,16 +5016,12 @@
     "deletePartialError": "Noen filer kunne ikke fjernes. Hvelvet er ikke lenger brukbart. Fortsett for å starte på nytt.",
     "failClosedEyebrow": "Kan ikke åpne hvelv",
     "restoreHint": "Gjenoppretting fra en sikkerhetskopi er ennå ikke tilgjengelig på mobil.",
-    "memberHint": "Denne vaulten deles med deg. Lås den opp med din egen gjenopprettingsfrase.",
     "memberSubtitle": "Åpne dette delte hvelvet.",
-    "memberPhraseLabel": "Gjenopprettingsfrase",
+    "memberNoCredential": "Dette delte hvelvet ble satt opp på en annen enhet. For å åpne det her, godta en ny invitasjon fra hvelveieren: denne enheten har ikke noe passord for det, og gjenopprettingsfrasen låser ikke lenger opp et delt hvelv.",
     "memberSubmit": "Lås opp",
-    "memberError": "Den frasen åpnet ikke denne delte vaulten.",
     "memberPasswordHint": "Dette hvelvet er delt med deg. Lås det opp med passordet du angav på denne enheten.",
     "memberPasswordLabel": "Hvelvpassord",
     "memberPasswordError": "Det passordet åpnet ikke dette delte hvelvet.",
-    "memberUsePhrase": "Bruk gjenopprettingsfrasen i stedet",
-    "memberUseFast": "Bruk rask opplåsing i stedet",
     "memberPinHint": "Dette hvelvet er delt med deg. Lås det opp med PIN-koden du angav på denne enheten.",
     "memberPinLabel": "Hvelv-PIN",
     "memberPinPlaceholder": "Hvelv-PIN (minst {{count}} sifre)",
@@ -5245,6 +5031,7 @@
     "restoreCta": "Gjenopprett fra sikkerhetskopi",
     "ioErrorHint": "Prøv igjen, eller åpne Myne på nytt.",
     "identityPhraseLink": "Bruk identitetsfrasen din",
+    "passwordOnlyNote": "Dette hvelvet åpnes bare med passordet sitt. Det finnes ingen gjenopprettingsfrase for det.",
     "identityPhrase": {
       "title": "Lås opp med identitetsfrasen din",
       "body": "Dette hvelvet åpnes med passordet eller identitetsfrasen din. Hvis du har lagret en egen hvelvfrase for det, er den trukket tilbake og åpner det ikke lenger. Å åpne det med de 24 ordene du skrev ned for identiteten din låser også opp identiteten din for denne økten, slik at synkronisering kjører uten en ny oppfordring.",
@@ -5261,13 +5048,11 @@
   "vault": {
     "ioBanner": {
       "cannotRead": "Kan ikke lese hvelvfilen.",
-      "notFound": "Fant ikke hvelvfilen. Start appen på nytt.",
       "permissionDenied": "Ingen tillatelse til å åpne hvelvfilen. Sjekk filtillatelsene."
     }
   },
   "vaultCreation": {
     "briefing": {
-      "back": "Tilbake",
       "continue": "Fortsett til opprettelse av hvelv",
       "eyebrow": "Nytt hvelv",
       "heading": "Før du oppretter hvelvet ditt",
@@ -5284,15 +5069,14 @@
           "why": "Passordet ditt er inndata til nøkkelen som dekrypterer notatene dine. Det forlater aldri denne enheten, og ingenting på serverne våre kan gjenskape det. Det er det som holder notatene dine private, og derfor kan vi ikke tilbakestille det for deg."
         },
         "phrase-backup": {
-          "ackLabel": "Jeg forstår at gjenopprettingsfrasen min er den eneste sikkerhetskopien.",
-          "statement": "Gjenopprettingsfrasen din er din eneste sikkerhetskopi.",
-          "why": "Hvis du glemmer passordet ditt, er den 24-ord lange gjenopprettingsfrasen den eneste veien tilbake. {{lostBothSecrets}} Skriv ned frasen, og oppbevar den et trygt sted."
+          "ackLabel": "Jeg forstår at ingenting annet får meg inn i dette hvelvet igjen.",
+          "statement": "Ta vare på det Myne viser deg. Ingenting annet får deg inn igjen.",
+          "why": "Et hvelv som opprettes mens identiteten din er låst opp, åpnes bare med passordet sitt: identitetsfrasen din beviser hvem du er på en ny enhet, og den åpner ikke et hvelv. Et hvelv som opprettes på en enhet uten identitet, har i stedet en gjenopprettingsfrase på 24 ord, og da er den frasen den eneste veien tilbake inn. {{lostBothSecrets}} Skriv ned det denne flyten viser deg, og oppbevar det et trygt sted."
         }
       },
       "why": "Hvorfor?"
     },
     "confirm": {
-      "back": "Tilbake",
       "heading": "Bekreft gjenopprettingsfrasen din",
       "intro": "Skriv inn ordene på disse fire posisjonene, for å sjekke at du har lagret dem.",
       "mismatch": "Samsvarer ikke med ord {{pos}}.",
@@ -5314,31 +5098,24 @@
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "Prøv igjen.",
         "title": "Ugyldig kontonummer"
       },
       "aeadFailure": {
-        "body": "Prøv igjen.",
         "title": "Kryptering mislyktes"
       },
       "csprng": {
-        "body": "Prøv igjen.",
         "title": "Kunne ikke generere sikre tilfeldige data"
       },
       "invalidPassword": {
-        "body": "Prøv igjen.",
         "title": "Ugyldig passord"
       },
       "invalidVaultMeta": {
-        "body": "Prøv igjen.",
         "title": "Feil i hvelvformatet"
       },
       "ioOther": {
-        "body": "Prøv igjen.",
         "title": "Kunne ikke lagre hvelvet"
       },
       "joinFailure": {
-        "body": "Prøv igjen.",
         "title": "Noe gikk galt"
       },
       "kdfFailure": {
@@ -5350,7 +5127,6 @@
         "title": "Ikke nok diskplass"
       },
       "notFound": {
-        "body": "Prøv igjen.",
         "title": "Hvelvmappe mangler"
       },
       "passwordTooShort": {
@@ -5398,7 +5174,6 @@
         "title": "Forkaste oppretting av hvelv?"
       },
       "genericError": {
-        "body": "Prøv igjen.",
         "title": "Noe gikk galt"
       },
       "provisionFailed": {
@@ -5407,17 +5182,14 @@
       }
     },
     "password": {
-      "back": "Tilbake",
       "heading": "Velg et hovedpassord",
       "helperLead": "Myne lagrer ikke passordet eller gjenopprettingsfrasen din.",
-      "submit": "Generer gjenopprettingsfrase",
-      "eyebrowLabel": "Hovedpassord"
+      "submit": "Generer gjenopprettingsfrase"
     },
     "phrase": {
       "clipboardNotCleared": "Nettleseren din lar ikke Myne tømme utklippstavlen etterpå, så de 24 ordene blir liggende der til du kopierer noe annet. Lim dem inn i passordbehandleren din, og kopier deretter hva som helst.",
       "copied": "Kopiert. Myne tømmer den om 30 sekunder, selv om du går videre, så lenge appen kjører.",
       "copiedNoAutoClear": "Kopiert. Myne kan ikke tømme utklippstavlen her, så ordene blir liggende på den til du kopierer noe annet.",
-      "copy": "Kopier",
       "extensionNotice": "Nettleserutvidelser med tilgang til dette nettstedet kan lese det som står på denne siden. Hvis du ikke er sikker på hver eneste utvidelse i denne profilen, bruk skrivebordsappen eller en ren nettleserprofil til dette trinnet.",
       "copyFailed": "Kunne ikke kopiere. Bruk «Lagre som fil» i stedet.",
       "downloadStarted": "Sendt til nettleserens nedlastinger. Sjekk at den kom frem: nettleseren din bestemmer hvor filen havner, og Myne kan ikke se om den gjorde det.",
@@ -5428,42 +5200,31 @@
       "sessionOnlyNotice": "Denne nettleseren beholder ikke frasen din etter en ny lasting, så du vil bli bedt om de 24 ordene igjen. Oppbevar dem et trygt sted."
     },
     "ready": {
-      "backedUp": "Sikkerhetskopiert",
-      "backingUp": "Sikkerhetskopierer…",
-      "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Sikkerhetskopieringen ble ikke fullført. Ingen fil ble igjen. Du kan sikkerhetskopiere når som helst fra Innstillinger → Lagring.",
-      "backupFilterName": "Myne-sikkerhetskopi",
-      "backUpNow": "Sikkerhetskopier nå",
       "body": "Notatene dine er kryptert og lagret på denne enheten. Oppbevar passordet og gjenopprettingssettet ditt på et trygt sted: de er den eneste veien tilbake.",
       "decrypting": "Dekrypterer…",
       "done": "Åpne hvelvet",
-      "heading": "Hvelvet ditt er klart",
-      "showFolder": "Vis hvelvmappe"
+      "heading": "Hvelvet ditt er klart"
     },
     "sessionLost": {
       "startOver": "Start på nytt"
     },
     "kit": {
-      "accountFor": "Kontonummer — når du legger til en annen enhet",
-      "back": "Tilbake",
+      "accountFor": "Kontonummer: når du legger til en annen enhet",
       "continue": "Jeg har lagret dette, bekreft frase",
       "copied": "Settet ligger i utklippstavlen din. Myne tømmer den etter 30 sekunder, selv om du går videre, så lenge appen fortsetter å kjøre.",
       "copiedNoAutoClear": "Kopiert. Myne kan ikke tømme utklippstavlen din her, så settet blir liggende der til du kopierer noe annet.",
-      "copy": "Kopier",
       "copyFailed": "Kunne ikke kopiere. Bruk «Lagre gjenopprettingssett» i stedet.",
       "documentTitle": "Mynes gjenopprettingssett",
       "downloadStarted": "Sendt til nedlastingene i nettleseren din. Sjekk at settet kom frem: nettleseren din bestemmer hvor filen havner, og Myne kan ikke se om den gjorde det.",
       "eyebrowLabel": "Gjenopprettingssett",
       "heading": "Lagre gjenopprettingssettet ditt",
       "intro": "Filen du er i ferd med å lagre, er nøyaktig dette. Den vises én gang.",
-      "phraseFor": "Gjenopprettingsfrase — hvis du glemmer passordet",
+      "phraseFor": "Gjenopprettingsfrase: hvis du glemmer passordet",
       "save": "Lagre gjenopprettingssett",
       "saveFailed": "Kunne ikke lagre filen. Kopier settet i stedet, eller skriv ned begge delene.",
       "savedToFile": "Lagret. Det er en ren tekstfil som inneholder begge hemmelighetene, så oppbevar den et sted bare du kan lese."
     },
     "name": {
-      "back": "Tilbake",
-      "continue": "Fortsett",
       "eyebrowLabel": "Gi hvelvet et navn",
       "heading": "Hva skal vi kalle dette hvelvet?",
       "helper": "Navnet lagres kryptert sammen med hvelvet. På denne enheten vises det i hvelvvelgeren ved oppstart før du låser opp, så alle som kan se den skjermen, kan lese det; skjul hvelvnavn i Innstillinger for å slå det av. Du kan endre det senere.",
@@ -5474,13 +5235,10 @@
   },
   "vaultPicker": {
     "createAnother": "Opprett et nytt hvelv",
-    "deviceOnly": "Bare enhet",
     "heading": "Velg et hvelv",
-    "joinDevice": "Legg til denne enheten på en konto",
     "loading": "Laster hvelvene dine…",
     "noneLoaded": "Ingen hvelv kunne lastes akkurat nå.",
     "openedRelative": "åpnet {{rel}}",
-    "restoreFromBackup": "Gjenopprett fra sikkerhetskopi",
     "subline": "Du har mer enn ett hvelv på denne enheten. Velg ett for å låse opp.",
     "vaultFallback": "Hvelv {{n}}",
     "accountError": "Kontogrupperingen kunne ikke leses på denne enheten.",
@@ -5500,7 +5258,6 @@
       "errors": {
         "cancelledVaultLocked": "Gjenoppretting avbrutt: hvelvet ble låst.",
         "operationInProgress": "En operasjon pågår. Vent litt.",
-        "unexpected": "Uventet feil. Prøv igjen.",
         "weakPassword": "Det nye passordet må være minst 12 tegn."
       },
       "eyebrow": "Gjenoppretting · Nytt passord",
@@ -5522,8 +5279,7 @@
       "accountInvalid": "Ugyldig kontonummer. Sjekk det og prøv igjen.",
       "accountLabel": "Kontonummer (valgfritt)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (valgfritt)",
-      "body": "Velg hvelvet du vil gjenopprette med den 24-ord lange gjenopprettingsfrasen din. Du kan også skrive inn kontonummeret ditt for å gå rett til det.",
-      "cancel": "Avbryt",
+      "body": "Velg hvelvet du vil gjenopprette. Et hvelv som fortsatt har sin egen gjenopprettingsfrase, kan gjenopprettes med de 24 ordene; et som ikke har det, sier det når du velger det. Du kan også skrive inn kontonummeret ditt for å gå rett til det.",
       "checking": "Sjekker…",
       "loadFailed": "Ingen hvelv kunne lastes akkurat nå.",
       "loading": "Laster hvelvene dine…",
@@ -5533,20 +5289,18 @@
       "useAccountNumber": "Bruk kontonummer",
       "vaultFallback": "Hvelv {{index}}",
       "accountFallback": "Konto",
-      "accountsError": "Kunne ikke laste kontogrupperingen. Vault-er er listet uten gruppering; ingenting om gjenoppretting endres."
+      "accountsError": "Kunne ikke laste kontogrupperingen. Hvelvene er listet uten gruppering; ingenting om gjenoppretting endres."
     },
     "siblingNotice": {
-      "body_one": "Denne kontoen har {{count}} vault til. Gjenopprette den også, så ingenting blir igjen.",
-      "body_other": "Denne kontoen har {{count}} vault-er til. Gjenopprette dem også, så ingenting blir igjen.",
-      "recoverAnother": "Gjenopprett en annen vault",
-      "unknown": "Kunne ikke sjekke om denne kontoen har andre vault-er. Hvis du har mer enn én vault, gjenopprett hver med sin egen frase."
+      "body_one": "Denne kontoen har {{count}} hvelv til. Gjenopprett det også, så ingenting blir igjen.",
+      "body_other": "Denne kontoen har {{count}} hvelv til. Gjenopprett dem også, så ingenting blir igjen.",
+      "recoverAnother": "Gjenopprett et annet hvelv",
+      "unknown": "Kunne ikke sjekke om denne kontoen har andre hvelv. Hvis du har mer enn ett hvelv, gjenopprett hvert med sin egen frase."
     }
   },
   "vaultSwitcher": {
     "chipFallback": "Hvelv",
     "createAnother": "Opprett et nytt hvelv",
-    "deviceOnly": "Bare enhet",
-    "joinDevice": "Legg til denne enheten på en konto",
     "switching": "bytter…",
     "switchVaultLabel": "Bytt hvelv",
     "vaultFallback": "Hvelv {{n}}"
@@ -5602,15 +5356,16 @@
     "heroLine2": "tilhører",
     "heroLine3": "ingen andre enn deg.",
     "lede": "Markdown, kryptert på denne enheten før det i det hele tatt forlater den. Ingen konto-e-post. Ingen servere som kan lese et eneste ord.",
-    "residueBanner": "Gjenværende filer fra en avbrutt sletting ({{n}}). Rydd dem opp før du oppretter et hvelv.",
+    "residueBanner": "Gjenværende filer fra en avbrutt sletting ({{n}}). De er allerede uleselige, så opprydding fjerner dem bare fra denne enheten.",
+    "residueGated": "En hvelvmappe denne enheten ikke kan åpne, ligger fortsatt her ({{n}}). Hvis du allerede slettet den, er dette den delen slettingen ikke fikk fullført.",
+    "residueGatedDelete": "Slett den permanent",
+    "residueGatedHint": "Skriv DELETE for å bekrefte",
     "cleanUpFiles": "Rydd opp gjenværende filer",
     "connect": "Koble til kontoen min",
     "tagline": "Krypterte markdown-notater. Ingen e-post ved registrering.",
     "startAction": "Opprett identiteten og hvelvet ditt",
     "startBody": "Start på nytt på denne enheten: en ny identitet, og deretter hvelvet som hører til den.",
-    "restoreTitle": "Gjenopprett fra sikkerhetskopi",
     "restoreBody": "Åpne en .myne-backup-fil du lagret tidligere.",
-    "joinTitle": "Legg denne enheten til en konto",
     "joinBody": "Bruk et hvelv du allerede har på en annen enhet.",
     "invitedTitle": "Jeg ble invitert til et hvelv",
     "invitedBody": "Sett opp identiteten invitasjonen var adressert til. Du trenger ikke ditt eget hvelv.",
@@ -5689,28 +5444,15 @@
     "accountError": "Kontogrupperingen kunne ikke leses på denne enheten."
   },
   "join": {
-    "transportError": "Kunne ikke nå den synkroniseringsserveren. Sjekk adressen og tilkoblingen din, og prøv igjen.",
-    "passwordPlaceholder": "Hvelvpassordet ditt",
     "waitingHint": "Hold denne skjermen åpen. Når enheten er godkjent, vises en verifiseringskode her som du kan sammenligne med den andre enheten din.",
     "verifyBody": "Sjekk at denne koden er den samme som vises på enheten du godkjente fra.",
-    "verifyChanged": "Koden endret seg mens du så på. Sammenlign begge skjermene på nytt. Hvis den fortsetter å endre seg, stopp og ikke fortsett.",
     "removing": "Fjerner…",
     "sasMismatch": "De stemmer ikke, fjern denne enheten",
-    "title": "Koble til kontoen din",
-    "lead": "Skriv inn kontodetaljene dine for å hente notatene dine til denne enheten. Alt forblir ende-til-ende-kryptert.",
-    "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Dobbeltsjekk dette nummeret. Det ser ikke riktig ut.",
-    "approvalHint": "Notatene dine vises når du godkjenner denne enheten fra en enhet som allerede har kontoen din.",
-    "connectingSubtitle": "Henter kontoen din og låser opp hvelvet ditt på denne enheten.",
     "qr": {
-      "confirmAccount": "Konto",
-      "confirmServer": "Server",
-      "confirmTitle": "Legge til denne enheten?",
-      "continue": "Fortsett",
       "expired": "Denne QR-koden er utløpt. Vis en ny på den andre enheten din, og skann på nytt.",
       "invalid": "Dette er ikke en QR-kode for en Myne-enhet.",
+      "legacyAccount": "Denne koden er for en eldre kontotype. Be hvelveieren om en invitasjon.",
       "newerVersion": "Denne QR-koden er fra en nyere versjon av Myne. Oppdater appen og prøv igjen.",
-      "scan": "Skann QR",
       "scanFailed": "Kunne ikke skanne. Prøv igjen, eller skriv inn opplysningene manuelt.",
       "scanUnavailable": "Skanning er ikke tilgjengelig på denne enheten. Skriv inn opplysningene nedenfor."
     }
@@ -5723,7 +5465,7 @@
     "phraseCopied": "Kopiert. Den blir værende på denne enheten, og systemet forkaster den etter 30 sekunder.",
     "phraseCopyFailed": "Kunne ikke kopiere. Bruk «Lagre til fil» i stedet.",
     "savedToFile": "Lagret til {{label}}",
-    "savedToShareSheet": "Lagret inne i Myne, der systemets filbehandler ikke når den. Det er en fil med ren tekst, så hvis du bruker delingsmenyen til å legge en kopi et sted du kommer til, velg et sted der bare du kan lese den, ikke en skytjeneste. Trykk Lagre igjen hvis du lukket menyen.",
+    "savedToShareSheet": "Lagret inne i Myne, der ingen filbehandler kan åpne det. Det er en ren tekstfil, så hvis systemet spurte deg hvor du ville legge en kopi, og du valgte et sted, velg et sted bare du kan lese i stedet for en skytjeneste. Trykk Lagre igjen for å få tilbudet tilbake.",
     "savedFileWritten": "Lagret inne i Myne. Det er en fil med ren tekst, så oppbevar enhver kopi du lager et sted der bare du kan lese den. Denne enheten oppga ikke hvor filen kan nås fra, så regn den som tilgjengelig bare inne i appen til du har sjekket.",
     "saveFileError": "Kunne ikke lagre filen.",
     "stepLabel": "Opprett et hvelv · {{current}} av {{total}}",
@@ -5736,7 +5478,6 @@
     "showSecondHalf": "Vis ord 13-24",
     "saveToFile": "Lagre til fil",
     "writtenThemDown": "Jeg har skrevet dem ned",
-    "typebackTitle": "Bekreft frasen din",
     "typebackLead": "Skriv inn disse fire ordene fra gjenopprettingsfrasen du nettopp lagret.",
     "wordMismatch": "Stemmer ikke med ord #{{pos}}",
     "backToPhrase": "Tilbake til frasen",
@@ -5747,8 +5488,7 @@
     "unlockingSubtitle": "Åpner hvelvet ditt.",
     "readyTitle": "Hvelvet ditt er klart",
     "readyBody": "Alt du skriver herfra krypteres på denne enheten før det lagres eller synkroniseres.",
-    "openVault": "Åpne hvelv",
-    "backUpNow": "Sikkerhetskopier nå"
+    "openVault": "Åpne hvelv"
   },
   "web": {
     "openElsewhere": {
@@ -5796,6 +5536,15 @@
       }
     }
   },
+  "approvalWait": {
+    "approversIntro": "Disse enhetene kan godkjenne denne:",
+    "noApprovers": "Ingen andre enheter på denne kontoen kan godkjenne den akkurat nå. Åpne Myne på en enhet som allerede har tilgang, og kom deretter tilbake hit.",
+    "pendingStartOver": "Start på nytt med en annen konto",
+    "sasMatch": "De stemmer, fortsett",
+    "sasMismatch": "De stemmer ikke",
+    "verifyBody": "Kontroller at denne koden er den samme på begge enhetene før du fortsetter. Hvis den ikke er det, stopp: noe er galt med forbindelsen, ikke med passordet ditt.",
+    "verifyTitle": "Sammenlign denne koden"
+  },
   "screenCaptureEscape": {
     "disableBody": "Beskyttelse mot skjermopptak ber operativsystemet om å holde dette vinduet utenfor skjermbilder og skjermopptak. Den virker på Windows 10 (May 2020 Update) og nyere; macOS og Linux har ikke noe system-API for det, så der kan den ikke blokkere opptak. Der den virker, skjuler den også vinduet for fjernskrivebordsprogrammer og skjermforstørrere, og det er derfor denne veien ut finnes.",
     "disableConfirm": "Slå av beskyttelsen",
@@ -5811,17 +5560,14 @@
     "savedForNextLaunch": "Lagret. Denne økten har fortsatt beskyttelsen av fordi den ble startet med --disable-screen-capture-protection, så den kommer tilbake neste gang du åpner Myne uten det flagget."
   },
   "identitySetup": {
-    "doneCta": "Ferdig",
     "error": "Kunne ikke sette opp identiteten. Prøv igjen.",
-    "intro": "En identitet lar folk adressere en invitasjon til deg før du eier noen vault. Den oppretter ingen vault og lagrer ingen notater.",
+    "intro": "En identitet lar folk adressere en invitasjon til deg før du eier noe hvelv. Den oppretter ikke noe hvelv og lagrer ingen notater.",
     "pending": "Denne enheten venter på at en annen enhet på kontoen skal godkjenne den.",
     "phraseWarning": "Skriv disse 24 ordene ned og oppbevar dem trygt. Dette er eneste gang de vises; de er den eneste måten å gjenopprette denne identiteten på.",
     "recoverCta": "Gjenopprett en identitet",
     "recoverIntro": "Gjenopprettingsfrase for identitet",
     "recovered": "Identitet gjenopprettet.",
-    "title": "Opprett en identitet",
     "errorAlreadyHeld": "Denne enheten har allerede en identitet. Gjenopprett den med gjenopprettingsfrasen, eller glem den og opprett en ny.",
-    "forgetCancel": "Behold den",
     "forgetConfirm": "Glem og opprett ny",
     "forgetCta": "Glem denne identiteten og opprett en ny",
     "forgetWarning": "Dette sletter identiteten som finnes på denne enheten. Hvis du ikke har skrevet ned den 24 ord lange gjenopprettingsfrasen, er den borte: denne enheten mister tilgang til ethvert hvelv den eier eller har blitt med i, til du gjenoppretter den med den frasen. Fortsett bare hvis du er sikker.",
@@ -5834,10 +5580,7 @@
     "recoverTitle": "Jeg har allerede én",
     "recoverHint": "Gjenopprett den på denne enheten med den 24 ord lange gjenopprettingsfrasen.",
     "recoverAction": "Gjenopprett",
-    "back": "Tilbake",
-    "phraseTitle": "Lagre identitetsfrasen din",
-    "phraseContinue": "Fortsett",
-    "confirmTitle": "Bekreft frasen din"
+    "phraseTitle": "Lagre identitetsfrasen din"
   },
   "personIdentityCode": {
     "copy": "Kopier identitetskode",
@@ -5845,15 +5588,13 @@
     "copyFailed": "Identitetskoden kunne ikke kopieres"
   },
   "identityHome": {
-    "createVaultCta": "Opprett en vault",
+    "createVaultCta": "Opprett et hvelv",
     "createVaultLocked": "Lås opp identiteten din for å opprette et hvelv. Den signerer hvelvets første medlemsliste, som er det som gjør hvelvet til ditt, og denne enheten har den forseglet for denne økten.",
     "invitesError": "Kunne ikke laste invitasjoner. Sjekk tilkoblingen og synkroniseringsserveren.",
     "invitesHeading": "Invitasjoner",
     "invitesLoading": "Sjekker etter invitasjoner…",
     "invitesPending": "Denne enheten venter på godkjenning. Invitasjoner vises her når en annen av dine enheter godkjenner den.",
     "invitesUnregistered": "Denne identiteten er ikke registrert hos en synkroniseringsserver ennå, så ingen invitasjon kan nå den.",
-    "noInvites": "Ingen invitasjoner ennå.",
-    "subtitle": "Du har en identitet på denne enheten, så folk kan invitere deg til en vault. Du trenger ikke opprette en for å bli invitert.",
     "accept": "Godta",
     "acceptHint": "Lim inn eierens identitetskode (de deler den når de inviterer deg).",
     "acceptOwnerCodeLabel": "Eierens identitetskode",
@@ -5862,7 +5603,6 @@
     "acceptError": "Invitasjonen kunne ikke godtas.",
     "shareCodeHeading": "Invitasjonskoden din",
     "shareCodeHint": "Del denne koden med hvem som helst som inviterer deg. Den inneholder bare offentlig informasjon (identitets-ID-en og offentlige nøkler), aldri frasen din.",
-    "title": "Din identitet",
     "acceptPasswordNote": "Velg et passord for denne enheten. Det er atskilt fra hvelveierens passord og fra gjenopprettingsfrasen din: det låser opp dette hvelvet på denne enheten, og frasen din forblir den flyttbare veien tilbake inn.",
     "acceptErrorNotFound": "Denne invitasjonen er ikke lenger tilgjengelig. Den kan allerede være brukt eller trukket tilbake. Be eieren sende en ny invitasjon.",
     "acceptErrorNotEnrolled": "Denne enheten er ikke identiteten denne invitasjonen var adressert til. Åpne identiteten invitasjonen ble sendt til, og godta den deretter.",
@@ -5873,7 +5613,7 @@
     "join": "Legg til på denne enheten",
     "joinHint": "Dette hvelvet er allerede delt med identiteten din. Skriv inn gjenopprettingsfrasen din for å installere det på denne enheten.",
     "joinPhraseLabel": "Gjenopprettingsfrasen din",
-    "joinPasswordNote": "Velg et passord for denne enheten. Det er atskilt fra hvelveierens passord: det låser opp dette hvelvet her, og gjenopprettingsfrasen din forblir den flyttbare veien tilbake inn.",
+    "joinPasswordNote": "Velg et passord for denne enheten. Det er atskilt fra hvelveierens passord, og det er den eneste veien inn i dette hvelvet på denne enheten: mister du det, må du be eieren om en ny invitasjon.",
     "joinSubmit": "Legg til og lås opp",
     "joinError": "Hvelvet kunne ikke legges til på denne enheten.",
     "joinErrorAlreadyHeld": "Denne enheten har allerede dette hvelvet, så det er ingenting å legge til. Åpne hvelvet du allerede har her.",
@@ -5882,14 +5622,9 @@
     "joinErrorNotConfigured": "Synkronisering er ikke satt opp på denne enheten. Angi synkroniseringsserveren din, og prøv igjen.",
     "joinErrorUnauthenticated": "Identiteten din er ikke logget på denne enheten. Lås opp identiteten din og prøv igjen.",
     "joinErrorTransport": "Kunne ikke nå synkroniseringsserveren, eller dette hvelvet er ikke publisert der ennå. Sjekk tilkoblingen din og prøv igjen.",
-    "forgetCancel": "Behold den",
     "forgetCheckbox": "Jeg forstår at denne identiteten fjernes fra denne enheten.",
     "forgetConfirm": "Glem identiteten",
-    "forgetCta": "Glem denne identiteten på denne enheten",
     "forgetError": "Kunne ikke glemme identiteten. Prøv igjen.",
-    "forgetWarning": "Dette fjerner identiteten bare fra denne enheten. Serverkontoen og ethvert hvelv den eier eller har blitt med i, berøres ikke, og du kan gjenopprette identiteten med den 24 ord lange frasen på en annen enhet. Hvis du ikke har lagret den frasen, kan denne enheten ikke gjenopprette den.",
-    "registerCta": "Registrer denne identiteten",
-    "registerContinue": "Fortsett",
     "registerSubmit": "Registrer",
     "registerError": "Kunne ikke registrere. Sjekk frasen og serveradressen, og prøv igjen.",
     "registerServerLabel": "Synkroniseringsserveradresse",
@@ -5898,7 +5633,6 @@
     "registerInviteCodeLabel": "Serverinvitasjonskode",
     "registerInviteCodeHint": "Bare hvis serveren ber om en.",
     "registerServerError": "Den serveren kunne ikke nås. Sjekk adressen og prøv igjen. Ordene dine er fortsatt her.",
-    "accountNumberHeading": "Kontonummer",
     "accountNumberHint": "Avledet fra identitetsfrasen din, så det kan ikke mistes, og det er ikke en hemmelighet. Bruk det for støtte eller for overlevering til en serveroperatør.",
     "copyAccountNumber": "Kopier kontonummer",
     "registerPhraseLabel": "Identitetsfrasen din, 24 ord",
@@ -5927,7 +5661,6 @@
     },
     "download": "Last ned",
     "downloading": "Laster ned…",
-    "cancel": "Avbryt",
     "complete": "Klar",
     "retry": "Prøv igjen",
     "skip": "Hopp over",
@@ -5950,7 +5683,6 @@
     },
     "deeplink": {
       "body": "Den ligger utenfor alle hvelv, så Myne krypterer den ikke.",
-      "cancel": "Avbryt",
       "confirm": "Åpne",
       "failed": "Filen kunne ikke åpnes. Den kan ha blitt flyttet eller endret.",
       "title": "Åpne denne lokale filen?"
@@ -5971,7 +5703,6 @@
     "unsaved": "Ulagrede endringer"
   },
   "update": {
-    "banner": {},
     "notice": {
       "available": "Myne {{version}} er tilgjengelig.",
       "consequence": "Oppdateringen låser hvelvet ditt og starter Myne på nytt. De åpne notatene dine lagres først.",
@@ -5983,41 +5714,39 @@
       "confirmTitle": "Oppdatere og starte Myne på nytt?",
       "confirmBody": "Hvelvet ditt låses, og Myne starter på nytt. Nedlasting og installasjon kan ta noen minutter på en treg tilkobling.",
       "confirmPrimary": "Lås hvelvet og oppdater",
-      "cancel": "Avbryt",
       "pill": "Oppdatering tilgjengelig"
     },
     "updating": {
       "eyebrow": "Oppdaterer",
-      "heading": "Oppdaterer Myne",
       "version": "Versjon {{version}}",
-      "caption": "Laster ned og installerer den nye versjonen.",
-      "hint": "Myne starter på nytt av seg selv når dette er ferdig. La vinduet stå åpent."
+      "progressLabel": "Oppdateringsfremdrift",
+      "bytes": "{{done}} lastet ned",
+      "bytesOfTotal": "{{done}} av {{total}}"
+    },
+    "phase": {
+      "starting": "Forbereder",
+      "downloading": "Laster ned",
+      "verifying": "Verifiserer",
+      "installing": "Installerer"
     },
     "failed": {
-      "eyebrow": "Oppdateringen fullførte ikke",
       "heading": "Oppdateringen fullførte ikke",
       "caption": "Myne {{version}} kjører fortsatt, og notatene dine er urørt.",
-      "hint": "Å prøve igjen starter nedlastingen på nytt.",
-      "retry": "Prøv igjen",
       "back": "Tilbake til opplåsing",
       "manual": "Hvis det fortsetter, last ned den nye versjonen fra myne.md og installer den for hånd. Appen du har nå, blir urørt."
     }
   },
   "identityFlow": {
-    "title": "Opprett en identitet",
-    "lead": "En identitet lar folk invitere deg til et hvelv, og lar én identitet eie mange hvelv. Den trenger en synkroniseringsserver til å oppbevare de krypterte notatene dine og nå deg.",
-    "start": "Opprett en identitet",
-    "skip": "Ikke nå, bruk bare denne enheten",
-    "back": "Tilbake",
-    "serverUnreachable": "Kunne ikke nå den serveren. Sjekk adressen og prøv igjen.",
-    "createFailed": "Kunne ikke opprette identiteten. Sjekk synkroniseringsserveren og prøv igjen.",
-    "server": {
-      "title": "Velg en synkroniseringsserver",
-      "lead": "Notatene dine forblir kryptert på denne enheten før de forlater den. Serveren lagrer bare chiffertekst.",
-      "urlLabel": "Serveradresse",
-      "connect": "Koble til",
-      "connecting": "Kobler til…"
+    "fork": {
+      "lead": "Ta identiteten du allerede har med til denne enheten, eller start en ny.",
+      "words": "Skriv inn mine 24 ord",
+      "wordsBody": "Identitetsfrasen du lagret da du opprettet den. Det er ikke en hvelvfrase.",
+      "code": "Skann koden fra min andre enhet",
+      "codeBody": "En enhet som allerede har identiteten din, viser en kode; denne blir med i kontoen og venter på godkjenning fra den."
     },
+    "forget": {},
+    "lead": "En identitet lar folk invitere deg til et hvelv, og lar én identitet eie mange hvelv. Den trenger en synkroniseringsserver til å oppbevare de krypterte notatene dine og nå deg.",
+    "createFailed": "Kunne ikke opprette identiteten. Sjekk synkroniseringsserveren og prøv igjen.",
     "held": {
       "title": "Det finnes allerede en identitet på denne enheten",
       "lead": "Denne enheten har allerede en identitet. Å glemme den gjør at denne enheten mister tilgang til ethvert hvelv den eier eller har blitt med i, til du gjenoppretter den med den 24 ord lange frasen. Hvis du ikke har lagret den frasen, kan den ikke gjenopprettes.",
@@ -6036,17 +5765,15 @@
       "typebackLead": "Skriv inn disse fire ordene fra identitetsfrasen du nettopp lagret.",
       "wordNumber": "Ord nr. {{position}}",
       "wordMismatch": "Det samsvarer ikke med ord nr. {{pos}}.",
-      "continue": "Fortsett"
+      "registerCta": "Lagre og registrer",
+      "registerLater": "Senere",
+      "registerHint": "Registrering legger denne identiteten til på {{server}}, synkroniseringsserveren denne enheten allerede bruker, slik at folk kan invitere deg og hvelvene dine kan synkroniseres. Senere beholder den bare på denne enheten, og identitetshjemmet kan registrere den da."
     },
+    "typeback": {},
     "home": {
-      "title": "Identiteten din",
       "lead": "Folk kan invitere deg til et hvelv. Du trenger ikke eie et hvelv for å bli invitert.",
-      "codeLabel": "Identitetskoden din",
       "invitesHeading": "Invitasjoner",
-      "noInvites": "Ingen invitasjoner ennå.",
       "inviteHint": "Åpne denne invitasjonen fra hvelvvelgeren for å bli med med identitetsfrasen din.",
-      "forgetHeading": "Denne enheten",
-      "forget": "Glem denne identiteten på denne enheten",
       "forgetCheckbox": "Jeg forstår at denne identiteten fjernes fra denne enheten. Serverkontoen består, og frasen gjenoppretter den.",
       "vaultHeading": "Hvelvene dine",
       "vaultHint": "Identiteten din kan eie så mange hvelv du vil. Hvert har sitt eget passord.",
@@ -6054,21 +5781,31 @@
       "registerHint": "Denne identiteten er ikke registrert ennå, så ingen kan invitere deg og ingenting synkroniseres."
     },
     "register": {
-      "title": "Registrer denne identiteten",
-      "open": "Registrer denne identiteten",
       "cta": "Registrer",
       "working": "Registrerer…",
       "failed": "Kunne ikke registrere denne identiteten. Den blir på denne enheten og du kan prøve igjen."
     },
     "personJoin": {
+      "inviteLabel": "Invitasjonskode",
+      "inviteHint": "Bare hvis serveren din ber om det. De fleste servere slipper inn en enhet som allerede har kontoen.",
       "title": "Legg til denne telefonen på kontoen din",
       "lead": "Skriv inn de 24 ordene for kontoen denne koden kom fra. En eksisterende enhet godkjenner deretter denne telefonen, så en frase alene kan ikke legge til en.",
       "phraseLabel": "Identitetsfrase",
       "cta": "Legg til denne telefonen",
       "working": "Legger til denne telefonen…",
       "mismatch": "Disse ordene tilhører en annen identitet enn denne koden.",
+      "error": {
+        "held": "Denne enheten har allerede en annen identitet, så den kan ikke forsegle denne. Glem den på denne enheten først, og legg den deretter til på nytt.",
+        "inviteRequired": "Serveren din tar bare inn nye kontoer med en invitasjonskode. Skriv inn koden du fikk, og prøv igjen.",
+        "inviteInvalid": "Den invitasjonskoden samsvarer ikke med den serveren din forventer.",
+        "deviceLimit": "Kontoen din har nådd enhetsgrensen. Fjern en enhet på en enhet som allerede har kontoen, og prøv deretter igjen.",
+        "alreadyInstalled": "Denne enheten er allerede tatt inn i den kontoen. Åpne den i stedet for å legge den til på nytt.",
+        "awaitingApproval": "Denne enheten er lagt til og venter på godkjenning på en enhet som allerede har kontoen din.",
+        "accountFrozen": "Serveren din har frosset denne kontoen. Ingenting du skriver her endrer det; kontakt den som driver serveren.",
+        "notConfigured": "Angi serveradressen først, og legg deretter til denne enheten.",
+        "transport": "Kunne ikke nå serveren din. Identiteten din er uendret; prøv igjen når forbindelsen er tilbake."
+      },
       "failed": "Det la ikke til denne telefonen. Sjekk ordene og prøv igjen.",
-      "pendingTitle": "Venter på godkjenning",
       "pendingLead": "Denne telefonen er lagt til og venter. Godkjenn den på en enhet som allerede har kontoen din, og denne skjermen fullføres av seg selv.",
       "pendingHint": "Ingenting å gjøre her før den andre enheten godkjenner.",
       "sessionEnded": "Ventingen endte da appen ble lukket. Skriv inn de 24 ordene på nytt for å fortsette.",
@@ -6076,7 +5813,11 @@
       "finishingTitle": "Fullfører denne enheten",
       "finishingLead": "Denne telefonen er lagt til kontoen din. Hvelvene dine hentes nå; hvert av dem spør fortsatt om sitt eget passord.",
       "listFailed": "Denne telefonen ble lagt til, men kontoens hvelv kom ikke frem. Sjekk tilkoblingen og prøv igjen.",
-      "listRetry": "Hent hvelvene på nytt"
+      "listRetry": "Hent hvelvene på nytt",
+      "noVaults": "Denne telefonen ble lagt til, men ingen av hvelvene dine kunne tas med til den. Åpne denne kontoen på en enhet som allerede har ett, og prøv deretter igjen.",
+      "vaultsNoneOnServer": "Kontoen din har ingen hvelv på serveren ennå. Et hvelv vises her når enheten som har det, har publisert det.",
+      "vaultsNotHere_one": "{{count}} hvelv i denne kontoen kunne ikke tas med til denne telefonen. Åpne denne kontoen én gang til for å prøve på nytt.",
+      "vaultsNotHere_other": "{{count}} hvelv i denne kontoen kunne ikke tas med til denne telefonen. Åpne denne kontoen én gang til for å prøve på nytt."
     },
     "unlock": {
       "title": "Lås opp identiteten din",
@@ -6094,18 +5835,190 @@
       "working": "Gjenoppretter…",
       "failed": "Kunne ikke gjenopprette en identitet på denne enheten. Sjekk de 24 ordene og prøv igjen."
     },
-    "typeback": {
-      "title": "Bekreft frasen din"
-    },
     "joinFromQr": {
       "notFound": "Denne koden viser til et hvelv som ikke ligger i invitasjonene dine på denne enheten. Be hvelveieren sende invitasjonen til denne identiteten på nytt."
     }
   },
   "calendar": {
+    "occurrenceOf": "Én forekomst av en serie, den {{date}}",
+    "occurrence": {
+      "thisIsOne": "Dette er én forekomst av en serie, {{date}}. For å endre den, rediger serien eller legg til en enkelthendelse på denne dagen.",
+      "editSeries": "Rediger serien",
+      "addOneOff": "Legg til en enkelthendelse på denne dagen",
+      "skip": "Avlys denne",
+      "retime": "Start denne kl.",
+      "retimeHint": "Bare denne dagen endres. Resten av serien beholder sitt eget tidspunkt.",
+      "retimeSave": "Endre tidspunktet"
+    },
+    "import": "Importer en .ics-fil",
+    "export": "Eksporter som .ics",
+    "imported": "Importerte {{count}} hendelser fra {{filename}}",
+    "importRefused": {
+      "too-large": "Den filen er større enn Myne vil lese (1 MiB). Bare en kalenderfil av den størrelsen er et helt hvelv, ikke en timeplan.",
+      "malformed-property": "Den filen er ikke en .ics-kalender: en linje er verken NAVN:verdi eller NAVN;parameter:verdi.",
+      "unreadable-start": "Den filen har en starttid Myne ikke kan lese, så ingenting ble importert.",
+      "unknown-zone": "Den filen navngir en tidssone denne enheten ikke kjenner, så ingenting ble importert.",
+      "value-shape-mismatch": "Den filen markerer en hendelse som en dato og gir den også et klokkeslett, så ingenting ble importert.",
+      "unreadable-rule": "Den filen gjentas etter en regel Myne ikke støtter, så ingenting ble importert.",
+      "missing-start": "Den filen har en hendelse uten starttid, og en hendelse uten start er ikke et sted i en kalender.",
+      "no-events": "Den filen har ingen hendelser i seg."
+    },
+    "exported": "Skrev {{count}} hendelser til {{filename}}",
+    "exportFailed": "Kunne ikke skrive den .ics-filen.",
+    "exportEmpty": "Det er ingenting i kalenderen å eksportere ennå.",
+    "importedSkipped": "Importerte {{count}} hendelser fra {{filename}}, og utelot {{skipped}} som dette hvelvet allerede har",
+    "title": "Kalender",
+    "close": "Lukk kalenderen",
+    "noEvents": "Ingenting denne dagen",
+    "conflict": "overlapper en annen hendelse",
+    "composer": {
+      "title": "Ny hendelse",
+      "titleLabel": "Hva er det?",
+      "start": "Starter",
+      "end": "Slutter (valgfritt)",
+      "badTime": "Et klokkeslett skrives som 09:00, 24-timers.",
+      "create": "Legg til i kalenderen",
+      "cancel": "Avbryt",
+      "createFailed": "Hendelsen kunne ikke lagres.",
+      "repeatNever": "Én gang",
+      "repeatDaily": "Daglig",
+      "repeatWeekly": "Ukentlig",
+      "repeatMonthly": "Månedlig",
+      "remindNone": "Ingen påminnelse",
+      "calendarLabel": "Kalender (et navn)",
+      "refused": "Denne hendelsen ble endret et annet sted, så ingenting ble lagret. Åpne den på nytt.",
+      "date": "Dato",
+      "badDate": "Bruk YYYY-MM-DD."
+    },
+    "skipFailed": "Den forekomsten kunne ikke avlyses. Den er fortsatt i kalenderen.",
+    "taskRow": "En oppgave med frist {date}",
+    "composeOn": "Legg til en hendelse den {date}",
+    "calendarsToggle": "Kalendere som vises",
+    "calendarsToggleHelper": "Fjern haken ved én for å ta den ut av denne visningen. Ingenting slettes.",
     "calendarsToggleFailed": "Den kalenderen ble ikke endret. Den er som den var.",
+    "view": {
+      "label": "Kalendervisning",
+      "month": "Måned",
+      "week": "Uke",
+      "day": "Dag",
+      "agenda": "Agenda"
+    },
+    "allDay": "Hele dagen",
+    "untitled": "Hendelse uten navn",
+    "locked": "Lås opp hvelvet for å se kalenderen.",
+    "loadFailed": "Kalenderen kunne ikke leses. Hvelvet ditt er ikke endret.",
+    "capture": {
+      "on": "Legg til en hendelse den {{date}}"
+    },
+    "unreadable": {
+      "heading_one": "{{count}} hendelse kunne ikke leses",
+      "heading_other": "{{count}} hendelser kunne ikke leses",
+      "start-missing": "den har ingen start",
+      "start-unreadable": "starten er ikke en dato denne appen kan lese",
+      "end-unreadable": "slutten er ikke en dato denne appen kan lese",
+      "end-before-start": "den slutter før den starter",
+      "end-time-without-start-time": "den har et sluttidspunkt og ingen starttid",
+      "calendar-unreadable": "kalendernavnet er ikke brukbart"
+    },
+    "agendaRange": "De neste {{days}} dagene",
+    "prev": "Forrige",
+    "next": "Neste",
+    "today": "I dag",
+    "more": "+{{count}} flere",
+    "weekday": {
+      "monday": "man",
+      "tuesday": "tir",
+      "wednesday": "ons",
+      "thursday": "tor",
+      "friday": "fre",
+      "saturday": "lør",
+      "sunday": "søn"
+    },
+    "resize": "Endre størrelsen på {{title}}",
+    "refused": {
+      "value-changed": "Den hendelsen ble endret på en annen enhet. Kalenderen viser der notatet sier at den er.",
+      "start-missing": "Det notatet har ikke lenger en starttid, så det er ikke i kalenderen.",
+      "base-mismatch": "Notatet ble endret mens kalenderen skrev. Ingenting ble overskrevet."
+    },
+    "weekdayLong": {
+      "monday": "mandag",
+      "tuesday": "tirsdag",
+      "wednesday": "onsdag",
+      "thursday": "torsdag",
+      "friday": "fredag",
+      "saturday": "lørdag",
+      "sunday": "søndag"
+    },
     "form": {
+      "title": "Ny hendelse",
+      "openNote": "Åpne notatet",
+      "eventTitle": "Hendelsestittel",
+      "starts": "Starter",
+      "startDate": "Startdato",
+      "startTime": "Starttid, eller hele dagen",
+      "ends": "Slutter",
+      "endDate": "Sluttdato, eller la stå tomt for én dag",
+      "endTime": "Slutttid",
+      "addEnd": "Legg til en slutt",
+      "clearEnd": "Fjern slutten",
+      "allDay": "Hele dagen",
+      "timed": "På et klokkeslett",
+      "endBeforeStart": "Hendelsen kan ikke slutte før den starter. Endre sluttdatoen.",
+      "repeat": "Gjentas",
+      "repeatNever": "Aldri",
+      "repeatInterval": "Hver",
+      "repeatWeekdays": "På en ukedag",
+      "repeatDayOfMonth": "På en dag i måneden",
+      "repeatCount": "Hvor mange",
+      "repeatUnit": "Per hvor lang periode",
+      "repeatWeekday": "Ukedag",
+      "repeatDay": "Dag i måneden",
+      "repeatLastDay": "Den siste dagen",
+      "repeatOrdinal": "Hvilken",
+      "decrease": "Reduser {{label}}",
+      "increase": "Øk {{label}}",
+      "remindLabel": "Påminn",
+      "remind": "Påminn meg, senest {{days}} dager før",
+      "remindNone": "Ingen påminnelse",
+      "leadBeyondHorizon": "En påminnelse rekker høyst {{days}} dager fram. Velg en kortere frist.",
+      "titleRequired": "Gi hendelsen en tittel.",
+      "save": "Lagre hendelse",
+      "unit": {
+        "day": "Dager",
+        "week": "Uker",
+        "month": "Måneder",
+        "year": "År"
+      },
+      "ordinal": {
+        "first": "Første",
+        "second": "Andre",
+        "third": "Tredje",
+        "fourth": "Fjerde",
+        "last": "Siste"
+      },
+      "lead": {
+        "10m": "10 minutter før",
+        "30m": "30 minutter før",
+        "1h": "1 time før",
+        "2h": "2 timer før",
+        "1d": "1 dag før",
+        "2d": "2 dager før",
+        "7d": "1 uke før",
+        "1m": "1 minutt før"
+      },
+      "noTime": "Ingen tid",
+      "hour": "Time",
+      "minute": "Minutt",
+      "editTitle": "Rediger hendelse",
+      "calendarLabel": "Kalender",
+      "noCalendar": "Ingen kalender",
       "calendarPlaceholder": "Gi kalenderen et navn, for eksempel Personlig",
       "calendarRequired": "Gi hendelsen en kalender. Det er den som farger hendelsen, og det er den denne visningen kan slå av."
     }
+  },
+  "identityForget": {
+    "body": "Dette fjerner identiteten fra denne enheten bare. Serverkontoen og ethvert hvelv den eier eller har blitt med i, er urørt, og du kan gjenopprette identiteten med frasen på 24 ord på en annen enhet.",
+    "savedPhraseTail": "Hvis du ikke har lagret den frasen, vil denne enheten ikke kunne gjenopprette den.",
+    "rosterTail": "Invitasjoner og medlemshandlinger på denne enheten trenger at den låses opp igjen."
   }
 }

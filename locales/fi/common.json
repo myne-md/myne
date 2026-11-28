@@ -1,41 +1,14 @@
 {
-  "accountBootstrap": {
-    "accountMismatch": "Tässä selaimessa on jo toisen tilin holvi. Avaa se tai kirjaudu ensin ulos ja poista tämän selaimen kopio.",
-    "changeAccount": "Käytä toista tilinumeroa",
-    "continue": "Jatka",
-    "hint": "Syötä tämän tilin pääsalasana. Myne hakee holvisi ja määrittää tämän selaimen sen laitteeksi.",
-    "noEndpoint": "Tälle Mynen kopiolle ei ole määritetty synkronointipalvelinta, joten se ei tavoita holviasi. Ota yhteyttä sen ylläpitäjään.",
-    "passwordLabel": "Pääsalasana",
-    "approversIntro": "Nämä laitteet voivat hyväksyä tämän:",
-    "noApprovers": "Yksikään muu tämän tilin laite ei voi hyväksyä sitä juuri nyt. Avaa Myne laitteella, jolla on jo pääsy, ja palaa sitten tänne.",
-    "pendingStartOver": "Aloita alusta toisella tilillä",
-    "pendingTitle": "Odotetaan hyväksyntää",
-    "sasMatch": "Ne täsmäävät, jatka",
-    "sasMismatch": "Ne eivät täsmää",
-    "verifyBody": "Tarkista ennen jatkamista, että tämä koodi on sama molemmilla laitteilla. Jos ei ole, keskeytä: vika on yhteydessä, ei salasanassasi.",
-    "verifyChanged": "Koodi muuttui sillä aikaa kun katsoit. Vertaa molempia näyttöjä uudelleen. Jos se muuttuu yhä, keskeytä äläkä jatka.",
-    "verifyTitle": "Vertaa tätä koodia",
-    "title": "Kirjaudu holviisi",
-    "working": "Määritetään…"
-  },
-  "accountEntry": {
-    "createAccount": "Minulla ei ole vielä tiliä. Luo tili.",
-    "checkFailed": "Tuota tilinumeroa ei voitu tarkistaa. Yritä uudelleen.",
-    "checking": "Tarkistetaan…",
-    "continue": "Jatka",
-    "hint": "Se on muotoa MY-XXXX-XXXX-XXXX-XXXX-XXXX. Tarkistetaan täällä laitteellasi. Mitään ei vielä lähetetä.",
-    "invalid": "Tuo tilinumero ei ole kelvollinen. Tarkista se ja yritä uudelleen.",
-    "title": "Syötä tilinumerosi"
-  },
   "agent": {
     "composer": {
       "placeholder": "Kysy tekoälyltä…",
       "scopeLabel": "Kohteena",
-      "scopeOpenNote": "Tämä muistiinpano",
       "scopeCount_one": "{{count}} muistiinpano",
       "scopeCount_other": "{{count}} muistiinpanoa",
       "scopeCountUnavailable": "Kansion muistiinpanojen määrää ei juuri nyt voitu tarkistaa.",
       "startFailed": "Agenttia ei voitu käynnistää.",
+      "modelCannotEdit": "Tämä malli ei pysty tekemään muutoksia, joita agenttitila tarvitsee. Valitse sellainen malli kohdasta Asetukset → Tekoäly.",
+      "stillWorking": "Agentti työstää yhä edellistä vaihetta. Odota, että se valmistuu, ja lähetä sitten uudelleen.",
       "autoApplyFailed": "Muutoksia ei voitu ottaa käyttöön automaattisesti. Mitään ei kirjoitettu; avaa tarkistus ja ota ne käyttöön itse.",
       "permissionLabel": "Kun ajo päättyy",
       "permissionAsk": "Tarkista ensin",
@@ -49,7 +22,6 @@
       "checking": "Tarkistetaan",
       "unsupportedProvisional": "Tätä läpäisyrajaa ei ole vielä mitattu eri malleilla, joten se voi olla tiukempi tai löysempi kuin sen pitäisi olla.",
       "scopeNone": "ei avointa muistiinpanoa, joten työstettävää ei vielä ole",
-      "scopeAllVault": "Kaikki muistiinpanot",
       "scopeQuestion": "Mitä agentti voi lukea",
       "scopeFolders": "Kansiot",
       "scopeApplies": "Koskee seuraavaa viestiäsi. Roskakorissa, arkistossa ja mallimuistiinpanoissa olevat jätetään aina pois.",
@@ -70,7 +42,13 @@
       "confirm_one": "Liitä {{count}} tiedosto",
       "confirm_other": "Liitä {{count}} tiedostoa",
       "remove": "Poista {{name}}",
-      "noText": "{{name}} ei sisällä tekstiä, jota agentti voi lukea. Vain tiedostot, joiden teksti voitiin poimia, voi liittää."
+      "noText": "{{name}} ei sisällä tekstiä, jota agentti voi lukea. Vain tiedostot, joiden teksti voitiin poimia, voi liittää.",
+      "fromDevice": "Ota kuva tai valitse tiedosto",
+      "readingDevice": "Luetaan tällä laitteella…",
+      "deviceOnly": "Luetaan tällä laitteella, ei koskaan tallenneta",
+      "deviceUnsupported": "{{name}} ei ole tiedosto, jota agentti voi lukea. Kuvat, PDF-tiedostot ja pelkkä teksti toimivat.",
+      "deviceFailed": "Tiedostoa ei voitu lukea. Mitään ei lähetetty.",
+      "readingInProgress": "Viimeistele ensin tiedoston lukeminen ja liitä sitten uudelleen."
     },
     "progress": {
       "working": "Käsitellään",
@@ -108,7 +86,6 @@
     "review": {
       "title": "Tarkista muutokset",
       "statusWaiting": "Odottaa hyväksyntääsi",
-      "close": "Sulje",
       "scopeTotal_one": "{{count}} muistiinpano rajauksessa",
       "scopeTotal_other": "{{count}} muistiinpanoa rajauksessa",
       "noChanges": "Agentti ei ehdottanut muutoksia.",
@@ -178,8 +155,6 @@
       "undoFailed": "Ajoa ei voitu kumota.",
       "undoReport": "{{reverted}} muistiinpanoa palautettiin. {{kept}} ajon luomaa muistiinpanoa jätettiin paikalleen.",
       "alreadyApplied": "Otettu käyttöön",
-      "untitledNote": "Nimetön muistiinpano",
-      "vaultRoot": "Holvin juuri",
       "newNotesHeading_one": "{{count}} uusi muistiinpano",
       "newNotesHeading_other": "{{count}} uutta muistiinpanoa",
       "createdCount_one": "{{count}} muistiinpano luotu.",
@@ -245,7 +220,6 @@
       "loading": "Ladataan keskusteluja…",
       "modeLabel": "Mitkä keskustelut",
       "modeVault": "Kaikki",
-      "modeNote": "Tämä muistiinpano",
       "renamedAnnouncement": "Nimetty uudelleen: {{name}}",
       "deletedAnnouncement": "Keskustelu poistettu",
       "loadFailed": "Keskustelujasi ei juuri nyt voitu ladata.",
@@ -261,7 +235,6 @@
       "titleSaveFailed": "Otsikkoa ei voitu tallentaa.",
       "searchLabel": "Etsi keskusteluista",
       "searchPlaceholder": "Etsi keskusteluista…",
-      "noMatchTitle": "Ei osumia",
       "noMatchBody": "Mikään keskustelu ei vastaa hakua “{{query}}”. Tyhjennä haku nähdäksesi ne kaikki.",
       "emptyBody": "Aloittamasi keskustelut näkyvät tässä.",
       "menu": "Keskustelun toiminnot",
@@ -293,9 +266,7 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "Peruuta",
       "cleaning": "Siivotaan…",
-      "close": "Sulje",
       "completeTitle": "Siivous valmis",
       "deleteCta": "Poista {{count}} käyttämätöntä",
       "deleteCta_one": "Poista {{count}} käyttämätön",
@@ -315,16 +286,13 @@
       "willBeReclaimed": "{{size}} vapautuu."
     },
     "coverPicker": {
-      "close": "Sulje",
       "dropHint": "Pudota kuva käyttääksesi sitä kansikuvana.",
       "empty": "Tässä holvissa ei ole vielä kuvia. Lähetä kuva tai vedä se tähän.",
-      "loading": "Ladataan…",
       "removeCover": "Poista kansikuva",
       "title": "Valitse kansikuva",
       "upload": "Lähetä"
     },
     "deleteDialog": {
-      "cancel": "Peruuta",
       "confirmPrompt": "Poistetaanko tämä liite pysyvästi? Tätä ei voi perua.",
       "delete": "Poista",
       "deleting": "Poistetaan…",
@@ -332,8 +300,7 @@
       "notUsed": "Ei käytössä missään muistiinpanossa.",
       "stillUsed_one": "Sitä käytetään edelleen {{count}} muistiinpanossa. Poistaminen jättää tilalle hautakiven kohtaan, johon se oli upotettu:",
       "stillUsed_other": "Sitä käytetään edelleen {{count}} muistiinpanossa. Poistaminen jättää tilalle hautakiven kohtaan, johon se oli upotettu:",
-      "title": "Poista liite",
-      "untitled": "Nimetön"
+      "title": "Poista liite"
     },
     "library": {
       "actionsAriaLabel": "Liitteen toiminnot",
@@ -341,7 +308,7 @@
       "checking": "Tarkistetaan…",
       "checkUnusedFailedNotice": "Käyttämättömien liitteiden tarkistus ei onnistunut. Yritä uudelleen.",
       "corpusIncompleteNotice": "Tee synkronointi ensin loppuun. Tällä laitteella ei ole vielä kaikkia muistiinpanojasi, joten se ei voi päätellä, mitkä liitteet ovat käyttämättömiä.",
-      "sharedVaultNotice": "Tämä on jaettu holvi, joten keskustelut pidetään henkilökohtaisina. Myne ei voi tietää, mitä tiedostoja toinen jäsen vielä käyttää, joten sitä ei tarjota siivoukseen.",
+      "sharedVaultNotice": "Tämä on jaettu holvi, joten keskustelut pidetään henkilökohtaisina. Myne ei voi tietää, mitä tiedostoja toinen jäsen vielä käyttää, joten niitä ei tarjota siivoukseen.",
       "cleanUnused": "Siivoa käyttämättömät",
       "cleanUnusedTitle": "Poista liitteet, joita ei käytetä missään muistiinpanossa",
       "colCreated": "Luotu",
@@ -351,7 +318,6 @@
       "colUsedIn": "Käytössä",
       "decrypting": "Puretaan liitteitä…",
       "clearSearchAriaLabel": "Tyhjennä haku",
-      "emptyClearSearch": "Tyhjennä haku",
       "emptyImportHint": "Muistiinpanoon lisäämäsi tiedostot säilytetään holvissasi, salattuna tällä laitteella ennen kuin ne menevät minnekään. Tuo yksi aloittaaksesi.",
       "emptyLoadError": "Liiteluetteloa ei voitu lukea",
       "emptyNoAttachments": "Ei vielä liitteitä",
@@ -364,9 +330,7 @@
       "importing": "Tuodaan…",
       "listView": "Luettelonäkymä",
       "menuDelete": "Poista",
-      "menuExport": "Vie",
       "menuPreview": "Esikatsele",
-      "menuRename": "Nimeä uudelleen",
       "menuTranscribe": "Litteroi",
       "menuViewTranscription": "Näytä litteraatti",
       "noUnusedNotice": "Ei käyttämättömiä liitteitä siivottavaksi.",
@@ -402,8 +366,6 @@
       "emptyFilteredBody": "Mikään täällä ei vastaa nykyistä tyyppisuodatinta. Tyhjennä se nähdäksesi koko kirjaston uudelleen.",
       "emptyFilteredBodyQuery": "Mikään kirjastossa ei vastaa",
       "emptyLoadErrorBody": "Luettelo on salattu holvisi mukana, joten tämä on yleensä keskeytynyt luku eikä kadonnutta tietoa. Yritä uudelleen; jos se epäonnistuu yhä, muistiinpanosi ja niiden tiedostot ovat kunnossa.",
-      "emptyRetry": "Yritä uudelleen",
-      "transcriptCopy": "Kopioi",
       "transcriptCopied": "Litteraatti kopioitu.",
       "transcriptCopyFailed": "Litteraattia ei voitu kopioida.",
       "transcriptEmpty": "Tästä tallenteesta ei löytynyt puhetta.",
@@ -414,7 +376,7 @@
       "folderScopeAriaLabel": "Näytä yhden kansion tiedostot",
       "selectAriaLabel": "Valitse {{name}}",
       "selectedCount_one": "{{count}} valittu",
-      "selectedCount_other": "{{count}} valittu",
+      "selectedCount_other": "{{count}} valittua",
       "moveToAriaLabel": "Siirrä valitut tiedostot kansioon",
       "moveFailed": "Valittuja tiedostoja ei voitu siirtää. Mikään ei muuttunut; yritä uudelleen.",
       "importFolder": "Tuo kansio",
@@ -435,8 +397,7 @@
       "play": "Toista"
     },
     "usedInNotesPopover": {
-      "empty": "Ei käytössä missään muistiinpanossa.",
-      "untitled": "Nimetön"
+      "empty": "Ei käytössä missään muistiinpanossa."
     },
     "needsApp": "Liitteiden siivous vaatii sovelluksen.",
     "noUnused": "Ei käyttämättömiä liitteitä: jokaiseen tiedostoon viitataan.",
@@ -455,7 +416,7 @@
     "unusedSummary_other": "{{count}} liitteeseen ei viittaa mikään muistiinpano ({{size}}). Poistaminen on pysyvä kryptografinen poisto. Roskakoria ei ole.",
     "eraseCta_one": "Poista {{count}} käyttämätön tiedosto",
     "eraseCta_other": "Poista {{count}} käyttämätöntä tiedostoa",
-    "emptyState": "Ei vielä liitteitä. Lisää kuva tai PDF napauttamalla Lataa.",
+    "emptyState": "Ei vielä liitteitä. Lisää kuva tai PDF napauttamalla Lähetä.",
     "insert": "Lisää",
     "pauseLabel": "Keskeytä {{filename}}",
     "playLabel": "Toista {{filename}}",
@@ -468,7 +429,6 @@
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
         "cancelled": "Varmuuskopiointi peruutettu. Tiedostoa ei jäänyt jäljelle.",
         "invalidDestination": "Kohdekansiota ei voi käyttää.",
         "ioGeneric": "Varmuuskopiotiedostoa ei voitu kirjoittaa.",
@@ -481,7 +441,6 @@
         "unknown": "Varmuuskopio epäonnistui syystä, jonka Myne ei voinut tunnistaa. Luota mihinkään tiedostoon kohteessa; yritä uudelleen."
       },
       "restore": {
-        "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
         "cancelled": "Palautus peruutettu. Mitään ei muutettu.",
         "damagedBackup": "Varmuuskopiotiedosto on vaurioitunut.",
         "futureVersionBackup": "Tämä varmuuskopio on tehty uudemmalla Mynen versiolla. Päivitä Myne ja palauta se sitten.",
@@ -496,8 +455,6 @@
       }
     },
     "export": {
-      "cancel": "Peruuta",
-      "close": "Sulje",
       "copying": "Kopioidaan {{done}} / {{total}}…",
       "preparing": "Valmistellaan…",
       "successToast": "Varmuuskopio tarkistettu ja tallennettu.",
@@ -509,7 +466,6 @@
   "clipper": {
     "pairing": {
       "accept": "Hyväksy",
-      "close": "Sulje",
       "codeAriaLabel": "Pariliitoskoodi",
       "intro": "Varmista, että tämä koodi vastaa laajennuksessa näkyvää koodia, ja muodosta sitten pariliitos napsauttamalla Hyväksy.",
       "reject": "Hylkää",
@@ -525,7 +481,6 @@
     "matchedInAttachment": "liitteessä",
     "matchedInAttachmentTitle": "Haku osui tähän muistiinpanoon upotetun tiedoston sisältöön",
     "matchedInBody": "↳ osuma sisällössä",
-    "noMatches": "Ei osumia",
     "operatorHint": "Täydennä Tab-näppäimellä",
     "operators": {
       "tag": "Muistiinpanot, joissa on tunniste",
@@ -538,7 +493,6 @@
     "searchPlaceholder": "Etsi muistiinpanoja tai suorita komento. Kokeile tag: · path: · task:",
     "sectionCommands": "Komennot",
     "sectionNotes": "Muistiinpanot",
-    "untitledNote": "Nimetön",
     "resultsLabel": "Komennot ja muistiinpanot",
     "pin": "Kiinnitä vasempaan nauhaan",
     "unpin": "Poista vasemmasta nauhasta",
@@ -654,9 +608,6 @@
       "togglePreview": {
         "label": "Vierekkäinen esikatselu päälle/pois"
       },
-      "findInNote": {
-        "label": "Etsi muistiinpanosta"
-      },
       "findReplace": {
         "label": "Etsi ja korvaa muistiinpanossa"
       },
@@ -744,6 +695,7 @@
       "exportVaultMarkdown": {
         "label": "Vie holvi Markdown-muodossa…"
       },
+      "findInNote": {},
       "foldAll": {
         "label": "Tiivistä kaikki"
       },
@@ -828,6 +780,9 @@
       "unfoldAll": {
         "label": "Laajenna kaikki"
       },
+      "showCalendar": {
+        "label": "Avaa kalenteri"
+      },
       "openThisWeekNote": {
         "label": "Avaa tämän viikon muistiinpano"
       },
@@ -877,11 +832,9 @@
     "hotkeys": {
       "command": {
         "bold": "Lihavointi",
-        "closeTab": "Sulje välilehti",
         "cycleHeadingLevel": "Vaihda otsikkotasoa",
         "cycleTabs": "Selaa välilehtiä",
         "deleteWorkspace": "Poista työtila",
-        "findInNote": "Etsi muistiinpanosta",
         "focusNextPane": "Siirrä kohdistus seuraavaan ruutuun",
         "focusPrevPane": "Siirrä kohdistus edelliseen ruutuun",
         "foldAll": "Tiivistä kaikki",
@@ -891,12 +844,10 @@
         "italic": "Kursivointi",
         "navigateBack": "Siirry takaisin",
         "navigateForward": "Siirry eteenpäin",
-        "newNote": "Uusi muistiinpano",
         "openSettings": "Avaa asetukset",
         "outdent": "Vähennä sisennystä",
         "paletteToggle": "Avaa komentopaletti",
         "redo": "Tee uudelleen",
-        "renameWorkspace": "Nimeä työtila uudelleen",
         "saveWorkspaceAs": "Tallenna työtila nimellä",
         "selectAllScoped": "Valitse kaikki (rajattu)",
         "selectNextOccurrence": "Valitse seuraava esiintymä",
@@ -913,6 +864,7 @@
         "toggleTaskList": "Vaihda tehtäväluettelo",
         "undo": "Kumoa",
         "unfoldAll": "Laajenna kaikki",
+        "showCalendar": "Avaa kalenteri",
         "cycleRegion": "Vaihda painopiste alueiden välillä",
         "focusEditorRegion": "Keskitä muokkaimeen",
         "focusRightPanelRegion": "Keskitä oikeaan paneeliin",
@@ -923,7 +875,6 @@
       "invalidChordReason": "Lisää muunnosnäppäin (⌘, Ctrl tai Alt). Pelkkä näppäin ei voi olla pikanäppäin."
     },
     "picker": {
-      "vaultRoot": "Holvin juuri",
       "moveNoteTitle": "Siirrä muistiinpano kansioon",
       "moveNotePlaceholder": "Valitse kansio…",
       "noFolders": "Ei vielä kansioita",
@@ -945,6 +896,68 @@
     },
     "back": "Takaisin",
     "continue": "Jatka",
+    "phraseWordsProgress": "{{filled}}/{{total}} sanaa",
+    "clear": "Tyhjennä",
+    "untitled": "Nimetön",
+    "done": "Valmis",
+    "rename": "Nimeä uudelleen",
+    "remove": "Poista",
+    "edit": "Muokkaa",
+    "export": "Vie",
+    "copy": "Kopioi",
+    "loading": "Ladataan…",
+    "tasks": "Tehtävät",
+    "priority": "Prioriteetti",
+    "today": "Tänään",
+    "thisnote": "Tämä muistiinpano",
+    "nomatches": "Ei osumia",
+    "allnotes": "Kaikki muistiinpanot",
+    "untitlednote": "Nimetön muistiinpano",
+    "vaultroot": "Holvin juuri",
+    "clearsearch": "Tyhjennä haku",
+    "tryagain": "Yritä uudelleen",
+    "anothervaultoperationisinprogresswaitforittofinishthentryagain": "Toinen holvitoiminto on käynnissä. Odota, että se päättyy, ja yritä sitten uudelleen.",
+    "closetab": "Sulje välilehti",
+    "emptytrash": "Tyhjennä roskakori",
+    "findinnote": "Etsi muistiinpanosta",
+    "newfolder": "Uusi kansio",
+    "newnote": "Uusi muistiinpano",
+    "renameworkspace": "Nimeä työtila uudelleen",
+    "notnow": "Ei nyt",
+    "versionhistory": "Versiohistoria",
+    "duedate": "Eräpäivä",
+    "nodate": "Ei päivämäärää",
+    "movetotrash": "Siirrä roskakoriin",
+    "thevaultislockedunlockitthentryagain": "Holvi on lukittu. Avaa se ja yritä sitten uudelleen.",
+    "showinfolder": "Näytä kansiossa",
+    "untitledview": "Nimetön näkymä",
+    "choosefolder": "Valitse kansio…",
+    "untitledtemplate": "Nimetön malli",
+    "justnow": "juuri nyt",
+    "nonotesmatchthisview": "Yksikään muistiinpano ei vastaa tätä näkymää",
+    "novalue": "Ei arvoa",
+    "masterpassword": "Pääsalasana",
+    "recoveryphrase": "Palautuslause",
+    "unexpectederrorpleasetryagain": "Odottamaton virhe. Yritä uudelleen.",
+    "vaultfilenotfoundpleaserestarttheapp": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
+    "vaultfileisunreadablerestorefromabackup": "Holvitiedostoa ei voi lukea. Palauta varmuuskopiosta.",
+    "restorefrombackup": "Palauta varmuuskopiosta",
+    "deviceonly": "Vain tällä laitteella",
+    "accountnumber": "Tilinumero",
+    "changepassword": "Vaihda salasana",
+    "couldnotsavethissetting": "Tätä asetusta ei voitu tallentaa.",
+    "periodicnotes": "Jaksottaiset muistiinpanot",
+    "thisdevice": "Tämä laite",
+    "thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue": "Koodi vaihtui, kun katsoit sitä. Vertaa molempia näyttöjä uudelleen. Jos se vaihtuu yhä, pysähdy äläkä jatka.",
+    "waitingforapproval": "Odottaa hyväksyntää",
+    "youridentitycode": "Identiteettikoodisi",
+    "keepit": "Säilytä se",
+    "youridentity": "Identiteettisi",
+    "forgetthisidentityonthisdevice": "Unohda tämä identiteetti tällä laitteella",
+    "noinvitationsyet": "Ei vielä kutsuja.",
+    "createanidentity": "Luo identiteetti",
+    "confirmyourphrase": "Vahvista lauseesi",
+    "registerthisidentity": "Rekisteröi tämä identiteetti",
     "skipToContent": "Siirry sisältöön"
   },
   "deviceRevoked": {
@@ -967,7 +980,6 @@
         "noticeContainerChanged": "Pakattu muotoon {{format}}: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "Peruuta",
         "confirm": "Muunna",
         "skipped": "ohitettiin: {{note}}",
         "subtitle_one": "1 viittaus kirjoitetaan uudelleen. Tarkista ennen vahvistamista.",
@@ -1041,7 +1053,6 @@
       },
       "lightbox": {
         "close": "Sulje esikatselu",
-        "export": "Vie",
         "exportAria": "Vie liite",
         "imagePreview": "Kuvan esikatselu",
         "pdfFallback": "PDF",
@@ -1053,27 +1064,21 @@
       "menu": {
         "actionsAria": "Liitteen toiminnot"
       },
-      "pdf": {
-        "loading": "Ladataan…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "Tiedostonvalitsimen avaaminen ei onnistunut."
       },
       "progress": {
         "encrypting": "Salataan…",
-        "importing": "Tuodaan…",
-        "loading": "Ladataan…"
+        "importing": "Tuodaan…"
       },
       "recording": {
         "barAria": "Ääniviestin tallennus",
-        "cancel": "Peruuta",
         "noAudio": "Ääntä ei havaittu. Tarkista mikrofonisi.",
         "saving": "Tallennetaan…",
         "stop": "Pysäytä"
       },
       "rename": {
-        "cancel": "Peruuta",
-        "confirm": "Nimeä uudelleen",
         "title": "Nimeä liite uudelleen"
       },
       "summary": {
@@ -1114,9 +1119,6 @@
           "seek": "Kelaa"
         },
         "menu": {
-          "export": "Vie",
-          "remove": "Poista",
-          "rename": "Nimeä uudelleen",
           "reveal": "Näytä kirjastossa",
           "transcribe": "Litteroi",
           "customSize": "Mukautettu koko…",
@@ -1177,7 +1179,6 @@
         "bug": "Vika",
         "caution": "Varoitus",
         "danger": "Vaara",
-        "done": "Valmis",
         "error": "Virhe",
         "example": "Esimerkki",
         "failure": "Epäonnistuminen",
@@ -1205,8 +1206,7 @@
         "linksTo": "Linkittää {{count}} muistiinpanoon",
         "linksTo_one": "Linkittää {{count}} muistiinpanoon",
         "linksTo_other": "Linkittää {{count}} muistiinpanoon",
-        "outgoingEmpty": "Tämä muistiinpano ei linkitä vielä mihinkään.",
-        "untitled": "Nimetön"
+        "outgoingEmpty": "Tämä muistiinpano ei linkitä vielä mihinkään."
       },
       "barItems": {
         "graph": "Kaavio",
@@ -1306,7 +1306,7 @@
           "insert": "Lisää muistiinpanoon",
           "noAnswer": "Ei vastausta. Kokeile muotoilla uudelleen.",
           "newChat": "Uusi keskustelu",
-          "unavailableHint": "Tämä Mynen kooste on käännetty ilman paikallista tekoälyä, joten täällä ei voi suorittaa mitään. Mikään asetus ei muuta sitä — tarvitaan kooste, jossa tekoäly on mukana.",
+          "unavailableHint": "Tämä Mynen kooste on käännetty ilman paikallista tekoälyä, joten täällä ei voi suorittaa mitään. Mikään asetus ei muuta sitä: tarvitaan kooste, jossa tekoäly on mukana.",
           "offHint": "Paikallinen tekoäly on pois päältä. Ota se käyttöön kohdasta Asetukset → Kehittäjä → Tekoäly.",
           "send": "Lähetä",
           "statusNoModel": "Ei palveluntarjoajaa",
@@ -1320,38 +1320,23 @@
           "truncated": "Tiivistettiin ensimmäiset {{count}} merkkiä.",
           "you": "Sinä",
           "history": "Historia",
-          "historyCancel": "Peruuta",
           "historyDelete": "Poista",
           "historyDeleteBody": "Tämä poistaa keskustelun jokaisesta laitteesta seuraavan yhdistyksen yhteydessä. Tätä ei voi kumota.",
           "historyError": "Keskusteluja ei voitu ladata. Yritä uudelleen.",
-          "historyProposalNewNote": "Uusi muistiinpano",
-          "historyRename": "Nimeä uudelleen",
           "historyTitle": "Chathistoria",
           "historyDeleteTitle": "Poista keskustelu",
-          "persistWarning": "Tallennus valtiointiin epäonnistui. Viestisi ovat yhä täällä ja niitä yritetään uudelleen.",
+          "persistWarning": "Tallennus holviin epäonnistui. Viestisi ovat yhä täällä ja niitä yritetään uudelleen.",
           "memory": "Muisti",
-          "memoryPopoverTitle": "Mitä avustaja muistaa",
-          "memoryPopoverEmpty": "Ei muistettu vielä.",
-          "memoryPopoverDelete": "Poista",
-          "memoryPopoverDeleted": "Merkintä poistettu kaikkialta.",
-          "memoryPopoverDeleteFailed": "Merkintää ei voitu poistaa.",
-          "memoryPopoverEntryFailed": "Tätä merkintää ei voitu lukea. Se on yhä tallennettu; poista se tästä tai korjaa Asetuksissa.",
-          "memoryPopoverLoadFailed": "Muistoja ei voitu ladata. Mitään ei muutettu.",
-          "memoryPopoverRetry": "Yritä uudelleen",
-          "memoryPopoverSettings": "Hallitse Asetuksissa",
-          "memoryPopoverClose": "Sulje",
           "seedCard": {
             "title": "Haluatko, että Myne tuntee holvisi?",
             "body": "Se voi lukea muistiinpanojesi rakenteen kerran ja luoda muutaman muistimerkinnän. Tarkistat jokaisen rivin ennen kuin mitään tallennetaan.",
-            "action": "Opeta Myne holvisi",
-            "dismiss": "Ei nyt"
+            "action": "Opeta Myne holvisi"
           },
           "copied": "Kopioitu",
           "copyAnswer": "Kopioi vastaus",
           "copyFailed": "Kopiointi ei onnistunut",
           "copyYourMessage": "Kopioi viestisi",
           "emptyTitle": "Kysy muistiinpanoistasi",
-          "noticeSettingsCta": "Avaa tekoälyasetukset",
           "viewDiff": "Näytä muutokset",
           "revertRun": "Palauta tämä ajo",
           "diffTitle": "Ehdotetut muutokset",
@@ -1365,8 +1350,7 @@
           "statusKeyRejected": "Avain hylätty",
           "statusOutOfCredit": "Saldo loppu",
           "statusRefused": "Torjuttu",
-          "statusNotWorking": "Ei toimi",
-          "historyRetry": "Yritä uudelleen"
+          "statusNotWorking": "Ei toimi"
         },
         "allHidden": "Kaikki välilehdet on piilotettu. Palauta napsauttamalla hiiren oikealla.",
         "outline": {
@@ -1401,15 +1385,12 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "Työtilan nimi",
-        "renameConfirm": "Nimeä uudelleen",
-        "renameTitle": "Nimeä työtila uudelleen",
         "saveAsTitle": "Tallenna työtila nimellä",
         "saveConfirm": "Tallenna"
       },
       "workspaceSwitcher": {
         "defaultName": "Työtila",
         "renameItemLabel": "Nimeä työtila {{name}} uudelleen",
-        "renameTitle": "Nimeä työtila uudelleen",
         "saveCurrentAs": "Tallenna nykyinen nimellä…",
         "switchLabel": "Vaihda työtilaa",
         "toggleTitle": "Työtila: {{name}}"
@@ -1433,14 +1414,12 @@
     "noteActions": {
       "buttonLabel": "Muistiinpanon toiminnot",
       "convertFailed": "Muistiinpanon tyyppiä ei voitu muuttaa, joten se on ennallaan.",
-      "rename": "Nimeä uudelleen",
       "move": "Siirrä kansioon…",
       "duplicate": "Kahdenna",
       "convertToTemplate": "Tee tästä malli",
       "convertToNote": "Muunna muistiinpanoksi",
       "turnedIntoTemplate": "Muutettu malliksi",
       "convertedToNote": "Muunnettu muistiinpanoksi",
-      "versionHistory": "Versiohistoria",
       "trash": "Siirrä roskakoriin",
       "openInNewWindow": "Avaa uudessa ikkunassa"
     },
@@ -1449,9 +1428,7 @@
       "defaultBadge": "koodi"
     },
     "drawingEmbed": {
-      "done": "Valmis",
       "edit": "Muokkaa piirrosta {{name}}",
-      "editAction": "Muokkaa",
       "empty": "Tyhjä piirros: piirrä napsauttamalla",
       "open": "Avaa",
       "rename": "Nimeä piirros uudelleen"
@@ -1466,8 +1443,6 @@
       "matchCase": "Sama kirjainkoko",
       "matchCount": "{{current}} / {{total}}",
       "nextMatch": "Seuraava osuma",
-      "noMatches": "Ei osumia",
-      "placeholder": "Etsi muistiinpanosta",
       "previousMatch": "Edellinen osuma",
       "replaceAll": "Korvaa kaikki",
       "replaceAllCount": "Korvaa kaikki ({{total}})",
@@ -1498,7 +1473,6 @@
       "propertiesLabel": "Ominaisuudet",
       "removeListItemAriaLabel": "Poista {{item}}",
       "titleAriaLabel": "Muistiinpanon otsikko",
-      "titlePlaceholder": "Nimetön",
       "managedField": "Myne kirjoittaa tämän kentän"
     },
     "mermaid": {
@@ -1513,11 +1487,9 @@
       "panLeft": "Siirrä vasemmalle",
       "panRight": "Siirrä oikealle",
       "edit": "Muokkaa kaavion lähdetekstiä",
-      "editText": "Muokkaa",
       "expand": "Laajenna kaavio",
       "expandText": "Laajenna",
-      "expandClose": "Sulje laajennettu kaavio",
-      "expandCloseText": "Sulje"
+      "expandClose": "Sulje laajennettu kaavio"
     },
     "slash": {
       "aiContinue": "Jatka kirjoittamista (tekoäly)",
@@ -1531,7 +1503,6 @@
       "day": "Päivä",
       "divider": "Erotin",
       "drawing": "Piirros",
-      "due": "Eräpäivä",
       "heading1": "Otsikko 1",
       "heading2": "Otsikko 2",
       "heading3": "Otsikko 3",
@@ -1541,7 +1512,6 @@
       "link": "Linkki",
       "now": "Nyt",
       "numberedList": "Numeroitu luettelo",
-      "priority": "Prioriteetti",
       "quote": "Lainaus",
       "repeat": "Toisto",
       "table": "Taulukko",
@@ -1592,19 +1562,15 @@
       "title": {
         "due": "Eräpäivä",
         "repeat": "Toisto",
-        "priority": "Prioriteetti",
         "remind": "Muistutus"
       },
       "invalidRemind": "Myne ei osaa lukea tätä päivämäärää, joten se ei muistuta sinua.",
       "addTime": "Lisää aika",
-      "clear": "Tyhjennä",
       "dateGrid": "Valitse päivämäärä",
       "dateNext": "Seuraava kuukausi",
       "datePrev": "Edellinen kuukausi",
-      "today": "Tänään",
       "tomorrow": "Huomenna",
       "selectField": "Valitse lisättävä kenttä",
-      "noDate": "Ei päivämäärää",
       "removeTime": "Poista aika",
       "timeHour": "Tunti",
       "timeMeridiem": "AM tai PM",
@@ -1613,6 +1579,7 @@
     "toolbar": {
       "apply": "Käytä",
       "exportImageTitle": "Vie valinta kuvana",
+      "label": "Muotoilu",
       "customize": {
         "bold": "Lihavointi",
         "bulletList": "Luettelo",
@@ -1650,7 +1617,8 @@
         "brown": "Ruskea",
         "grey": "Harmaa",
         "indigo": "Indigo",
-        "remove": "Poista korostus"
+        "remove": "Poista korostus",
+        "colours": "Korostusväri"
       },
       "urlPlaceholder": "Liitä linkin osoite"
     },
@@ -1699,7 +1667,6 @@
         "embed": "Upotus: {{label}}"
       },
       "convert": {
-        "cancel": "Peruuta",
         "choiceClause_one": " · {{count}} vaatii valinnan.",
         "choiceClause_other": " · {{count}} vaatii valinnan.",
         "chooseTarget": "Valitse kohde…",
@@ -1726,9 +1693,9 @@
       "openFailed": "Tämän muistiinpanon avaaminen epäonnistui.",
       "saveFailed": "Tämän muistiinpanon tallentaminen epäonnistui.",
       "liveResynced": "Tämä muistiinpano päivitettiin muualla ja ladattiin uudelleen.",
-      "liveResyncedKept": "Tämä muistiinpano päivitettiin muualla ja ladattiin uudelleen. Muuttumattomat muutoksesi säilytettiin erillisenä kopiona.",
+      "liveResyncedKept": "Tämä muistiinpano päivitettiin muualla ja ladattiin uudelleen. Tallentamattomat muutoksesi säilytettiin erillisenä kopiona.",
       "liveResyncFailed": "Tätä muistiinpanoa ei voitu päivittää muualta tulleilla muutoksilla. Tekstisi on ennallaan.",
-      "liveCopyFailed": "Muuttumattomia muutoksia ei voitu säilyttää erillisenä kopiona, joten tätä muistiinpanoa ei päivitetty. Tekstisi on ennallaan.",
+      "liveCopyFailed": "Tallentamattomia muutoksia ei voitu säilyttää erillisenä kopiona, joten tätä muistiinpanoa ei päivitetty. Tekstisi on ennallaan.",
       "moveFailed": "Tämän muistiinpanon siirtäminen epäonnistui.",
       "openTodayFailed": "Tämän päivän muistiinpanon avaaminen epäonnistui.",
       "exportFailed": "Tämän muistiinpanon vieminen epäonnistui.",
@@ -1746,15 +1713,12 @@
     },
     "nav": {
       "dailyNote": "Päivän muistiinpano",
-      "openToday": "Avaa tämä päivä",
-      "allNotes": "Kaikki muistiinpanot"
+      "openToday": "Avaa tämä päivä"
     },
     "list": {
       "searchPlaceholder": "Hae muistiinpanoja",
-      "clearSearch": "Tyhjennä haku",
       "viewNoteCount_one": "{{count}} muistiinpano kohteessa ”{{name}}”",
       "viewNoteCount_other": "{{count}} muistiinpanoa kohteessa ”{{name}}”",
-      "edit": "Muokkaa",
       "trashEmpty": "Roskakori on tyhjä",
       "archiveEmpty": "Ei arkistoituja muistiinpanoja",
       "noMatchingNotes": "Ei osuvia muistiinpanoja",
@@ -1771,10 +1735,8 @@
       "wordCount_one": "{{count}} sana · {{minutes}} min lukuaika",
       "wordCount_other": "{{count}} sanaa · {{minutes}} min lukuaika",
       "moveToFolder": "Siirrä kansioon…",
-      "moveToTrash": "Siirrä roskakoriin",
       "copied": "Kopioitu ✓",
-      "copyToClipboard": "Kopioi leikepöydälle",
-      "versionHistory": "Versiohistoria"
+      "copyToClipboard": "Kopioi leikepöydälle"
     },
     "purge": {
       "body": "Tämä poistaa muistiinpanon tältä laitteelta pysyvästi. Tätä ei voi kumota."
@@ -1793,8 +1755,7 @@
       "body": "Valitse muistiinpano listasta tai aloita uusi."
     },
     "readingBar": {
-      "editNote": "Muokkaa muistiinpanoa",
-      "edit": "Muokkaa"
+      "editNote": "Muokkaa muistiinpanoa"
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} linkitetty muistiinpano",
@@ -1828,9 +1789,7 @@
       "emptyState": "Ei vielä tallennettuja näkymiä. Luo näkymä suodattaaksesi muistiinpanojasi tunnisteen, kansion tai tekstin mukaan.",
       "editView": "Muokkaa näkymää"
     },
-    "sheet": {
-      "done": "Valmis"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "Holvit"
     },
@@ -1839,7 +1798,6 @@
       "notesCount_one": "Muistiinpanot · {{count}}",
       "notesCount_other": "Muistiinpanot · {{count}}"
     },
-    "untitledNote": "Nimetön muistiinpano",
     "commandPalette": {
       "searchPlaceholder": "Hae muistiinpanoja tai suorita komento…",
       "noMatches": "Ei osuvia komentoja tai muistiinpanoja."
@@ -1876,7 +1834,6 @@
     "meeting": {
       "ai": {
         "cancelled": "Pysäytetty. Muistiinpanoon ei lisätty mitään.",
-        "close": "Sulje",
         "discard": "Hylkää",
         "failed": "Tekoälyvaihe epäonnistui. Litterointi on ennallaan.",
         "generate": "Luo",
@@ -1901,7 +1858,6 @@
         "title": "Kokouksen tekoäly"
       },
       "barAria": "Kokousistunto",
-      "cancel": "Peruuta",
       "chunksMissing": "Osa kokouksesta ei siirtynyt, joten muistiinpanossa on aukko. Perille tullut ääni on yhä tallessa.",
       "clipFailed": "Osaa kokouksesta ei voitu tallentaa. Loput ovat yhä muistiinpanossa.",
       "machineNotice": "Tämä on koneen tekemä litterointi kokouksesta, ja se voi sisältää virheitä.",
@@ -1940,8 +1896,7 @@
         "pdfPayloadMissing": "Vienti keskeytyi. Jos holvi lukittui, avaa se ja yritä uudelleen.",
         "pdfRenderTimeout": "Muistiinpanon piirtäminen kesti liian kauan, joten mitään ei viety.",
         "pdfWindowCreateFailed": "Vienti-ikkunaa ei voitu avata, joten mitään ei viety.",
-        "targetExists": "Samanniminen tiedosto on jo kohteessa.",
-        "vaultLocked": "Holvi on lukittu. Avaa se ja yritä sitten uudelleen."
+        "targetExists": "Samanniminen tiedosto on jo kohteessa."
       },
       "flow": {
         "couldNotRead": "Tätä muistiinpanoa ei voitu lukea.",
@@ -1953,11 +1908,9 @@
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
-        "filterPlainText": "Pelkkä teksti",
-        "showInFolder": "Näytä kansiossa"
+        "filterPlainText": "Pelkkä teksti"
       },
       "modal": {
-        "cancel": "Peruuta",
         "export": "Vie…",
         "includeAttachments_one": "Sisällytä {{count}} liite",
         "includeAttachments_other": "Sisällytä {{count}} liitettä",
@@ -1968,12 +1921,10 @@
       }
     },
     "egress": {
-      "cancel": "Peruuta",
       "confirm": "Lataa",
       "title": "Lataa tämä tiedosto"
     },
     "pdf": {
-      "cancel": "Peruuta",
       "continue": "Jatka…",
       "title": "Vie PDF-muodossa"
     },
@@ -1982,7 +1933,6 @@
       "errors": {
         "attachmentCorrupt": "Muistiinpanon viittaamaa liitettä ei voitu lukea, joten mitään ei viety.",
         "attachmentMissing": "Muistiinpanon viittaama liite puuttuu, joten mitään ei viety.",
-        "authOperationInProgress": "Toinen holvitoiminto on käynnissä. Odota, että se valmistuu, ja yritä sitten uudelleen.",
         "cancelled": "Vienti peruutettu. Kohteeseen ei jäänyt mitään.",
         "cannotDecrypt": "Muistiinpanoa ei voitu lukea, joten mitään ei viety.",
         "destinationAlreadyExists": "Kohteessa on jo jotain. Valitse vientiä varten tyhjä paikka.",
@@ -1991,7 +1941,6 @@
         "invalidVaultMeta": "Holvin metatietoja ei voitu lukea, joten mitään ei viety.",
         "ioWriteDefault": "Vientiä ei voitu kirjoittaa.",
         "joinFailure": "Vienti epäonnistui odottamatta. Kohteeseen ei jäänyt mitään.",
-        "vaultLocked": "Holvi on lukittu. Avaa se ja yritä sitten uudelleen.",
         "vaultNotFound": "Vietävää holvia ei löytynyt."
       },
       "flow": {
@@ -2012,12 +1961,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "Peruuta",
         "cancelling": "Peruutetaan…",
         "title": "Viedään…"
       },
       "setup": {
-        "cancel": "Peruuta",
         "choose": "Valitse…",
         "chooseFolder": "Valitse kansio…",
         "destinationLabel": "Kohde",
@@ -2031,8 +1978,6 @@
         "title": "Vie holvi Markdown-muodossa"
       },
       "summary": {
-        "done": "Valmis",
-        "showInFolder": "Näytä kansiossa",
         "title": "Vienti valmis"
       }
     }
@@ -2068,8 +2013,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Peruuta",
-      "close": "Sulje",
       "count_one": "{{count}} muistiinpano",
       "count_other": "{{count}} muistiinpanoa",
       "delete": "Poista",
@@ -2080,14 +2023,12 @@
       "folderDeleteBody_other": "”{{name}}” ja sen {{count}} muistiinpanoa",
       "folderDeleteConfirm_one": "Siirretäänkö {{count}} muistiinpano roskakoriin?",
       "folderDeleteConfirm_other": "Siirretäänkö {{count}} muistiinpanoa roskakoriin?",
-      "folderDeleteConfirmCta": "Siirrä roskakoriin",
       "folderDeleteError": "Kansion muistiinpanojen siirtäminen roskakoriin epäonnistui. Yritä uudelleen.",
       "folderDeleteTitle": "Siirretäänkö tämä kansio roskakoriin?",
       "folderDeleteWarning": "Ne siirtyvät roskakoriin. Voit palauttaa ne milloin tahansa. Pysyvä poisto on erillinen vaihe.",
       "restore": "Palauta",
       "restoreError": "Muistiinpanon palauttaminen ei onnistunut. Yritä uudelleen.",
-      "title": "Arkisto",
-      "untitled": "Nimetön"
+      "title": "Arkisto"
     },
     "cardMenu": {
       "copyLink": "Kopioi linkki",
@@ -2115,10 +2056,8 @@
       "none": "Ei mitään"
     },
     "deleteConfirm": {
-      "cancel": "Peruuta",
       "delete": "Poista",
       "title": "Poistetaanko tämä muistiinpano?",
-      "untitled": "Nimetön",
       "warning": "Tätä ei voi perua."
     },
     "example": {
@@ -2147,7 +2086,6 @@
     "filterBuilder": {
       "addCondition": "Lisää ehto",
       "addFilterGroup": "Lisää suodatinryhmä",
-      "cancel": "Peruuta",
       "combinator": {
         "all": "kaikki",
         "any": "mikä tahansa"
@@ -2193,6 +2131,7 @@
       "unsettledSave": "Avoin muistiinpano ei ole vielä tallentunut, joten kansioon ei koskettu. Yritä uudelleen, kun se on tallentunut.",
       "renameFailed": "Kansion nimeäminen uudelleen ei onnistunut, joten se on ennallaan.",
       "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Tyhjä kansio ilmestyy vanhalla nimellä uudelleen aina, kun avaat holvin; sen voi poistaa turvallisesti, eikä poistaminen muuta mitään muuta. Kansion uudelleennimeäminen ei poista sitä.",
+      "mcpScopeRewriteFailed": "Kansion nimi vaihdettiin, mutta niitä kansioita, joista ulkoinen tekoäly-yhteys pidetään poissa, ei voitu päivittää. Jos olit jättänyt tämän kansion pois yhden yhteyden hyväksynnästä, kyseinen yhteys voi nyt lukea sen. Avaa Asetukset → Tekoäly → Ulkoinen pääsy ja tarkista kunkin yhteyden pois jätetyt kansiot.",
       "folderListFull": "Myne voi muistaa vain rajallisen määrän kansioita, ja tuo luettelo on täynnä. Tämä kansio toimii silti, mutta se katoaa, kun siitä poistuu viimeinen muistiinpano. Tilaa vapautuu, kun poistat kansion, jota et enää tarvitse.",
       "folderNotRemembered": "Kansio luotiin, mutta Myne ei saanut sitä muistiin. Se katoaa, kun siitä poistuu viimeinen muistiinpano, ja se on poissa, kun avaat holvin seuraavan kerran, jos se on silloin yhä tyhjä. Sen voi turvallisesti luoda uudelleen.",
       "attachmentFolderRewriteFailed": "Kansion nimi vaihdettiin, mutta siinä olleet tiedostot eivät siirtyneet mukana. Ne viittaavat yhä vanhaan kansioon, joten ne puuttuvat kirjastopuusta ja agentilta, jolle tämä kansio annettiin. Siirrä ne uudelleen käsin Liitteistä tai vaihda kansion nimi takaisin ja sitten uudelleen."
@@ -2223,8 +2162,7 @@
         "filterConditions_other": "{{count}} ehtoa",
         "heading": "Väriryhmät",
         "namePlaceholder": "Nimetön sääntö",
-        "rowLabel": "{{name}}, ryhmä {{index}}/{{total}}. Alt plus ylös- tai alasin siirtää sitä uudelleen.",
-        "editRuleButton": "Muokkaa",
+        "rowLabel": "{{name}}, ryhmä {{index}}/{{total}}. Alt ja ylös- tai alanuoli järjestää sen uudelleen.",
         "derivedMakeEditable": "Tee näistä muokattavia",
         "derivedMakeEditableFailed": "Näitä ryhmiä ei voitu tallentaa. Yritä uudelleen.",
         "derivedNote_one": "Kaavio värjätään tunnisteella: {{count}} ryhmä, johdettu tunnisteistasi. Sitä ei tallenneta ennen kuin teet siitä muokattavan.",
@@ -2245,7 +2183,6 @@
       "refreshTitle": "Holvi muuttui: rakenna kaavio uudelleen",
       "settings": {
         "appearanceHeading": "Ulkoasu",
-        "closeTitle": "Sulje",
         "forceCenter": "Keskitysvoima",
         "forceLinkDistance": "Linkkien etäisyys",
         "forceLinkStrength": "Linkkien voimakkuus",
@@ -2269,27 +2206,19 @@
       "relayoutTitle": "Aseta kaavio uudelleen alusta",
       "showingCount_one": "Näytetään {{count}} muistiinpano",
       "showingCount_other": "Näytetään {{count}} muistiinpanoa",
-      "untitledNote": "Nimetön muistiinpano",
       "viewGraph": "Kaavio",
       "viewList": "Luettelo",
       "viewToggleAriaLabel": "Valitse kaavion kuva tai sen muistiinpanojen luettelo"
     },
     "import": {
-      "base": {
-        "untitledView": "Nimetön näkymä"
-      },
+      "base": {},
       "modal": {
-        "cancel": "Peruuta",
         "cancelledNotImported": "{{count}} ei tuotu",
         "cancelledNotImported_one": "{{count}} ei tuotu",
         "cancelledNotImported_other": "{{count}} ei tuotu",
         "cancelling": "Peruutetaan…",
-        "chooseFolder": "Valitse kansio…",
-        "close": "Sulje",
         "closeAriaLabel": "Sulje",
         "copied": "Kopioitu",
-        "copy": "Kopioi",
-        "done": "Valmis",
         "errorBody": "Tuontia ei voitu viedä loppuun. Kaikki jo tuodut muistiinpanot säilytettiin, ja ne voi turvallisesti pitää tai poistaa.",
         "flagDetail": "{{kind}} ”{{segment}}” {{reason}}.",
         "flagKindFolder": "Kansio",
@@ -2362,10 +2291,8 @@
         "statFoldersNotKept": "Kansioita ei säilytetty"
       },
       "offer": {
-        "body": "Tuo olemassa olevat muistiinpanosi Myneen. Jokainen salataan tuonnin yhteydessä. Mikään ei poistu tältä laitteelta, ja alkuperäiset tiedostosi pysyvät täsmälleen paikoillaan.",
-        "chooseFolder": "Valitse kansio…",
+        "body": "Tuo olemassa olevat muistiinpanosi Myneen. Jokainen salataan sitä tuotaessa, ja alkuperäiset tiedostosi pysyvät täsmälleen paikoillaan.",
         "laterHint": "Voit aina tuoda myöhemmin kohdasta Asetukset → Tallennus.",
-        "notNow": "Ei nyt",
         "title": "Tuodaanko muistiinpanosi?"
       },
       "picker": {
@@ -2492,12 +2419,8 @@
       "mergeAnyway": "Yhdistä silti",
       "newDrawingHere": "Uusi piirros tähän",
       "newDrawingMenu": "Uusi piirros",
-      "newFolder": "Uusi kansio",
       "newFolderInPlaceholder": "Uusi kansio kohteessa {{path}}",
-      "newFolderPlaceholder": "Uusi kansio",
-      "newNote": "Uusi muistiinpano",
       "newNoteHere": "Uusi muistiinpano tähän",
-      "newNoteMenu": "Uusi muistiinpano",
       "newSubfolder": "Uusi alikansio",
       "newViewTitle": "Uusi näkymä",
       "noteMovedToTrash": "Muistiinpano siirretty roskakoriin",
@@ -2509,19 +2432,16 @@
       "openToSide": "Avaa viereen",
       "removeFolderNote": "Poista kansiomuistiinpano",
       "removeFromFavorites": "Poista suosikeista",
-      "rename": "Nimeä uudelleen",
       "setAsFolderNote": "Aseta kansiomuistiinpanoksi",
       "trash": "Roskakori",
       "trashBulkError": "Muistiinpanojen siirtäminen roskakoriin ei onnistunut.",
       "trashConfirmBulkBody_one": "{{count}} muistiinpano siirretään roskakoriin.",
       "trashConfirmBulkBody_other": "{{count}} muistiinpanoa siirretään roskakoriin.",
       "trashConfirmBulkWarning": "Voit palauttaa ne roskakorista myöhemmin.",
-      "trashConfirmConfirm": "Siirrä roskakoriin",
       "trashConfirmTitle": "Siirretäänkö roskakoriin?",
       "trashConfirmWarning": "Voit palauttaa sen roskakorista myöhemmin.",
       "trashSingleError": "Muistiinpanon siirtäminen roskakoriin ei onnistunut.",
       "undo": "Kumoa",
-      "vaultRoot": "Holvin juuri",
       "viewSettingsTitle": "Näkymäasetukset",
       "imported_one": "Tuotiin 1 muistiinpano tähän kansioon",
       "imported_other": "Tuotiin {{count}} muistiinpanoa tähän kansioon",
@@ -2532,32 +2452,25 @@
       "moveFolderTo": "Siirrä kansio kohteeseen…",
       "treeLabel": "Muistiinpanot ja kansiot",
       "selectionAnnouncement": "Valittu {{title}}",
-      "untitled": "Nimetön",
       "search": "Etsi"
     },
     "newFromTemplate": {
-      "back": "Takaisin",
       "blankNote": "Tyhjä muistiinpano",
       "createNote": "Luo muistiinpano",
       "createFirstTemplate": "Luo malli",
       "manageTemplates": "Hallitse malleja",
       "emptyState": "Et ole vielä luonut yhtään mallia.",
       "listLabel": "Mallit",
-      "loading": "Ladataan…",
       "nameLabel": "Muistiinpanon nimi (mallista ”{{templateName}}”)",
-      "namePlaceholder": "Nimetön",
       "nameStepTitle": "Nimeä tämä muistiinpano",
-      "pickStepTitle": "Uusi muistiinpano mallista",
-      "untitledTemplate": "Nimetön malli"
+      "pickStepTitle": "Uusi muistiinpano mallista"
     },
     "newTab": {
-      "createNote": "Uusi muistiinpano",
       "createDrawing": "Uusi piirros",
       "noNotesYet": "Ei vielä muistiinpanoja.",
       "recent": "Jatka siitä, mihin jäit",
       "searchAriaLabel": "Etsi muistiinpanoja ja komentoja",
       "searchPlaceholder": "Etsi muistiinpanoja ja komentoja…",
-      "untitled": "Nimetön",
       "createFromTemplate": "Mallista",
       "kindCommand": "Komento",
       "kindNote": "Muistiinpano",
@@ -2568,6 +2481,7 @@
         "graph": "Kaavio",
         "tasks": "Tehtävät",
         "today": "Tänään",
+        "calendar": "Kalenteri",
         "home": "Koti"
       },
       "placesLabel": "Siirry kohteeseen",
@@ -2576,15 +2490,13 @@
     "pane": {
       "graphTab": "Kaavio",
       "tasksTab": "Tehtävät",
-      "loading": "Ladataan…",
-      "untitledView": "Nimetön näkymä",
       "agentTab": "Agentti",
+      "calendarTab": "Kalenteri",
       "homeTab": "Koti"
     },
     "relativeTime": {
       "daysAgo": "{{d}} päivää sitten",
       "hoursAgo": "{{h}} t sitten",
-      "justNow": "juuri nyt",
       "minutesAgo": "{{m}} min sitten",
       "oneWeekAgo": "1 viikko sitten",
       "weeksAgo": "{{w}} viikkoa sitten",
@@ -2603,7 +2515,6 @@
       "taskBadgeTitle": "Tehtävämuistiinpano",
       "unsyncedLabel": "Ei vielä palvelimella",
       "unsyncedTitle": "Tämän muistiinpanon viimeisimmät muutokset ovat vain tällä laitteella",
-      "untitled": "Nimetön",
       "untitledDrawing": "Nimetön piirros"
     },
     "savedView": {
@@ -2615,7 +2526,6 @@
       "editing": "Muokataan",
       "editingEllipsis": "Muokataan…",
       "editingTitle": "Muokataan: automaattitallennus on valmiina",
-      "justNow": "juuri nyt",
       "retry": "Yritä uudelleen",
       "saved": "Tallennettu",
       "savedRelative": "Tallennettu {{rel}}",
@@ -2627,39 +2537,33 @@
       "savingEllipsis": "Tallennetaan…"
     },
     "snapshotFailed": {
-      "dismiss": "Hylkää",
       "message": "Tilannekuvaa ei voitu tallentaa. Muistiinpanosi on tallennettu, mutta sen versiohistoria voi olla puutteellinen (levy voi olla täynnä)."
     },
     "snapshots": {
-      "cancel": "Peruuta",
       "changeCount_one": "{{count}} muutos tämän tilannekuvan jälkeen",
       "changeCount_other": "{{count}} muutosta tämän tilannekuvan jälkeen",
       "changeCountPrev_one": "{{count}} muutos edelliseen tilannekuvaan verrattuna",
       "changeCountPrev_other": "{{count}} muutosta edelliseen tilannekuvaan verrattuna",
-      "close": "Sulje",
       "compareAgainstLabel": "Vertaa kohteeseen",
       "compareCurrent": "Nykyinen muistiinpano",
       "comparePrevious": "Edellinen tilannekuva",
       "confirmBody": "Nykyinen muistiinpanosi tallennetaan ensin tilannekuvaksi, joten voit kumota tämän.",
       "confirmTitle": "Palautetaanko tämä tilannekuva?",
       "decrypting": "Puretaan salausta…",
-      "emptyState": "",
+      "emptyState": "Ei vielä tilannekuvia. Tilannekuvat tallennetaan automaattisesti muokatessasi, niitä säilytetään noin 7 päivää, ja ne poistuvat pysyvästi, kun muistiinpano poistetaan pysyvästi.",
       "errorCannotDecrypt": "Tämän tilannekuvan salausta ei voitu purkaa.",
       "errorGeneric": "Jokin meni pieleen. Yritä uudelleen.",
       "errorIo": "Tapahtui levyvirhe. Levy voi olla täynnä tai kirjoitussuojattu.",
       "errorNotFound": "Tuo tilannekuva ei ole enää saatavilla.",
       "errorStorageAccess": "Holvin tilannekuvavarastoon ei saatu yhteyttä.",
       "errorVaultLocked": "Holvi on lukittu. Avaa se nähdäksesi tilannekuvat.",
-      "justNow": "juuri nyt",
       "listLabel": "Tilannekuvaluettelo",
-      "loading": "Ladataan…",
       "noPrevious": "Tämä on varhaisin tilannekuva. Sitä ennen ei ole mitään, mihin verrata.",
       "restore": "Palauta",
       "restoreCta": "Palauta tämä tilannekuva",
       "restoredStatus": "Palautettu. Sinulla ollut versio on tallennettu tilannekuvaksi.",
       "selectPlaceholder": "Valitse tilannekuva esikatsellaksesi, mikä on muuttunut siitä lähtien.",
       "title": "Tilannekuvat",
-      "untitled": "Nimetön",
       "deviceFallback": "Laite {{code}}",
       "unknownAuthor": "Tuntematon laite"
     },
@@ -2672,14 +2576,10 @@
       "pinned": "Kiinnitetty",
       "pinnedTitle": "Kiinnitetty: irrota kiinnitys sulkeaksesi",
       "unpin": "Irrota kiinnitys",
-      "untitled": "Nimetön",
-      "closeTabMenuItem": "Sulje välilehti",
       "moveLeft": "Siirrä vasemmalle",
       "moveRight": "Siirrä oikealle"
     },
     "tagBrowser": {
-      "cancel": "Peruuta",
-      "clear": "Tyhjennä",
       "combineTagsWith": "Yhdistä tunnisteet operaattorilla",
       "filtering": "Suodatetaan…",
       "modeAll": "Kaikki",
@@ -2695,19 +2595,15 @@
       "saveAsView": "Tallenna näkymänä",
       "searchPlaceholder": "Etsi tunnisteita…",
       "title": "Tunnisteet",
-      "untitled": "Nimetön",
       "viewNamePlaceholder": "Näkymän nimi"
     },
     "trash": {
-      "close": "Sulje",
       "count_one": "{{count}} muistiinpano",
       "count_other": "{{count}} muistiinpanoa",
       "delete": "Poista",
       "deleteError": "Muistiinpanon poistaminen ei onnistunut. Yritä uudelleen.",
-      "empty": "Tyhjennä roskakori",
       "emptyConfirmBody_one": "{{count}} muistiinpano poistetaan pysyvästi.",
       "emptyConfirmBody_other": "{{count}} muistiinpanoa poistetaan pysyvästi.",
-      "emptyConfirmCta": "Tyhjennä roskakori",
       "emptyConfirmTitle": "Tyhjennetäänkö roskakori?",
       "emptyPartialFailure_one": "{{count}} muistiinpanoa ei voitu poistaa, ja se jää roskakoriin.",
       "emptyPartialFailure_other": "{{count}} muistiinpanoa ei voitu poistaa, ja ne jäävät roskakoriin.",
@@ -2717,8 +2613,7 @@
       "purgeConfirmTitle": "Poistetaanko pysyvästi?",
       "restore": "Palauta",
       "restoreError": "Muistiinpanon palauttaminen ei onnistunut. Yritä uudelleen.",
-      "title": "Roskakori",
-      "untitled": "Nimetön"
+      "title": "Roskakori"
     },
     "unlinkedMentions": {
       "empty": "Ei linkittämättömiä mainintoja.",
@@ -2727,8 +2622,7 @@
       "linkTooltip": "Linkitä tämä maininta kohteeseen {{title}}",
       "refresh": "Maininnat ovat saattaneet muuttua: päivitä",
       "searching": "Etsitään…",
-      "thisNote": "tämä muistiinpano",
-      "untitled": "Nimetön"
+      "thisNote": "tämä muistiinpano"
     },
     "unsettledSave": "Avoin muistiinpano ei ole vielä tallentunut, joten mitään ei muutettu. Yritä uudelleen, kun se on tallentunut.",
     "views": {
@@ -2775,11 +2669,9 @@
         "renameLane": "Nimeä sarake {{lane}} uudelleen",
         "newLaneName": "Uuden sarakkeen nimi",
         "saveLaneName": "Tallenna sarakkeen nimi",
-        "cancelLaneRename": "Peruuta",
         "lanesNotSaved": "Kortit siirtyivät, mutta sarakkeiden järjestystä ei voitu tallentaa.",
         "laneOrderRestored": "Sarakkeiden järjestys on palautettu.",
         "laneOrderRestoreFailed": "Sarakkeiden järjestystä ei voitu palauttaa.",
-        "cancel": "Peruuta",
         "archiveFailed": "Muistiinpanoa ei voitu arkistoida.",
         "trashFailed": "Muistiinpanoa ei voitu siirtää roskakoriin.",
         "noGroupBy": "Tällä taululla ei ole sarakkeen ominaisuutta. Valitse ryhmittelyominaisuus näkymän asetuksista."
@@ -2787,17 +2679,11 @@
       "cards": {
         "changeCover": "Vaihda kansikuva",
         "changeCoverImage": "Vaihda kansikuva",
-        "empty": "Yksikään muistiinpano ei vastaa tätä näkymää",
-        "noValue": "Ei arvoa",
         "setCover": "Aseta kansikuva",
-        "setCoverImage": "Aseta kansikuva",
-        "untitled": "Nimetön"
+        "setCoverImage": "Aseta kansikuva"
       },
       "empty": "Ei vielä näkymiä. Tallenna nykyinen muistiinpanoluettelo näkymänä.",
-      "list": {
-        "empty": "Yksikään muistiinpano ei vastaa tätä näkymää",
-        "noValue": "Ei arvoa"
-      },
+      "list": {},
       "import": {
         "approveAction": "Hyväksy v{{version}}",
         "approveFailed": "Hyväksyntää ei voitu tallentaa.",
@@ -2809,7 +2695,6 @@
         "armRefusedHeading": "{{name}} ei tuotu",
         "armSameVersionDifferent": "Tiedosto sanoo v{{version}}, sama versio kuin tällä holvissa, mutta sisältö eroaa. Kyse on joko toisesta tekijästä, joka käyttää samaa tunnistetta, tai tiedostosta, jota on muutettu allekirjoituksen jälkeen, joten se hylätään.",
         "armUpdate": "Tämä korvaa näkymän {{name}}: tällä holvissa on v{{stored}}, tiedostossa on v{{incoming}}.",
-        "close": "Sulje",
         "filterName": "Näkymän manifesti",
         "idleBody": "Näkymätiedosto on yksi tallennettu näkymä, jonka joku on vienyt. Myne tarkistaa sen ensin ja näyttää sinulle, mitä se valitsee ja lukee, ennen kuin mitään tallennetaan.",
         "importAction": "Tuo näkymä",
@@ -2835,7 +2720,6 @@
       "manager": {
         "approve": "Hyväksy",
         "approvedState": "Hyväksytty tällä laitteella",
-        "close": "Sulje",
         "deleteFailed": "Näkymää ei voitu poistaa.",
         "deleteLabel": "Poista {{name}}",
         "emptyBody": "Täällä näkyy näkymä, jonka tallennat muistiinpanoluettelosta, tai jonkun sinulle lähettämä.",
@@ -2852,18 +2736,14 @@
         "editFilter": "Muokkaa suodatinta…",
         "moveDown": "Siirrä alas",
         "moveUp": "Siirrä ylös",
-        "rename": "Nimeä uudelleen",
         "viewSettings": "Näkymäasetukset…"
       },
       "newView": "Uusi näkymä",
       "noMatch": "Yksikään näkymä ei vastaa hakuasi.",
       "searchPlaceholder": "Etsi näkymiä…",
       "table": {
-        "empty": "Yksikään muistiinpano ei vastaa tätä näkymää",
-        "name": "Nimi",
-        "noValue": "Ei arvoa"
-      },
-      "untitledView": "Nimetön näkymä"
+        "name": "Nimi"
+      }
     },
     "viewSettings": {
       "aspect": {
@@ -2873,7 +2753,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (leveä)"
       },
-      "cancel": "Peruuta",
       "cardSize": "Kortin koko",
       "cardSizeValue": "{{size}} px",
       "columns": "Sarakkeet",
@@ -3033,7 +2912,6 @@
       "confirmLabel": "Vahvista pääsalasana",
       "defaultEmptyCaption": "Valitse jotain, jonka muistat. Sitä ei voi nollata.",
       "mismatch": "Salasanat eivät täsmää.",
-      "passwordLabel": "Pääsalasana",
       "suggestPassword": "Ehdota salasanaa",
       "tooShort": "Käytä vähintään {{n}} merkkiä."
     },
@@ -3051,8 +2929,6 @@
   },
   "migrate": {
     "intro": "Päivitä tämä holvi uuteen muotoon. Muistiinpanosi yhdistyvät jatkossa automaattisesti laitteiden välillä. Tämä uusii koko holvin avaimet; vanha kopio säilytetään tällä laitteella, kunnes vahvistat.",
-    "passwordLabel": "Pääsalasana",
-    "phraseLabel": "Palautuslause",
     "phraseHelp": "Pakollinen: uudet avaimesi suojataan tällä lauseella, jotta palautus toimii jatkossakin. Syötä kaikki palautussanasi.",
     "submit": "Päivitä uuteen muotoon",
     "migrating": "Päivitetään…",
@@ -3079,11 +2955,8 @@
     "errors": {
       "cancelledVaultLocked": "Palautus peruutettu: holvi oli lukittu.",
       "operationInProgress": "Toiminto on käynnissä. Odota.",
-      "unexpected": "Odottamaton virhe. Yritä uudelleen.",
-      "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
       "openAsImportSource": "Tuonti lukee tätä holvia juuri nyt. Vie tuonti loppuun tai peruuta se, ja palauta sitten tämä holvi."
     },
-    "vaultUnreadable": "Holvitiedostoa ei voi lukea. Palauta varmuuskopiosta.",
     "genericError": "Jokin meni vikaan. Yritä uudelleen.",
     "weakPassword": "Salasanassa on oltava vähintään {{min}} merkkiä.",
     "setPasswordError": "Uuden salasanan asettaminen epäonnistui. Yritä uudelleen.",
@@ -3092,7 +2965,7 @@
     "restoreVaultHeader": "Palauta holvi",
     "accountTitle": "Syötä tilinumerosi",
     "accountLead": "Löydät tämän sieltä, mihin tallensit palautuslauseesi. Se yksilöi palautettavan holvin.",
-    "accountInvalid": "Virheellinen tilinumero — tarkista ja kirjoita uudelleen.",
+    "accountInvalid": "Virheellinen tilinumero. Tarkista ja kirjoita uudelleen.",
     "accountOptionalHint": "Eikö sitä ole? Jätä tämä tyhjäksi ja jatka. 24 sanan palautuslauseesi riittää.",
     "paste": "Liitä",
     "phraseGridHint": "Kirjoita jokainen sana tai liitä kaikki 24 kerralla täyttääksesi ruudukon.",
@@ -3177,8 +3050,6 @@
     }
   },
   "restore": {
-    "backLabel": "Takaisin",
-    "cancelLabel": "Takaisin",
     "collision": {
       "body": "Tämän varmuuskopion holvi on jo olemassa tällä laitteella. Voit säilyttää molemmat: palautettu kopio näkyy erillisenä holvina holviluettelossasi. Tai voit palauttaa nyt ja poistaa sitten olemassa olevan holvin itse holviluettelosta. Poistaminen pyytää kirjoittamaan DELETE, ja siinä on järkeä vasta kun olet varmistanut, että palautettu holvi avautuu.",
       "keepBoth": "Säilytä molemmat",
@@ -3186,14 +3057,13 @@
     },
     "damaged": {
       "body": "Varmuuskopiotiedosto on vaurioitunut, joten mitään ei palautettu. Jos tämä on ainoa kopiosi, pelastus voi palauttaa ehjät muistiinpanot ja luetella tarkalleen, mitä ei voitu lukea. Tulos merkitään aina osittaiseksi palautukseksi.",
-      "close": "Sulje",
       "salvage": "Pelasta ehjät muistiinpanot…"
     },
     "error": {
       "tryAnotherFile": "Kokeile toista tiedostoa"
     },
     "pick": {
-      "body": "Valitse <code>.myne-backup</code>-tiedosto. Varmuuskopio tarkistetaan ennen kuin mitään palautetaan; palautettu holvi avataan kyseisen holvin salasanalla tai palautuslauseella, aivan kuten avattaessa.",
+      "body": "Valitse <code>.myne-backup</code>-tiedosto. Varmuuskopio tarkistetaan ennen kuin mitään palautetaan; palautettu holvi avataan kyseisen holvin salasanalla, aivan kuten avattaessa.",
       "chooseFile": "Valitse varmuuskopiotiedosto…",
       "corruptedSuffix": "Nykyiseen holviisi ei kosketa: varmuuskopio palautetaan ensin erilliseksi holviksi."
     },
@@ -3207,9 +3077,7 @@
       "restored": "Holvi palautettu.",
       "versionHistory": "Versiohistorian merkinnät: {{n}}"
     },
-    "title": "Palauta varmuuskopiosta",
     "working": {
-      "cancel": "Peruuta",
       "restoringProgress": "Palautetaan… {{done}} / {{total}}",
       "verifying": "Tarkistetaan varmuuskopiota…",
       "verifyingProgress": "Tarkistetaan varmuuskopiota… {{done}} / {{total}}"
@@ -3220,8 +3088,7 @@
       "buildChannelDevelopment": "Kehitysversio",
       "buildLabel": "Kooste",
       "buildChannelLabel": "Koostekanava",
-      "buildChannelStable": "Vakaa",
-      "developerModeHelper": "Näyttää lisäasetukset, jotka Myne pitää oletuksena poissa tieltä: ne, joissa poikkeat Mynen takaamasta polusta, ja tehokäyttäjän työkalut, joita useimmat eivät koskaan tarvitse. Käytöstä poistaminen vain piilottaa ne uudelleen. Kaikki päälle kytkemäsi pysyy päällä, ja sen oma säädin on se paikka, josta se kytketään pois.",
+      "developerModeHelper": "Ne, joissa poikkeat Mynen takaamasta polusta, ja tehokäyttäjän työkalut, joita useimmat eivät koskaan tarvitse. Käytöstä poistaminen vain piilottaa ne uudelleen. Kaikki päälle kytkemäsi pysyy päällä, ja sen oma säädin on se paikka, josta se kytketään pois.",
       "developerModeLabel": "Kehittäjätila",
       "legalLabel": "Juridiset tiedot",
       "legalHelper": "Avautuu osoitteessa myne.md selaimessasi. Saksaksi siellä, missä käyttöliittymä on saksankielinen.",
@@ -3231,9 +3098,8 @@
       "tagline": "Esialfa",
       "threatModelHelper": "Avaa julkinen uhkamalliasiakirja selaimessasi.",
       "threatModelLabel": "Uhkamalli",
-      "version": "Versio",
       "dev": "Dev",
-      "updateAutoCheckHelper": "Myne lataa pienen allekirjoitetun tiedoston osoitteesta myne.md nähdäkseen, onko uudempaa versiota, ja kertoo sinulle. Se lähettää nykyisen versiosi ja alustasi, ei mitään muuta. Voit silti tarkistaa käsin yllä olevalla painikkeella.",
+      "updateAutoCheckHelper": "Myne lataa pienen allekirjoitetun tiedoston osoitteesta myne.md nähdäkseen, onko uudempaa versiota, ja kertoo sinulle. Se lähettää nykyisen versiosi ja alustasi, ei mitään muuta.",
       "updateAutoCheckLabel": "Tarkista päivitykset automaattisesti",
       "updateAvailable": "Versio {{version}} on saatavilla.",
       "updateChannelBeta": "Beta",
@@ -3243,8 +3109,9 @@
       "updateChecking": "Tarkistetaan…",
       "updateFailed": "Päivityksiä ei voitu tarkistaa. Se yrittää myöhemmin uudelleen.",
       "updateHelper": "Myne varmistaa jokaisen päivityksen offline-julkaisuavainta vasten ennen sen asentamista. Tarkistus kysyy uusinta versiota osoitteesta downloads.myne.md ja lähettää vain versionsi ja alustasi (sekä IP-osoitteesi, jota kyseinen lähde ei lokita); ei koskaan muistiinpanojasi tai tiliäsi.",
-      "updateIdle": "Allekirjoitetut päivitykset, jotka haetaan osoitteesta downloads.myne.md, kun tarkistat.",
+      "updateIdle": "Ei vielä tarkistettu.",
       "updateInstallButton": "Käynnistä uudelleen päivittääksesi",
+      "updateFlushFailed": "Kaikkia avoimia muistiinpanoja ei voitu tallentaa, joten Myne ei käynnistynyt uudelleen päivittääkseen. Yritä hetken kuluttua uudelleen.",
       "updateLabel": "Päivitykset",
       "updateUpToDate": "Käytössäsi on uusin versio.",
       "developerModeInline": "Näyttää asetukset, jotka Myne pitää oletuksena poissa tieltä.",
@@ -3253,6 +3120,10 @@
       "diagnosticLogError": "Myne ei voinut muuttaa tuota asetusta.",
       "diagnosticLogReadError": "Myne ei voinut lukea diagnostiikkalokin asetusta, joten se näytetään pois päältä.",
       "diagnosticBlockLabel": "Raportin tiedot",
+      "diagnosticsIntro": "Mitä Myne tietää tästä laitteesta juuri nyt. Mitään ei lähetetä minnekään; sinä päätät, mitä jaat.",
+      "diagnosticsReading": "Luetaan…",
+      "diagnosticCopied": "Kopioitu",
+      "diagnosticsLogNote": "Tällä laitteella ei ole lokitiedostoa, jonka tämä lohko voisi luovuttaa: tallennettu diagnostiikkaloki on työpöytäominaisuus.",
       "diagnosticCopy": "Kopioi diagnostiikkatiedot",
       "diagnosticCopyDone": "Diagnostiikkatiedot kopioitu",
       "diagnosticCopyFailed": "Kopiointi ei onnistunut. Valitse yllä oleva teksti ja kopioi se käsin.",
@@ -3281,7 +3152,6 @@
       "updateBlocked": "Myne ei voinut aloittaa päivitystä täältä, joten mitään ei asennettu. Yritä hetken kuluttua uudelleen."
     },
     "vault": {
-      "changePasswordButton": "Vaihda salasana",
       "changePasswordError": {
         "invalidCredentialOrVault": "Väärä nykyinen salasana tai holvitiedosto on vaurioitunut.",
         "ioError": "Levyvirhe, yritä uudelleen.",
@@ -3293,13 +3163,9 @@
         "vaultNotUnlocked": "Avaa tämä holvi ennen salasanan vaihtamista."
       },
       "changePasswordHeading": "Vaihda salasana",
-      "changePasswordHelper": "Vaihda pääsalasanasi säilyttäen sama holvi. Palautuslause pysyy samana.",
+      "changePasswordHelper": "Vaihda pääsalasanasi säilyttäen sama holvi. Mikään muu holvissa ei muutu.",
       "dangerZoneHeading": "Vaaravyöhyke",
-      "dangerZoneHelper": "Poista tämä holvi ja kaikki muistiinpanot pysyvästi. Ei voi perua. Palautuslause ei palauta holvia.",
       "localEraseHeading": "Tämä selain",
-      "localEraseHelper": "Pyyhi Mynen kopio holvistasi tästä selaimesta. Tilisi ja kaikki jo synkronoitu säilyvät palvelimella.",
-      "localEraseButton": "Kirjaudu ulos ja pyyhi tämän selaimen kopio…",
-      "deleteVaultButton": "Poista holvi…",
       "vaultLabelEyebrow": "HOLVIN TUNNISTE",
       "vaultLabelHelper": "Tämän holvin nimi, joka näkyy sovelluksen sisäisessä vaihtimessa ja käynnistyksen holvivalitsimessa ennen kuin avaat holvin. Tallennetaan salattuna holvin sisälle; ei koskaan poistu laitteeltasi selkotekstinä.",
       "vaultLabelPlaceholder": "Lisää tunniste…",
@@ -3307,17 +3173,15 @@
       "vaultLabelSave": "Tallenna",
       "vaultIconLabel": "IKONI",
       "vaultIconDefault": "Oletus (sanamerkki)",
-      "renamedToast": "Holvi nimetty uudelleen",
       "renameError": "Holvia ei voitu nimetä uudelleen",
       "newPasswordMismatch": "Uudet salasanat eivät täsmää.",
       "samePassword": "Uusi salasana on sama kuin nykyinen.",
       "passwordChangedToast": "Salasana vaihdettu",
-      "vaultUnreadable": "Holvitiedosto on lukukelvoton. Palauta varmuuskopiosta.",
       "genericChangeError": "Jotain meni pieleen. Yritä uudelleen.",
       "renameHelper": "Näytetään holvivalitsimessa. Tallennetaan salattuna tämän holvin sisälle; jätä tyhjäksi poistaaksesi sen.",
       "newPasswordPlaceholder": "Vähintään 12 merkkiä",
       "reenterNewPassword": "Kirjoita uusi salasana uudelleen",
-      "changePasswordFootnote": "Tämä mitätöi nopean avaamisen. Palautuslauseesi ei muutu.",
+      "changePasswordFootnote": "Tämä mitätöi pika-avauksen. Identiteettilauseesi ei muutu.",
       "changing": "Vaihdetaan…",
       "memberVaultNotice": "Tämä on jaettu holvi. Sillä ei ole holvin salasanaa. Käytä yksityisyyden kohdassa Jaetun holvin avaamista lisätäksesi salasanan tai PIN-koodin.",
       "topics": {
@@ -3329,14 +3193,14 @@
       },
       "format": {
         "heading": "Holvin muoto",
-        "intro": "Tämä holvi käyttää yhä omaa palautuslausettaan. Päivittäminen siirtää sen identiteettilauseeseesi, joten yksi lause palauttaa kaikki omistamasi holvit.",
-        "cta": "Päivitä yhden lauseen palautukseen",
-        "confirm": "Eläköity holvin lauseeni ja päivitä",
-        "cancel": "Pidä holvin lauseeni vielä",
+        "intro": "Tämä holvi kantaa yhä oman palautuslauseensa. Päivittäminen poistaa sen käytöstä, joten tämä holvi avautuu pelkällä salasanallaan. Identiteettilauseesi palauttaa yhä sen, kuka olet uudella laitteella, eikä se avaa mitään holvia.",
+        "cta": "Lopeta holvin lauseeni käyttö",
+        "confirm": "Lopeta lauseen käyttö ja päivitä",
+        "cancel": "Säilytä holvin lauseeni",
         "running": "Päivitetään…",
-        "warningPhrase": "Tallentamasi holvin palautuslause lakkaa avaamasta tätä holvia. Holvin salasanasi toimii yhä, ja identiteettilauseesi tulee tavaksi palata sisään.",
+        "warningPhrase": "Tallentamasi holvin palautuslause lakkaa avaamasta tätä holvia, eikä mikään korvaa sitä: siitä lähtien holvi avautuu pelkällä salasanallaan, joten unohtunut salasana tarkoittaa menetettyä holvia.",
         "warningDevices": "Kaikkien käyttämiesi laitteiden täytyy olla päivitetty ensin. Vanhempi versio ei voi avata tätä holvia, kun päivitys on synkronoitunut.",
-        "done": "Tämä holvi käyttää nyt identiteettilauseesi (päivitetty {{from}}).",
+        "done": "Tämä holvi avautuu nyt pelkällä salasanallaan (päivitetty versiosta {{from}}). Tallentamasi holvin lause ei enää toimi.",
         "error": {
           "migrationRequired": "Tämä holvi on yhä vanhassa v0.1-muodossa. Viimeistele holvin päivitys Synkronointiasetuksissa ensin.",
           "personRequired": "Tällä laitteella ei ole vielä identiteettiä. Luo identiteettisi ensin, ja palaa sitten.",
@@ -3345,7 +3209,7 @@
           "notOwner": "Tämä on jaettu holvi. Vain sen omistaja voi muuttaa sen muotoa.",
           "notUnlocked": "Avaa holvi ennen sen muodon päivittämistä.",
           "inProgress": "Toinen suojaustoiminto on käynnissä. Yritä uudelleen hetken kuluttua.",
-          "alreadyUpgraded": "Tämä holvi käyttää jo identiteettilauseesi.",
+          "alreadyUpgraded": "Tämä holvi avautuu jo pelkällä salasanallaan.",
           "generic": "Päivitys ei valmistunut. Mitään ei muuttunut.",
           "sharedVault": "Tämä holvi on jaettu jonkun muun kanssa. Yhden lauseen palautus on vain sinun omistamallesi holville, koska jaetun jäsenen käsittely ei vielä tue sitä."
         }
@@ -3370,6 +3234,7 @@
         "light": "Vaalea",
         "system": "Järjestelmä"
       },
+      "themeCustomOverride": "{{name}} on käytössä ja ohittaa nämä valinnat.",
       "themeHelper": "Vaihda vaalean ja tumman teeman välillä tai noudata järjestelmän asetusta.",
       "themeLabel": "Teema",
       "themeOptionAria": "{{label}}-teema",
@@ -3397,7 +3262,10 @@
         "theme": "Teema ja korostusväri",
         "sidebar": "Sivupalkissa",
         "customisation": "Mukauttaminen"
-      }
+      },
+      "homeZoneLabel": "Kotiaikavyöhyke",
+      "homeZoneHelper": "Näytetään tapahtuman ajan vieressä toisena kellona. Tämä laite on vyöhykkeellä {zone}. Tätä ei kirjoiteta muistiinpanoihisi.",
+      "homeZoneUnknown": "Tuo ei ole aikavyöhyke, jonka tämä laite tunnistaa, joten toista kelloa ei näytetä."
     },
     "archive": {
       "helper": "Salli muistiinpanojen siirtäminen arkistoon, pois päälistalta. Tämän poistaminen käytöstä palauttaa jokaisen arkistoidun muistiinpanon kansioonsa, poistaa jokaisen arkistoidun kansion arkistosta ja piilottaa arkistointitoiminnot. Se koskee koko holvia jokaisella laitteella.",
@@ -3409,8 +3277,7 @@
       "label": "Pakkaa kuvat tuotaessa",
       "helper": "Pienentää liitetyt tai pudotetut kuvat ennen niiden salaamista ja tallentamista, jotta holvisi, varmuuskopiosi ja synkronointi pysyvät pienempinä. Tätä ei voi perua: alkuperäistä tiedostoa ei säilytetä.",
       "helperScopeEveryDevice": "Koskee koko holvia jokaisella laitteella.",
-      "helperScopeNotHere": "Koskee koko holvia, mutta ei tässä selaimessa: täällä lisätyt kuvat tallennetaan täsmälleen sellaisina kuin ne annetaan.",
-      "errorSaveSetting": "Tätä asetusta ei voitu tallentaa."
+      "helperScopeNotHere": "Koskee koko holvia, mutta ei tässä selaimessa: täällä lisätyt kuvat tallennetaan täsmälleen sellaisina kuin ne annetaan."
     },
     "transcription": {
       "label": "Puheesta tekstiksi",
@@ -3420,15 +3287,11 @@
     "attachmentOcr": {
       "label": "Hae kuvien ja skannattujen asiakirjojen sisältä",
       "helper": "Lukee tekstiä kuvaliitteistä ja skannatuista PDF-tiedostoista tällä laitteella, jotta haku löytää ne sisältönsä perusteella. Mitään ei lähetetä verkkoon. Tämän poistaminen käytöstä pysäyttää taustalla tapahtuvan poiminnan; jo poimittu teksti säilytetään.",
-      "errorSaveSetting": "Asetusta ei voitu tallentaa.",
       "processing_one": "Luetaan 1 liite…",
-      "processing_other": "Luetaan {{count}} liitettä…",
-      "draftUse": "Tämän lukemaa tekstiä tarjotaan myös luonnoksena, jonka voit lisätä muistiinpanoon. Muistiinpano synkronoituu salattuna kuten mikä tahansa muu.",
-      "mobileDeviceLocal": "Tämä on laitekohtainen: se päättää, mitä tämä puhelin indeksoi, joten muut laitteesi pitävät oman valintansa."
+      "processing_other": "Luetaan {{count}} liitettä…"
     },
     "autoBackup": {
       "backupFolder": "Varmuuskopiokansio",
-      "chooseFolder": "Valitse kansio…",
       "chooseFolderDialogTitle": "Valitse kansio automaattisille varmuuskopioille",
       "frequency": "Tiheys",
       "frequencyAriaLabel": "Varmuuskopioinnin tiheys",
@@ -3447,14 +3310,12 @@
       "title": "Automaattiset varmuuskopiot"
     },
     "changePassword": {
-      "cancel": "Peruuta",
       "checkingStrength": "Tarkistetaan vahvuutta…",
       "strengthUnavailable": "Vahvuustarkistusta ei voitu ladata, joten vain vähimmäispituus tarkistetaan.",
       "confirmLabel": "Vahvista uusi salasana",
       "currentLabel": "Nykyinen salasana",
       "mismatch": "Salasanat eivät täsmää.",
       "newLabel": "Uusi salasana",
-      "submit": "Vaihda salasana",
       "submitting": "Vaihdetaan salasanaa…",
       "title": "Vaihda salasana",
       "tooShort": "Käytä vähintään {{n}} merkkiä."
@@ -3482,7 +3343,7 @@
     "cliAccess": {
       "label": "Päätteen käyttöoikeus",
       "helperOff": "Pois. `myne`-komento ei voi lukea eikä muuttaa mitään tässä holvissa.",
-      "helperOn": "Päällä niin kauan kuin tämä holvi on avattuna. Mikä tahansa käyttäjätunnuksellasi käynnissä oleva ohjelma voi lukea, hakea ja luoda muistiinpanoja sen kautta. Myne ei erota päätettäsi skriptistä eikä tarkista muuta kuin sen, että ovi on auki. Se ei koskaan kysy salasanaasi, sulkeutuu sillä hetkellä kun holvi lukittuu, eikä voi poistaa muistiinpanoja.",
+      "helperOn": "Päällä niin kauan kuin tämä holvi on avattuna. Myne ei erota päätettäsi skriptistä eikä tarkista muuta kuin sen, että ovi on auki. Se ei koskaan kysy salasanaasi, sulkeutuu sillä hetkellä kun holvi lukittuu, eikä voi poistaa muistiinpanoja.",
       "lastUsedNever": "Ei käytetty tämän holvin avaamisen jälkeen.",
       "lastUsedJustNow": "Käytetty juuri äsken.",
       "lastUsedMinutesAgo": "Käytetty {{count}} min sitten.",
@@ -3505,7 +3366,7 @@
     },
     "clipperInstall": {
       "error": "Selainleikkurin asetuksen päivittäminen epäonnistui.",
-      "helper": "Rekisteröi natiiviviestinnän isäntä, jotta Myne-selainlaajennus voi lähettää leikkeitä tähän sovellukseen. Päällä oletuksena; poista käytöstä poistaaksesi sen.",
+      "helper": "Antaa Myne-selainlaajennuksen lähettää leikkeitä tähän sovellukseen.",
       "label": "Selainleikkuri"
     },
     "customThemes": {
@@ -3547,7 +3408,6 @@
       "folderSearchPlaceholder": "Etsi kansioita…",
       "searchEmpty": "Yksikään malli ei vastaa hakua.",
       "searchPlaceholder": "Etsi malleja…",
-      "untitledTemplate": "Nimetön malli",
       "sectionDaily": "Päivittäiset muistiinpanot",
       "sectionWeekly": "Viikoittaiset muistiinpanot",
       "sectionMonthly": "Kuukausittaiset muistiinpanot",
@@ -3572,16 +3432,13 @@
       "periodTemplateAriaLabel": "{{period}} muistiinpanojen malli",
       "sectionPeriodic": "Toistuvat muistiinpanot",
       "periodSwitcherAriaLabel": "Toistuvan muistiinpanon tyyppi",
-      "blockLabel": "Jaksottaiset muistiinpanot",
       "mobilePeriodAriaLabel": "Muistiinpanon jakso",
       "mobileSaveGlyph": "✓",
       "mobileSaveLabel": "Tallenna",
       "mobileSharedNotice": "Nämä asetukset ovat jaettuja: muokkaus täällä saavuttaa muut laitteesi, ja tietokoneella asetettu sama arvo saapuu tänne."
     },
     "deleteVault": {
-      "cancel": "Peruuta",
       "caseSensitiveHint": "Kirjainkokoriippuvainen. Kirjoita sana täsmälleen oikein ottaaksesi poiston käyttöön.",
-      "continue": "Jatka",
       "copyPrimary": "Tämä poistaa pysyvästi tämän holvin ja kaikki sen sisältämät muistiinpanot. Toimintoa ei voi perua, eikä palautuslauseesi palauta tietoja.",
       "copySecondary": "Holvin avaimet nollataan muistista ennen tiedostojen poistamista; mahdollinen levylle jäävä irrallinen salateksti pysyy palautuskelvottomana Argon2id-käärittynä roskana.",
       "keychainNote": "Kun poisto valmistuu, Myne pyytää myös järjestelmän avainnippua poistamaan tälle holville tallentamansa biometrisen avaamisen avaimen niillä alustoilla, joilla se sellaisen tallentaa.",
@@ -3606,7 +3463,8 @@
       "vaultPath": "Holvin polku: {{path}}",
       "deleteError": "Holvin täydellinen poistaminen epäonnistui. Yritä uudelleen.",
       "warning": "Tämä poistaa tämän holvin ja kaikki sen muistiinpanot tältä laitteelta pysyvästi. Tätä ei voi kumota.",
-      "deleteButton": "Poista tämä holvi"
+      "deleteButton": "Poista tämä holvi",
+      "detailsLabel": "Lisätietoja tämän holvin poistamisesta"
     },
     "files": {
       "newNote": {
@@ -3626,13 +3484,11 @@
         "label": "Oletuksena avattava tiedosto",
         "noteLabel": "Käynnistyksessä avattava muistiinpano",
         "notePlaceholder": "Valitse muistiinpano…",
-        "optionEmpty": "Uusi muistiinpano",
         "optionLast": "Viimeksi avattu",
         "optionSpecific": "Tietty muistiinpano",
         "saveError": "Käynnistysasetuksen tallentaminen epäonnistui.",
         "searchEmpty": "Muistiinpanoja ei löytynyt.",
-        "searchPlaceholder": "Hae muistiinpanoja…",
-        "untitledNote": "Nimetön"
+        "searchPlaceholder": "Hae muistiinpanoja…"
       },
       "sections": {
         "notes": "Muistiinpanot ja kansiot",
@@ -3642,17 +3498,17 @@
     "focusMode": {
       "dimAria": "Himmennä ei-aktiiviset rivit",
       "dimHelper": "Tarkennustilassa (⇧⌘F) himmennä kaikki rivit paitsi se, jota muokkaat.",
-      "dimLabel": "Tarkennustila · himmennä ei-aktiiviset rivit",
+      "dimLabel": "Himmennä ei-aktiiviset rivit",
       "off": "Pois",
       "on": "Päällä",
       "saveError": "Tarkennustilan asetusta ei voitu tallentaa.",
       "typewriterAria": "Kirjoituskonevieritys",
       "typewriterHelper": "Tarkennustilassa (⇧⌘F) pidä aktiivinen rivi pystysuunnassa keskellä kirjoittaessasi.",
-      "typewriterLabel": "Tarkennustila · kirjoituskonevieritys"
+      "typewriterLabel": "Kirjoituskonevieritys",
+      "typewriterHelperMobile": "Pidä kohdistin pystysuunnassa keskellä"
     },
     "hotkeys": {
       "addBindingAria": "Lisää pikanäppäin komennolle {{command}}",
-      "cancel": "Peruuta",
       "capturePrompt": "Paina näppäintä…",
       "conflictIndicator": "⚠ ristiriita",
       "conflictTitle": "Käytössä myös: {{commands}}",
@@ -3726,20 +3582,21 @@
       "on": "Päällä"
     },
     "toolbarCustomize": {
+      "errorLoad": "Nykyistä työkalurivin asetteluasi ei voitu lukea, joten nämä rivit ovat vain luku -tilassa, kunnes avaat tämän paneelin uudelleen.",
       "errorSave": "Työkalurivin asettelun tallentaminen epäonnistui.",
       "helper": "Valitse, mitkä muotoilupainikkeet näkyvät valintatyökalurivillä ja missä järjestyksessä.",
       "label": "Työkalurivin painikkeet",
+      "lastShownHint": "Pidä vähintään yksi",
+      "lastHiddenHint": "Pidä vähintään yksi piilotettuna",
       "moveDown": "Siirrä alas",
-      "moveUp": "Siirrä ylös",
-      "pendingHint": "Tulossa pian"
+      "moveUp": "Siirrä ylös"
     },
     "ai": {
       "autoTagHelper": "Kun lopetat kirjoittamisen, pieni malli laitteellasi lukee muistiinpanon ja ehdottaa tunnisteita sen yläosaan. Mitään ei lisätä, ennen kuin hyväksyt ehdotuksen, ellei otat käyttöön riviä alla.",
       "autoTagLabel": "Ehdota tunnisteita automaattisesti",
-      "autoTagUnavailable": "Tunnistemallia ei ole vielä asennettu. Lataa se kerran kohdasta Asetukset → Tekoäly, niin kytkin menee itsestään päälle, kun se on asennettu.",
+      "autoTagUnavailable": "Tunnistemallia ei ole vielä asennettu. Kun se on asennettu, kytke kytkin päälle kohdassa Asetukset → Tekoäly.",
       "consent": {
         "accept": "Lähetä muistiinpanoni palveluun {{provider}}",
-        "cancel": "Peruuta",
         "cannotVerifyLabel": "Mitä Myne ei voi tarkistaa",
         "revokeLabel": "Miten tämän voi perua",
         "scopeLabel": "Mitä laitteita tämä koskee",
@@ -3767,7 +3624,7 @@
         "unsupportedScheme": "Vain http- ja https-osoitteet hyväksytään."
       },
       "endpointSaveFailed": "Osoitetta ei voitu tallentaa. Tarkista, että Myne pystyy kirjoittamaan asetuksensa.",
-      "endpointThirdParty": "{{name}} on erillinen ohjelma, jolla on oma verkkokäyttäytymisensä, eikä Myne hallitse sitä. Muistiinpanosi lähetetään sille — se toimii tällä tietokoneella.",
+      "endpointThirdParty": "{{name}} on erillinen ohjelma, jolla on oma verkkokäyttäytymisensä, eikä Myne hallitse sitä. Muistiinpanosi lähetetään sille, ja se toimii tällä tietokoneella.",
       "providerError": {
         "barred": "Tämänkaltainen pyyntö ei koskaan mene palveluntarjoajalle: se suoritetaan tällä laitteella tai ei lainkaan.",
         "failed": "Tämä ei onnistunut. Mitään ei tallennettu eikä mitään lähetetty uudelleen.",
@@ -3794,13 +3651,13 @@
       "modelNone": "Ei valittua tiedostoa",
       "modelSaveFailed": "Mallin polun tallentaminen epäonnistui (sen on oltava holvisi ulkopuolella).",
       "modelTranscriptionLabel": "Puheentunnistusmalli (litterointi)",
-      "modelsHelper": "Määritä tiedosto, jota kukin rooli käyttää, kun se tulee muualta kuin yllä olevasta tarkistetusta luettelosta: avaa linkki hankkiaksesi sellaisen selaimessasi ja valitse se sitten täältä. Malli suoritetaan laitteellasi; jos olet sen sijaan nimennyt palveluntarjoajan, kyseinen palvelu vastaa.",
+      "modelsHelper": "Määritä tiedosto, jota kukin rooli käyttää, kun se tulee muualta kuin yllä olevasta tarkistetusta luettelosta. Malli suoritetaan laitteellasi; jos olet sen sijaan nimennyt palveluntarjoajan, kyseinen palvelu vastaa.",
       "providerHelper": "Sen sijaan, että malli suoritettaisiin täällä, Myne voi lähettää pyynnön nimeämällesi palvelulle. Silloin muistiinpanosi poistuvat tältä laitteelta. ”Ei mitään” on oletus ja tarkoittaa, ettei mihinkään palveluun oteta yhteyttä.",
       "providerKeyAdd": "liitä API-avaimesi",
       "providerKeyLabel": "API-avain",
       "providerKeyNone": "Avainta ei ole tallennettu, joten mitään ei voi vielä lähettää.",
       "providerKeyRevoke": "Poista tämä avain",
-      "providerKeyReplace": "liitä uusi avain korvataksesi tallennetun",
+      "providerKeyReplace": "Vaihda avain",
       "providerKeyStored": "Avain on tallennettu. Myne ei koskaan näytä sitä sinulle uudelleen. Korvaa se liittämällä uusi.",
       "providerActive": "Vastaa nyt: {{name}}",
       "providerLabel": "Etäpalveluntarjoaja",
@@ -3830,7 +3687,7 @@
       "mobileRevokeHelper": "Poistaa palveluntarjoajan, sen avaimen ja tämän puhelimen hyväksynnän yhdessä, jolloin tila on täsmälleen sama kuin ennen käyttöönottoa. Muut laitteet toimivat edelleen, kunnes poistat sen sielläkin.",
       "mobileApproveLabel": "Hyväksy lähettäminen tässä puhelimessa",
       "mobileApproveHelper": "Palveluntarjoaja ja sen avain tulivat toisesta laitteesta. Tästä puhelimesta ei lähetetä mitään, ennen kuin luet mitä lähetetään ja hyväksyt sen täällä.",
-      "historyBudgetHelper": "Kuinka paljon viimeaikaisesta keskustelusta jokainen pyyntö kuljettaa, merkkeinä. Jätä tyhjäksi käyttääksesi oletusarvoa. Suurempi luku antaa tekoälyn seurata pidempiä keskusteluja ja lähettää niitä enemmän: jos palveluntarjoaja ei ole tällä laitteella, sitä enemmän tekstiäsi poistuu laitteelta ajon jokaisella askeleella.",
+      "historyBudgetHelper": "Jätä tyhjäksi käyttääksesi oletusarvoa. Suurempi luku antaa tekoälyn seurata pidempiä keskusteluja ja lähettää niitä enemmän: jos palveluntarjoaja ei ole tällä laitteella, se tarkoittaa, että tekstiäsi poistuu laitteelta enemmän ajon jokaisella askeleella.",
       "historyBudgetLabel": "Jokaisen pyynnön mukana lähetettävä keskustelu",
       "meetingPromptHelper": "Ohje, jota kokouksen tekoälyvaihe käyttää muuttaakseen litteroinnin osioiksi. Jätä se tyhjäksi käyttääksesi sisäänrakennettua oletusta. Se korvaa oletustulosmuodon, joten jos asetat sen, pyydä haluamasi osiot itse.",
       "meetingPromptLabel": "Kokousyhteenvedon kehote",
@@ -3838,7 +3695,6 @@
       "groupAdvanced": "Lisäasetukset",
       "excludedPickLabel": "Lisää kansio, joka jätetään pois",
       "excludedPickPlaceholder": "Valitse kansio…",
-      "modelShowInFolder": "Näytä kansiossa",
       "modelShowLocation": "Näytä kohteen {{name}} sijainti",
       "downloadsLabel": "Lataa mallit",
       "downloadsHelper": "Hae malli Mynen omasta lähteestä. Se tarkistetaan sovellukseen sisäänrakennettua sormenjälkeä vasten ennen käyttöä, joten peukaloitu lataus hylätään. Mitään ei haeta, ellet napsauta.",
@@ -3848,10 +3704,8 @@
       "downloadNotInstalled": "Ei asennettu",
       "downloadReinstall": "Lataa",
       "downloadInstall": "Lataa",
-      "modelRemove": "Poista",
       "downloading": "Ladataan…",
       "downloadingPercent": "Ladataan… {{percent}}%",
-      "downloadCancel": "Peruuta",
       "downloadFailed": "Lataus ei valmistunut.",
       "downloadFailedChecksum": "Lataus ei vastannut sormenjälkeään, ja se hylättiin. Yritä uudelleen.",
       "sideloadDisclosure": "Kehittäjätila antaa sinun myös osoittaa Mynen itse hankkimaasi mallitiedostoon. Myne ei tarkista muualta lataamaasi tiedostoa, joten käytä vain sellaista, johon luotat.",
@@ -3868,14 +3722,13 @@
       "excludedFoldersEmpty": "Mitään ei ole vielä rajattu pois, joten tekoäly voi lukea jokaisen kansion tässä holvissa.",
       "excludedFoldersAdd": "Lisää",
       "excludedFoldersAddLabel": "Tekoälystä rajattava kansio",
-      "excludedFoldersRemove": "Poista",
       "excludedFoldersRemoveLabel": "Lopeta kohteen {{folder}} rajaaminen pois tekoälystä",
       "excludedFoldersMonotoneNotice": "Millä tahansa laitteellasi lisätty rajaus pysyy, kunnes poistat sen kaikkialta: täältä tehdyt poistot eivät kulje, joten kansio, jonka muut laitteesi yhä rajaavat pois, palaa seuraavassa synkronoinnissa.",
       "catalogueOpen": "Lataa malli",
       "catalogueColModel": "Malli",
       "catalogueColState": "Tila",
       "providerInline": "Muistiinpanosi poistuvat tältä laitteelta, kun palvelu on nimetty.",
-      "providerChooseHelper": "Malli voi toimia tällä laitteella, tai Myne voi lähettää pyynnön nimeämällesi palvelulle. Silloin muistiinpanosi poistuvat tältä laitteelta. ”Tällä laitteella” on oletus ja tarkoittaa, ettei mihinkään palveluun oteta yhteyttä lainkaan.",
+      "providerChooseHelper": "Malli voi toimia tällä laitteella, tai Myne voi lähettää pyynnön nimeämällesi palvelulle. ”Tällä laitteella” on oletus ja tarkoittaa, ettei mihinkään palveluun oteta yhteyttä lainkaan.",
       "providerChooseLabel": "Valitse palveluntarjoaja",
       "providerKeySave": "Tallenna tämä avain",
       "providerOnDevice": "Tällä laitteella",
@@ -3890,56 +3743,90 @@
       "externalAccess": {
         "label": "Ulkoinen pääsy",
         "helperOff": "Pois päältä. Mikään tekoälytyökalu ei pääse tähän holviin `myne-mcp`:n kautta.",
-        "explanationShared": "Tämä on sama kytkin kuin Asetukset, CLI, Pääsy päätteestä. Yksi ovi, kaksi sisäänkäyntiä: `myne` on sinun ohjaamasi ja `myne-mcp` sen tekoälytyökalun, jonka määrität.",
-        "explanationLabel": "Yhteyden nimi on tunniste, ei salasana. Myne ei voi erottaa toisistaan kahta ohjelmaa, jotka toimivat tilisi alla, eikä tarkista mitään sen lisäksi, että ovi on auki.",
-        "explanationDevice": "Hyväksynnät tallennetaan tälle laitteelle. Toinen tietokone tai puhelin aloittaa ilman mitään ja on kysyttävä uudelleen.",
-        "outsideMyne": "Mitä yhdistetty työkalu luetulla tekee, on Mynen ulkopuolella: se toimii tällä koneella, sillä on oma verkkopääsynsä, eikä Myne näe, minne se lähettää mitään.",
+        "helperOn": "Päällä niin kauan kuin tämä holvi on avattuna. Myne ei näe, mitä yhdistetty työkalu tekee lukemallaan.",
+        "empty": "Ei vielä yhteyttä",
+        "outsideMyne": "Ohjelma on erillinen. Sillä on oma verkkopääsynsä, eikä Myne näe, minne se lähettää mitään lukemaansa.",
+        "infoOneDoor": "Yksi ovi, kaksi sisäänkäyntiä: sama kytkin avaa `myne`-pääteasiakkaan, jota sinä käytät, ja `myne-mcp`:n, jota määrittämäsi työkalu käyttää.",
+        "infoNotACredential": "Yhteyden nimi ratkaisee, mitä jaetaan ja kenelle, ei sitä, kuka kysyy: mikä tahansa sinun tunnuksellasi toimiva ohjelma voi käyttää mitä tahansa nimeä.",
+        "infoBudget": "Lukuja rajoitetaan yhteyksittäin liukuvassa ikkunassa, ja laskuri on muistissa: Mynen sulkeminen nollaa sen. Se hidastaa, ei lukitse.",
+        "accessLabel": "Kansiot, joita tämä yhteys saa käyttää",
+        "accessNothing": "Ei vielä mitään",
         "readFailed": "Yhteysluetteloa ei juuri nyt voitu lukea. Myne ei ole kertonut, ettei mitään ole hyväksytty.",
         "retry": "Yritä uudelleen",
         "readSummary": "Saa lukea {{count}} muistiinpanoa {{folders}} kansiossa.",
         "readSummary_one": "Saa lukea {{count}} muistiinpanon {{folders}} kansiossa.",
         "readSummary_other": "Saa lukea {{count}} muistiinpanoa {{folders}} kansiossa.",
-        "writeNone": "Saa kirjoittaa mitään. Tämä versio myöntää vain lukuja.",
+        "readNothing": "Ei lue mitään: jokainen kansio on jätetty pois.",
+        "wholeVault": "Lukee koko holvin: yhtään kansiota ei ole jätetty pois.",
+        "writeNone": "Ei kirjoita mihinkään.",
+        "writeSummary": "Kirjoittaa kansioon {{folders}}.",
+        "toolsAll": "Jokainen työkalu on käytettävissä.",
+        "toolsOff": "{{count}} työkalua pois: {{verbs}}.",
+        "toolsOff_one": "{{count}} työkalu pois: {{verbs}}.",
+        "toolsOff_other": "{{count}} työkalua pois: {{verbs}}.",
         "whenLine": "Hyväksytty {{approved}}. Viimeksi käytetty {{used}}.",
         "whenLineNever": "Hyväksytty {{approved}}. Ei käytetty sen jälkeen.",
         "revoke": "Peruuta",
         "revokeFailed": "Yhteyttä ei voitu peruuttaa. Se voi silti lukea sen, mitä sille annettiin.",
-        "snippetToggle": "Asennuskatkelma",
-        "snippetHelper": "Liitä tämä tekoälytyökalusi MCP-määritykseen. Nimen täytyy täsmätä yllä olevan yhteyden nimeen, koska hyväksyntä avainnetaan tuon nimen perusteella.",
+        "editExclusions": "Muuta sitä, mitä se saa käyttää",
         "rootFolder": "Holvin juuri",
-        "addConnection": "Hyväksy yhteys",
-        "dialogTitleNew": "Hyväksy yhteys",
-        "dialogTitle": "Hyväksy {{name}} uudelleen",
+        "requestsTitle": "Odottaa sinua",
+        "requestLineWrite": "{{connection}} haluaa kirjoittaa kansioon {{folder}}.",
+        "requestLineWriteTyped": "{{connection}} haluaa kirjoittaa kansioon {{folder}}: \"{{summary}}\"",
+        "requestLineRead": "{{connection}} haluaa lukea kansion {{folder}}.",
+        "requestAccept": "Salli",
+        "requestDismiss": "Hylkää",
+        "requestAccepted": "{{connection}} saa nyt käyttää kansiota {{folder}}.",
+        "requestStale": "Pyyntö ei ole enää voimassa. Mitään ei muuttunut.",
+        "requestFailed": "Pyyntöä ei voitu ratkaista. Mitään ei muuttunut.",
+        "addConnection": "Lisää yhteys",
+        "step1Title": "Työkalu",
+        "step2Title": "Käyttöönotto",
+        "step3Title": "Käyttöoikeus",
+        "step1Question": "Mikä työkalu on yhdistämässä?",
+        "otherClientsDetail": "raakakomento",
+        "otherClientsHelper": "Mikä tahansa MCP-asiakas voi suorittaa tämän komennon. Anna sille alla asettamasi yhteyden nimi.",
+        "configPath": "Lisää tämä tiedostoon {{path}} ja käynnistä työkalu uudelleen.",
         "nameLabel": "Yhteyden nimi",
-        "namePlaceholder": "claude-desktop",
-        "nameHelper": "Nimi, jonka asiakas lähettää. Se on tunniste, ei salasana: mikä tahansa ohjelma tällä koneella voi käyttää mitä tahansa nimeä, joten tämä päättää, mitä jaetaan kenelle, ei sitä, kuka kysyy.",
-        "nameReserved": "Tämä nimi on varattu: asiakas, jolle ei ole määritetty nimeä, saapuu nimellä `unnamed-client`, joten sen hyväksyminen hyväksyisi jokaisen nimeämättömän asiakkaan.",
-        "nameEmpty": "Yhteydellä tarvitsee olla nimi, koska hyväksyntä avainnetaan sen perusteella.",
-        "countsPending": "Selvitetään, mitä se kattaa…",
-        "countsNotes": "Jakaa {{count}} muistiinpanoa {{folders}} kansiossa.",
-        "countsNotes_one": "Jakaa {{count}} muistiinpanon {{folders}} kansiossa.",
-        "countsNotes_other": "Jakaa {{count}} muistiinpanoa {{folders}} kansiossa.",
-        "countsExcluded_one": "{{count}} kansio rajattu pois.",
-        "countsExcluded_other": "{{count}} kansiota rajattu pois.",
+        "nameClaim": "Nimike, ei salasana: mikä tahansa ohjelma tällä koneella voi käyttää mitä tahansa nimeä.",
+        "clientToolsNote": "{{name}} voi myös suodattaa, mitä työkaluja se käyttää. Se on mukavuus: sen, minkä tämä näyttö sallii, Myne myös toteuttaa.",
+        "copySnippet": "Kopioi käyttöönottoteksti",
+        "back": "Takaisin",
+        "next": "Seuraava",
         "excludeLabel": "Jätä pois",
-        "excludePlaceholder": "Ei mitään jätetty pois",
-        "excludeSearch": "Etsi kansio",
-        "excludeEmpty": "Mikään kansio ei vastaa.",
-        "excludeHelper": "Jättämäsi kansio ei jaeta, eikä mikään sen sisällä. Valitset kaikista tämän holvin kansioista, joten tämä on se paikka, jossa koko holvi on pöydällä.",
         "approve": "Hyväksy",
-        "grantRefused": "Tämä hyväksyntä ei mahtuisi holvin asetusbudjettiin. Mitään ei muuttunut. Peruuta yhteys, jota et enää käytä, ja yritä uudelleen.",
         "grantFailed": "Hyväksyntää ei voitu tallentaa. Mitään ei muuttunut.",
         "verb": {
+          "note_search": "Hae muistiinpanoja",
+          "note_read": "Lue muistiinpano",
+          "vault_list": "Listaa kansiot",
+          "vault_state": "Holvin yhteenveto",
+          "note_create": "Luo muistiinpano",
+          "note_append": "Lisää muistiinpanon loppuun",
+          "note_set_field": "Aseta muistiinpanon kenttä",
+          "note_move": "Siirrä muistiinpano",
+          "note_edit": "Muokkaa muistiinpanoa",
           "attachment_list": "Listaa tiedostot",
           "attachment_read": "Lue tiedoston teksti",
           "calendar_read": "Lue kalenteri",
           "view_list": "Listaa tallennetut näkymät"
         },
+        "emptyBody": "Hyväksyminen on se, mikä antaa asentamasi työkalun lukea tätä holvia, pois lukien ne kansiot, jotka jätät pois.",
+        "trademarks": "Myne ei ole sidoksissa näihin työkaluihin eikä mikään niistä tue tai sponsoroi sitä. Nimet ja logot kuuluvat niiden omistajille.",
         "wholeVaultLabel": "Lue ja kirjoita koko holvi",
         "excludeNothing": "Ei mitään pois jätetty",
+        "scopeLineAll": "Jokainen olemassa oleva kansio on luettavissa ja kirjoitettavissa, ellet jätä sitä pois alla. Myöhemmin luomasi kansio on luettavissa, mutta ei kirjoitettavissa, ennen kuin nimeät sen.",
+        "writeRestore": "Kirjoitus jättää palautuspisteen, jonka voit peruuttaa.",
         "scopeLine": "Tavoittaa {{count}} muistiinpanoa {{folders}} kansiossa ja voi muuttaa niissä kaikkea.",
+        "scopeLine_one": "Tavoittaa {{count}} muistiinpanon {{folders}} kansiossa ja voi muuttaa kaikkea nimeämissäsi kansioissa.",
+        "scopeLine_other": "Tavoittaa {{count}} muistiinpanoa {{folders}} kansiossa ja voi muuttaa kaikkea nimeämissäsi kansioissa.",
+        "findFolder": "Etsi kansio",
+        "noFolderMatches": "Yksikään kansio ei vastaa.",
+        "toolsLabel": "Työkalut",
+        "toolUnavailable": "ei tässä koosteessa",
         "toolsNote": "Lukemisilla on kiintiö: enintään {{count}} muistiinpanoa {{minutes}} minuutissa.",
         "needsReapproval": "Vanhempi versio hyväksyi sen päinvastaisella säännöllä. Tämä kooste ei lue sille mitään ennen kuin hyväksyt uudelleen.",
+        "approveAgain": "Hyväksy uudelleen",
         "scopeLineWords": "Tavoittaa nimeämäsi kansiot ja voi muuttaa niissä kaikkea."
       },
       "autoApplyLabel": "Ota ehdotetut tunnisteet käyttöön automaattisesti",
@@ -3973,7 +3860,7 @@
       "folderListFull": "Tuo kansioluettelo on täynnä. Poista siitä kansio, ennen kuin lisäät uuden."
     },
     "reminders": {
-      "aria": "Näytä tehtävämuistutukset tällä laitteella",
+      "aria": "Tehtävämuistutukset tällä laitteella",
       "exactAllow": "Salli",
       "exactLabel": "Tarkka ajoitus",
       "exactOn": "Päällä",
@@ -3993,8 +3880,6 @@
       "autoLockSearchPlaceholder": "Etsi kestoja…",
       "hideVaultNamesLabel": "Piilota holvien nimet lukitusnäytöltä",
       "hideVaultNamesHelper": "Laitteella, jolla on käytettävissä oleva avainnippu, holvivalitsin näyttää holvin nimen sen jälkeen, kun tämä laite on avannut sen. Kun tämä on päällä, jokainen holvi näyttää sen sijaan paikanvaraajan, kuten Holvi 2, ja tuo numero pysyy holvilla riippumatta siitä, miten luettelo järjestyy uudelleen.",
-      "hideVaultNamesErases": "Käyttöönotto tuhoaa avaimet, jotka tekevät tänne tallennetuista nimistä luettavia, joten niitä nimiä ei voi palauttaa tällä laitteella, eikä uusia nimiä kirjoiteta niin kauan kuin asetus on päällä.",
-      "hideVaultNamesResidue": "Se ei ylety aiemmin otettuun kopioon: koko järjestelmän varmuuskopio, levykuva tai mikä tahansa muu järjestelmätason kopio tästä levystä, joka on otettu nimien näkyessä, sisältää sekä tallennetut nimet että niiden avaimet.",
       "hideVaultNamesUnavailable": "Myne ei voi tallentaa holvien nimiä tässä sovelluksen kopiossa, joten se ei tallenna niitä tänne eikä tätä asetusta voi ottaa käyttöön. Valitsin näyttää jo paikanvaraajan jokaiselle holville.",
       "hideVaultNamesErrorRead": "Nykyistä asetusta ei voitu lukea. Aseta se uudelleen kytkimellä.",
       "hideVaultNamesErrorSave": "Asetusta ei voitu tallentaa, joten se on ennallaan. Jos olit ottamassa sitä käyttöön, osa tallennetuista nimistä on saatettu jo tuhota; ota se uudelleen käyttöön viimeistelläksesi.",
@@ -4049,27 +3934,12 @@
       "setPin": "Aseta PIN",
       "setupHelper": "Touch ID on vain macOS:lle ja tällä hetkellä kokeellinen (odottaa laitteistovahvistusta). PIN toimii kaikkialla.",
       "title": "Pika-avaus",
-      "useTouchId": "Käytä Touch ID:tä",
-      "pinTooShort": "PIN-koodissa on oltava vähintään 6 numeroa.",
-      "pinMismatch": "PIN-koodit eivät täsmää.",
-      "pinOnToast": "PIN-pika-avaus on käytössä",
       "setupError": "Pika-avauksen määrittäminen epäonnistui.",
-      "turnedOffToast": "Pika-avaus poistettu käytöstä",
       "turnOffError": "Pika-avauksen poistaminen käytöstä epäonnistui",
-      "biometricOnToast": "{{method}}-pika-avaus on käytössä",
       "biometricUnavailable": "{{method}} ei ole käytettävissä tällä laitteella.",
-      "warningBanner": "Vain kätevyyttä varten. PIN-koodia käytettäessä salasanasi vaaditaan taas uudelleenkäynnistyksen jälkeen; sormenjälki- tai kasvotunnistus riittää myös uudelleenkäynnistyksen jälkeen.",
-      "biometricToggleSubtitle": "Avaa lukitus {{method}}-tunnistuksella automaattilukituksen jälkeen",
-      "pinOnLead": "PIN-pika-avaus on ",
-      "pinOnEmphasis": "käytössä",
-      "pinOnRest": ". Kun holvi lukittuu automaattisesti, voit avata sen uudelleen PIN-koodilla koko salasanan sijaan (vain tämän sovellusistunnon ajan). Kylmäkäynnistys vaatii aina koko salasanan.",
-      "turnOffPin": "Poista PIN käytöstä",
       "pinSetupHelper": "Aseta vähintään 6-numeroinen PIN-koodi avataksesi lukituksen nopeasti automaattilukituksen jälkeen. PIN-koodi suojaa laitekohtaista avainta: se ei koskaan poistu tältä laitteelta eikä koskaan kosketa palautuslausettasi.",
       "pinReplacesBiometric": " PIN-koodin asettaminen korvaa {{method}}-tunnistuksen.",
-      "pinPlaceholder6": "Vähintään 6 numeroa",
-      "confirmPin": "Vahvista PIN",
-      "reenterPin": "Syötä PIN uudelleen",
-      "setupButton": "Määritä pika-avaus",
+      "useBiometric": "Käytä {{method}}-tunnistusta",
       "errorBiometricAuthFailed": "Touch ID -tunnistuksen käyttöönotto ei onnistunut. Varmista, että sormenjälki on rekisteröity järjestelmäasetuksissa, tai käytä sen sijaan PIN-koodia.",
       "biometricAuthFailed": "{{method}} ei voitu ottaa käyttöön. Varmista, että se on käytössä laitteesi asetuksissa, tai käytä sen sijaan PIN-koodia."
     },
@@ -4118,7 +3988,7 @@
       "mobileUnavailable": "Oikoluku ei ole vielä käytettävissä tässä puhelimessa: tällä laitteella ei ole sanakirjaa, joten muokkain ei voi alleviivata täällä mitään. Ota se käyttöön tietokoneeltasi."
     },
     "storage": {
-      "backupHelper": "Varmuuskopiot pysyvät täsmälleen yhtä salattuina kuin holvisi, yhtenä tarkistettuna .myne-backup-tiedostona. Palauttaminen onnistuu kyseisen holvin salasanalla tai palautuslauseella, aivan kuten avattaessa.",
+      "backupHelper": "Varmuuskopiot pysyvät täsmälleen yhtä salattuina kuin holvisi, yhtenä tarkistettuna .myne-backup-tiedostona. Palauttaminen onnistuu kyseisen holvin salasanalla, aivan kuten avattaessa.",
       "backupLabel": "Varmuuskopio",
       "backUpVault": "Varmuuskopioi holvi…",
       "exportAction": "Vie…",
@@ -4128,14 +3998,10 @@
       "importHelper": "Tuo muistiinpanoja Obsidianista, Notionista, Evernotesta, HTML-tiedostoista tai CSV-tiedostosta. Kaikki tuodaan ja salataan saman tien; alkuperäiset tiedostosi jätetään koskemattomiksi.",
       "importLabel": "Tuo",
       "importObsidian": "Tuo muistiinpanoja…",
-      "locationHelper": "Jokainen holvi on kansio salattuja tiedostoja tämän polun alla. Suosi alla olevaa Varmuuskopioi-painiketta manuaalisten kopioiden sijaan: se tarkistaa kirjoitetun tiedoston.",
-      "openInFiles": "Avaa Finderissa",
       "webLocationHelper": "Muistiinpanosi sijaitsevat tämän selaimen tälle sivustolle varaamassa tallennustilassa, jota selain hallinnoi. Avattavaa kansiota ei ole. Tämän sivuston tietojen tyhjentäminen poistaa paikallisen kopion; koska tämä asiakasohjelma synkronoi, se latautuu takaisin, kun kirjaudut uudelleen sisään.",
       "webLocationLabel": "Missä muistiinpanosi säilytetään",
-      "pathUnavailable": "Polku ei käytettävissä",
       "restoreBackup": "Palauta varmuuskopiosta…",
       "sections": {
-        "location": "Missä holvi sijaitsee",
         "backup": "Varmuuskopiointi ja palautus",
         "transfer": "Tuonti ja vienti"
       }
@@ -4172,6 +4038,8 @@
     "data": {
       "exported_one": "Vietiin {{count}} muistiinpano → {{label}}",
       "exported_other": "Vietiin {{count}} muistiinpanoa → {{label}}",
+      "exportedChoose_one": "Vietiin {{count}} muistiinpano. Valitse, minne kopio tallennetaan.",
+      "exportedChoose_other": "Vietiin {{count}} muistiinpanoa. Valitse, minne kopio tallennetaan.",
       "exportNeedsApp": "Vienti vaatii sovelluksen (ei selaimen esikatselua).",
       "exportFailed": "Holvin vieminen epäonnistui.",
       "exportToMarkdown": "Vie Markdowniksi",
@@ -4184,7 +4052,6 @@
       "vaultName": "Holvin nimi",
       "approveDevice": "Hyväksy laite"
     },
-    "done": "Valmis",
     "sectionOptions": "Valinnat",
     "footerTagline": "myne · salattu tällä laitteella · avoin lähdekoodi",
     "editor": {
@@ -4199,18 +4066,11 @@
         "heading": "Viekas kettu punaturkki",
         "bullet1": "Pakkaa laatikkooni viisi tusinaa juomakannua",
         "bullet2": "Kuinka ärsyttävän nopeasti hassut seeprat hyppäävät",
-        "spellCaption": "Oikoluku",
-        "spellSample": "kirjotusvirhe",
         "dateTime": "Päivämäärä ja kellonaika",
         "toolbar": "Työkalurivi",
-        "task": "Tehtävät",
         "taskSampleOpen": "Lähetä neljännesvuosiraportti",
         "taskSampleDone": "Varaa tila"
       },
-      "defaultView": "Oletusnäkymä",
-      "typewriter": "Kirjoituskonevieritys",
-      "typewriterSubtitle": "Pidä kohdistin pystysuunnassa keskellä",
-      "enableArchiving": "Ota arkistointi käyttöön",
       "taskChipColor": {
         "accent": "Korostus",
         "danger": "Punainen",
@@ -4225,7 +4085,8 @@
         "label": "Vain ikonin prioriteetti"
       },
       "topics": {
-        "periodic": "Jaksottaiset muistiinpanot"
+        "periodic": "Jaksottaiset muistiinpanot",
+        "calendar": "Kalenteri"
       }
     },
     "search": {
@@ -4301,18 +4162,18 @@
         "periodicNotes": "jaksottaiset muistiinpanot viikoittainen kuukausittainen viikko kuukausi kansio malli muoto",
         "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö",
         "screenCaptureOverride": "näytönkaappaus ohitus salli poista käytöstä suurennuslasi näytönsuurennusohjelma etätyöpöytä saavutettavuus avaaminen avaus musta ikkuna näyttö screen capture override",
-        "aiMemory": "muisti muistetut faktat avustaja oppii persoonallisuus äänensiirtymäasetukset",
+        "aiMemory": "muisti muistetut faktat avustaja oppii persoonallisuus sävyasetukset",
         "ribbon": "vasen nauha kisko kiinnitä pin komento komennot mukauta järjestä irrota työkalupalkki pikanäppäimet",
         "folderNotes": "kansio muistiinpano indeksi folder_index laskeutumissivu kaksoisnapsautus kansiolinkki projektit pois poista käytöstä",
-        "syncMembers": "jäsenet, jaa, kutsu, tiimi, yhteistyö, valtiointi",
+        "syncMembers": "jäsenet, jaa, kutsu, tiimi, yhteistyö, holvi",
         "accountVaults": "tili holvit ryhmitelty mitkä holvit kuuluvat ryhmä luettelo",
         "aiMeetingPrompt": "kokous tiivistelmä kehote ohje mukautettu litterointi toimenpiteet päätökset",
         "update": "päivitys päivitä tarkista päivitykset uusi versio julkaisu lataa",
         "plainFile": "pelkkä tiedosto muokkain markdown paikallinen levy holvin ulkopuolinen selkoteksti avaa paikan päällä",
         "memberPassword": "jaettu holvi salasana jäsen avaa liity lause",
         "bar": "alapalkki tilarivi ilmaisimet mukauta järjestä piilota näytä työkalurivi",
-        "vaultFormat": "holvin muoto päivitä yhden lauseen palautus eläköity holvi palautuslause siirrä identiteetti",
-        "externalAccess": "ulkoinen pääsy MCP myne-mcp Claude Desktop asiakas yhteys hyväksy rajaus peruuta",
+        "vaultFormat": "holvin muoto päivitä holvin lause lopeta käyttö palautuslause vain salasana siirrä identiteetti",
+        "externalAccess": "ulkoinen pääsy MCP myne-mcp Claude Desktop Cursor VS Code Hermes asiakas yhteys hyväksy rajaus peruuta työkalut kiintiö",
         "diagnosticLog": "diagnostiikkaloki lokitus virheenjäljitys vianmääritys kaatumisraportti virheraportti tuki"
       },
       "emptyBody": "Kokeile lyhyempää sanaa tai paneelin nimeä."
@@ -4327,16 +4188,26 @@
       "time24": "24 tunnin kello",
       "time12": "12 tunnin kello",
       "zoneLabel": "Aikavyöhyke",
-      "zoneHelper": "Vyöhyke, joka ratkaisee, mikä lasketaan tämänpäiväiseksi ja siten minkä muistiinpanon päivittäiset, viikoittaiset ja kuukausittaiset muistiinpanosi avaavat. Jätä tyhjäksi, niin Myne seuraa tätä laitetta. Valinta säilyy laitekohtaisesti: mikään toinen laite ei korvaa sitä, joten ohitus voi asettaa tämän laitteen eri päivään kuin muut laitteesi. Muistiinpanoon kirjoittamiasi kellonaikoja ei koskaan muuteta; 09:00 pysyy 09:00 kaikkialla.",
+      "zoneHelper": "Jätä tyhjäksi, niin Myne seuraa tätä laitetta. Valinta säilyy laitekohtaisesti: mikään muu laite ei korvaa sitä, joten ohitus voi asettaa tämän laitteen eri päivään kuin muut laitteesi. Muistiinpanoon kirjoittamiasi kellonaikoja ei koskaan muuteta; 09:00 pysyy 09:00 kaikkialla.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne ei tunne tuota aikavyöhykettä. Käytä nimeä, kuten Europe/Berlin.",
       "errorSave": "Tuota asetusta ei voitu tallentaa.",
       "zoneInline": "Mikä vyöhyke ratkaisee, mikä lasketaan tämänpäiväiseksi ja siten minkä muistiinpanon päivittäiset, viikoittaiset ja kuukausittaiset muistiinpanosi avaavat."
     },
+    "calendar": {
+      "anchorLabel": "Koko päivän muistutuksen aika",
+      "anchorHelper": "Mihin kellonaikaan koko päivän tapahtuman muistutus laukeaa. Ajastettu tapahtuma laskee sen sijaan omasta alkamisestaan taaksepäin.",
+      "coloursLabel": "Kalenterien värit",
+      "coloursHelper": "Jokainen kalenteri piirtyy valitsemallasi värillä. Värit tulevat teemasta, joten teeman vaihtaminen maalaa kalenterin uudelleen.",
+      "coloursEmpty": "Yhdelläkään kalenterilla ei ole vielä väriä. Lisää yksi alle, tai anna tapahtumalle kalenterin nimi, niin se ilmestyy tänne.",
+      "newNameLabel": "Uuden kalenterin nimi",
+      "newNamePlaceholder": "Työ",
+      "addColour": "Lisää",
+      "saveFailed": "Asetusta ei voitu tallentaa. Holvisi ei ole muuttunut."
+    },
     "folderNotes": {
       "label": "Kansion muistiinpanot",
-      "helper": "Salli muistiinpanon toimia kansion indeksinä: se avautuu kun kaksoisnapsautat kansiota, ja kansiolinkit kuten [[Projects/]] osoittavat siihen. Poissa oletuksena. Poistaminen piilottaa kansiomuistiinpanon luomispainikkeet ja näyttää jo olemassa olevat tavallisina muistiinpanoina; se ei muuta mitään levylä, joten uudelleen ottaminen palauttaa ne täsmälleen.",
-      "errorSaveSetting": "Tätä asetusta ei voitu tallentaa.",
+      "helper": "Oletuksena pois päältä. Käytöstä poistaminen piilottaa kansiomuistiinpanojen luontipainikkeet ja näyttää jo olemassa olevat tavallisina muistiinpanoina; se ei muuta levyltä mitään, joten uudelleen käyttöön ottaminen palauttaa ne täsmälleen.",
       "inline": "Salli muistiinpanon toimia kansion indeksinä: se avautuu, kun kaksoisnapsautat kansiota, ja kansiolinkit kuten [[Projects/]] osoittavat siihen."
     },
     "ribbonCustomize": {
@@ -4350,7 +4221,7 @@
       "searchEmpty": "Ei vastaavia komentoja.",
       "searchPlaceholder": "Etsi komentoja…",
       "searchResultsLabel": "Vastaavat komennot",
-      "showHelper": "Näytä vasen nauha tällä laitteella.",
+      "showHelper": "Vain tällä laitteella.",
       "showLabel": "Näytä vasen nauha",
       "emptyTitle": "Ei vielä kiinnitettyjä kohteita"
     },
@@ -4358,11 +4229,8 @@
       "heading": "Mitä avustaja muistaa",
       "helper": "Tiedot, jotka AI oppi työskentelemällä kanssasi. Se kirjoittaa ne itse (enintään yhden suoritusta kohti); näet ja voit korjata jokaisen. Merkinnät synkronoituvat muille laitteillesi ja pysyvät salattuina.",
       "empty": "Merkinnät ilmestyvät tähän, kun avustaja oppii jotain suorituksen aikana.",
-      "editLabel": "Muokkaa",
       "deleteLabel": "Poista",
       "save": "Tallenna",
-      "cancel": "Peruuta",
-      "cancelLabel": "Peruuta",
       "saveFailed": "Merkintää ei voitu tallentaa.",
       "deleteFailed": "Merkintää ei voitu poistaa.",
       "entryUnreadable": "Tätä merkintää ei voitu lukea. Se on yhä tallennettu; poista se tästä tai korjaa Asetuksissa.",
@@ -4373,28 +4241,26 @@
       "clearAllLabel": "Tyhjennä koko muisti",
       "clearConfirm": "Poistetaanko todella jokainen merkintä? Tätä ei voi kumota.",
       "updatedAt": "Päivitetty {{val}}",
-      "personalityLabel": "Äänensiirtymäasetuksesi",
-      "personalityHelper": "Yksi ohje rivillä. Nämä muovaavat, miten avustaja kirjoittaa jokaisessa suorituksessa: sävy, pituus, kieli. Tallennetaan valtiointiin ja synkronoidaan.",
+      "personalityLabel": "Sävyasetuksesi",
+      "personalityHelper": "Yksi ohje rivillä. Nämä muovaavat, miten avustaja kirjoittaa jokaisessa suorituksessa: sävy, pituus, kieli. Tallennetaan holviin ja synkronoidaan.",
       "personalityPlaceholder": "Pidä vastaukset lyhyinä, päätelmä ensin.",
-      "personalitySaveLabel": "Tallenna äänensiirtymäasetukset",
-      "personalitySavedToast": "Äänensiirtymäasetukset päivitetty.",
-      "personalitySaveFailed": "Äänensiirtymäasetuksia ei voitu tallentaa.",
-      "loadFailed": "Muistoja tai äänensiirtymäasetuksia ei voitu ladata. Mitään ei muutettu.",
-      "retryLabel": "Yritä uudelleen",
+      "personalitySaveLabel": "Tallenna sävyasetukset",
+      "personalitySavedToast": "Sävyasetukset päivitetty.",
+      "personalitySaveFailed": "Sävyasetuksia ei voitu tallentaa.",
+      "loadFailed": "Muistoja tai sävyasetuksia ei voitu ladata. Mitään ei muutettu.",
       "seed": {
-        "rowTitle": "Opeta Myne holvisi",
         "rowHelper": "Rakenna muisti kerran muistiinpanoistasi, tarkistaen jokainen rivi ennen tallennusta.",
         "rowSeeded": "Luotu {{date}} · {{count}} merkintää",
-        "start": "Opeta Myne holvisi",
         "rebuild": "Rakenna uudelleen",
         "rebuildConfirm": "Korvataanko siementäminen {{date}} ({{count}} merkintää)?",
         "title": "Opeta Myne holvisi",
         "candidatesTitle": "Tarkista, mitä Myne oppi",
-        "close": "Sulje",
         "loading": "Luetaan holviasi…",
         "scopeIntro": "Myne lukee ensin holvisi rakenteen: muistiinpanojen otsikot, kansiot ja tunnisteet. Se pyytää muistiinpanojen tekstiä vain tarvittaessa, eikä koskaan liitteitä.",
         "provider": "Palveluntarjoaja: {{provider}}",
         "estimatedChars": "Noin {{chars}} merkkiä",
+        "excluded_one": "{{count}} muistiinpano jätetty pois, koska sen kansio on rajattu pois tekoälyltä",
+        "excluded_other": "{{count}} muistiinpanoa jätetty pois, koska niiden kansio on rajattu pois tekoälyltä",
         "showPayload": "Näytä täsmälleen, mitä lähetetään",
         "hidePayload": "Piilota sisältö",
         "consentLabel": "Lähetä tämä hahmotelma palveluun {{provider}} (noin {{chars}} merkkiä). Ymmärrän, että palvelu vastaanottaa sen.",
@@ -4432,7 +4298,7 @@
         },
         "phases": {
           "projecting": "Luetaan holvisi rakennetta…",
-          "asking": "Pyydetään malleja teemoja…",
+          "asking": "Pyydetään mallilta muistimerkintöjä…",
           "reading": "Luetaan muistiinpanoja, joita malli pyysi…",
           "finalizing": "Kirjoitetaan merkintöjä…",
           "working": "Työstetään…"
@@ -4443,13 +4309,13 @@
         "removeConfirm": "Poistetaanko kaikki tämän siementämisen merkinnät?",
         "removedToast": "Merkinnät holvistasi poistettu.",
         "rowStale": "Holvi on muuttunut tämän siementämisen jälkeen",
-        "providerLocalName": "Provider: on this device",
-        "countNotes_one": "{{count}} note",
-        "countNotes_other": "{{count}} notes",
-        "countFolders_one": "{{count}} folder",
-        "countFolders_other": "{{count}} folders",
-        "countTags_one": "{{count}} tag",
-        "countTags_other": "{{count}} tags"
+        "providerLocalName": "Palveluntarjoaja: tällä laitteella",
+        "countNotes_one": "{{count}} muistiinpano",
+        "countNotes_other": "{{count}} muistiinpanoa",
+        "countFolders_one": "{{count}} kansio",
+        "countFolders_other": "{{count}} kansiota",
+        "countTags_one": "{{count}} tunniste",
+        "countTags_other": "{{count}} tunnistetta"
       },
       "emptyTitle": "Ei vielä mitään muistissa",
       "count": "{{used}} / {{cap}}",
@@ -4459,24 +4325,23 @@
       "vaultsLabel": "Tilin holvit",
       "vaultsHelper": "Holvit, jotka tämä laite ryhmittelee yhteen. Ryhmittely on laitekohtainen järjestelyvalinta, joten se ei ole minkään holvin sisältöä eikä matkusta sen mukana.",
       "vaultsHelperShort": "Ryhmittely jää tälle laitteelle eikä matkusta holvin mukana.",
-      "vaultsCount_one": "{{count}} holvia",
+      "vaultsCount_one": "{{count}} holvi",
       "vaultsCount_other": "{{count}} holvia",
       "vaultCorrupted": "Tämän holvin metatietoja ei voitu lukea",
       "vaultUnreadable": "Ei luettu tällä laitteella",
-      "vaultDeviceOnly": "Vain laite",
       "currentVault": "Tämä holvi",
       "unknownVault": "Toinen holvi tällä laitteella",
       "numberLabel": "Tilinumero",
       "numberHelper": "Identiteettisi numero, ei holvin. Johdettu identiteettilauseestasi, joten se ei voi kadota eikä sitä tarvitse tallentaa. Se ei ole salaisuus; käytä sitä tukeen tai palvelimen ylläpitäjän luovutukseen.",
       "numberUnavailable": "Tilinumeroa ei voitu lukea tällä laitteella. Avaa Asetukset uudelleen yrittääksesi.",
       "numberEmpty": "Tällä laitteella ei ole identiteettiä. Lisää tai palauta se kohdassa Synkronointi saadaksesi tilinumeron.",
-      "numberCopy": "Kopioi",
       "numberCopied": "Tilinumero kopioitu",
       "numberCopyFailed": "Tilinumeroa ei voitu kopioida",
       "copyAccountNumber": "Kopioi tilinumero",
       "standaloneHelper": "Tätä holvia ei ole ryhmitelty tilin alle tällä laitteella, joten se on itsenäinen. Ryhmittely on laitekohtaista: toinen laite saattaa näyttää sen tilin sisällä.",
       "unresolvedHelper": "Selvitetään, mikä holvi on auki…",
       "devicesNote": "Laitteita, jaetun holvin jäseniä ja identiteettiä hallinnoidaan kohdassa Synkronointi.",
+      "noStoreHelper": "Tällä laitteella ei ole käyttöjärjestelmän avainsäilöä, joten se ei voi säilyttää tilin ryhmittelyä. Holvit avautuvat täällä erikseen, ja toinen laite voi näyttää ne yhdessä.",
       "groupingError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muuttunut.",
       "sections": {
         "grouping": "Tämä tili"
@@ -4489,14 +4354,12 @@
       "openFilesRemain": "Tiedostoja, joissa on tallentamattomia muutoksia, on yhä auki. Ratkaise ne ja kytke tämä sitten uudelleen pois."
     },
     "memberPassword": {
-      "reminder": "Tällä laitteella ei ole vielä pika-avausta, joten tämä holvi kysyy palautuslausettasi joka kerta.",
-      "reminderDismiss": "Ei nyt",
+      "reminder": "Aseta sellainen, jotta tämä laite voi avata holvin uudelleen.",
       "title": "Jaetun holvin avaus",
       "helperConfigured": "Tämä jaettu holvi avautuu tälle laitteelle tallennetulla menetelmällä {{method}}.",
-      "helperNotConfigured": "Aseta salasana tai PIN-koodi, jotta sinun ei tarvitse kirjoittaa palautuslausettasi uudelleen joka kerta.",
+      "helperNotConfigured": "Aseta salasana tai PIN-koodi, jotta tämä laite voi avata holvin uudelleen. Ilman sellaista sen uudelleenavaaminen täällä vaatii omistajalta uuden kutsun.",
       "set": "Aseta",
       "change": "Vaihda",
-      "remove": "Poista",
       "label": "Holvin salasana",
       "methodPassword": "salasana",
       "methodPin": "PIN-koodi",
@@ -4505,8 +4368,8 @@
       "useBiometric": "Käytä Touch ID -tunnistusta",
       "pinLabel": "Holvin PIN-koodi",
       "pinPlaceholder": "PIN-koodi, vähintään {{count}} numeroa",
-      "setupHelper": "Vähintään {{count}} merkkiä. Tallennetaan vain tälle laitteelle; palautuslauseesi avaa holvin silti missä tahansa.",
-      "pinSetupHelper": "Vähintään {{count}} numeroa. Tallennetaan vain tälle laitteelle; palautuslauseesi avaa holvin silti missä tahansa.",
+      "setupHelper": "Vähintään {{count}} merkkiä. Tallennetaan vain tälle laitteelle. Jos unohdat sen, tämä laite tarvitsee holvin omistajalta uuden kutsun.",
+      "pinSetupHelper": "Vähintään {{count}} numeroa. Tallennetaan vain tälle laitteelle. Jos unohdat sen, tämä laite tarvitsee holvin omistajalta uuden kutsun.",
       "errorTooShort": "Käytä vähintään {{count}} merkkiä/numeroa.",
       "errorGeneric": "Tunnistetta ei voitu asettaa. Yritä uudelleen."
     },
@@ -4588,21 +4451,19 @@
       "emptyTitle": "Ei ristiriitoja"
     },
     "deviceJoinQr": {
-      "accountLabel": "Tilinumero",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "QR-koodin luominen ei onnistunut. Yritä uudelleen.",
       "generate": "Luo QR-koodi",
       "hint": "Liitä tilinumerosi luodaksesi QR-koodin, jonka puhelimesi voi lukea. Se täyttää palvelimen ja tilinumeron puolestasi.",
       "invalidAccount": "Tuo ei näytä kelvolliselta tilinumerolta.",
       "notConfigured": "Määritä ensin synkronointipalvelin ja luo sitten QR-koodi.",
-      "scanWithApp": "Lue iOS-sovelluksella",
+      "scanWithApp": "Lue mobiilisovelluksella",
       "title": "Kirjaudu toisella laitteella"
     },
     "devices": {
       "approve": "Hyväksy",
       "awaitingApproval_one": "{{count}} laite odottaa hyväksyntää",
       "awaitingApproval_other": "{{count}} laitetta odottaa hyväksyntää",
-      "loading": "Ladataan…",
       "noDevices": "Ei vielä muita laitteita.",
       "notEnrolled": "Tätä laitetta ei ole vielä kirjattu sisään. Jos juuri lisäsit sen, odota hyväksyntää laitteelta, joka on jo tililläsi; muuten kirjaa se sisään kohdalla “Kirjaa tämä laite sisään”.",
       "platform": {
@@ -4616,15 +4477,12 @@
         "web": "Selain",
         "windows": "Windows-tietokone"
       },
-      "remove": "Poista",
       "removedElsewhere": "Tämä laite poistettiin tililtäsi toisella laitteella.",
-      "rename": "Nimeä uudelleen",
       "renameFailed": "Nimeä ei voitu tallentaa. Yritä uudelleen.",
       "renameLabel": "Laitteen nimi",
       "resetAndReAdd": "Nollaa ja lisää tämä laite uudelleen",
       "resetSyncOnThisDevice": "Nollaa synkronointi tällä laitteella",
       "shortName": "Laite {{hex}}",
-      "thisDevice": "Tämä laite",
       "reasonUnreachable": "palvelin ei vastannut",
       "reasonUnexpected": "odottamaton virhe",
       "reasonRejected": "palvelin hylkäsi tämän laitteen kirjautumisen",
@@ -4638,7 +4496,6 @@
       "verifyMatch": "Ne täsmäävät",
       "verifyMismatch": "Ne eivät täsmää",
       "verifyPending": "Tämä koodi näkyy, kun uusi laite on suorittanut ensimmäisen synkronointinsa.",
-      "verifyChanged": "Koodi muuttui sillä aikaa kun katsoit. Vertaa molempia näyttöjä uudelleen. Jos se muuttuu yhä, keskeytä äläkä jatka.",
       "verifySyncing": "Synkronoidaan…",
       "verifyTitle": "Vahvista uusi laite",
       "verifyAction": "Vertaa koodia",
@@ -4665,7 +4522,6 @@
       "invitePlaceholder": "Koodi, jonka palvelimen ylläpitäjä antoi sinulle"
     },
     "enroll": {
-      "accountNumberLabel": "Tilinumero",
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Yhdistetään…",
       "credentialTypeAria": "Tunnistautumistapa",
@@ -4683,64 +4539,21 @@
         "inviteCodeRequired": "Tämä palvelin hyväksyy uudet tilit vain kutsukoodilla. Syötä koodi, jonka sen ylläpitäjä antoi sinulle."
       },
       "mode": {
-        "password": "Salasana",
-        "recovery": "Palautuslause"
+        "password": "Salasana"
       },
       "passwordLabel": "Salasana",
       "recoveryPhraseHint": "Syötä 24-sanainen palautuslauseesi.",
-      "recoveryPhraseLabel": "Palautuslause",
       "signInWith": "Kirjaudu tavalla",
       "submit": "Lisää tämä laite",
       "wordAria": "Sana {{number}}"
     },
     "join": {
-      "accountLabel": "Tilinumero",
       "cancel": "Peruuta",
-      "error": "Tämän laitteen lisääminen ei onnistunut. Tarkista palvelimen osoite, tilinumero ja salasana sekä että palvelimeen saa yhteyden.",
-      "help": "Kirjaudu tilinumerollasi ja salasanallasi. Tämä laite synkronoi muistiinpanosi, kun jokin olemassa oleva laite hyväksyy sen. Palautuslausetta ei tarvita.",
-      "passwordLabel": "Salasana",
       "serverLabel": "Synkronointipalvelin",
-      "serverPlaceholder": "https://your-server.example",
       "sasMatch": "Ne täsmäävät, jatka",
-      "sasMismatch": "Ne eivät täsmää, poista tämä laite",
-      "submit": "Lisää laite",
       "submitting": "Lisätään…",
-      "title": "Lisää tämä laite tiliin",
-      "verifyBody": "Tarkista, että tämä koodi täsmää sen laitteen koodin kanssa, jolta hyväksyit.",
-      "verifyChanged": "Koodi muuttui sillä aikaa kun katsoit. Vertaa molempia näyttöjä uudelleen. Jos se muuttuu yhä, keskeytä äläkä jatka.",
       "verifyTitle": "Vahvista tämä laite",
-      "waitingHint": "Pidä tämä ikkuna auki. Kun laite on hyväksytty, tähän ilmestyy vahvistuskoodi, jonka voit verrata toiseen laitteeseesi.",
-      "waitingTitle": "Odotetaan hyväksyntää",
-      "personListFailed": "Olet tällä tilillä, mutta sen holvien listaaminen ei valmistunut, joten mitään ei vielä näytetä. Yritä uudelleen tai avaa tämä näyttö myöhemmin.",
-      "personListRetry": "Listaa holvit uudelleen",
-      "sasAbortFailed": "Tämän laitteen yhteyttä ei voitu katkaista. Se on yhä liitetty tuohon palvelimeen, joten käsittele sitä epäluotettavana: avaa Asetukset → Synkronointi ja poista se sieltä. Muistiinpanojasi ei poistettu.",
-      "backToWaiting": "Takaisin odottamaan",
-      "codeBody": "Liitä toisen laitteen näyttämä koodi. Identiteetin koodi lisää tämän laitteen koko tiliin.",
-      "codeContinue": "Jatka",
-      "codeExpired": "Tämä koodi on vanhentunut. Pyydä toista laitetta näyttämään uusi.",
-      "codeInvalid": "Tämä ei ole Mynen liittymiskoodi.",
-      "codeLabel": "Liittymiskoodi",
-      "codeMemberUnsupported": "Tämä koodi on jaettua holvia varten. Lisää tämä laite identiteetin näytöltä sen sijaan, jossa holvi näkyy kutsujesi alla.",
-      "codeOpen": "Minulla on liittymiskoodi",
-      "codeTitle": "Lisää tämä laite koodilla",
-      "personMismatch": "Tämä koodi on toiselle identiteetille kuin kirjoittamasi lause. Tarkista molemmat ja yritä uudelleen.",
-      "personPendingBody": "Yhden toisen laitteesi täytyy hyväksyä tämä. Siihen asti tämä laite ei voi avata yhtäkään tilin holvia.",
-      "personPendingHint": "Odotetaan hyväksyntää. Tämä valmistuu itsestään, kun toinen laite hyväksyy.",
-      "personPendingPhraseAgain": "Tämä laite käynnistettiin uudelleen ennen kuin hyväksyntä saapui, joten lause tarvitaan vielä kerran.",
-      "personPendingPhraseCta": "Kirjoita lause uudelleen",
-      "personPendingTitle": "Odotetaan hyväksyntää",
-      "personPhraseBody": "Koodi nimesi identiteetin; 24 sanaa todistavat sen. Tämä laite kysyy kunkin holvin oman salasanan, kun avaat sen.",
-      "personPhraseSubmit": "Lisää tämä laite",
-      "personPhraseTitle": "Kirjoita identiteettilauseesi",
-      "errorPhrase": "Tätä laitetta ei voitu lisätä. Tarkista palvelimen URL, tilinumero ja palautuslause sekä se, että palvelin on tavoitettavissa.",
-      "modePassword": "Salasanani",
-      "modePhrase": "Palautuslauseeni",
-      "noDeviceBody": "Eikö hyväksymiseen ole toista laitetta? Voit sen sijaan vahvistaa palautuslauseellasi.",
-      "phraseEscapeBody": "Palautuslauseesi on koko tämän tilin avain, joten se vahvistaa tämän laitteen ilman toisen laitteen hyväksyntää. Käyttämäsi salasana jää voimaan.",
-      "phraseTitle": "Vahvista palautuslauseellasi",
-      "phraseWarning": "Palautuslauseesi on koko tämän tilin avain, joten tämä laite lisätään ilman toisen laitteen hyväksyntää. Käytä sitä vain, jos sinulla ei ole toista laitetta, jolla hyväksyä. Asetat seuraavaksi uuden salasanan.",
-      "usePhrase": "Käytä palautuslausettani",
-      "back": "Takaisin"
+      "sasAbortFailed": "Tämän laitteen yhteyttä ei voitu katkaista. Se on yhä liitetty tuohon palvelimeen, joten käsittele sitä epäluotettavana: avaa Asetukset → Synkronointi ja poista se sieltä. Muistiinpanojasi ei poistettu."
     },
     "panel": {
       "addDevice": {
@@ -4759,7 +4572,6 @@
         "helper": "Yksi hyväksyntä kirjaa laitteen tiliisi. Se näkee sitten jokaisen omistamasi holvin, ja jokainen holvi avautuu yhä omalla salasanallaan."
       },
       "recovered": {
-        "close": "Sulje",
         "decrypting": "Puretaan salausta…",
         "deleteConfirmTitle": "Poistetaanko tämä palautettu muistiinpano?",
         "deleteConfirmWarning": "Tämä poistaa pysyvästi ainoan tällä laitteella säilytetyn kopion. Tätä ei voi kumota.",
@@ -4777,7 +4589,16 @@
       },
       "status": {
         "helper": "Myne synkronoi salatut muistiinpanosi laitteidesi välillä. Palvelin tallentaa vain salatekstiä, jota se ei voi lukea.",
-        "label": "Synkronoinnin tila"
+        "label": "Synkronoinnin tila",
+        "authorityIdentityClosed": "Synkronointi jatkuu, kun avaat identiteettisi tällä laitteella",
+        "authorityKeyMissing": "Synkronointi jatkuu, kun avaat identiteettisi ja tämä laite korjataan",
+        "authorityNoHeadContext": "Tämä laite ei voi lukea holvista tarpeeksi allekirjoittaakseen sen. Vika ei ole tunnuksissasi.",
+        "authorityNoDeviceId": "Tällä laitteella ei ole vielä omaa identiteettiä, joten holvi ei voi nimetä sitä.",
+        "authorityNoKeyAtRest": "Tällä laitteella ei ole allekirjoitusavainta. Avaa identiteettisi tällä laitteella asettaaksesi sellaisen.",
+        "authorityKeyUnreadable": "Tämän laitteen allekirjoitusavain on olemassa, mutta järjestelmän avainsäilö ei suostunut lukemaan sitä. Uudelleenkäynnistys yleensä korjaa sen, ja identiteettisi avaaminen toimii siihen asti.",
+        "authorityNoBindingRow": "Tämän laitteen allekirjoitusavainta ei ole vielä julkaistu holvissa. Avaa identiteettisi tällä laitteella julkaistaksesi sen.",
+        "authorityRowNamesDifferentKey": "Holvin merkintä tästä laitteesta nimeää eri avaimen kuin täällä tallennettu. Avaa identiteettisi tällä laitteella korjataksesi sen.",
+        "authorityRowUnverified": "Holvin merkintä tästä laitteesta ei täsmää. Avaa identiteettisi tällä laitteella allekirjoittaaksesi sen uudelleen."
       },
       "usage": {
         "helper": "Kuinka paljon salattua dataa tämä tili säilyttää palvelimella ja kuinka monta laitetta on kirjautuneena.",
@@ -4789,7 +4610,6 @@
         "label": "Identiteetti",
         "helper": "Identiteetti antaa ihmisten kutsua sinut holviin ja yhden identiteetin omistaa useita holveja.",
         "cta": "Lisää identiteetti",
-        "codeLabel": "Identiteettikoodisi",
         "lockedHelper": "Tällä laitteella on identiteetti. Se on lukittu tämän istunnon ajan; avaa se palautuslauseellasi allekirjoittaaksesi synkronoinnin ja kutsut.",
         "unregisteredHelper": "Tämä identiteetti on olemassa vain tällä laitteella. Rekisteröinti kirjoittaa sen synkronointipalvelimellesi, mikä antaa kutsun tavoittaa sinut.",
         "unlockedHelper": "Tällä laitteella on identiteetti, joka on avattu tämän istunnon ajaksi."
@@ -4812,8 +4632,7 @@
       "restoredToast": "Palautettu uutena muistiinpanona."
     },
     "stale": {
-      "body": "Myne ei ole tavoittanut synkronointipalvelinta useaan päivään. Muistiinpanosi tallentuvat tälle laitteelle, mutta mitään ei ole lähtenyt siltä, joten tämä on ainoa kopio. Avaa Asetukset → Synkronointi nähdäksesi syyn.",
-      "dismiss": "Sulje"
+      "body": "Myne ei ole tavoittanut synkronointipalvelinta useaan päivään. Muistiinpanosi tallentuvat tälle laitteelle, mutta mitään ei ole lähtenyt siltä, joten tämä on ainoa kopio. Avaa Asetukset → Synkronointi nähdäksesi syyn."
     },
     "status": {
       "awaitingApproval": "Odottaa hyväksyntää",
@@ -4835,8 +4654,11 @@
       "syncing": "Synkronoidaan…",
       "syncNow": "Synkronoi nyt",
       "errorIdentityLocked": "Avaa identiteettisi synkronoidaksesi",
+      "uploadsBlocked": "Lähetykset keskeytetty: tämä laite ei voi allekirjoittaa holvin päätä",
       "errorTls": "Synkronointipalvelimen HTTPS-yhteyttä ei voitu varmistaa",
-      "unlockIdentityCta": "Avaa identiteetti"
+      "unlockIdentityCta": "Avaa identiteetti",
+      "errorDeviceKeyMissing": "Allekirjoitusavain, jonka tämä laite julkaisi, ei ole täällä, joten synkronointi ei voi toimia",
+      "repairDeviceCta": "Korjaa tämä laite"
     },
     "usage": {
       "devices": "Laitteet",
@@ -4851,6 +4673,7 @@
       "serverSection": "Palvelin",
       "serverNotSet": "Ei asetettu",
       "statusLabel": "Tila",
+      "approvalCode": "Tämän laitteen hyväksyntäkoodi",
       "hubHelp": "Synkronointi pitää muistiinpanosi ajan tasalla eri laitteilla. Kaikki salataan tällä laitteella ennen lähettämistä. Palvelin ei koskaan näe muistiinpanojasi.",
       "connectedTls": "Yhdistetty TLS:n yli.",
       "connectedLocal": "Yhdistetty paikallisverkossasi.",
@@ -4865,7 +4688,6 @@
       "verifyBody": "Tarkista, että sama koodi näkyy juuri hyväksymälläsi laitteella. Jos se täsmää, laite on tililläsi. Jos ei, poista laite.",
       "sasMismatch": "Ne eivät täsmää",
       "removeDeviceButton": "Poista laite",
-      "keepDevice": "Säilytä se",
       "notEnrolledHelp": "Tämä laite ei vielä synkronoi. Lisää se edelliseltä näytöltä nähdäksesi laitteesi.",
       "unauthenticated": "Tämän laitteen käyttöoikeus on peruttu, luultavasti poistettu toiselta laitteelta.",
       "transportError": "Synkronointipalvelinta ei tavoitettu. Tarkista palvelimen osoite ja sen HTTPS-varmenne.",
@@ -4889,20 +4711,19 @@
       "access": "Sinun pääsysi",
       "epochLabel": "Ryhmäavain-epokki",
       "people": "Ihmiset",
-      "removalLimitsLabel": "Poistolimittaukset"
+      "removalLimitsLabel": "Poistamisen rajat"
     },
     "memberRoster": {
       "loading": "Ladataan jäseniä…",
-      "error": "Valtiointin jäsenluetteloa ei voitu lukea.",
-      "hint": "Tämän valtiointin jäsenet. Jokainen liittyy omalla identiteetillään ja tunnuksillaan.",
+      "error": "Holvin jäsenluetteloa ei voitu lukea.",
+      "hint": "Tämän holvin jäsenet. Jokainen liittyy omalla identiteetillään ja tunnuksillaan. Laitemäärä on jäsenen allekirjoittama ilmoitus, ei todiste siitä, että laite on heidän.",
       "empty": "Kutsu joku jakamaan tämä holvi. Hän liittyy omalla identiteetillään.",
-      "rotated": "Avain rotaatio",
+      "rotated": "Avain vaihdettu",
       "keyChanged": "Avain muuttui. Vahvista omistajan kanssa.",
       "relinkConfirmed": "Uudelleenliitos vahvistettu omistajan toimesta",
       "ownerBadge": "Omistaja",
       "memberBadge": "Jäsen",
       "invite": "Kutsu jäsen",
-      "remove": "Poista",
       "removeConfirm": "Poistetaanko {{name}}? Kun avainrotaatio on valmis, he menettävät pääsyn tuleviin muutoksiin. Tämä ei voi poistaa mitään, mitä he ovat jo kopioineet, eikä se palauta sisältöä laitteelta tai AI-palveluntarjoajalta.",
       "removalLimits": "Jäsenen poistaminen pysäyttää vain heidän pääsynsä tuleviin muutoksiin. Se ei voi poistaa mitään, mitä he ovat jo kopioineet, eikä se palauta sisältöä laitteelta tai AI-palveluntarjoajalta.",
       "inviteReady": "Kutsu valmis: {{fingerprint}}…",
@@ -4910,25 +4731,25 @@
       "invitationClaimed": "Hyväksytty",
       "invitationPending": "Ei hyväksytty vielä",
       "invitationsFailed": "Kutsujasi ei voitu ladata.",
-      "title": "Valtiointin jäsenet",
+      "title": "Holvin jäsenet",
       "personUnlock": "Avaa jäsenidentiteetti",
       "personReady": "Identiteettisi on auki tätä istuntoa varten.",
-      "ownerCodeHint": "Jaa tämä koodi henkilölle, jonka kutsut, jotta he voivat vahvistaa, että valtiointi on sinun. Se sisältää vain julkista tietoa.",
+      "ownerCodeHint": "Jaa tämä koodi henkilölle, jonka kutsut, jotta he voivat vahvistaa, että holvi on sinun. Se sisältää vain julkista tietoa.",
       "personLock": "Lukitse identiteetti",
-      "personError": "Frasi ei avannut jäsenidentiteettiä.",
+      "personError": "Lause ei avannut jäsenidentiteettiä.",
       "inviteHint": "Liitä kutsutun jäsenen identiteettikoodi (heidän identiteetin kotisivulta).",
-      "inviteCodeLabel": "Identiteettikoodisi",
-      "untitledVault": "Nimetön valtiointi",
+      "untitledVault": "Nimetön holvi",
       "inviteFailed": "Kutsua ei voitu luoda.",
       "inviteNotOnServer": "Tätä holvia ei ole vielä synkronointipalvelimellasi. Julkaise se ja rekisteröi identiteettisi, ja kutsu sitten uudelleen.",
       "removeFailed": "Jäsentä ei voitu poistaa.",
       "youBadge": "Sinä",
+      "deviceCount_one": "{{count}} laiteilmoitus",
+      "deviceCount_other": "{{count}} laiteilmoitusta",
+      "deviceClaimsUnverified_one": "Yhtä laiteilmoitusta ei voitu vahvistaa: jäsen, jonka se nimeää, ei allekirjoittanut sitä.",
+      "deviceClaimsUnverified_other": "{{count}} laiteilmoitusta ei voitu vahvistaa: jäsen, jonka ne nimeävät, ei allekirjoittanut niitä.",
       "nameUnverified": "Nimeä ei ole vahvistettu",
       "nameLabel": "Näyttönimesi",
-      "nameEdit": "Nimeä uudelleen",
       "nameSave": "Tallenna",
-      "nameClear": "Tyhjennä",
-      "nameCancel": "Peruuta",
       "nameErrorEmpty": "Syötä nimi tai poista omasi Tyhjennä-toiminnolla.",
       "nameErrorTooLong": "Tuo nimi on liian pitkä.",
       "nameErrorUnreadable": "Nimitietovarastoa ei voitu lukea tällä laitteella. Mitään ei tallennettu.",
@@ -4937,7 +4758,6 @@
       "nameErrorGeneric": "Nimeäsi ei voitu tallentaa. Yritä uudelleen.",
       "nameInviteCta": "Aseta nimi",
       "noInvitations": "Ei vielä lähetettyjä kutsuja.",
-      "identityHeading": "Identiteettisi",
       "membersHeading": "Jäsenet",
       "emptyTitle": "Ei vielä jäseniä",
       "personUnlockOpen": "Avaa",
@@ -4947,16 +4767,12 @@
       "shareConfirmBody": "Jonkun kutsuminen muuttaa tämän holvin jaetuksi: se saa ryhmäavaimen, ja kutsumasi henkilöt avaavat sen sisällön sillä. Tämä muutos on pysyvä, eikä paluuta yhden käyttäjän holviin ole. Jatka valitaksesi, kenet kutsut.",
       "shareConfirmCta": "Jaa ja kutsu",
       "shareFailed": "Tämän holvin jakamista ei voitu aloittaa.",
-      "identityForgetCta": "Unohda tämä identiteetti tällä laitteella",
       "identityForgetCheckbox": "Ymmärrän, että tämä identiteetti poistetaan tältä laitteelta.",
       "identityForgetConfirm": "Unohda identiteetti",
-      "identityForgetCancel": "Säilytä se",
-      "identityForgetWarning": "Tämä poistaa identiteetin vain tältä laitteelta. Palvelintiliä ja mitä tahansa holvia, jonka se omistaa tai johon se on liittynyt, ei muuteta, ja voit palauttaa identiteetin sen 24-sanaisella lauseella toisella laitteella. Kutsut ja jäsenluettelotoiminnot tällä laitteella vaativat sen avaamisen uudelleen.",
       "identityForgetError": "Identiteettiä ei voitu unohtaa. Yritä uudelleen.",
       "invitationDeclined": "Hylätty"
     },
     "deviceBindings": {
-      "title": "Laitteet ja jäsenet",
       "errorLocked": "Avaa holvi lukeaksesi sen laitteet.",
       "errorUnshared": "Tämä holvi ei ole jaettu, joten siinä ei ole laitesidontoja.",
       "errorNoDeviceId": "Tätä laitetta ei ole lisätty tiliisi, joten sillä ei ole laiteidentiteettiä, jonka alla ilmoittaa itsensä.",
@@ -4968,8 +4784,7 @@
       "title": "Valitse näyttönimi",
       "body": "Tältä muut tämän holvin jäsenet näkevät sinut jäsenluettelossa. Sormenjälkesi pysyy sen vieressä, ja voit vaihtaa nimen myöhemmin.",
       "label": "Näyttönimesi",
-      "checking": "Tarkistetaan nimeäsi…",
-      "save": "Jatka"
+      "checking": "Tarkistetaan nimeäsi…"
     },
     "memberJoinQr": {
       "error": "Koodia ei voitu luoda.",
@@ -5002,11 +4817,8 @@
       "folder": "Kansio",
       "insert": "Lisää",
       "noDueDate": "Ei eräpäivää",
-      "priority": "Prioriteetti",
       "sort": "Lajitteluperuste",
-      "sortDue": "Eräpäivä",
       "sortPath": "Muistiinpano",
-      "sortPriority": "Prioriteetti",
       "status": "Tila",
       "statusDone": "Valmis",
       "statusTodo": "Tekemättä",
@@ -5017,11 +4829,10 @@
       "rebuilding": "Luetaan muistiinpanojasi…",
       "scope": "Ei tehtäviä tässä kansiossa tai tunnisteessa. Kokeile laajentaa rajausta.",
       "vault": "Ei vielä tehtäviä. Kirjoita ”- [ ]” riville missä tahansa muistiinpanossa luodaksesi sellaisen.",
-      "search": "Yksikään tehtävä ei täsmää haula “{{query}}”."
+      "search": "Yksikään tehtävä ei täsmää haulla “{{query}}”."
     },
     "filter": {
       "overdue": "Myöhässä",
-      "today": "Tänään",
       "upcoming": "Tulossa"
     },
     "noteTitle": "Tämän muistiinpanon tehtävät",
@@ -5044,12 +4855,10 @@
       "untitled": "Nimetön tehtävä",
       "editFields": "Muokkaa tehtäväkenttiä"
     },
-    "title": "Tehtävät",
     "axis": {
       "due": "Eräpäivä",
       "folder": "Kansio",
       "note": "Muistiinpano",
-      "priority": "Prioriteetti",
       "sort": "Lajittele",
       "status": "Tila",
       "tag": "Tunniste"
@@ -5057,9 +4866,7 @@
     "due": {
       "any": "Mikä tahansa päivä",
       "later": "Myöhemmin",
-      "none": "Ei päivämäärää",
       "overdue": "Myöhässä",
-      "today": "Tänään",
       "upcoming": "Tulossa"
     },
     "filters": {
@@ -5076,30 +4883,22 @@
       "medium": "Keskitaso"
     },
     "section": {
-      "done": "Valmis",
       "later": "Myöhemmin",
-      "none": "Ei päivämäärää",
       "overdue": "Myöhässä",
-      "today": "Tänään",
       "upcoming": "Tulossa"
     },
     "sort": {
-      "due": "Eräpäivä",
       "dueDesc": "Eräpäivä, uusin ensin",
-      "note": "Muistiinpano",
-      "priority": "Prioriteetti"
+      "note": "Muistiinpano"
     },
     "status": {
       "all": "Kaikki",
-      "done": "Valmis",
       "undone": "Avoin"
     },
     "view": {
       "allFolders": "Kaikki kansiot",
-      "allNotes": "Kaikki muistiinpanot",
       "anyPriority": "Mikä tahansa prioriteetti",
-      "anyTag": "Mikä tahansa tunniste",
-      "untitled": "Nimetön"
+      "anyTag": "Mikä tahansa tunniste"
     },
     "search": {
       "label": "Etsi tehtäviä",
@@ -5113,9 +4912,7 @@
       "emptyBody": "Luo malli, jotta voit käyttää muistiinpanon runkoa uudelleen: kokousmuistiinpano, päiväkirja, lukumuistiinpano. Valitse yksi luodessasi uuden muistiinpanon.",
       "emptyTitle": "Ei vielä malleja",
       "listLabel": "Mallit",
-      "loading": "Ladataan…",
       "newTemplate": "Uusi malli",
-      "newTemplateName": "Nimetön malli",
       "removeFromTemplates": "Poista malleista",
       "removeRowLabel": "Poista {{name}} malleista (säilyttää muistiinpanon)",
       "title": "Muistiinpanomallit",
@@ -5127,7 +4924,6 @@
     "newAction": "Uusi",
     "emptyAfter": " luodaksesi uudelleenkäytettävän muistiinpanomallin, aloita sitten muistiinpanoja siitä (ja valitse yksi päivän muistiinpanon malliksi Asetuksissa).",
     "use": "Käytä",
-    "edit": "Muokkaa",
     "deleteConfirm": "Poistetaanko tämä malli?",
     "convertToNote": "Muunna muistiinpanoksi"
   },
@@ -5135,8 +4931,6 @@
     "apply": "Käytä teemaa",
     "applying": "Otetaan käyttöön…",
     "byAuthor": "Tämän linkin mukaan tekijä on {{author}}",
-    "cancel": "Peruuta",
-    "close": "Sulje",
     "collision": {
       "keepBoth": "Säilytä molemmat ja asenna nimellä ”{{name}}”",
       "question": "Sinulla on jo teema nimeltä ”{{name}}”.",
@@ -5159,7 +4953,6 @@
   },
   "unlock": {
     "backToPicker": "Valitse toinen holvi",
-    "continue": "Jatka",
     "decrypting": "Puretaan salausta…",
     "deleteLink": "Hävisikö sekä salasana että palautuslause? Poista holvi ja aloita alusta",
     "memberRemoveLink": "Poista tämä holvi tästä laitteesta",
@@ -5167,8 +4960,6 @@
       "alreadyUnlocked": "Holvi on jo avattu.",
       "inProgress": "Toiminto on käynnissä.",
       "kdfMemoryExceedsHost": "Tämän holvin avaaminen vaatii {{required}} MiB muistia, enemmän kuin tämä selain voi antaa ({{available}} MiB). Holvi on kunnossa; avaa se Mynen työpöytäsovelluksessa.",
-      "unexpected": "Odottamaton virhe. Yritä uudelleen.",
-      "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
       "vaultUpgraded": "Tämä holvi päivitettiin uudempaan muotoon, jota tämä Mynen versio ei vielä tue. Tietosi ovat kunnossa. Avaa se päivittämällä Myne uusimpaan versioon.",
       "openAsImportSource": "Tuonti lukee tätä holvia juuri nyt. Vie tuonti loppuun tai peruuta se, ja avaa sitten tämä holvi."
     },
@@ -5183,8 +4974,8 @@
       "wrongCredential": "Väärin. {{remaining}} yritystä jäljellä.",
       "showPin": "Näytä PIN-koodi",
       "hidePin": "Piilota PIN-koodi",
-      "waitingForTouchId": "Waiting for Touch ID…",
-      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
+      "waitingForTouchId": "Odotetaan Touch ID:tä…",
+      "waitingForTouchIdHint": "Vastaa järjestelmän kyselyyn avataksesi lukituksen. Jos kyselyä ei ilmesty, käytä sen sijaan salasanaasi."
     },
     "recoveryInterruptedBanner": "Palautusprosessi keskeytyi. Aseta ensin uusi salasana.",
     "recoveryInterruptedBody": "Aseta ensin uusi salasana ja sinetöi sitten holvisi uudelleen.",
@@ -5199,7 +4990,6 @@
       "metaChangedExternally": "Holvia muokattiin toisessa istunnossa. Avaa se uudelleen."
     },
     "title": "Avaa holvisi",
-    "vaultUnreadable": "Holvitiedostoa ei voi lukea. Palauta varmuuskopiosta.",
     "unlockFailedGeneric": "Lukituksen avaaminen epäonnistui. Yritä uudelleen.",
     "biometricTooManyAttempts": "Liian monta {{biometric}}-yritystä. Käytä salasanaasi.",
     "pinIncorrect_one": "Väärä PIN-koodi. {{count}} yritys jäljellä.",
@@ -5226,16 +5016,12 @@
     "deletePartialError": "Joitakin tiedostoja ei voitu poistaa. Holvi ei ole enää käyttökelpoinen. Jatka aloittaaksesi alusta.",
     "failClosedEyebrow": "Holvia ei voi avata",
     "restoreHint": "Varmuuskopiosta palauttaminen ei ole vielä käytettävissä mobiilissa.",
-    "memberHint": "Tämä valtiointi jaetaan kanssasi. Avaa se omalla palautusfraasillasi.",
     "memberSubtitle": "Avaa tämä jaettu holvi.",
-    "memberPhraseLabel": "Palautusfraasi",
+    "memberNoCredential": "Tämä jaettu holvi otettiin käyttöön toisella laitteella. Avaa se täällä hyväksymällä holvin omistajalta uusi kutsu: tällä laitteella ei ole sille salasanaa, eikä palautuslause enää avaa jaettua holvia.",
     "memberSubmit": "Avaa",
-    "memberError": "Frasi ei avannut tätä jaettua valtiointia.",
     "memberPasswordHint": "Tämä holvi on jaettu kanssasi. Avaa se salasanalla, jonka asetit tälle laitteelle.",
     "memberPasswordLabel": "Holvin salasana",
     "memberPasswordError": "Tuo salasana ei avannut tätä jaettua holvia.",
-    "memberUsePhrase": "Käytä sen sijaan palautuslausetta",
-    "memberUseFast": "Käytä sen sijaan pika-avausta",
     "memberPinHint": "Tämä holvi on jaettu kanssasi. Avaa se PIN-koodilla, jonka asetit tälle laitteelle.",
     "memberPinLabel": "Holvin PIN-koodi",
     "memberPinPlaceholder": "Holvin PIN-koodi (vähintään {{count}} numeroa)",
@@ -5245,9 +5031,10 @@
     "restoreCta": "Palauta varmuuskopiosta",
     "ioErrorHint": "Yritä uudelleen tai avaa Myne uudelleen.",
     "identityPhraseLink": "Käytä identiteettilauseesi",
+    "passwordOnlyNote": "Tämä holvi avautuu vain salasanallaan. Sillä ei ole palautuslausetta.",
     "identityPhrase": {
       "title": "Avaa identiteettilauseellasi",
-      "body": "Tämä holvi avautuu salasanallaan tai identiteettilauseellasi. Jos tallensit sille erillisen holvin lauseen, se on eläköity eikä enää avaa sitä. Avaaminen 24 sanalla, jotka kirjoitit ylös identiteetillesi, avaa myös identiteettisi tämän istunnon ajaksi, joten synkronointi toimii ilman toista kyselyä.",
+      "body": "Tämä holvi avautuu salasanallaan tai identiteettilauseellasi. Jos tallensit sille erillisen holvin lauseen, se on poistettu käytöstä eikä enää avaa sitä. Avaaminen 24 sanalla, jotka kirjoitit ylös identiteetillesi, avaa myös identiteettisi tämän istunnon ajaksi, joten synkronointi toimii ilman toista kyselyä.",
       "label": "Identiteettilause",
       "hint": "24 sanaa järjestyksessä.",
       "submit": "Avaa identiteettilauseella",
@@ -5261,13 +5048,11 @@
   "vault": {
     "ioBanner": {
       "cannotRead": "Holvitiedostoa ei voi lukea.",
-      "notFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
       "permissionDenied": "Ei oikeutta käyttää holvitiedostoa. Tarkista tiedoston käyttöoikeudet."
     }
   },
   "vaultCreation": {
     "briefing": {
-      "back": "Takaisin",
       "continue": "Jatka holvin luomiseen",
       "eyebrow": "Uusi holvi",
       "heading": "Ennen holvin luomista",
@@ -5284,15 +5069,14 @@
           "why": "Salasanasi on syöte avaimelle, joka purkaa muistiinpanojesi salauksen. Se ei koskaan poistu tältä laitteelta, eikä mikään palvelimillamme voi tuottaa sitä uudelleen. Juuri tämä pitää muistiinpanosi yksityisinä, ja siksi emme voi nollata sitä puolestasi."
         },
         "phrase-backup": {
-          "ackLabel": "Ymmärrän, että palautuslauseeni on ainoa varmuuskopio.",
-          "statement": "Palautuslauseesi on ainoa varmuuskopiosi.",
-          "why": "Jos unohdat salasanasi, 24-sanainen palautuslause on ainoa tie takaisin sisään. {{lostBothSecrets}} Kirjoita lause ylös ja säilytä se turvallisessa paikassa."
+          "ackLabel": "Ymmärrän, ettei mikään muu palauta minua tähän holviin.",
+          "statement": "Säilytä kaikki, mitä Myne näyttää sinulle. Mikään muu ei palauta sinua sisään.",
+          "why": "Holvi, joka luodaan identiteettisi ollessa avattuna, avautuu pelkällä salasanallaan: identiteettilauseesi todistaa, kuka olet uudella laitteella, eikä se avaa holvia. Laitteella ilman identiteettiä luotu holvi kantaa sen sijaan 24-sanaista palautuslausetta, ja silloin juuri se lause on tie takaisin sisään. {{lostBothSecrets}} Kirjoita ylös kaikki, mitä tämä kulku näyttää sinulle, ja säilytä se turvallisessa paikassa."
         }
       },
       "why": "Miksi?"
     },
     "confirm": {
-      "back": "Takaisin",
       "heading": "Vahvista palautuslauseesi",
       "intro": "Kirjoita sanat näihin neljään kohtaan varmistaaksesi, että tallensit ne.",
       "mismatch": "Ei vastaa sanaa {{pos}}.",
@@ -5314,31 +5098,24 @@
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "Yritä uudelleen.",
         "title": "Virheellinen tilinumero"
       },
       "aeadFailure": {
-        "body": "Yritä uudelleen.",
         "title": "Salaus epäonnistui"
       },
       "csprng": {
-        "body": "Yritä uudelleen.",
         "title": "Turvallista satunnaisdataa ei voitu luoda"
       },
       "invalidPassword": {
-        "body": "Yritä uudelleen.",
         "title": "Virheellinen salasana"
       },
       "invalidVaultMeta": {
-        "body": "Yritä uudelleen.",
         "title": "Holvin muotovirhe"
       },
       "ioOther": {
-        "body": "Yritä uudelleen.",
         "title": "Holvia ei voitu tallentaa"
       },
       "joinFailure": {
-        "body": "Yritä uudelleen.",
         "title": "Jokin meni pieleen"
       },
       "kdfFailure": {
@@ -5350,7 +5127,6 @@
         "title": "Levytilaa ei ole riittävästi"
       },
       "notFound": {
-        "body": "Yritä uudelleen.",
         "title": "Holvin kansio puuttuu"
       },
       "passwordTooShort": {
@@ -5398,7 +5174,6 @@
         "title": "Hylätäänkö holvin luonti?"
       },
       "genericError": {
-        "body": "Yritä uudelleen.",
         "title": "Jokin meni pieleen"
       },
       "provisionFailed": {
@@ -5407,17 +5182,14 @@
       }
     },
     "password": {
-      "back": "Takaisin",
       "heading": "Valitse pääsalasana",
       "helperLead": "Myne ei tallenna salasanaasi eikä palautuslausettasi.",
-      "submit": "Luo palautuslause",
-      "eyebrowLabel": "Pääsalasana"
+      "submit": "Luo palautuslause"
     },
     "phrase": {
       "clipboardNotCleared": "Selaimesi ei anna Mynen tyhjentää leikepöytääsi jälkeenpäin, joten nuo 24 sanaa jäävät sinne, kunnes kopioit jotain muuta. Liitä ne salasanojen hallintaohjelmaan ja kopioi sitten mitä tahansa.",
       "copied": "Kopioitu. Myne tyhjentää sen 30 sekunnissa, vaikka siirtyisit eteenpäin, kunhan sovellus pysyy käynnissä.",
       "copiedNoAutoClear": "Kopioitu. Myne ei voi tyhjentää leikepöytääsi täällä, joten sanat jäävät sille, kunnes kopioit jotain muuta.",
-      "copy": "Kopioi",
       "extensionNotice": "Selainlaajennukset, joilla on pääsy tähän sivustoon, voivat lukea tämän sivun sisällön. Jos et ole varma jokaisesta tämän profiilin laajennuksesta, käytä tähän vaiheeseen työpöytäsovellusta tai puhdasta selainprofiilia.",
       "copyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan ”Tallenna tiedostona”.",
       "downloadStarted": "Lähetettiin selaimesi latauksiin. Tarkista, että se saapui: selain päättää, minne tiedosto menee, eikä Myne näe, menikö se perille.",
@@ -5428,42 +5200,31 @@
       "sessionOnlyNotice": "Tämä selain ei säilytä lausettasi uudelleenlatauksen jälkeen, joten sinulta kysytään 24 sanaa uudelleen. Säilytä ne turvallisessa paikassa."
     },
     "ready": {
-      "backedUp": "Varmuuskopioitu",
-      "backingUp": "Varmuuskopioidaan…",
-      "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Varmuuskopiointi ei valmistunut. Tiedostoa ei jäänyt jäljelle. Voit varmuuskopioida milloin tahansa kohdasta Asetukset → Tallennus.",
-      "backupFilterName": "Myne-varmuuskopio",
-      "backUpNow": "Varmuuskopioi nyt",
       "body": "Muistiinpanosi on salattu ja tallennettu tälle laitteelle. Säilytä salasanasi ja palautuspakettisi turvallisessa paikassa: ne ovat ainoa tie takaisin sisään.",
       "decrypting": "Puretaan salausta…",
       "done": "Avaa holvi",
-      "heading": "Holvisi on valmis",
-      "showFolder": "Näytä holvin kansio"
+      "heading": "Holvisi on valmis"
     },
     "sessionLost": {
       "startOver": "Aloita alusta"
     },
     "kit": {
-      "accountFor": "Tilinumero — kun lisäät toisen laitteen",
-      "back": "Takaisin",
+      "accountFor": "Tilinumero: kun lisäät toisen laitteen",
       "continue": "Olen tallentanut tämän, vahvista lause",
       "copied": "Paketti on leikepöydälläsi. Myne tyhjentää sen 30 sekunnissa, vaikka siirtyisit eteenpäin, kunhan sovellus pysyy käynnissä.",
       "copiedNoAutoClear": "Kopioitu. Myne ei voi tyhjentää leikepöytääsi tässä, joten paketti pysyy siinä, kunnes kopioit jotain muuta.",
-      "copy": "Kopioi",
       "copyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan toimintoa “Tallenna palautuspaketti”.",
       "documentTitle": "Mynen palautuspaketti",
       "downloadStarted": "Lähetetty selaimesi latauksiin. Tarkista, että paketti saapui: selaimesi päättää, minne tiedosto menee, eikä Myne näe, saapuiko se.",
       "eyebrowLabel": "Palautuspaketti",
       "heading": "Tallenna palautuspakettisi",
       "intro": "Tiedosto, jonka aiot tallentaa, on täsmälleen tämä. Se näytetään kerran.",
-      "phraseFor": "Palautuslause — jos unohdat salasanasi",
+      "phraseFor": "Palautuslause: jos unohdat salasanasi",
       "save": "Tallenna palautuspaketti",
       "saveFailed": "Tiedostoa ei voitu tallentaa. Kopioi paketti sen sijaan tai kirjoita molemmat osat ylös.",
       "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joka sisältää molemmat salaisuudet, joten pidä se paikassa, josta vain sinä voit lukea sen."
     },
     "name": {
-      "back": "Takaisin",
-      "continue": "Jatka",
       "eyebrowLabel": "Nimeä holvisi",
       "heading": "Miksi kutsumme tätä holvia?",
       "helper": "Nimi tallennetaan salattuna holvin mukana. Tällä laitteella se näytetään käynnistyksen holvivalitsimessa ennen kuin avaat holvin, joten kuka tahansa, joka näkee tuon näytön, voi lukea sen; piilota holvien nimet Asetuksissa kytkeäksesi sen pois. Voit vaihtaa sen myöhemmin.",
@@ -5474,13 +5235,10 @@
   },
   "vaultPicker": {
     "createAnother": "Luo toinen holvi",
-    "deviceOnly": "Vain laite",
     "heading": "Valitse holvi",
-    "joinDevice": "Lisää tämä laite tiliin",
     "loading": "Ladataan holvejasi…",
     "noneLoaded": "Holveja ei voitu ladata juuri nyt.",
     "openedRelative": "avattu {{rel}}",
-    "restoreFromBackup": "Palauta varmuuskopiosta",
     "subline": "Tällä laitteella on useampi kuin yksi holvi. Valitse avattava holvi.",
     "vaultFallback": "Holvi {{n}}",
     "accountError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella.",
@@ -5500,7 +5258,6 @@
       "errors": {
         "cancelledVaultLocked": "Palautus peruutettu: holvi oli lukittu.",
         "operationInProgress": "Toiminto on käynnissä. Odota.",
-        "unexpected": "Odottamaton virhe. Yritä uudelleen.",
         "weakPassword": "Uuden salasanan on oltava vähintään 12 merkkiä."
       },
       "eyebrow": "Palautus · Uusi salasana",
@@ -5522,8 +5279,7 @@
       "accountInvalid": "Virheellinen tilinumero. Tarkista ja yritä uudelleen.",
       "accountLabel": "Tilinumero (valinnainen)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (valinnainen)",
-      "body": "Valitse holvi, jonka haluat palauttaa 24-sanaisella palautuslauseellasi. Voit myös kirjoittaa tilinumerosi siirtyäksesi suoraan siihen.",
-      "cancel": "Peruuta",
+      "body": "Valitse holvi, jonka haluat palauttaa. Holvi, joka kantaa yhä oman palautuslauseensa, voidaan palauttaa noilla 24 sanalla; holvi, jolla sitä ei ole, kertoo siitä, kun valitset sen. Voit myös kirjoittaa tilinumerosi siirtyäksesi suoraan siihen.",
       "checking": "Tarkistetaan…",
       "loadFailed": "Holveja ei voitu ladata juuri nyt.",
       "loading": "Ladataan holvejasi…",
@@ -5533,20 +5289,18 @@
       "useAccountNumber": "Käytä tilinumeroa",
       "vaultFallback": "Holvi {{index}}",
       "accountFallback": "Tili",
-      "accountsError": "Tilin ryhmittelyä ei voitu ladata. Valtiointien luettelo on ilman ryhmittelyä; palautukseen ei tule muutoksia."
+      "accountsError": "Tilin ryhmittelyä ei voitu ladata. Holvit luetellaan ilman ryhmittelyä; palautukseen ei tule muutoksia."
     },
     "siblingNotice": {
-      "body_one": "Tällä tilillä on {{count}} valtiointi lisää. Palauta sekin, jottei mitään jää taakse.",
-      "body_other": "Tällä tilillä on {{count}} valtiointia lisää. Palauta nekin, jottei mitään jää taakse.",
-      "recoverAnother": "Palauta toinen valtiointi",
-      "unknown": "Ei voitu tarkistaa, onko tällä tilillä muita valtiointeja. Jos sinulla on useampi kuin yksi, palauta jokainen omalla fraasillaan."
+      "body_one": "Tällä tilillä on {{count}} holvi lisää. Palauta sekin, jottei mitään jää taakse.",
+      "body_other": "Tällä tilillä on {{count}} holvi lisää. Palauta nekin, jottei mitään jää taakse.",
+      "recoverAnother": "Palauta toinen holvi",
+      "unknown": "Ei voitu tarkistaa, onko tällä tilillä muita holveja. Jos sinulla on useampi kuin yksi holvi, palauta jokainen omalla lauseellaan."
     }
   },
   "vaultSwitcher": {
     "chipFallback": "Holvi",
     "createAnother": "Luo toinen holvi",
-    "deviceOnly": "Vain laite",
-    "joinDevice": "Lisää tämä laite tiliin",
     "switching": "vaihdetaan…",
     "switchVaultLabel": "Vaihda holvia",
     "vaultFallback": "Holvi {{n}}"
@@ -5603,14 +5357,15 @@
     "heroLine3": "vain sinulle.",
     "lede": "Markdown, salattu tällä laitteella ennen kuin se koskaan poistuu siitä. Ei tilisähköpostia. Ei palvelimia, jotka voisivat lukea sanaakaan.",
     "residueBanner": "Keskeytyneestä poistosta jääneitä tiedostoja ({{n}}). Siivoa ne ennen holvin luomista.",
+    "residueGated": "Tällä laitteella on yhä holvikansio, jota se ei voi avata ({{n}}). Jos olet jo poistanut sen, tämä on se osa, jota poisto ei saanut valmiiksi.",
+    "residueGatedDelete": "Poista se pysyvästi",
+    "residueGatedHint": "Vahvista kirjoittamalla DELETE",
     "cleanUpFiles": "Siivoa jäljelle jääneet tiedostot",
     "connect": "Yhdistä tiliini",
     "tagline": "Salattuja markdown-muistiinpanoja. Ei sähköpostia rekisteröityessä.",
     "startAction": "Luo identiteettisi ja holvisi",
     "startBody": "Aloita tästä laitteesta alusta: uusi identiteetti, sitten siihen kuuluva holvi.",
-    "restoreTitle": "Palauta varmuuskopiosta",
     "restoreBody": "Avaa aiemmin tallentamasi .myne-backup-tiedosto.",
-    "joinTitle": "Lisää tämä laite tilille",
     "joinBody": "Käytä holvia, joka sinulla on jo toisella laitteella.",
     "invitedTitle": "Minut kutsuttiin holviin",
     "invitedBody": "Aseta identiteetti, jolle kutsu osoitettiin. Et tarvitse omaa holvia.",
@@ -5689,28 +5444,15 @@
     "accountError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella."
   },
   "join": {
-    "transportError": "Synkronointipalvelinta ei tavoitettu. Tarkista osoite ja yhteytesi, ja yritä sitten uudelleen.",
-    "passwordPlaceholder": "Holvisi salasana",
     "waitingHint": "Pidä tämä näyttö auki. Kun laite on hyväksytty, tähän ilmestyy vahvistuskoodi, jota voit verrata toisen laitteesi koodiin.",
     "verifyBody": "Tarkista, että tämä koodi on sama kuin sillä laitteella näkyvä, jolta hyväksyit.",
-    "verifyChanged": "Koodi muuttui sillä aikaa kun katsoit. Vertaa molempia näyttöjä uudelleen. Jos se muuttuu yhä, keskeytä äläkä jatka.",
     "removing": "Poistetaan…",
     "sasMismatch": "Ne eivät täsmää, poista tämä laite",
-    "title": "Yhdistä tiliisi",
-    "lead": "Syötä tilitietosi tuodaksesi muistiinpanosi tälle laitteelle. Kaikki pysyy päästä päähän salattuna.",
-    "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Tarkista tämä numero. Se ei näytä oikealta.",
-    "approvalHint": "Muistiinpanosi ilmestyvät, kun hyväksyt tämän laitteen laitteelta, jolla tilisi jo on.",
-    "connectingSubtitle": "Haetaan tiliäsi ja avataan holvisi lukitus tällä laitteella.",
     "qr": {
-      "confirmAccount": "Tili",
-      "confirmServer": "Palvelin",
-      "confirmTitle": "Lisätäänkö tämä laite?",
-      "continue": "Jatka",
       "expired": "Tämä QR-koodi on vanhentunut. Näytä toisella laitteellasi uusi ja lue se uudelleen.",
       "invalid": "Tuo ei ole Mynen laite-QR-koodi.",
+      "legacyAccount": "Tämä koodi on vanhemmalle tilityypille. Pyydä holvin omistajalta kutsua.",
       "newerVersion": "Tämä QR-koodi on uudemmasta Mynen versiosta. Päivitä sovellus ja yritä uudelleen.",
-      "scan": "Lue QR-koodi",
       "scanFailed": "Lukeminen ei onnistunut. Yritä uudelleen tai syötä tietosi itse.",
       "scanUnavailable": "QR-koodin lukeminen ei ole käytettävissä tällä laitteella. Syötä tietosi alle."
     }
@@ -5723,7 +5465,7 @@
     "phraseCopied": "Kopioitu. Se pysyy tällä laitteella, ja järjestelmä poistaa sen 30 sekunnin kuluttua.",
     "phraseCopyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan ”Tallenna tiedostoon”.",
     "savedToFile": "Tallennettu kohteeseen {{label}}",
-    "savedToShareSheet": "Tallennettu Mynen sisään, jonne järjestelmän tiedostoselain ei ylety. Se on pelkkä tekstitiedosto, joten jos viet kopion jakovalikon kautta paikkaan, johon itse pääset käsiksi, valitse paikka, jonka vain sinä voit lukea, pilvipalvelun sijaan. Napauta Tallenna uudelleen, jos suljit valikon.",
+    "savedToShareSheet": "Tallennettu Mynen sisään, jonne tiedostoselain ei ylety. Se on pelkkä tekstitiedosto, joten jos järjestelmä kysyi, minne kopio sijoitetaan, ja valitsit paikan, valitse paikka, jonka vain sinä voit lukea, pilvipalvelun sijaan. Napauta Tallenna uudelleen saadaksesi tarjouksen takaisin.",
     "savedFileWritten": "Tallennettu Mynen sisään. Se on pelkkä tekstitiedosto, joten säilytä jokainen tekemäsi kopio paikassa, jonka vain sinä voit lukea. Tämä laite ei kertonut, mistä tiedostoon pääsee käsiksi, joten oleta, että siihen pääsee vain sovelluksen sisältä, kunnes olet tarkistanut asian.",
     "saveFileError": "Tiedoston tallentaminen epäonnistui.",
     "stepLabel": "Luo holvi · {{current}}/{{total}}",
@@ -5736,7 +5478,6 @@
     "showSecondHalf": "Näytä sanat 13–24",
     "saveToFile": "Tallenna tiedostoon",
     "writtenThemDown": "Olen kirjoittanut ne ylös",
-    "typebackTitle": "Vahvista lauseesi",
     "typebackLead": "Syötä nämä neljä sanaa juuri tallentamastasi palautuslauseesta.",
     "wordMismatch": "Ei täsmää sanan #{{pos}} kanssa",
     "backToPhrase": "Takaisin lauseeseen",
@@ -5747,8 +5488,7 @@
     "unlockingSubtitle": "Avataan holviasi.",
     "readyTitle": "Holvisi on valmis",
     "readyBody": "Kaikki, mitä kirjoitat tästä eteenpäin, salataan tällä laitteella ennen tallennusta tai synkronointia.",
-    "openVault": "Avaa holvi",
-    "backUpNow": "Varmuuskopioi nyt"
+    "openVault": "Avaa holvi"
   },
   "web": {
     "openElsewhere": {
@@ -5796,6 +5536,15 @@
       }
     }
   },
+  "approvalWait": {
+    "approversIntro": "Nämä laitteet voivat hyväksyä tämän:",
+    "noApprovers": "Yksikään muu tämän tilin laite ei voi juuri nyt hyväksyä sitä. Avaa Myne laitteella, jolla on jo pääsy, ja palaa sitten tänne.",
+    "pendingStartOver": "Aloita alusta toisella tilillä",
+    "sasMatch": "Ne täsmäävät, jatka",
+    "sasMismatch": "Ne eivät täsmää",
+    "verifyBody": "Tarkista, että tämä koodi on sama molemmilla laitteilla, ennen kuin jatkat. Jos se ei ole, pysähdy: vika on yhteydessä, ei salasanassasi.",
+    "verifyTitle": "Vertaa tätä koodia"
+  },
   "screenCaptureEscape": {
     "disableBody": "Näytönkaappaussuojaus pyytää käyttöjärjestelmää pitämään tämän ikkunan poissa kuvakaappauksista ja näytön tallenteista. Se toimii Windows 10:ssä (toukokuun 2020 päivitys) ja uudemmissa; macOS:ssä ja Linuxissa ei ole tähän järjestelmärajapintaa, joten siellä se ei estä kaappausta. Siellä missä se toimii, se piilottaa ikkunan myös etätyöpöytäohjelmilta ja näytönsuurennusohjelmilta, ja juuri siksi tämä poistumistie on olemassa.",
     "disableConfirm": "Poista suojaus käytöstä",
@@ -5811,17 +5560,14 @@
     "savedForNextLaunch": "Tallennettu. Tässä istunnossa suojaus on yhä pois päältä, koska istunto käynnistettiin valitsimella --disable-screen-capture-protection, joten suojaus palaa, kun avaat Mynen seuraavan kerran ilman sitä."
   },
   "identitySetup": {
-    "doneCta": "Valmis",
     "error": "Identiteettiä ei voitu määrittää. Yritä uudelleen.",
-    "intro": "Identiteetti mahdollistaa kutsun osoittamisen sinulle ennen kuin omistat minkään valtiointin. Se ei luo valtiointia eikä tallenna muistiinpanoja.",
+    "intro": "Identiteetti mahdollistaa kutsun osoittamisen sinulle ennen kuin omistat yhtään holvia. Se ei luo holvia eikä tallenna muistiinpanoja.",
     "pending": "Tämä laite odottaa, että toinen tilin laite hyväksyy sen.",
     "phraseWarning": "Kirjoita nämä 24 sanaa ylös ja säilytä ne turvallisesti. Ne näytetään vain tässä; ne ovat ainoa tapa palauttaa tämä identiteetti.",
     "recoverCta": "Palauta identiteetti",
     "recoverIntro": "Identiteetin palautuslause",
     "recovered": "Identiteetti palautettu.",
-    "title": "Luo identiteetti",
     "errorAlreadyHeld": "Tällä laitteella on jo identiteetti. Palauta se sen palautuslauseella tai unohda se ja luo uusi.",
-    "forgetCancel": "Säilytä se",
     "forgetConfirm": "Unohda ja luo uusi",
     "forgetCta": "Unohda tämä identiteetti ja luo uusi",
     "forgetWarning": "Tämä poistaa tällä laitteella olevan identiteetin. Jos et ole kirjoittanut ylös sen 24-sanaista palautuslausetta, se on mennyttä: tämä laite menettää pääsyn kaikkiin holveihin, jotka se omistaa tai joihin se on liittynyt, kunnes palautat sen tuolla lauseella. Jatka vain, jos olet varma.",
@@ -5834,10 +5580,7 @@
     "recoverTitle": "Minulla on jo sellainen",
     "recoverHint": "Palauta se tällä laitteella sen 24-sanaisella palautuslauseella.",
     "recoverAction": "Palauta",
-    "back": "Takaisin",
-    "phraseTitle": "Tallenna identiteettilauseesi",
-    "phraseContinue": "Jatka",
-    "confirmTitle": "Vahvista lauseesi"
+    "phraseTitle": "Tallenna identiteettilauseesi"
   },
   "personIdentityCode": {
     "copy": "Kopioi tunnuskoodi",
@@ -5845,24 +5588,21 @@
     "copyFailed": "Tunnuskoodia ei voitu kopioida"
   },
   "identityHome": {
-    "createVaultCta": "Luo valtiointi",
+    "createVaultCta": "Luo holvi",
     "createVaultLocked": "Avaa identiteettisi luodaksesi holvin. Se allekirjoittaa holvin ensimmäisen jäsenluettelon, mikä tekee holvista sinun, ja tämä laite on sinetöinyt sen tätä istuntoa varten.",
     "invitesError": "Kutsuja ei voitu ladata. Tarkista yhteytesi ja synkronointipalvelin.",
     "invitesHeading": "Kutsut",
     "invitesLoading": "Tarkistetaan kutsuja…",
     "invitesPending": "Tämä laite odottaa hyväksyntää. Kutsut näkyvät täällä, kun toinen laitteesi hyväksyy sen.",
     "invitesUnregistered": "Tätä identiteettiä ei ole vielä rekisteröity synkronointipalvelimelle, joten kutsu ei voi tavoittaa sitä.",
-    "noInvites": "Ei kutsuja vielä.",
-    "subtitle": "Sinulla on identiteetti tällä laitteella, joten ihmiset voivat kutsua sinut valtiointiin. Sinun ei tarvitse luoda sellaista saadaksesi kutsun.",
     "accept": "Hyväksy",
     "acceptHint": "Liitä omistajan identiteettikoodi (he jakavat sen, kun kutsuvat sinut).",
     "acceptOwnerCodeLabel": "Omistajan identiteettikoodi",
     "acceptSubmit": "Hyväksy ja avaa",
-    "acceptPhraseLabel": "Palautusfraasisi",
+    "acceptPhraseLabel": "Palautuslauseesi",
     "acceptError": "Kutsua ei voitu hyväksyä.",
     "shareCodeHeading": "Kutsukoodisi",
-    "shareCodeHint": "Jaa tämä koodi kenelle tahansa, joka kutsuu sinut. Se sisältää vain julkista tietoa (identiteettitunnuksesi ja julkiset avaimet), ei koskaan fraasia.",
-    "title": "Identiteettisi",
+    "shareCodeHint": "Jaa tämä koodi kenelle tahansa, joka kutsuu sinut. Se sisältää vain julkista tietoa (identiteettitunnuksesi ja julkiset avaimet), ei koskaan lausetta.",
     "acceptPasswordNote": "Valitse salasana tälle laitteelle. Se on erillinen holvin omistajan salasanasta ja palautuslauseestasi: se avaa tämän holvin tällä laitteella, ja lauseesi on edelleen se siirrettävä tapa päästä takaisin sisään.",
     "acceptErrorNotFound": "Tämä kutsu ei ole enää saatavilla. Se on ehkä jo käytetty tai peruutettu. Pyydä omistajaa lähettämään uusi kutsu.",
     "acceptErrorNotEnrolled": "Tämä laite ei ole se identiteetti, jolle tämä kutsu oli osoitettu. Avaa identiteetti, jolle kutsu lähetettiin, ja hyväksy sitten.",
@@ -5873,7 +5613,7 @@
     "join": "Lisää tälle laitteelle",
     "joinHint": "Tämä holvi on jo jaettu identiteettisi kanssa. Syötä palautuslauseesi asentaaksesi sen tälle laitteelle.",
     "joinPhraseLabel": "Palautuslauseesi",
-    "joinPasswordNote": "Valitse salasana tälle laitteelle. Se on erillinen holvin omistajan salasanasta: se avaa tämän holvin täällä, ja palautuslauseesi on edelleen se siirrettävä tapa päästä takaisin sisään.",
+    "joinPasswordNote": "Valitse salasana tälle laitteelle. Se on erillinen holvin omistajan salasanasta, ja se on ainoa tapa päästä tähän holviin tällä laitteella: jos menetät sen, pyydä omistajalta uusi kutsu.",
     "joinSubmit": "Lisää ja avaa",
     "joinError": "Holvia ei voitu lisätä tälle laitteelle.",
     "joinErrorAlreadyHeld": "Tällä laitteella on jo tämä holvi, joten lisättävää ei ole. Avaa holvi, joka sinulla jo on täällä.",
@@ -5882,14 +5622,9 @@
     "joinErrorNotConfigured": "Synkronointia ei ole määritetty tällä laitteella. Määritä synkronointipalvelimesi ja yritä sitten uudelleen.",
     "joinErrorUnauthenticated": "Identiteettisi ei ole kirjautuneena tällä laitteella. Avaa identiteettisi ja yritä uudelleen.",
     "joinErrorTransport": "Synkronointipalvelinta ei tavoitettu tai tätä holvia ei ole vielä julkaistu siellä. Tarkista yhteytesi ja yritä uudelleen.",
-    "forgetCancel": "Säilytä se",
     "forgetCheckbox": "Ymmärrän, että tämä identiteetti poistetaan tältä laitteelta.",
     "forgetConfirm": "Unohda identiteetti",
-    "forgetCta": "Unohda tämä identiteetti tällä laitteella",
     "forgetError": "Identiteettiä ei voitu unohtaa. Yritä uudelleen.",
-    "forgetWarning": "Tämä poistaa identiteetin vain tältä laitteelta. Palvelintiliä ja mitä tahansa holvia, jonka se omistaa tai johon se on liittynyt, ei muuteta, ja voit palauttaa identiteetin sen 24-sanaisella lauseella toisella laitteella. Jos et ole tallentanut tuota lausetta, tämä laite ei voi palauttaa sitä.",
-    "registerCta": "Rekisteröi tämä identiteetti",
-    "registerContinue": "Jatka",
     "registerSubmit": "Rekisteröi",
     "registerError": "Rekisteröinti ei onnistunut. Tarkista lause ja palvelimen osoite, ja yritä uudelleen.",
     "registerServerLabel": "Synkronointipalvelimen osoite",
@@ -5898,7 +5633,6 @@
     "registerInviteCodeLabel": "Palvelimen kutsukoodi",
     "registerInviteCodeHint": "Vain jos palvelimesi pyytää sitä.",
     "registerServerError": "Palvelinta ei tavoitettu. Tarkista osoite ja yritä uudelleen. Sanasi ovat yhä täällä.",
-    "accountNumberHeading": "Tilinumero",
     "accountNumberHint": "Johdettu identiteettilauseestasi, joten se ei voi kadota, eikä se ole salaisuus. Käytä sitä tukeen tai palvelimen ylläpitäjän luovutukseen.",
     "copyAccountNumber": "Kopioi tilinumero",
     "registerPhraseLabel": "Identiteettilauseesi, 24 sanaa",
@@ -5927,7 +5661,6 @@
     },
     "download": "Lataa",
     "downloading": "Ladataan…",
-    "cancel": "Peruuta",
     "complete": "Valmis",
     "retry": "Yritä uudelleen",
     "skip": "Ohita",
@@ -5950,7 +5683,6 @@
     },
     "deeplink": {
       "body": "Se on kaikkien holvien ulkopuolella, joten Myne ei salaa sitä.",
-      "cancel": "Peruuta",
       "confirm": "Avaa",
       "failed": "Tiedostoa ei voitu avata. Se on ehkä siirtynyt tai muuttunut.",
       "title": "Avataanko tämä paikallinen tiedosto?"
@@ -5971,7 +5703,6 @@
     "unsaved": "Tallentamattomia muutoksia"
   },
   "update": {
-    "banner": {},
     "notice": {
       "available": "Myne {{version}} on saatavilla.",
       "consequence": "Päivittäminen lukitsee holvisi ja käynnistää Mynen uudelleen. Avoimet muistiinpanosi tallennetaan ensin.",
@@ -5983,41 +5714,39 @@
       "confirmTitle": "Päivitetäänkö Myne ja käynnistetäänkö se uudelleen?",
       "confirmBody": "Holvisi lukitaan ja Myne käynnistyy uudelleen. Lataaminen ja asentaminen voi kestää muutaman minuutin hitaalla yhteydellä.",
       "confirmPrimary": "Lukitse holvi ja päivitä",
-      "cancel": "Peruuta",
       "pill": "Päivitys saatavilla"
     },
     "updating": {
       "eyebrow": "Päivitetään",
-      "heading": "Päivitetään Myneä",
       "version": "Versio {{version}}",
-      "caption": "Ladataan ja asennetaan uutta versiota.",
-      "hint": "Myne käynnistyy itsestään, kun tämä valmistuu. Jätä ikkuna auki."
+      "progressLabel": "Päivityksen edistyminen",
+      "bytes": "{{done}} ladattu",
+      "bytesOfTotal": "{{done}} / {{total}}"
+    },
+    "phase": {
+      "starting": "Valmistellaan",
+      "downloading": "Ladataan",
+      "verifying": "Tarkistetaan",
+      "installing": "Asennetaan"
     },
     "failed": {
-      "eyebrow": "Päivitys ei valmistunut",
       "heading": "Päivitys ei valmistunut",
       "caption": "Myne {{version}} on yhä käynnissä, eikä muistiinpanoihisi ole koskettu.",
-      "hint": "Uudelleen yrittäminen aloittaa latauksen alusta.",
-      "retry": "Yritä uudelleen",
       "back": "Takaisin avaamiseen",
       "manual": "Jos ongelma jatkuu, lataa uusi versio osoitteesta myne.md ja asenna se käsin. Nykyinen sovellus pysyy koskemattomana."
     }
   },
   "identityFlow": {
-    "title": "Luo identiteetti",
-    "lead": "Identiteetti antaa ihmisten kutsua sinut holviin ja yhden identiteetin omistaa monta holvia. Se tarvitsee synkronointipalvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut.",
-    "start": "Luo identiteetti",
-    "skip": "Ei nyt, käytä vain tätä laitetta",
-    "back": "Takaisin",
-    "serverUnreachable": "Tuota palvelinta ei tavoitettu. Tarkista osoite ja yritä uudelleen.",
-    "createFailed": "Identiteettiä ei voitu luoda. Tarkista synkronointipalvelin ja yritä uudelleen.",
-    "server": {
-      "title": "Valitse synkronointipalvelin",
-      "lead": "Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät. Palvelin tallentaa vain salatekstiä.",
-      "urlLabel": "Palvelimen osoite",
-      "connect": "Yhdistä",
-      "connecting": "Yhdistetään…"
+    "fork": {
+      "lead": "Tuo tälle laitteelle identiteetti, joka sinulla jo on, tai aloita uusi.",
+      "words": "Syötä 24 sanaani",
+      "wordsBody": "Identiteettilause, jonka tallensit luodessasi sen. Se ei ole holvin lause.",
+      "code": "Lue koodi toiselta laitteeltani",
+      "codeBody": "Laite, jolla identiteettisi jo on, näyttää koodin; tämä liittyy tiliin ja odottaa hyväksyntää."
     },
+    "forget": {},
+    "lead": "Identiteetti antaa ihmisten kutsua sinut holviin ja yhden identiteetin omistaa monta holvia. Se tarvitsee synkronointipalvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut.",
+    "createFailed": "Identiteettiä ei voitu luoda. Tarkista synkronointipalvelin ja yritä uudelleen.",
     "held": {
       "title": "Tällä laitteella on jo identiteetti",
       "lead": "Tällä laitteella on jo identiteetti. Sen unohtaminen saa tämän laitteen menettämään pääsyn kaikkiin holveihin, jotka se omistaa tai joihin se on liittynyt, kunnes palautat sen sen 24-sanaisella lauseella. Jos et ole tallentanut tuota lausetta, sitä ei voi palauttaa.",
@@ -6036,17 +5765,15 @@
       "typebackLead": "Syötä nämä neljä sanaa juuri tallentamastasi identiteettilauseesta.",
       "wordNumber": "Sana nro {{position}}",
       "wordMismatch": "Se ei vastaa sanaa nro {{pos}}.",
-      "continue": "Jatka"
+      "registerCta": "Tallenna ja rekisteröi",
+      "registerLater": "Myöhemmin",
+      "registerHint": "Rekisteröinti lisää tämän identiteetin palvelimelle {{server}}, jota tämä laite jo käyttää, jotta ihmiset voivat kutsua sinut ja holvisi voivat synkronoitua. Myöhemmin pitää sen vain tällä laitteella, ja identiteetin kotisivu voi rekisteröidä sen sitten."
     },
+    "typeback": {},
     "home": {
-      "title": "Identiteettisi",
       "lead": "Ihmiset voivat kutsua sinut holviin. Sinun ei tarvitse omistaa holvia tullaksesi kutsutuksi.",
-      "codeLabel": "Identiteettikoodisi",
       "invitesHeading": "Kutsut",
-      "noInvites": "Ei vielä kutsuja.",
       "inviteHint": "Avaa tämä kutsu holvivalitsimesta liittyäksesi identiteettilauseellasi.",
-      "forgetHeading": "Tämä laite",
-      "forget": "Unohda tämä identiteetti tällä laitteella",
       "forgetCheckbox": "Ymmärrän, että tämä identiteetti poistetaan tältä laitteelta. Palvelintili säilyy, ja lause palauttaa sen.",
       "vaultHeading": "Holvisi",
       "vaultHint": "Identiteettisi voi omistaa niin monta holvia kuin haluat. Jokaisella on oma salasanansa.",
@@ -6054,21 +5781,31 @@
       "registerHint": "Tätä identiteettiä ei ole vielä rekisteröity, joten kukaan ei voi kutsua sinua eikä mitään synkronoidu."
     },
     "register": {
-      "title": "Rekisteröi tämä identiteetti",
-      "open": "Rekisteröi tämä identiteetti",
       "cta": "Rekisteröi",
       "working": "Rekisteröidään…",
       "failed": "Identiteettiä ei voitu rekisteröidä. Se jää tälle laitteelle ja voit yrittää uudelleen."
     },
     "personJoin": {
+      "inviteLabel": "Kutsukoodi",
+      "inviteHint": "Vain jos palvelimesi pyytää sitä. Useimmat palvelimet päästävät sisään laitteen, jolla tili jo on.",
       "title": "Lisää tämä puhelin tiliisi",
       "lead": "Kirjoita 24 sanaa sen tilin palautuslauseesta, josta tämä koodi tuli. Toinen laite hyväksyy sitten tämän puhelimen, joten pelkkä lause ei voi lisätä laitetta.",
       "phraseLabel": "Identiteettilause",
       "cta": "Lisää tämä puhelin",
       "working": "Lisätään tätä puhelinta…",
       "mismatch": "Nämä sanat kuuluvat toiseen identiteettiin kuin tämä koodi.",
+      "error": {
+        "held": "Tällä laitteella on jo toinen identiteetti, joten se ei voi sinetöidä tätä. Unohda se ensin tällä laitteella ja lisää se sitten uudelleen.",
+        "inviteRequired": "Palvelimesi ottaa uusia tilejä vastaan vain kutsukoodilla. Kirjoita sen antama koodi ja yritä uudelleen.",
+        "inviteInvalid": "Tuo kutsukoodi ei vastaa sitä, jota palvelimesi odottaa.",
+        "deviceLimit": "Tilisi on saavuttanut laiterajansa. Poista laite laitteella, jolla tili jo on, ja yritä sitten uudelleen.",
+        "alreadyInstalled": "Tämä laite on jo hyväksytty tuolle tilille. Avaa se sen sijaan, että lisäät sen uudelleen.",
+        "awaitingApproval": "Tämä laite on lisätty ja odottaa hyväksyntää laitteella, jolla tilisi jo on.",
+        "accountFrozen": "Palvelimesi on jäädyttänyt tämän tilin. Mikään, mitä kirjoitat tähän, ei muuta sitä; ota yhteyttä palvelimen ylläpitäjään.",
+        "notConfigured": "Aseta ensin palvelimen osoite ja lisää sitten tämä laite.",
+        "transport": "Palvelimeesi ei saatu yhteyttä. Identiteettisi on ennallaan; yritä uudelleen, kun yhteys palaa."
+      },
       "failed": "Tämä puhelin ei lisääntynyt. Tarkista sanat ja yritä uudelleen.",
-      "pendingTitle": "Odotetaan hyväksyntää",
       "pendingLead": "Tämä puhelin on lisätty ja odottaa. Hyväksy se laitteella, jolla on jo tilisi, ja tämä näyttö valmistuu itsestään.",
       "pendingHint": "Täällä ei ole tehtävää, ennen kuin toinen laite hyväksyy.",
       "sessionEnded": "Odottaminen päättyi, kun sovellus suljettiin. Kirjoita 24 sanasi uudelleen jatkaaksesi.",
@@ -6076,7 +5813,11 @@
       "finishingTitle": "Viimeistellään tämä laite",
       "finishingLead": "Tämä puhelin on lisätty tiliisi. Holvisi haetaan nyt; jokaiselta kysytään vielä oma salasanansa.",
       "listFailed": "Tämä puhelin lisättiin, mutta tilisi holvit eivät saapuneet. Tarkista yhteys ja yritä uudelleen.",
-      "listRetry": "Hae holvit uudelleen"
+      "listRetry": "Hae holvit uudelleen",
+      "noVaults": "Tämä puhelin lisättiin, mutta yhtään holviasi ei voitu tuoda sille. Avaa tämä tili laitteella, jolla sellainen jo on, ja yritä sitten uudelleen.",
+      "vaultsNoneOnServer": "Tililläsi ei ole vielä holveja palvelimella. Holvi ilmestyy tänne, kun sen omistava laite on julkaissut sen.",
+      "vaultsNotHere_one": "{{count}} tämän tilin holvi ei voitu tuoda tälle puhelimelle. Avaa tämä tili vielä kerran yrittääksesi uudelleen.",
+      "vaultsNotHere_other": "{{count}} tämän tilin holvia ei voitu tuoda tälle puhelimelle. Avaa tämä tili vielä kerran yrittääksesi uudelleen."
     },
     "unlock": {
       "title": "Avaa identiteettisi",
@@ -6094,18 +5835,190 @@
       "working": "Palautetaan…",
       "failed": "Identiteettiä ei voitu palauttaa tälle laitteelle. Tarkista 24 sanaa ja yritä uudelleen."
     },
-    "typeback": {
-      "title": "Vahvista lauseesi"
-    },
     "joinFromQr": {
       "notFound": "Tämä koodi nimeää holvin, jota ei ole kutsuissasi tällä laitteella. Pyydä holvin omistajaa lähettämään kutsu tälle identiteetille uudelleen."
     }
   },
   "calendar": {
+    "view": {
+      "label": "Kalenterinäkymä",
+      "month": "Kuukausi",
+      "week": "Viikko",
+      "day": "Päivä",
+      "agenda": "Ohjelma"
+    },
+    "allDay": "Koko päivä",
+    "untitled": "Nimetön tapahtuma",
+    "locked": "Avaa holvi nähdäksesi kalenterin.",
+    "loadFailed": "Kalenterin lukeminen epäonnistui. Holvisi ei ole muuttunut.",
+    "capture": {
+      "on": "Lisää tapahtuma päivälle {{date}}"
+    },
+    "unreadable": {
+      "heading_one": "{{count}} tapahtumaa ei voitu lukea",
+      "heading_other": "{{count}} tapahtumaa ei voitu lukea",
+      "start-missing": "siinä ei ole alkua",
+      "start-unreadable": "sen alku ei ole päivämäärä, jonka tämä sovellus voi lukea",
+      "end-unreadable": "sen loppu ei ole päivämäärä, jonka tämä sovellus voi lukea",
+      "end-before-start": "se päättyy ennen kuin alkaa",
+      "end-time-without-start-time": "siinä on loppuaika mutta ei alkuaikaa",
+      "calendar-unreadable": "sen kalenterin nimi ei ole käyttökelpoinen"
+    },
+    "agendaRange": "Seuraavat {{days}} päivää",
+    "prev": "Edellinen",
+    "next": "Seuraava",
+    "today": "Tänään",
+    "more": "+{{count}} lisää",
+    "weekday": {
+      "monday": "Ma",
+      "tuesday": "Ti",
+      "wednesday": "Ke",
+      "thursday": "To",
+      "friday": "Pe",
+      "saturday": "La",
+      "sunday": "Su"
+    },
+    "resize": "Muuta kohteen {{title}} kokoa",
+    "refused": {
+      "value-changed": "Tapahtuma muuttui toisella laitteella. Kalenteri näyttää sen kohdan, jonka muistiinpano ilmoittaa.",
+      "start-missing": "Muistiinpanossa ei ole enää alkuaikaa, joten se ei ole kalenterissa.",
+      "base-mismatch": "Muistiinpano muuttui kalenterin kirjoittaessa. Mitään ei korvattu."
+    },
+    "weekdayLong": {
+      "monday": "maanantai",
+      "tuesday": "tiistai",
+      "wednesday": "keskiviikko",
+      "thursday": "torstai",
+      "friday": "perjantai",
+      "saturday": "lauantai",
+      "sunday": "sunnuntai"
+    },
     "form": {
+      "title": "Uusi tapahtuma",
+      "openNote": "Avaa muistiinpano",
+      "eventTitle": "Tapahtuman otsikko",
+      "starts": "Alkaa",
+      "startDate": "Alkamispäivä",
+      "startTime": "Alkuaika, tai koko päivä",
+      "ends": "Päättyy",
+      "endDate": "Päättymispäivä, tai jätä tyhjäksi yhden päivän tapahtumalle",
+      "endTime": "Päättymisaika",
+      "addEnd": "Lisää päättyminen",
+      "clearEnd": "Poista päättyminen",
+      "allDay": "Koko päivä",
+      "timed": "Tiettynä aikana",
+      "endBeforeStart": "Tapahtuma ei voi päättyä ennen kuin se alkaa. Muuta päättymispäivää.",
+      "repeat": "Toistuu",
+      "repeatNever": "Ei koskaan",
+      "repeatInterval": "Joka",
+      "repeatWeekdays": "Viikonpäivänä",
+      "repeatDayOfMonth": "Kuukauden päivänä",
+      "repeatCount": "Kuinka monta kertaa",
+      "repeatUnit": "Minkä jakson välein",
+      "repeatWeekday": "Viikonpäivä",
+      "repeatDay": "Kuukauden päivä",
+      "repeatLastDay": "Viimeinen päivä",
+      "repeatOrdinal": "Monesko",
+      "decrease": "Pienennä: {{label}}",
+      "increase": "Suurenna: {{label}}",
+      "remindLabel": "Muistuta",
+      "remind": "Muistuta minua enintään {{days}} päivää aiemmin",
+      "remindNone": "Ei muistutusta",
+      "leadBeyondHorizon": "Muistutus ulottuu enintään {{days}} päivää eteenpäin. Valitse lyhyempi ennakko.",
+      "titleRequired": "Anna tapahtumalle otsikko.",
+      "save": "Tallenna tapahtuma",
+      "unit": {
+        "day": "Päiviä",
+        "week": "Viikkoja",
+        "month": "Kuukausia",
+        "year": "Vuosia"
+      },
+      "ordinal": {
+        "first": "Ensimmäinen",
+        "second": "Toinen",
+        "third": "Kolmas",
+        "fourth": "Neljäs",
+        "last": "Viimeinen"
+      },
+      "lead": {
+        "10m": "10 minuuttia aiemmin",
+        "30m": "30 minuuttia aiemmin",
+        "1h": "1 tunti aiemmin",
+        "2h": "2 tuntia aiemmin",
+        "1d": "1 päivä aiemmin",
+        "2d": "2 päivää aiemmin",
+        "7d": "1 viikko aiemmin",
+        "1m": "1 minuutti aiemmin"
+      },
+      "noTime": "Ei aikaa",
+      "hour": "Tunti",
+      "minute": "Minuutti",
+      "editTitle": "Muokkaa tapahtumaa",
+      "calendarLabel": "Kalenteri",
+      "noCalendar": "Ei kalenteria",
       "calendarPlaceholder": "Nimeä kalenteri, esimerkiksi Henkilökohtainen",
       "calendarRequired": "Anna tapahtumalle kalenteri. Se värjää tapahtuman, ja juuri sen tämä näkymä voi kytkeä pois."
     },
+    "occurrenceOf": "Yksi toistuvan sarjan kerta, päivänä {{date}}",
+    "occurrence": {
+      "thisIsOne": "Tämä on yksi toistuvan sarjan kerta, päivänä {{date}}. Muuttaaksesi sitä muokkaa sarjaa tai lisää kertaluonteinen tapahtuma tälle päivälle.",
+      "editSeries": "Muokkaa sarjaa",
+      "addOneOff": "Lisää kertaluonteinen tälle päivälle",
+      "skip": "Peruuta tämä kerta",
+      "retime": "Aloita tämä kerta klo",
+      "retimeHint": "Vain tämä päivä muuttuu. Sarjan muut kerrat pitävät oman aikansa.",
+      "retimeSave": "Muuta aikaa"
+    },
+    "import": "Tuo .ics-tiedosto",
+    "export": "Vie .ics-muodossa",
+    "imported": "Tuotiin {{count}} tapahtumaa tiedostosta {{filename}}",
+    "importRefused": {
+      "too-large": "Tiedosto on suurempi kuin Myne lukee (1 MiB). Vain sellaisen kokoinen kalenteritiedosto on kokonainen holvi, ei aikataulu.",
+      "malformed-property": "Tuo tiedosto ei ole .ics-kalenteri: yksi rivi ei ole muotoa NAME:value eikä NAME;param:value.",
+      "unreadable-start": "Tiedostossa on alkuaika, jota Myne ei voi lukea, joten mitään ei tuotu.",
+      "unknown-zone": "Tiedosto nimeää aikavyöhykkeen, jota tämä laite ei tunne, joten mitään ei tuotu.",
+      "value-shape-mismatch": "Tiedosto merkitsee tapahtuman päivämääräksi ja antaa sille myös kellonajan, joten mitään ei tuotu.",
+      "unreadable-rule": "Tiedosto toistaa tapahtumaa säännöllä, jota Myne ei tue, joten mitään ei tuotu.",
+      "missing-start": "Tiedostossa on tapahtuma ilman alkuaikaa, eikä tapahtuma ilman alkua ole paikka kalenterissa.",
+      "no-events": "Tiedostossa ei ole yhtään tapahtumaa."
+    },
+    "exported": "Kirjoitettiin {{count}} tapahtumaa tiedostoon {{filename}}",
+    "exportFailed": ".ics-tiedostoa ei voitu kirjoittaa.",
+    "exportEmpty": "Kalenterissa ei ole vielä mitään vietävää.",
+    "importedSkipped": "Tuotiin {{count}} tapahtumaa tiedostosta {{filename}} ja jätettiin {{skipped}}, jotka tässä holvissa jo on",
+    "title": "Kalenteri",
+    "close": "Sulje kalenteri",
+    "noEvents": "Tälle päivälle ei ole mitään",
+    "conflict": "menee päällekkäin toisen tapahtuman kanssa",
+    "composer": {
+      "title": "Uusi tapahtuma",
+      "titleLabel": "Mikä tapahtuma?",
+      "start": "Alkaa",
+      "end": "Päättyy (valinnainen)",
+      "badTime": "Aika kirjoitetaan muodossa 09:00, 24 tunnin kellolla.",
+      "create": "Lisää kalenteriin",
+      "cancel": "Peruuta",
+      "createFailed": "Tapahtumaa ei voitu tallentaa.",
+      "repeatNever": "Kerran",
+      "repeatDaily": "Päivittäin",
+      "repeatWeekly": "Viikoittain",
+      "repeatMonthly": "Kuukausittain",
+      "remindNone": "Ei muistutusta",
+      "calendarLabel": "Kalenteri (nimi)",
+      "refused": "Tämä tapahtuma muuttui muualla, joten mitään ei tallennettu. Avaa se uudelleen.",
+      "date": "Päivämäärä",
+      "badDate": "Käytä muotoa YYYY-MM-DD."
+    },
+    "skipFailed": "Tuota kertaa ei voitu peruuttaa. Se on yhä kalenterissa.",
+    "taskRow": "Tehtävä, jonka eräpäivä on {date}",
+    "composeOn": "Lisää tapahtuma päivälle {date}",
+    "calendarsToggle": "Näytetyt kalenterit",
+    "calendarsToggleHelper": "Poista valinta ottaaksesi kalenterin pois tästä näkymästä. Mitään ei poisteta.",
     "calendarsToggleFailed": "Kalenteri ei vaihtunut. Se on kuten oli."
+  },
+  "identityForget": {
+    "body": "Tämä poistaa identiteetin vain tältä laitteelta. Palvelintili ja kaikki sen omistamat tai joihin se on liittynyt holvit pysyvät koskemattomina, ja voit palauttaa identiteetin sen 24-sanaisella lauseella toisella laitteella.",
+    "savedPhraseTail": "Jos et ole tallentanut tuota lausetta, tämä laite ei voi palauttaa sitä.",
+    "rosterTail": "Kutsut ja jäsenluettelon toiminnot tällä laitteella vaativat sen avaamisen uudelleen."
   }
 }

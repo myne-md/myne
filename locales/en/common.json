@@ -5855,7 +5855,7 @@
       "on": "Add an event on {{date}}"
     },
     "unreadable": {
-      "heading": "{{count}} event could not be read",
+      "heading_one": "{{count}} event could not be read",
       "heading_other": "{{count}} events could not be read",
       "start-missing": "it has no start",
       "start-unreadable": "its start is not a date this app can read",

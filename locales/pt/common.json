@@ -1,42 +1,15 @@
 {
-  "accountBootstrap": {
-    "accountMismatch": "Este navegador já contém o cofre de outra conta. Abra esse, ou termine a sessão e apague primeiro a cópia deste navegador.",
-    "changeAccount": "Usar um número de conta diferente",
-    "continue": "Continuar",
-    "hint": "Introduza a palavra-passe mestra desta conta. O Myne vai obter o seu cofre e configurar este navegador como um dispositivo da conta.",
-    "noEndpoint": "Esta cópia do Myne não tem nenhum servidor de sincronização configurado, por isso não consegue alcançar o seu cofre. Contacte quem a gere.",
-    "passwordLabel": "Palavra-passe mestra",
-    "approversIntro": "Estes dispositivos podem aprovar este:",
-    "noApprovers": "Nenhum outro dispositivo desta conta o pode aprovar neste momento. Abra o Myne num dispositivo que já tenha acesso e depois volte aqui.",
-    "pendingStartOver": "Começar de novo com outra conta",
-    "pendingTitle": "A aguardar aprovação",
-    "sasMatch": "Coincidem, continuar",
-    "sasMismatch": "Não coincidem",
-    "verifyBody": "Verifique se este código é o mesmo nos dois dispositivos antes de continuar. Se não for, pare: há algo errado com a ligação, não com a sua palavra-passe.",
-    "verifyChanged": "O código mudou enquanto estava a ver. Compare novamente os dois ecrãs. Se continuar a mudar, pare e não prossiga.",
-    "verifyTitle": "Compare este código",
-    "title": "Inicie sessão no seu cofre",
-    "working": "A configurar…"
-  },
-  "accountEntry": {
-    "createAccount": "Ainda não tenho conta. Criar uma.",
-    "checkFailed": "Não foi possível verificar esse número de conta. Tente novamente.",
-    "checking": "A verificar…",
-    "continue": "Continuar",
-    "hint": "Tem o aspeto de MY-XXXX-XXXX-XXXX-XXXX-XXXX. É verificado aqui, no seu dispositivo. Ainda não é enviado nada.",
-    "invalid": "Esse número de conta não é válido. Verifique-o e tente novamente.",
-    "title": "Introduza o seu número de conta"
-  },
   "agent": {
     "composer": {
       "placeholder": "Pergunte à IA…",
       "scopeLabel": "A trabalhar em",
-      "scopeOpenNote": "Esta nota",
       "scopeCount_one": "{{count}} nota",
       "scopeCount_many": "{{count}} notas",
       "scopeCount_other": "{{count}} notas",
       "scopeCountUnavailable": "Não foi possível verificar agora quantas notas essa pasta contém.",
       "startFailed": "Não foi possível iniciar o agente.",
+      "modelCannotEdit": "Este modelo não consegue fazer as alterações de que o modo de agente precisa. Escolha um modelo que consiga, em Definições, IA.",
+      "stillWorking": "O agente ainda está a trabalhar no último passo. Aguarde que termine e envie novamente.",
       "autoApplyFailed": "Não foi possível aplicar as alterações automaticamente. Nada foi escrito; abra a revisão para as aplicar você mesmo.",
       "permissionLabel": "Quando a execução terminar",
       "permissionAsk": "Rever primeiro",
@@ -50,7 +23,6 @@
       "checking": "A verificar",
       "unsupportedProvisional": "Este limiar de aprovação ainda não foi medido em vários modelos, por isso pode ser mais rígido ou mais permissivo do que devia.",
       "scopeNone": "nenhuma nota aberta, por isso ainda não há nada para trabalhar",
-      "scopeAllVault": "Todas as notas",
       "scopeQuestion": "O que o agente pode ler",
       "scopeFolders": "Pastas",
       "scopeApplies": "Aplica-se à sua próxima mensagem. Notas na lixeira, arquivadas e de modelo ficam sempre de fora.",
@@ -73,6 +45,12 @@
       "confirm_other": "Anexar {{count}} ficheiros",
       "remove": "Remover {{name}}",
       "noText": "{{name}} não tem texto que o agente consiga ler. Só se podem anexar ficheiros cujo texto pôde ser extraído.",
+      "fromDevice": "Tire uma fotografia ou escolha um ficheiro",
+      "readingDevice": "A ler neste dispositivo…",
+      "deviceOnly": "Lido neste dispositivo, nunca guardado",
+      "deviceUnsupported": "{{name}} não é um ficheiro que o agente consiga ler. Fotografias, PDFs e texto simples funcionam.",
+      "deviceFailed": "Não foi possível ler esse ficheiro. Nada foi enviado.",
+      "readingInProgress": "Termine primeiro a leitura do ficheiro e cole novamente.",
       "confirm_many": "Anexar {{count}} ficheiros"
     },
     "progress": {
@@ -117,7 +95,6 @@
     "review": {
       "title": "Rever alterações",
       "statusWaiting": "À espera da sua aprovação",
-      "close": "Fechar",
       "scopeTotal_one": "{{count}} nota no âmbito",
       "scopeTotal_many": "{{count}} notas no âmbito",
       "scopeTotal_other": "{{count}} notas no âmbito",
@@ -192,8 +169,6 @@
       "undoFailed": "Não foi possível anular a execução.",
       "undoReport": "{{reverted}} notas restauradas. {{kept}} notas criadas pela execução foram mantidas.",
       "alreadyApplied": "Aplicada",
-      "untitledNote": "Nota sem título",
-      "vaultRoot": "Raiz do cofre",
       "newNotesHeading_one": "{{count}} nota nova",
       "newNotesHeading_many": "{{count}} notas novas",
       "newNotesHeading_other": "{{count}} notas novas",
@@ -276,7 +251,6 @@
       "loading": "A carregar conversas…",
       "modeLabel": "Que conversas",
       "modeVault": "Todas",
-      "modeNote": "Esta nota",
       "renamedAnnouncement": "Mudou o nome para {{name}}",
       "deletedAnnouncement": "Conversa apagada",
       "loadFailed": "Não foi possível carregar as suas conversas agora.",
@@ -292,7 +266,6 @@
       "titleSaveFailed": "Não foi possível guardar o título.",
       "searchLabel": "Pesquisar conversas",
       "searchPlaceholder": "Pesquisar conversas…",
-      "noMatchTitle": "Sem resultados",
       "noMatchBody": "Nenhuma conversa corresponde a “{{query}}”. Limpe a pesquisa para as ver todas.",
       "emptyBody": "As conversas que iniciar aparecem aqui.",
       "menu": "Ações da conversa",
@@ -325,9 +298,7 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "Cancelar",
       "cleaning": "A limpar…",
-      "close": "Fechar",
       "completeTitle": "Limpeza concluída",
       "deleteCta": "Eliminar {{count}} não utilizados",
       "deleteCta_one": "Apagar {{count}} não utilizado",
@@ -351,16 +322,13 @@
       "willBeReclaimed": "{{size}} serão recuperados."
     },
     "coverPicker": {
-      "close": "Fechar",
       "dropHint": "Largue uma imagem para a usar como capa.",
       "empty": "Ainda não há imagens neste cofre. Carregue uma ou arraste uma imagem para aqui.",
-      "loading": "A carregar…",
       "removeCover": "Remover capa",
       "title": "Escolher uma imagem de capa",
       "upload": "Carregar"
     },
     "deleteDialog": {
-      "cancel": "Cancelar",
       "confirmPrompt": "Apagar permanentemente este anexo? Isto não pode ser desfeito.",
       "delete": "Apagar",
       "deleting": "A apagar…",
@@ -369,8 +337,7 @@
       "stillUsed_one": "Ainda é usado em {{count}} nota. Apagá-lo deixa uma lápide onde estava incorporado:",
       "stillUsed_many": "Ainda é usado em {{count}} notas. Apagá-lo deixa uma lápide onde estava incorporado:",
       "stillUsed_other": "Ainda é usado em {{count}} notas. Apagá-lo deixa uma lápide onde estava incorporado:",
-      "title": "Apagar anexo",
-      "untitled": "Sem título"
+      "title": "Apagar anexo"
     },
     "library": {
       "actionsAriaLabel": "Ações do anexo",
@@ -388,7 +355,6 @@
       "colUsedIn": "Usado em",
       "decrypting": "A desencriptar anexos…",
       "clearSearchAriaLabel": "Limpar a pesquisa",
-      "emptyClearSearch": "Limpar a pesquisa",
       "emptyImportHint": "Os ficheiros que adiciona a uma nota ficam no seu cofre, encriptados neste dispositivo antes de irem para qualquer lado. Importe um para começar.",
       "emptyLoadError": "Não foi possível ler o catálogo de anexos",
       "emptyNoAttachments": "Ainda não há anexos",
@@ -401,9 +367,7 @@
       "importing": "A importar…",
       "listView": "Vista de lista",
       "menuDelete": "Apagar",
-      "menuExport": "Exportar",
       "menuPreview": "Pré-visualizar",
-      "menuRename": "Mudar o nome",
       "menuTranscribe": "Transcrever",
       "menuViewTranscription": "Ver a transcrição",
       "noUnusedNotice": "Não há anexos não utilizados para limpar.",
@@ -440,8 +404,6 @@
       "emptyFilteredBody": "Nada aqui corresponde ao filtro de tipo atual. Limpe-o para voltar a ver a biblioteca inteira.",
       "emptyFilteredBodyQuery": "Nada na biblioteca corresponde",
       "emptyLoadErrorBody": "O catálogo está encriptado com o seu cofre, por isso isto costuma ser uma leitura interrompida e não dados perdidos. Tente novamente; se continuar a falhar, as suas notas e os respetivos ficheiros estão intactos.",
-      "emptyRetry": "Tentar novamente",
-      "transcriptCopy": "Copiar",
       "transcriptCopied": "Transcrição copiada.",
       "transcriptCopyFailed": "Não foi possível copiar a transcrição.",
       "transcriptEmpty": "Não foi encontrada fala nesta gravação.",
@@ -476,8 +438,7 @@
       "play": "Reproduzir"
     },
     "usedInNotesPopover": {
-      "empty": "Não utilizado em nenhuma nota.",
-      "untitled": "Sem título"
+      "empty": "Não utilizado em nenhuma nota."
     },
     "needsApp": "A limpeza de anexos precisa da aplicação.",
     "noUnused": "Sem anexos não utilizados: todos os ficheiros estão referenciados.",
@@ -512,7 +473,6 @@
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "Outra operação do cofre está em curso. Aguarde que termine e tente novamente.",
         "cancelled": "Cópia de segurança cancelada. Não ficou nenhum ficheiro.",
         "invalidDestination": "Essa pasta de destino não é utilizável.",
         "ioGeneric": "Não foi possível gravar o ficheiro da cópia de segurança.",
@@ -525,7 +485,6 @@
         "unknown": "A cópia de segurança falhou por um motivo que o Myne não conseguiu identificar. Não confie em nenhum ficheiro no destino; tente novamente."
       },
       "restore": {
-        "authOperationInProgress": "Outra operação do cofre está em curso. Aguarde que termine e tente novamente.",
         "cancelled": "Restauro cancelado. Nada foi alterado.",
         "damagedBackup": "O ficheiro da cópia de segurança está danificado.",
         "futureVersionBackup": "Esta cópia de segurança foi feita por uma versão mais recente do Myne. Atualize o Myne e depois restaure-a.",
@@ -540,20 +499,17 @@
       }
     },
     "export": {
-      "cancel": "Cancelar",
-      "close": "Fechar",
       "copying": "A copiar {{done}} de {{total}}…",
       "preparing": "A preparar…",
       "successToast": "Cópia de segurança verificada e guardada.",
       "title": "Fazer cópia de segurança do cofre",
       "verifying": "A verificar {{done}} de {{total}}…",
-      "phraseNotSubstitute": "Uma cópia de segurança, sozinha, não o deixa voltar a entrar se perder a palavra-passe."
+      "phraseNotSubstitute": "Uma cópia de segurança, sozinha, não o deixa voltar a entrar se perder a palavra-passe: o ficheiro contém as suas notas, não a sua palavra-passe nem a sua frase de identidade."
     }
   },
   "clipper": {
     "pairing": {
       "accept": "Aceitar",
-      "close": "Fechar",
       "codeAriaLabel": "Código de emparelhamento",
       "intro": "Confirme que este código corresponde ao mostrado na extensão e depois toque em Aceitar para emparelhar.",
       "reject": "Rejeitar",
@@ -569,7 +525,6 @@
     "matchedInAttachment": "no anexo",
     "matchedInAttachmentTitle": "A pesquisa correspondeu dentro de um ficheiro incorporado nesta nota",
     "matchedInBody": "↳ correspondência no corpo",
-    "noMatches": "Sem correspondências",
     "operatorHint": "Tab para completar",
     "operators": {
       "tag": "Notas com uma etiqueta",
@@ -582,7 +537,6 @@
     "searchPlaceholder": "Pesquisar notas ou executar um comando. Experimente tag: · path: · task:",
     "sectionCommands": "Comandos",
     "sectionNotes": "Notas",
-    "untitledNote": "Sem título",
     "resultsLabel": "Comandos e notas",
     "pin": "Fixar à fita esquerda",
     "unpin": "Soltar da fita esquerda",
@@ -698,9 +652,6 @@
       "togglePreview": {
         "label": "Alternar pré-visualização lado a lado"
       },
-      "findInNote": {
-        "label": "Localizar na nota"
-      },
       "findReplace": {
         "label": "Localizar e substituir na nota"
       },
@@ -788,6 +739,7 @@
       "exportVaultMarkdown": {
         "label": "Exportar cofre como Markdown…"
       },
+      "findInNote": {},
       "foldAll": {
         "label": "Dobrar tudo"
       },
@@ -872,6 +824,9 @@
       "unfoldAll": {
         "label": "Desdobrar tudo"
       },
+      "showCalendar": {
+        "label": "Abrir o calendário"
+      },
       "openThisWeekNote": {
         "label": "Abrir a nota desta semana"
       },
@@ -921,11 +876,9 @@
     "hotkeys": {
       "command": {
         "bold": "Negrito",
-        "closeTab": "Fechar separador",
         "cycleHeadingLevel": "Percorrer nível de título",
         "cycleTabs": "Percorrer separadores",
         "deleteWorkspace": "Apagar área de trabalho",
-        "findInNote": "Localizar na nota",
         "focusNextPane": "Focar painel seguinte",
         "focusPrevPane": "Focar painel anterior",
         "foldAll": "Dobrar tudo",
@@ -935,12 +888,10 @@
         "italic": "Itálico",
         "navigateBack": "Navegar para trás",
         "navigateForward": "Navegar para a frente",
-        "newNote": "Nova nota",
         "openSettings": "Abrir definições",
         "outdent": "Diminuir avanço",
         "paletteToggle": "Abrir paleta de comandos",
         "redo": "Refazer",
-        "renameWorkspace": "Mudar o nome da área de trabalho",
         "saveWorkspaceAs": "Guardar área de trabalho como",
         "selectAllScoped": "Selecionar tudo (delimitado)",
         "selectNextOccurrence": "Selecionar a ocorrência seguinte",
@@ -957,6 +908,7 @@
         "toggleTaskList": "Alternar lista de tarefas",
         "undo": "Anular",
         "unfoldAll": "Desdobrar tudo",
+        "showCalendar": "Abrir o calendário",
         "cycleRegion": "Alternar o foco entre regiões",
         "focusEditorRegion": "Focar o editor",
         "focusRightPanelRegion": "Focar o painel direito",
@@ -967,7 +919,6 @@
       "invalidChordReason": "Adicione um modificador (⌘, Ctrl ou Alt). Uma tecla isolada não pode ser um atalho."
     },
     "picker": {
-      "vaultRoot": "Raiz do cofre",
       "moveNoteTitle": "Mover nota para pasta",
       "moveNotePlaceholder": "Escolha uma pasta…",
       "noFolders": "Ainda não há pastas",
@@ -989,6 +940,68 @@
     },
     "back": "Voltar",
     "continue": "Continuar",
+    "phraseWordsProgress": "{{filled}} de {{total}} palavras",
+    "clear": "Limpar",
+    "untitled": "Sem título",
+    "done": "Concluído",
+    "rename": "Mudar o nome",
+    "remove": "Remover",
+    "edit": "Editar",
+    "export": "Exportar",
+    "copy": "Copiar",
+    "loading": "A carregar…",
+    "tasks": "Tarefas",
+    "priority": "Prioridade",
+    "today": "Hoje",
+    "thisnote": "Esta nota",
+    "nomatches": "Sem resultados",
+    "allnotes": "Todas as notas",
+    "untitlednote": "Nota sem título",
+    "vaultroot": "Raiz do cofre",
+    "clearsearch": "Limpar a pesquisa",
+    "tryagain": "Tentar novamente",
+    "anothervaultoperationisinprogresswaitforittofinishthentryagain": "Está a decorrer outra operação no cofre. Aguarde que termine e tente novamente.",
+    "closetab": "Fechar separador",
+    "emptytrash": "Esvaziar a Lixeira",
+    "findinnote": "Localizar na nota",
+    "newfolder": "Nova pasta",
+    "newnote": "Nova nota",
+    "renameworkspace": "Mudar o nome da área de trabalho",
+    "notnow": "Agora não",
+    "versionhistory": "Histórico de versões",
+    "duedate": "Data limite",
+    "nodate": "Sem data",
+    "movetotrash": "Mover para a Lixeira",
+    "thevaultislockedunlockitthentryagain": "O cofre está bloqueado. Desbloqueie-o e tente novamente.",
+    "showinfolder": "Mostrar na pasta",
+    "untitledview": "Vista sem título",
+    "choosefolder": "Escolher pasta…",
+    "untitledtemplate": "Modelo sem título",
+    "justnow": "agora mesmo",
+    "nonotesmatchthisview": "Nenhuma nota corresponde a esta vista",
+    "novalue": "Sem valor",
+    "masterpassword": "Palavra-passe mestra",
+    "recoveryphrase": "Frase de recuperação",
+    "unexpectederrorpleasetryagain": "Erro inesperado. Tente novamente.",
+    "vaultfilenotfoundpleaserestarttheapp": "Ficheiro do cofre não encontrado. Reinicie a aplicação.",
+    "vaultfileisunreadablerestorefromabackup": "O ficheiro do cofre não pode ser lido. Restaure a partir de uma cópia de segurança.",
+    "restorefrombackup": "Restaurar a partir de uma cópia de segurança",
+    "deviceonly": "Apenas neste dispositivo",
+    "accountnumber": "Número de conta",
+    "changepassword": "Alterar a palavra-passe",
+    "couldnotsavethissetting": "Não foi possível guardar esta definição.",
+    "periodicnotes": "Notas periódicas",
+    "thisdevice": "Este dispositivo",
+    "thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue": "O código mudou enquanto estava a ver. Compare os dois ecrãs novamente. Se continuar a mudar, pare e não continue.",
+    "waitingforapproval": "A aguardar aprovação",
+    "youridentitycode": "O seu código de identidade",
+    "keepit": "Guarde-o",
+    "youridentity": "A sua identidade",
+    "forgetthisidentityonthisdevice": "Esquecer esta identidade neste dispositivo",
+    "noinvitationsyet": "Ainda não há convites.",
+    "createanidentity": "Criar uma identidade",
+    "confirmyourphrase": "Confirme a sua frase",
+    "registerthisidentity": "Registar esta identidade",
     "skipToContent": "Saltar para o conteúdo"
   },
   "deviceRevoked": {
@@ -1012,7 +1025,6 @@
         "noticeContainerChanged": "Comprimida para {{format}}: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "Cancelar",
         "confirm": "Converter",
         "skipped": "ignorado: {{note}}",
         "subtitle_one": "Será reescrita 1 referência. Reveja antes de confirmar.",
@@ -1090,7 +1102,6 @@
       },
       "lightbox": {
         "close": "Fechar pré-visualização",
-        "export": "Exportar",
         "exportAria": "Exportar anexo",
         "imagePreview": "Pré-visualização da imagem",
         "pdfFallback": "PDF",
@@ -1102,27 +1113,21 @@
       "menu": {
         "actionsAria": "Ações do anexo"
       },
-      "pdf": {
-        "loading": "A carregar…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "Não foi possível abrir o seletor de ficheiros."
       },
       "progress": {
         "encrypting": "A encriptar…",
-        "importing": "A importar…",
-        "loading": "A carregar…"
+        "importing": "A importar…"
       },
       "recording": {
         "barAria": "A gravar nota de voz",
-        "cancel": "Cancelar",
         "noAudio": "Nenhum áudio detetado. Verifique o microfone.",
         "saving": "A guardar…",
         "stop": "Parar"
       },
       "rename": {
-        "cancel": "Cancelar",
-        "confirm": "Mudar o nome",
         "title": "Mudar o nome do anexo"
       },
       "summary": {
@@ -1165,9 +1170,6 @@
           "seek": "Avançar"
         },
         "menu": {
-          "export": "Exportar",
-          "remove": "Remover",
-          "rename": "Mudar o nome",
           "reveal": "Revelar na biblioteca",
           "transcribe": "Transcrever",
           "customSize": "Tamanho personalizado…",
@@ -1228,7 +1230,6 @@
         "bug": "Erro",
         "caution": "Cuidado",
         "danger": "Perigo",
-        "done": "Concluído",
         "error": "Erro",
         "example": "Exemplo",
         "failure": "Falha",
@@ -1258,8 +1259,7 @@
         "linksTo_one": "Liga a {{count}}",
         "linksTo_many": "Liga a {{count}}",
         "linksTo_other": "Liga a {{count}}",
-        "outgoingEmpty": "Esta nota ainda não liga a nada.",
-        "untitled": "Sem título"
+        "outgoingEmpty": "Esta nota ainda não liga a nada."
       },
       "barItems": {
         "graph": "Gráfico",
@@ -1370,7 +1370,7 @@
           "insert": "Inserir na nota",
           "noAnswer": "Sem resposta. Tente reformular.",
           "newChat": "Nova conversa",
-          "unavailableHint": "Esta versão do Myne foi compilada sem IA local, por isso nada aqui pode ser executado. Nenhuma definição mudará isso — é preciso uma versão com IA incluída.",
+          "unavailableHint": "Esta versão do Myne foi compilada sem IA local, por isso nada aqui pode ser executado. Nenhuma definição mudará isso. É preciso uma versão com IA incluída.",
           "offHint": "A IA local está desligada. Ligue-a em Definições → Programador → IA.",
           "send": "Enviar",
           "statusNoModel": "Sem fornecedor",
@@ -1384,38 +1384,23 @@
           "truncated": "Foram resumidos os primeiros {{count}} caracteres.",
           "you": "Você",
           "history": "Histórico",
-          "historyCancel": "Cancelar",
           "historyDelete": "Apagar",
           "historyDeleteBody": "Isto apaga a conversa de cada dispositivo da próxima vez que se ligar. Não pode ser anulado.",
           "historyError": "Não foi possível carregar as conversas. Tente novamente.",
-          "historyProposalNewNote": "Nota nova",
-          "historyRename": "Renomear",
           "historyTitle": "Histórico de conversas",
           "historyDeleteTitle": "Apagar conversa",
           "persistWarning": "Falhou ao guardar no cofre. As suas mensagens continuam aqui e serão tentadas novamente.",
           "memory": "Memória",
-          "memoryPopoverTitle": "O que o assistente lembra",
-          "memoryPopoverEmpty": "Ainda não lembra nada.",
-          "memoryPopoverDelete": "Apagar",
-          "memoryPopoverDeleted": "Entrada removida em todo o lado.",
-          "memoryPopoverDeleteFailed": "Não foi possível apagar a entrada.",
-          "memoryPopoverEntryFailed": "Não foi possível ler esta entrada. Continua guardada; apague-a aqui ou corrija-a nas Definições.",
-          "memoryPopoverLoadFailed": "Não foi possível carregar as memórias. Nada foi alterado.",
-          "memoryPopoverRetry": "Tentar novamente",
-          "memoryPopoverSettings": "Gerir nas Definições",
-          "memoryPopoverClose": "Fechar",
           "seedCard": {
             "title": "Quer que o Myne conheça o seu cofre?",
             "body": "Ele pode ler a forma das suas notas uma vez e criar algumas entradas de memória. Reveja cada linha antes de qualquer coisa ser guardada.",
-            "action": "Ensinar o Myne ao seu cofre",
-            "dismiss": "Agora não"
+            "action": "Ensinar o Myne ao seu cofre"
           },
           "copied": "Copiado",
           "copyAnswer": "Copiar a resposta",
           "copyFailed": "Não foi possível copiar",
           "copyYourMessage": "Copiar a sua mensagem",
           "emptyTitle": "Pergunte sobre as suas notas",
-          "noticeSettingsCta": "Abrir as definições de IA",
           "viewDiff": "Ver alterações",
           "revertRun": "Anular esta execução",
           "diffTitle": "Alterações propostas",
@@ -1429,8 +1414,7 @@
           "statusKeyRejected": "Chave rejeitada",
           "statusOutOfCredit": "Sem crédito",
           "statusRefused": "Recusado",
-          "statusNotWorking": "Não funciona",
-          "historyRetry": "Tentar novamente"
+          "statusNotWorking": "Não funciona"
         },
         "allHidden": "Todos os separadores estão ocultos. Clique com o botão direito para restaurar.",
         "outline": {
@@ -1465,15 +1449,12 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "Nome da área de trabalho",
-        "renameConfirm": "Mudar o nome",
-        "renameTitle": "Mudar o nome da área de trabalho",
         "saveAsTitle": "Guardar área de trabalho como",
         "saveConfirm": "Guardar"
       },
       "workspaceSwitcher": {
         "defaultName": "Área de trabalho",
         "renameItemLabel": "Mudar o nome da área de trabalho {{name}}",
-        "renameTitle": "Mudar o nome da área de trabalho",
         "saveCurrentAs": "Guardar a atual como…",
         "switchLabel": "Mudar de área de trabalho",
         "toggleTitle": "Área de trabalho: {{name}}"
@@ -1499,14 +1480,12 @@
     "noteActions": {
       "buttonLabel": "Ações da nota",
       "convertFailed": "Não foi possível mudar o que esta nota é, por isso fica inalterada.",
-      "rename": "Mudar o nome",
       "move": "Mover para pasta…",
       "duplicate": "Duplicar",
       "convertToTemplate": "Transformar em modelo",
       "convertToNote": "Converter em nota",
       "turnedIntoTemplate": "Transformada em modelo",
       "convertedToNote": "Convertida em nota",
-      "versionHistory": "Histórico de versões",
       "trash": "Mover para a Lixeira",
       "openInNewWindow": "Abrir numa nova janela"
     },
@@ -1515,9 +1494,7 @@
       "defaultBadge": "código"
     },
     "drawingEmbed": {
-      "done": "Concluído",
       "edit": "Editar o desenho {{name}}",
-      "editAction": "Editar",
       "empty": "Desenho vazio: clique para desenhar",
       "open": "Abrir",
       "rename": "Mudar o nome do desenho"
@@ -1532,8 +1509,6 @@
       "matchCase": "Diferenciar maiúsculas",
       "matchCount": "{{current}} de {{total}}",
       "nextMatch": "Ocorrência seguinte",
-      "noMatches": "Sem correspondências",
-      "placeholder": "Procurar na nota",
       "previousMatch": "Ocorrência anterior",
       "replaceAll": "Substituir tudo",
       "replaceAllCount": "Substituir tudo ({{total}})",
@@ -1564,7 +1539,6 @@
       "propertiesLabel": "Propriedades",
       "removeListItemAriaLabel": "Remover {{item}}",
       "titleAriaLabel": "Título da nota",
-      "titlePlaceholder": "Sem título",
       "managedField": "O Myne escreve este campo"
     },
     "mermaid": {
@@ -1579,11 +1553,9 @@
       "panLeft": "Deslocar para a esquerda",
       "panRight": "Deslocar para a direita",
       "edit": "Editar o código do diagrama",
-      "editText": "Editar",
       "expand": "Expandir o diagrama",
       "expandText": "Expandir",
-      "expandClose": "Fechar o diagrama expandido",
-      "expandCloseText": "Fechar"
+      "expandClose": "Fechar o diagrama expandido"
     },
     "slash": {
       "aiContinue": "Continuar a escrever (IA)",
@@ -1597,7 +1569,6 @@
       "day": "Dia",
       "divider": "Separador",
       "drawing": "Desenho",
-      "due": "Data limite",
       "heading1": "Título 1",
       "heading2": "Título 2",
       "heading3": "Título 3",
@@ -1607,7 +1578,6 @@
       "link": "Ligação",
       "now": "Agora",
       "numberedList": "Lista numerada",
-      "priority": "Prioridade",
       "quote": "Citação",
       "repeat": "Repetição",
       "table": "Tabela",
@@ -1658,19 +1628,15 @@
       "title": {
         "due": "Data limite",
         "repeat": "Repetição",
-        "priority": "Prioridade",
         "remind": "Lembrete"
       },
       "invalidRemind": "O Myne não consegue ler esta data, por isso não o vai lembrar.",
       "addTime": "Adicionar hora",
-      "clear": "Limpar",
       "dateGrid": "Escolher uma data",
       "dateNext": "Mês seguinte",
       "datePrev": "Mês anterior",
-      "today": "Hoje",
       "tomorrow": "Amanhã",
       "selectField": "Selecione um campo para adicionar",
-      "noDate": "Sem data",
       "removeTime": "Remover hora",
       "timeHour": "Hora",
       "timeMeridiem": "AM ou PM",
@@ -1679,6 +1645,7 @@
     "toolbar": {
       "apply": "Aplicar",
       "exportImageTitle": "Exportar seleção como imagem",
+      "label": "Formatação",
       "customize": {
         "bold": "Negrito",
         "bulletList": "Lista com marcadores",
@@ -1716,7 +1683,8 @@
         "brown": "Castanho",
         "grey": "Cinzento",
         "indigo": "Índigo",
-        "remove": "Remover o realce"
+        "remove": "Remover o realce",
+        "colours": "Cor do realce"
       },
       "urlPlaceholder": "Colar o URL da ligação"
     },
@@ -1765,7 +1733,6 @@
         "embed": "Incorporar: {{label}}"
       },
       "convert": {
-        "cancel": "Cancelar",
         "choiceClause_one": " · {{count}} precisa de uma escolha.",
         "choiceClause_many": " · {{count}} precisam de uma escolha.",
         "choiceClause_other": " · {{count}} precisam de uma escolha.",
@@ -1815,16 +1782,13 @@
     },
     "nav": {
       "dailyNote": "Nota diária",
-      "openToday": "Abrir hoje",
-      "allNotes": "Todas as notas"
+      "openToday": "Abrir hoje"
     },
     "list": {
       "searchPlaceholder": "Pesquisar notas",
-      "clearSearch": "Limpar pesquisa",
       "viewNoteCount_one": "{{count}} nota em “{{name}}”",
       "viewNoteCount_many": "{{count}} notas em “{{name}}”",
       "viewNoteCount_other": "{{count}} notas em “{{name}}”",
-      "edit": "Editar",
       "trashEmpty": "A Lixeira está vazia",
       "archiveEmpty": "Nenhuma nota arquivada",
       "noMatchingNotes": "Nenhuma nota corresponde",
@@ -1842,10 +1806,8 @@
       "wordCount_many": "{{count}} palavras · {{minutes}} min de leitura",
       "wordCount_other": "{{count}} palavras · {{minutes}} min de leitura",
       "moveToFolder": "Mover para pasta…",
-      "moveToTrash": "Mover para a Lixeira",
       "copied": "Copiado ✓",
-      "copyToClipboard": "Copiar para a área de transferência",
-      "versionHistory": "Histórico de versões"
+      "copyToClipboard": "Copiar para a área de transferência"
     },
     "purge": {
       "body": "Isto remove a nota deste dispositivo definitivamente. Não é possível anular esta ação."
@@ -1864,8 +1826,7 @@
       "body": "Escolha uma nota da lista ou comece uma nova."
     },
     "readingBar": {
-      "editNote": "Editar nota",
-      "edit": "Editar"
+      "editNote": "Editar nota"
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} nota ligada",
@@ -1902,9 +1863,7 @@
       "emptyState": "Ainda não há vistas guardadas. Crie uma para filtrar as suas notas por etiqueta, pasta ou texto.",
       "editView": "Editar vista"
     },
-    "sheet": {
-      "done": "Concluído"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "Cofres"
     },
@@ -1914,7 +1873,6 @@
       "notesCount_many": "Notas · {{count}}",
       "notesCount_other": "Notas · {{count}}"
     },
-    "untitledNote": "Nota sem título",
     "commandPalette": {
       "searchPlaceholder": "Pesquisar notas ou executar um comando…",
       "noMatches": "Nenhum comando ou nota corresponde."
@@ -1953,7 +1911,6 @@
     "meeting": {
       "ai": {
         "cancelled": "Parado. Não foi adicionado nada à nota.",
-        "close": "Fechar",
         "discard": "Descartar",
         "failed": "A passagem da IA falhou. A transcrição está inalterada.",
         "generate": "Gerar",
@@ -1978,7 +1935,6 @@
         "title": "IA da reunião"
       },
       "barAria": "Sessão de reunião",
-      "cancel": "Cancelar",
       "chunksMissing": "Parte da reunião não foi transferida, por isso a nota tem uma falha. O áudio que chegou continua lá.",
       "clipFailed": "Não foi possível guardar uma parte da reunião. O resto continua na nota.",
       "machineNotice": "Esta é uma transcrição automática da reunião e pode conter erros.",
@@ -2017,8 +1973,7 @@
         "pdfPayloadMissing": "A exportação foi interrompida. Se o cofre se bloqueou, desbloqueie-o e tente novamente.",
         "pdfRenderTimeout": "A nota demorou demasiado tempo a processar, por isso nada foi exportado.",
         "pdfWindowCreateFailed": "Não foi possível abrir a janela de exportação, por isso nada foi exportado.",
-        "targetExists": "Já existe um ficheiro com esse nome no destino.",
-        "vaultLocked": "O cofre está bloqueado. Desbloqueie-o e tente novamente."
+        "targetExists": "Já existe um ficheiro com esse nome no destino."
       },
       "flow": {
         "couldNotRead": "Não foi possível ler esta nota.",
@@ -2032,11 +1987,9 @@
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
-        "filterPlainText": "Texto simples",
-        "showInFolder": "Mostrar na pasta"
+        "filterPlainText": "Texto simples"
       },
       "modal": {
-        "cancel": "Cancelar",
         "export": "Exportar…",
         "includeAttachments_one": "Incluir {{count}} anexo",
         "includeAttachments_many": "Incluir {{count}} anexos",
@@ -2048,12 +2001,10 @@
       }
     },
     "egress": {
-      "cancel": "Cancelar",
       "confirm": "Transferir",
       "title": "Transferir este ficheiro"
     },
     "pdf": {
-      "cancel": "Cancelar",
       "continue": "Continuar…",
       "title": "Exportar como PDF"
     },
@@ -2062,7 +2013,6 @@
       "errors": {
         "attachmentCorrupt": "Não foi possível ler um anexo referenciado por uma nota, por isso nada foi exportado.",
         "attachmentMissing": "Falta um anexo referenciado por uma nota, por isso nada foi exportado.",
-        "authOperationInProgress": "Outra operação do cofre está em curso. Aguarde que termine e tente novamente.",
         "cancelled": "Exportação cancelada. Nada ficou no destino.",
         "cannotDecrypt": "Não foi possível ler uma nota, por isso nada foi exportado.",
         "destinationAlreadyExists": "Já existe algo nesse local. Escolha um local novo para a exportação.",
@@ -2071,7 +2021,6 @@
         "invalidVaultMeta": "Não foi possível ler os metadados do cofre, por isso nada foi exportado.",
         "ioWriteDefault": "Não foi possível gravar a exportação.",
         "joinFailure": "A exportação falhou inesperadamente. Nada ficou no destino.",
-        "vaultLocked": "O cofre está bloqueado. Desbloqueie-o e tente novamente.",
         "vaultNotFound": "Nenhum cofre encontrado para exportar."
       },
       "flow": {
@@ -2097,12 +2046,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "Cancelar",
         "cancelling": "A cancelar…",
         "title": "A exportar…"
       },
       "setup": {
-        "cancel": "Cancelar",
         "choose": "Escolher…",
         "chooseFolder": "Escolha uma pasta…",
         "destinationLabel": "Destino",
@@ -2116,8 +2063,6 @@
         "title": "Exportar cofre como Markdown"
       },
       "summary": {
-        "done": "Concluído",
-        "showInFolder": "Mostrar na pasta",
         "title": "Exportação concluída"
       }
     }
@@ -2153,8 +2098,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Cancelar",
-      "close": "Fechar",
       "count_one": "{{count}} nota",
       "count_many": "{{count}} notas",
       "count_other": "{{count}} notas",
@@ -2168,14 +2111,12 @@
       "folderDeleteConfirm_one": "Mover {{count}} nota para a Lixeira?",
       "folderDeleteConfirm_many": "Mover {{count}} notas para a Lixeira?",
       "folderDeleteConfirm_other": "Mover {{count}} notas para a Lixeira?",
-      "folderDeleteConfirmCta": "Mover para a Lixeira",
       "folderDeleteError": "Não foi possível mover as notas dessa pasta para a Lixeira. Tente novamente.",
       "folderDeleteTitle": "Mover esta pasta para a Lixeira?",
       "folderDeleteWarning": "Vão para o Lixo. Pode restaurá-las quando quiser. A eliminação permanente é um passo separado.",
       "restore": "Restaurar",
       "restoreError": "Não foi possível restaurar essa nota. Tente novamente.",
-      "title": "Arquivo",
-      "untitled": "Sem título"
+      "title": "Arquivo"
     },
     "cardMenu": {
       "copyLink": "Copiar ligação",
@@ -2203,10 +2144,8 @@
       "none": "Nenhum"
     },
     "deleteConfirm": {
-      "cancel": "Cancelar",
       "delete": "Apagar",
       "title": "Apagar esta nota?",
-      "untitled": "Sem título",
       "warning": "Isto não pode ser desfeito."
     },
     "example": {
@@ -2235,7 +2174,6 @@
     "filterBuilder": {
       "addCondition": "Adicionar condição",
       "addFilterGroup": "Adicionar grupo de filtros",
-      "cancel": "Cancelar",
       "combinator": {
         "all": "todas",
         "any": "qualquer"
@@ -2282,6 +2220,7 @@
       "unsettledSave": "Uma nota aberta ainda não terminou de guardar, por isso a pasta ficou de lado. Tente de novo quando terminar.",
       "renameFailed": "Não foi possível mudar o nome da pasta, por isso fica inalterada.",
       "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Sempre que desbloquear, uma pasta vazia volta a aparecer com o nome antigo; pode apagá-la em segurança, sem que mais nada mude. Mudar o nome da pasta outra vez não a apaga.",
+      "mcpScopeRewriteFailed": "A pasta foi renomeada, mas as pastas de que uma ligação de IA externa está excluída não puderam ser atualizadas. Se tinha deixado esta pasta de fora da aprovação de uma ligação, ela pode agora ser legível por essa ligação. Abra Definições, IA, Acesso externo e verifique as pastas deixadas de fora em cada ligação.",
       "folderListFull": "O Myne só consegue guardar um número limitado de pastas, e essa lista está cheia. Esta pasta continua a funcionar, mas desaparece quando a sua última nota sair dela. Apagar uma pasta de que já não precisa liberta espaço.",
       "folderNotRemembered": "A pasta foi criada, mas o Myne não conseguiu registá-la. Vai desaparecer quando a sua última nota sair dela e, se ainda estiver vazia, desaparece no próximo desbloqueio. Pode voltar a criá-la em segurança.",
       "attachmentFolderRewriteFailed": "A pasta foi renomeada, mas os ficheiros guardados nela não foram movidos com ela. Continuam a indicar a pasta antiga, por isso faltam na árvore da biblioteca e a um agente a quem esta pasta foi dada. Mova-os novamente à mão a partir dos Anexos, ou renomeie a pasta para trás e depois outra vez."
@@ -2314,7 +2253,6 @@
         "heading": "Grupos de cores",
         "namePlaceholder": "Regra sem título",
         "rowLabel": "{{name}}, grupo {{index}} de {{total}}. Alt mais a seta para cima ou para baixo reordena-a.",
-        "editRuleButton": "Editar",
         "derivedMakeEditable": "Tornar editáveis",
         "derivedMakeEditableFailed": "Não foi possível guardar esses grupos. Tente novamente.",
         "derivedNote_one": "O grafo é colorido por etiqueta: {{count}} grupo, derivado das suas etiquetas. Não é guardado até o tornar editável.",
@@ -2336,7 +2274,6 @@
       "refreshTitle": "O cofre mudou: reconstruir o gráfico",
       "settings": {
         "appearanceHeading": "Aparência",
-        "closeTitle": "Fechar",
         "forceCenter": "Atração ao centro",
         "forceLinkDistance": "Distância das ligações",
         "forceLinkStrength": "Força das ligações",
@@ -2360,7 +2297,6 @@
       "relayoutTitle": "Reorganizar o grafo do zero",
       "showingCount_one": "A mostrar {{count}} nota",
       "showingCount_other": "A mostrar {{count}} notas",
-      "untitledNote": "Nota sem título",
       "viewGraph": "Grafo",
       "viewList": "Lista",
       "viewToggleAriaLabel": "Escolha a imagem do grafo ou a lista das suas notas",
@@ -2368,22 +2304,15 @@
       "showingCount_many": "A mostrar {{count}} notas"
     },
     "import": {
-      "base": {
-        "untitledView": "Vista sem título"
-      },
+      "base": {},
       "modal": {
-        "cancel": "Cancelar",
         "cancelledNotImported": "{{count}} não importadas",
         "cancelledNotImported_one": "{{count}} não importada",
         "cancelledNotImported_many": "{{count}} não importadas",
         "cancelledNotImported_other": "{{count}} não importadas",
         "cancelling": "A cancelar…",
-        "chooseFolder": "Escolher pasta…",
-        "close": "Fechar",
         "closeAriaLabel": "Fechar",
         "copied": "Copiado",
-        "copy": "Copiar",
-        "done": "Concluído",
         "errorBody": "Não foi possível concluir a importação. As notas já importadas foram mantidas e pode mantê-las ou apagá-las sem problemas.",
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Pasta",
@@ -2461,10 +2390,8 @@
         "statFoldersNotKept": "Pastas não mantidas"
       },
       "offer": {
-        "body": "Traga as suas notas existentes para o Myne. Cada uma é encriptada à medida que é importada. Nada sai deste dispositivo e os seus ficheiros originais permanecem exatamente onde estão.",
-        "chooseFolder": "Escolher pasta…",
+        "body": "Traga as suas notas existentes para o Myne. Cada uma é encriptada à medida que é importada, e os seus ficheiros originais ficam exatamente onde estão.",
         "laterHint": "Pode sempre importar mais tarde a partir de Definições → Armazenamento.",
-        "notNow": "Agora não",
         "title": "Importar as suas notas?"
       },
       "picker": {
@@ -2595,12 +2522,8 @@
       "mergeAnyway": "Fundir mesmo assim",
       "newDrawingHere": "Novo desenho aqui",
       "newDrawingMenu": "Novo desenho",
-      "newFolder": "Nova pasta",
       "newFolderInPlaceholder": "Nova pasta em {{path}}",
-      "newFolderPlaceholder": "Nova pasta",
-      "newNote": "Nova nota",
       "newNoteHere": "Nova nota aqui",
-      "newNoteMenu": "Nova nota",
       "newSubfolder": "Nova subpasta",
       "newViewTitle": "Nova vista",
       "noteMovedToTrash": "Nota movida para o Lixo",
@@ -2613,7 +2536,6 @@
       "openToSide": "Abrir ao lado",
       "removeFolderNote": "Remover nota da pasta",
       "removeFromFavorites": "Remover dos favoritos",
-      "rename": "Mudar o nome",
       "setAsFolderNote": "Definir como nota de pasta",
       "trash": "Lixo",
       "trashBulkError": "Não foi possível mover as notas para o Lixo.",
@@ -2621,12 +2543,10 @@
       "trashConfirmBulkBody_many": "{{count}} notas serão movidas para a Lixeira.",
       "trashConfirmBulkBody_other": "{{count}} notas serão movidas para a Lixeira.",
       "trashConfirmBulkWarning": "Pode restaurá-las da Lixeira mais tarde.",
-      "trashConfirmConfirm": "Mover para a Lixeira",
       "trashConfirmTitle": "Mover para a Lixeira?",
       "trashConfirmWarning": "Pode restaurá-la da Lixeira mais tarde.",
       "trashSingleError": "Não foi possível mover a nota para o Lixo.",
       "undo": "Anular",
-      "vaultRoot": "Raiz do cofre",
       "viewSettingsTitle": "Definições da vista",
       "imported_one": "Importada 1 nota para esta pasta",
       "imported_many": "Importadas {{count}} notas para esta pasta",
@@ -2639,32 +2559,25 @@
       "moveFolderTo": "Mover pasta para…",
       "treeLabel": "Notas e pastas",
       "selectionAnnouncement": "{{title}} selecionada",
-      "untitled": "Sem título",
       "search": "Pesquisar"
     },
     "newFromTemplate": {
-      "back": "Voltar",
       "blankNote": "Nota em branco",
       "createNote": "Criar nota",
       "createFirstTemplate": "Criar um modelo",
       "manageTemplates": "Gerir modelos",
       "emptyState": "Ainda não criou nenhum modelo.",
       "listLabel": "Modelos",
-      "loading": "A carregar…",
       "nameLabel": "Nome para a nota (de “{{templateName}}”)",
-      "namePlaceholder": "Sem título",
       "nameStepTitle": "Dê um nome a esta nota",
-      "pickStepTitle": "Nova nota a partir de modelo",
-      "untitledTemplate": "Modelo sem título"
+      "pickStepTitle": "Nova nota a partir de modelo"
     },
     "newTab": {
-      "createNote": "Nova nota",
       "createDrawing": "Novo desenho",
       "noNotesYet": "Ainda não há notas.",
       "recent": "Continue de onde parou",
       "searchAriaLabel": "Pesquisar notas e comandos",
       "searchPlaceholder": "Pesquisar notas e comandos…",
-      "untitled": "Sem título",
       "createFromTemplate": "A partir de modelo",
       "kindCommand": "Comando",
       "kindNote": "Nota",
@@ -2675,6 +2588,7 @@
         "graph": "Gráfico",
         "tasks": "Tarefas",
         "today": "Hoje",
+        "calendar": "Calendário",
         "home": "Início"
       },
       "placesLabel": "Ir para",
@@ -2683,15 +2597,13 @@
     "pane": {
       "graphTab": "Gráfico",
       "tasksTab": "Tarefas",
-      "loading": "A carregar…",
-      "untitledView": "Vista sem título",
       "agentTab": "Agente",
+      "calendarTab": "Calendário",
       "homeTab": "Início"
     },
     "relativeTime": {
       "daysAgo": "há {{d}} dias",
       "hoursAgo": "há {{h}} h",
-      "justNow": "agora mesmo",
       "minutesAgo": "há {{m}} min",
       "oneWeekAgo": "há 1 semana",
       "weeksAgo": "há {{w}} semanas",
@@ -2710,7 +2622,6 @@
       "taskBadgeTitle": "Nota de tarefa",
       "unsyncedLabel": "Ainda não está no servidor",
       "unsyncedTitle": "As últimas alterações desta nota só existem neste dispositivo",
-      "untitled": "Sem título",
       "untitledDrawing": "Desenho sem título"
     },
     "savedView": {
@@ -2722,7 +2633,6 @@
       "editing": "A editar",
       "editingEllipsis": "A editar…",
       "editingTitle": "A editar: gravação automática ativada",
-      "justNow": "agora mesmo",
       "retry": "Repetir",
       "saved": "Guardado",
       "savedRelative": "Guardado {{rel}}",
@@ -2734,41 +2644,35 @@
       "savingEllipsis": "A guardar…"
     },
     "snapshotFailed": {
-      "dismiss": "Dispensar",
       "message": "Não foi possível guardar um instantâneo. A sua nota está guardada, mas o histórico de versões pode estar incompleto (o disco pode estar cheio)."
     },
     "snapshots": {
-      "cancel": "Cancelar",
       "changeCount_one": "{{count}} alteração desde este instantâneo",
       "changeCount_many": "{{count}} alterações desde este instantâneo",
       "changeCount_other": "{{count}} alterações desde este instantâneo",
       "changeCountPrev_one": "{{count}} alteração desde o instantâneo anterior",
       "changeCountPrev_many": "{{count}} alterações desde o instantâneo anterior",
       "changeCountPrev_other": "{{count}} alterações desde o instantâneo anterior",
-      "close": "Fechar",
       "compareAgainstLabel": "Comparar com",
       "compareCurrent": "Nota atual",
       "comparePrevious": "Instantâneo anterior",
       "confirmBody": "A sua nota atual será guardada primeiro como um instantâneo, para que possa anular esta ação.",
       "confirmTitle": "Restaurar este instantâneo?",
       "decrypting": "A desencriptar…",
-      "emptyState": "",
+      "emptyState": "Ainda não há instantâneos. Os instantâneos são guardados automaticamente à medida que edita, ficam durante cerca de 7 dias e desaparecem de vez quando a nota é apagada permanentemente.",
       "errorCannotDecrypt": "Não foi possível desencriptar este instantâneo.",
       "errorGeneric": "Algo correu mal. Tente novamente.",
       "errorIo": "Ocorreu um erro de disco. O disco pode estar cheio ou não gravável.",
       "errorNotFound": "Esse instantâneo já não está disponível.",
       "errorStorageAccess": "Não foi possível aceder ao armazenamento de instantâneos do cofre.",
       "errorVaultLocked": "O cofre está bloqueado. Desbloqueie-o para ver os instantâneos.",
-      "justNow": "agora mesmo",
       "listLabel": "Lista de instantâneos",
-      "loading": "A carregar…",
       "noPrevious": "Este é o instantâneo mais antigo. Não há nada antes dele com que o comparar.",
       "restore": "Restaurar",
       "restoreCta": "Restaurar este instantâneo",
       "restoredStatus": "Restaurado. A versão que tinha foi guardada como um instantâneo.",
       "selectPlaceholder": "Selecione um instantâneo para pré-visualizar o que mudou desde então.",
       "title": "Instantâneos",
-      "untitled": "Sem título",
       "deviceFallback": "Dispositivo {{code}}",
       "unknownAuthor": "Dispositivo desconhecido"
     },
@@ -2781,14 +2685,10 @@
       "pinned": "Fixado",
       "pinnedTitle": "Fixado: desafixe para fechar",
       "unpin": "Desafixar",
-      "untitled": "Sem título",
-      "closeTabMenuItem": "Fechar separador",
       "moveLeft": "Mover para a esquerda",
       "moveRight": "Mover para a direita"
     },
     "tagBrowser": {
-      "cancel": "Cancelar",
-      "clear": "Limpar",
       "combineTagsWith": "Combinar etiquetas com",
       "filtering": "A filtrar…",
       "modeAll": "Todas",
@@ -2805,21 +2705,17 @@
       "saveAsView": "Guardar como vista",
       "searchPlaceholder": "Pesquisar etiquetas…",
       "title": "Etiquetas",
-      "untitled": "Sem título",
       "viewNamePlaceholder": "Nome da vista"
     },
     "trash": {
-      "close": "Fechar",
       "count_one": "{{count}} nota",
       "count_many": "{{count}} notas",
       "count_other": "{{count}} notas",
       "delete": "Apagar",
       "deleteError": "Não foi possível apagar essa nota. Tente novamente.",
-      "empty": "Esvaziar o lixo",
       "emptyConfirmBody_one": "{{count}} nota será apagada permanentemente.",
       "emptyConfirmBody_many": "{{count}} notas serão apagadas permanentemente.",
       "emptyConfirmBody_other": "{{count}} notas serão apagadas permanentemente.",
-      "emptyConfirmCta": "Esvaziar o lixo",
       "emptyConfirmTitle": "Esvaziar o lixo?",
       "emptyPartialFailure_one": "{{count}} nota não pôde ser apagada e permanece no lixo.",
       "emptyPartialFailure_many": "{{count}} notas não puderam ser apagadas e permanecem no lixo.",
@@ -2830,8 +2726,7 @@
       "purgeConfirmTitle": "Apagar permanentemente?",
       "restore": "Restaurar",
       "restoreError": "Não foi possível restaurar essa nota. Tente novamente.",
-      "title": "Lixo",
-      "untitled": "Sem título"
+      "title": "Lixo"
     },
     "unlinkedMentions": {
       "empty": "Não há menções sem ligação.",
@@ -2840,8 +2735,7 @@
       "linkTooltip": "Ligar esta menção a {{title}}",
       "refresh": "As menções podem ter mudado: atualizar",
       "searching": "A pesquisar…",
-      "thisNote": "esta nota",
-      "untitled": "Sem título"
+      "thisNote": "esta nota"
     },
     "unsettledSave": "Uma nota aberta ainda não terminou de guardar, por isso nada foi alterado. Tente de novo quando terminar.",
     "views": {
@@ -2888,11 +2782,9 @@
         "renameLane": "Mudar o nome da pista {{lane}}",
         "newLaneName": "Nome da nova pista",
         "saveLaneName": "Guardar nome da pista",
-        "cancelLaneRename": "Cancelar",
         "lanesNotSaved": "Os cartões moveram-se, mas a ordem das pistas não pôde ser guardada.",
         "laneOrderRestored": "A ordem das pistas voltou.",
         "laneOrderRestoreFailed": "Não foi possível restaurar a ordem das pistas.",
-        "cancel": "Cancelar",
         "archiveFailed": "Não foi possível arquivar a nota.",
         "trashFailed": "Não foi possível mover a nota para a lixeira.",
         "noGroupBy": "Este quadro não tem propriedade de pista. Escolha uma propriedade para agrupar em definições da vista."
@@ -2900,17 +2792,11 @@
       "cards": {
         "changeCover": "Mudar capa",
         "changeCoverImage": "Mudar imagem de capa",
-        "empty": "Nenhuma nota corresponde a esta vista",
-        "noValue": "Sem valor",
         "setCover": "Definir capa",
-        "setCoverImage": "Definir imagem de capa",
-        "untitled": "Sem título"
+        "setCoverImage": "Definir imagem de capa"
       },
       "empty": "Ainda não há vistas. Guarde a lista de notas atual como uma vista.",
-      "list": {
-        "empty": "Nenhuma nota corresponde a esta vista",
-        "noValue": "Sem valor"
-      },
+      "list": {},
       "import": {
         "approveAction": "Aprovar v{{version}}",
         "approveFailed": "Não foi possível guardar essa aprovação.",
@@ -2922,7 +2808,6 @@
         "armRefusedHeading": "{{name}} não foi importada",
         "armSameVersionDifferent": "O ficheiro diz v{{version}}, a mesma versão que este cofre tem, mas os conteúdos diferem. Ou é um autor diferente a reutilizar o id, ou o ficheiro mudou depois de ser aprovado, por isso é recusado.",
         "armUpdate": "Isto substitui {{name}}: este cofre tem v{{stored}}, o ficheiro é v{{incoming}}.",
-        "close": "Fechar",
         "filterName": "Manifesto de vista",
         "idleBody": "Um ficheiro de vista é uma vista guardada que alguém exportou. O Myne verifica-a primeiro e mostra-lhe o que seleciona e lê antes de qualquer coisa ser guardada.",
         "importAction": "Importar vista",
@@ -2948,7 +2833,6 @@
       "manager": {
         "approve": "Aprovar",
         "approvedState": "Aprovada neste dispositivo",
-        "close": "Fechar",
         "deleteFailed": "Não foi possível apagar essa vista.",
         "deleteLabel": "Apagar {{name}}",
         "emptyBody": "Uma vista que guarda a partir da lista de notas, ou que alguém lhe envia, aparece aqui.",
@@ -2965,18 +2849,14 @@
         "editFilter": "Editar filtro…",
         "moveDown": "Mover para baixo",
         "moveUp": "Mover para cima",
-        "rename": "Mudar o nome",
         "viewSettings": "Definições da vista…"
       },
       "newView": "Nova vista",
       "noMatch": "Nenhuma vista corresponde à sua pesquisa.",
       "searchPlaceholder": "Pesquisar vistas…",
       "table": {
-        "empty": "Nenhuma nota corresponde a esta vista",
-        "name": "Nome",
-        "noValue": "Sem valor"
-      },
-      "untitledView": "Vista sem título"
+        "name": "Nome"
+      }
     },
     "viewSettings": {
       "aspect": {
@@ -2986,7 +2866,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (largo)"
       },
-      "cancel": "Cancelar",
       "cardSize": "Tamanho do cartão",
       "cardSizeValue": "{{size}} px",
       "columns": "Colunas",
@@ -3147,7 +3026,6 @@
       "confirmLabel": "Confirmar palavra-passe mestra",
       "defaultEmptyCaption": "Escolha algo de que se consiga lembrar. Não é possível repô-la.",
       "mismatch": "As palavras-passe não correspondem.",
-      "passwordLabel": "Palavra-passe mestra",
       "suggestPassword": "Sugerir palavra-passe",
       "tooShort": "Use pelo menos {{n}} carateres."
     },
@@ -3165,8 +3043,6 @@
   },
   "migrate": {
     "intro": "Atualize este cofre para o novo formato. As suas notas passam a ter fusão automática entre dispositivos. Isto gera novas chaves para todo o cofre; a cópia antiga é mantida neste dispositivo até confirmar.",
-    "passwordLabel": "Palavra-passe mestra",
-    "phraseLabel": "Frase de recuperação",
     "phraseHelp": "Obrigatória: as suas novas chaves são protegidas com esta frase, para que a recuperação continue a funcionar. Introduza todas as suas palavras de recuperação.",
     "submit": "Migrar",
     "migrating": "A migrar…",
@@ -3194,11 +3070,8 @@
     "errors": {
       "cancelledVaultLocked": "Recuperação cancelada: o cofre estava bloqueado.",
       "operationInProgress": "Operação em curso. Aguarde, por favor.",
-      "unexpected": "Erro inesperado. Tente novamente, por favor.",
-      "vaultNotFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor.",
       "openAsImportSource": "Uma importação está a ler este cofre neste momento. Termine ou cancele essa importação e depois recupere este cofre."
     },
-    "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de um backup.",
     "genericError": "Algo correu mal. Tente novamente.",
     "weakPassword": "A palavra-passe tem de ter, no mínimo, {{min}} caracteres.",
     "setPasswordError": "Não foi possível definir a sua nova palavra-passe. Tente novamente.",
@@ -3207,7 +3080,7 @@
     "restoreVaultHeader": "Restaurar um cofre",
     "accountTitle": "Introduza o seu número da conta",
     "accountLead": "Encontra-o onde guardou a sua frase de recuperação. Identifica o cofre a restaurar.",
-    "accountInvalid": "Número de conta inválido — verifique e introduza novamente.",
+    "accountInvalid": "Número de conta inválido. Verifique e introduza novamente.",
     "accountOptionalHint": "Não o tem? Deixe em branco e continue. A sua frase de recuperação de 24 palavras é tudo de que precisa.",
     "paste": "Colar",
     "phraseGridHint": "Escreva cada palavra ou cole todas as 24 de uma vez para preencher a grelha.",
@@ -3296,8 +3169,6 @@
     }
   },
   "restore": {
-    "backLabel": "Voltar",
-    "cancelLabel": "Voltar",
     "collision": {
       "body": "Já existe um cofre desta cópia de segurança neste dispositivo. Pode manter ambos: a cópia restaurada aparece como um cofre separado na sua lista de cofres. Ou pode restaurar agora e depois remover o cofre existente da lista de cofres por si próprio. A remoção pede-lhe que escreva DELETE e só faz sentido depois de confirmar que o cofre restaurado abre.",
       "keepBoth": "Manter ambos",
@@ -3305,14 +3176,13 @@
     },
     "damaged": {
       "body": "O ficheiro da cópia de segurança está danificado, por isso nada foi restaurado. Se esta for a única cópia que tem, a recuperação pode restaurar as notas intactas e listar exatamente o que não pôde ser lido. O resultado é sempre identificado como um restauro parcial.",
-      "close": "Fechar",
       "salvage": "Recuperar notas intactas…"
     },
     "error": {
       "tryAnotherFile": "Experimente outro ficheiro"
     },
     "pick": {
-      "body": "Escolha um ficheiro <code>.myne-backup</code>. A cópia de segurança é verificada antes de qualquer coisa ser restaurada; o cofre restaurado desbloqueia com a palavra-passe ou a frase de recuperação desse cofre, tal como o desbloqueio.",
+      "body": "Escolha um ficheiro <code>.myne-backup</code>. A cópia de segurança é verificada antes de qualquer coisa ser restaurada; o cofre restaurado desbloqueia com a palavra-passe desse cofre, exatamente como no desbloqueio.",
       "chooseFile": "Escolher ficheiro de cópia de segurança…",
       "corruptedSuffix": "O seu cofre atual não é afetado: a cópia de segurança é restaurada primeiro como um cofre separado."
     },
@@ -3327,9 +3197,7 @@
       "restored": "Cofre restaurado.",
       "versionHistory": "Entradas do histórico de versões: {{n}}"
     },
-    "title": "Restaurar a partir de cópia de segurança",
     "working": {
-      "cancel": "Cancelar",
       "restoringProgress": "A restaurar… {{done}} de {{total}}",
       "verifying": "A verificar a cópia de segurança…",
       "verifyingProgress": "A verificar a cópia de segurança… {{done}} de {{total}}"
@@ -3340,8 +3208,7 @@
       "buildChannelDevelopment": "Compilação de desenvolvimento",
       "buildLabel": "Compilação",
       "buildChannelLabel": "Canal de compilação",
-      "buildChannelStable": "Estável",
-      "developerModeHelper": "Mostra as definições avançadas que o Myne mantém fora do caminho por predefinição: aquelas em que sai do caminho pelo qual o Myne se responsabiliza, e as ferramentas avançadas de que a maioria das pessoas nunca precisa. Desativá-lo só as volta a ocultar. O que ligou continua ligado, e é no controlo respetivo que o desliga.",
+      "developerModeHelper": "Aquelas em que sai do caminho pelo qual o Myne se responsabiliza, e as ferramentas avançadas de que a maioria das pessoas nunca precisa. Desativá-lo só as volta a ocultar. O que ligou continua ligado, e é no controlo respetivo que o desliga.",
       "developerModeLabel": "Modo de programador",
       "legalLabel": "Informação legal",
       "legalHelper": "Abre em myne.md no seu navegador. Em alemão quando a interface está em alemão.",
@@ -3349,11 +3216,10 @@
       "licenseBody": "documentação CC-BY-4.0 · código da aplicação AGPL-3.0.",
       "licenseLabel": "Licença",
       "tagline": "Pré-alfa",
-      "threatModelHelper": "Abra o documento público do modelo de ameaças no seu navegador.",
+      "threatModelHelper": "Abra no seu navegador.",
       "threatModelLabel": "Modelo de ameaças",
-      "version": "Versão",
       "dev": "Dev",
-      "updateAutoCheckHelper": "O Myne descarrega um pequeno ficheiro assinado de myne.md para ver se existe uma versão mais recente, e depois avisa-o. Envia a sua versão atual e a plataforma, e nada mais. Ainda pode verificar manualmente com o botão acima.",
+      "updateAutoCheckHelper": "O Myne descarrega um pequeno ficheiro assinado de myne.md para ver se existe uma versão mais recente, e depois avisa-o. Envia a sua versão atual e a plataforma, e nada mais.",
       "updateAutoCheckLabel": "Verificar atualizações automaticamente",
       "updateAvailable": "A versão {{version}} está disponível.",
       "updateChannelBeta": "Beta",
@@ -3363,8 +3229,9 @@
       "updateChecking": "A verificar…",
       "updateFailed": "Não foi possível verificar as atualizações. Vai tentar novamente mais tarde.",
       "updateHelper": "O Myne verifica cada atualização contra uma chave de lançamento offline antes de a instalar. A verificação pede a versão mais recente a downloads.myne.md, enviando apenas a sua versão e plataforma (e o seu IP, que essa origem não registra); nunca as suas notas nem a sua conta.",
-      "updateIdle": "Atualizações assinadas, obtidas de downloads.myne.md quando verifica.",
+      "updateIdle": "Ainda não verificado.",
       "updateInstallButton": "Reiniciar para atualizar",
+      "updateFlushFailed": "Não foi possível guardar todas as notas abertas, por isso o Myne não reiniciou para atualizar. Tente novamente dentro de momentos.",
       "updateLabel": "Atualizações",
       "updateUpToDate": "Está na versão mais recente.",
       "developerModeInline": "Mostra as definições que o Myne mantém fora do caminho por predefinição.",
@@ -3373,6 +3240,10 @@
       "diagnosticLogError": "O Myne não conseguiu alterar essa definição.",
       "diagnosticLogReadError": "O Myne não conseguiu ler a definição do registo de diagnóstico, por isso é mostrada como desligada.",
       "diagnosticBlockLabel": "Detalhes do relatório",
+      "diagnosticsIntro": "O que o Myne sabe sobre este dispositivo neste momento. Nada é enviado para lado nenhum; é você que decide o que partilhar.",
+      "diagnosticsReading": "A ler…",
+      "diagnosticCopied": "Copiado",
+      "diagnosticsLogNote": "Não há nenhum ficheiro de registo neste dispositivo para este bloco entregar: o registo de diagnóstico guardado é uma funcionalidade do ambiente de trabalho.",
       "diagnosticCopy": "Copiar diagnósticos",
       "diagnosticCopyDone": "Diagnósticos copiados",
       "diagnosticCopyFailed": "Não foi possível copiar. Selecione o texto acima e copie-o manualmente.",
@@ -3402,7 +3273,6 @@
       "updateBlocked": "O Myne não conseguiu iniciar a atualização a partir daqui, por isso nada foi instalado. Tente outra vez daqui a pouco."
     },
     "vault": {
-      "changePasswordButton": "Mudar palavra-passe",
       "changePasswordError": {
         "invalidCredentialOrVault": "Palavra-passe atual errada ou ficheiro do cofre corrompido.",
         "ioError": "Erro de disco, tente de novo.",
@@ -3414,13 +3284,9 @@
         "vaultNotUnlocked": "Desbloqueie este cofre antes de mudar a sua palavra-passe."
       },
       "changePasswordHeading": "Mudar palavra-passe",
-      "changePasswordHelper": "Rode a sua palavra-passe mestra mantendo o mesmo cofre. A frase de recuperação fica igual.",
+      "changePasswordHelper": "Rode a sua palavra-passe mestra mantendo o mesmo cofre. Mais nada no cofre muda.",
       "dangerZoneHeading": "Zona de perigo",
-      "dangerZoneHelper": "Apaga permanentemente este cofre e todas as notas. Não pode ser desfeito. A frase de recuperação não restaura o cofre.",
       "localEraseHeading": "Este navegador",
-      "localEraseHelper": "Apaga a cópia do seu cofre que o Myne tem neste navegador. A sua conta e tudo já sincronizado ficam no servidor.",
-      "localEraseButton": "Terminar sessão e apagar a cópia deste navegador…",
-      "deleteVaultButton": "Apagar cofre…",
       "vaultLabelEyebrow": "ETIQUETA DO COFRE",
       "vaultLabelHelper": "Um nome para este cofre, mostrado no seletor dentro da aplicação e no seletor de cofres de arranque antes de desbloquear. Guardado encriptado dentro do cofre; nunca sai do seu dispositivo em texto simples.",
       "vaultLabelPlaceholder": "Adicionar uma etiqueta…",
@@ -3428,17 +3294,15 @@
       "vaultLabelSave": "Guardar",
       "vaultIconLabel": "ÍCONE",
       "vaultIconDefault": "Predefinido (logótipo)",
-      "renamedToast": "Cofre renomeado",
       "renameError": "Não foi possível mudar o nome do cofre",
       "newPasswordMismatch": "As novas palavras-passe não coincidem.",
       "samePassword": "A nova palavra-passe é igual à atual.",
       "passwordChangedToast": "Palavra-passe alterada",
-      "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de uma cópia de segurança.",
       "genericChangeError": "Algo correu mal. Tente de novo.",
       "renameHelper": "Mostrado no seletor de cofres. Guardado encriptado dentro deste cofre; deixe em branco para limpar.",
       "newPasswordPlaceholder": "Pelo menos 12 carateres",
       "reenterNewPassword": "Reintroduza a nova palavra-passe",
-      "changePasswordFootnote": "Isto invalida o desbloqueio rápido. A sua frase de recuperação não muda.",
+      "changePasswordFootnote": "Isto invalida o desbloqueio rápido. A sua frase de identidade não é afetada.",
       "changing": "A mudar…",
       "memberVaultNotice": "Este é um cofre partilhado. Não tem palavra-passe de cofre. Use Desbloqueio de cofre partilhado em Privacidade para adicionar uma palavra-passe ou PIN.",
       "topics": {
@@ -3450,14 +3314,14 @@
       },
       "format": {
         "heading": "Formato do cofre",
-        "intro": "Este cofre ainda usa a sua própria frase de recuperação. Atualizar move-o para a sua frase de identidade, para uma frase recuperar todos os cofres que possui.",
-        "cta": "Atualizar para recuperação de uma frase",
+        "intro": "Este cofre ainda traz a sua própria frase de recuperação. A atualização aposenta-a, por isso este cofre passa a abrir apenas com a sua palavra-passe. A sua frase de identidade continua a recuperar quem é num dispositivo novo, e não abre nenhum cofre.",
+        "cta": "Aposentar a frase do meu cofre",
         "confirm": "Aposentar a minha frase de cofre e atualizar",
-        "cancel": "Manter a minha frase de cofre por agora",
+        "cancel": "Manter a minha frase de cofre",
         "running": "A atualizar…",
-        "warningPhrase": "A sua frase de recuperação de cofre guardada deixará de abrir este cofre. A sua palavra-passe de cofre continua a funcionar, e a sua frase de identidade passa a ser a forma de voltar a entrar.",
+        "warningPhrase": "A sua frase de recuperação de cofre guardada vai deixar de abrir este cofre, e nada a substitui: a partir daí o cofre abre apenas com a sua palavra-passe, por isso uma palavra-passe esquecida significa um cofre perdido.",
         "warningDevices": "Todos os dispositivos que usa têm de ser atualizados primeiro. Uma versão mais antiga não consegue abrir este cofre depois de a atualização sincronizar.",
-        "done": "Este cofre passa a usar a sua frase de identidade (atualizado de {{from}}).",
+        "done": "Este cofre passa a abrir apenas com a sua palavra-passe (atualizado de {{from}}). A sua frase de cofre guardada já não funciona.",
         "error": {
           "migrationRequired": "Este cofre ainda está no formato v0.1 antigo. Termine primeiro a atualização do cofre nas definições de Sincronização.",
           "personRequired": "Este dispositivo ainda não tem identidade. Crie a sua identidade primeiro e depois volte.",
@@ -3466,7 +3330,7 @@
           "notOwner": "Este é um cofre partilhado. Só o seu proprietário pode alterar o formato.",
           "notUnlocked": "Abra o cofre antes de atualizar o seu formato.",
           "inProgress": "Outra operação de segurança está em curso. Tente de novo daqui a pouco.",
-          "alreadyUpgraded": "Este cofre já usa a sua frase de identidade.",
+          "alreadyUpgraded": "Este cofre já abre apenas com a sua palavra-passe.",
           "generic": "A atualização não terminou. Nada foi alterado.",
           "sharedVault": "Este cofre é partilhado com outra pessoa. A recuperação de uma frase é para um cofre só seu, porque o tratamento de membros partilhados ainda não a suporta."
         }
@@ -3491,6 +3355,7 @@
         "light": "Claro",
         "system": "Sistema"
       },
+      "themeCustomOverride": "{{name}} está ativo e substitui estas escolhas.",
       "themeHelper": "Alterne entre os temas claro e escuro, ou siga a preferência do sistema.",
       "themeLabel": "Tema",
       "themeOptionAria": "Tema {{label}}",
@@ -3518,7 +3383,10 @@
         "theme": "Tema e cor de destaque",
         "sidebar": "Na barra lateral",
         "customisation": "Personalização"
-      }
+      },
+      "homeZoneLabel": "Fuso horário de origem",
+      "homeZoneHelper": "Mostrado ao lado da hora de um evento, como um segundo relógio. Este dispositivo está em {zone}. Nada disto é escrito nas suas notas.",
+      "homeZoneUnknown": "Esse não é um fuso horário que este dispositivo reconheça, por isso não é mostrado um segundo relógio."
     },
     "archive": {
       "helper": "Permite que as notas sejam movidas para um Arquivo, mantido fora da lista principal. Ao desativar isto, todas as notas arquivadas voltam à sua pasta, todas as pastas arquivadas são desarquivadas e os controlos do arquivo ficam ocultos. Aplica-se a todo o cofre, em todos os dispositivos.",
@@ -3530,8 +3398,7 @@
       "label": "Comprimir as imagens ao importar",
       "helper": "Reduz as imagens coladas ou largadas antes de serem encriptadas e guardadas, para que o seu cofre, as cópias de segurança e a sincronização se mantenham mais pequenos. Isto é irreversível: o ficheiro original não é mantido.",
       "helperScopeEveryDevice": "Aplica-se a todo o cofre, em todos os dispositivos.",
-      "helperScopeNotHere": "Aplica-se a todo o cofre, mas não neste navegador: as imagens adicionadas aqui são guardadas exatamente como foram fornecidas.",
-      "errorSaveSetting": "Não foi possível guardar esta definição."
+      "helperScopeNotHere": "Aplica-se a todo o cofre, mas não neste navegador: as imagens adicionadas aqui são guardadas exatamente como foram fornecidas."
     },
     "transcription": {
       "label": "Voz para texto",
@@ -3541,16 +3408,12 @@
     "attachmentOcr": {
       "label": "Pesquisar dentro de imagens e documentos digitalizados",
       "helper": "Lê o texto de anexos de imagem e de PDFs digitalizados neste dispositivo, para que a pesquisa os possa encontrar pelo respetivo conteúdo. Nada é carregado. Desativar isto interrompe a extração em segundo plano; o texto já extraído é mantido.",
-      "errorSaveSetting": "Não foi possível guardar esta definição.",
       "processing_one": "A ler 1 anexo…",
       "processing_many": "A ler {{count}} anexos…",
-      "processing_other": "A ler {{count}} anexos…",
-      "draftUse": "O texto que isto lê é também oferecido como rascunho que pode adicionar a uma nota. Uma nota sincroniza encriptada como qualquer outra.",
-      "mobileDeviceLocal": "Esta é por dispositivo: decide o que este telemóvel indexa, por isso os seus outros dispositivos mantêm a sua própria escolha."
+      "processing_other": "A ler {{count}} anexos…"
     },
     "autoBackup": {
       "backupFolder": "Pasta de cópias de segurança",
-      "chooseFolder": "Escolher pasta…",
       "chooseFolderDialogTitle": "Escolha uma pasta para as cópias de segurança automáticas",
       "frequency": "Frequência",
       "frequencyAriaLabel": "Frequência da cópia de segurança",
@@ -3569,14 +3432,12 @@
       "title": "Cópias de segurança automáticas"
     },
     "changePassword": {
-      "cancel": "Cancelar",
       "checkingStrength": "A verificar a robustez…",
       "strengthUnavailable": "A verificação de força não pôde carregar, por isso só se verifica o comprimento mínimo.",
       "confirmLabel": "Confirmar nova palavra-passe",
       "currentLabel": "Palavra-passe atual",
       "mismatch": "As palavras-passe não correspondem.",
       "newLabel": "Nova palavra-passe",
-      "submit": "Alterar palavra-passe",
       "submitting": "A alterar a palavra-passe…",
       "title": "Alterar palavra-passe",
       "tooShort": "Use pelo menos {{n}} carateres."
@@ -3607,7 +3468,7 @@
     "cliAccess": {
       "label": "Acesso pelo terminal",
       "helperOff": "Desligado. O comando `myne` não pode ler nem alterar nada neste cofre.",
-      "helperOn": "Ligado enquanto este cofre estiver desbloqueado. Qualquer programa executado com a sua conta pode ler, pesquisar e criar notas através dele. O Myne não distingue o seu terminal de um script e nada verifica além de a porta estar aberta. Nunca pede a sua palavra-passe, fecha-se assim que o cofre se bloqueia e não pode apagar notas.",
+      "helperOn": "Ligado enquanto este cofre estiver desbloqueado. O Myne não distingue o seu terminal de um script e nada verifica além de a porta estar aberta. Nunca pede a sua palavra-passe, fecha-se no momento em que o cofre se bloqueia e não consegue apagar notas.",
       "lastUsedNever": "Não é usado desde que este cofre foi desbloqueado.",
       "lastUsedJustNow": "Usado agora mesmo.",
       "lastUsedMinutesAgo": "Usado há {{count}} min.",
@@ -3633,7 +3494,7 @@
     },
     "clipperInstall": {
       "error": "Não foi possível atualizar a definição do clipper do navegador.",
-      "helper": "Registe o anfitrião de mensagens nativas para que a extensão Myne do navegador possa enviar recortes para esta aplicação. Ativado por predefinição; desative para o remover.",
+      "helper": "Permite que a extensão Myne do navegador envie recortes para esta aplicação.",
       "label": "Clipper do navegador"
     },
     "customThemes": {
@@ -3675,7 +3536,6 @@
       "folderSearchPlaceholder": "Pesquisar pastas…",
       "searchEmpty": "Nenhum modelo corresponde.",
       "searchPlaceholder": "Pesquisar modelos…",
-      "untitledTemplate": "Modelo sem título",
       "sectionDaily": "Notas diárias",
       "sectionWeekly": "Notas semanais",
       "sectionMonthly": "Notas mensais",
@@ -3700,16 +3560,13 @@
       "periodTemplateAriaLabel": "Modelo das notas {{period}}",
       "sectionPeriodic": "Notas periódicas",
       "periodSwitcherAriaLabel": "Tipo de nota periódica",
-      "blockLabel": "Notas periódicas",
       "mobilePeriodAriaLabel": "Período da nota",
       "mobileSaveGlyph": "✓",
       "mobileSaveLabel": "Guardar",
       "mobileSharedNotice": "Estas definições são partilhadas: uma edição aqui chega aos seus outros dispositivos, e o mesmo valor definido num computador chega aqui."
     },
     "deleteVault": {
-      "cancel": "Cancelar",
       "caseSensitiveHint": "Sensível a maiúsculas. Escreva a palavra exatamente para ativar a eliminação.",
-      "continue": "Continuar",
       "copyPrimary": "Isto apaga permanentemente este cofre e todas as notas dentro dele. A ação não pode ser desfeita, e a sua frase de recuperação não restaurará os dados.",
       "copySecondary": "As chaves do cofre são apagadas da memória antes de os ficheiros serem desvinculados; qualquer texto cifrado órfão que permaneça no disco continua a ser lixo inrecuperável protegido com Argon2id.",
       "keychainNote": "Quando a eliminação terminar, o Myne pede também ao seu porta-chaves do sistema para apagar a chave de desbloqueio biométrico que guardou para este cofre, nas plataformas onde guarda uma.",
@@ -3735,7 +3592,8 @@
       "vaultPath": "Caminho do cofre: {{path}}",
       "deleteError": "Não foi possível eliminar totalmente o cofre. Tente novamente.",
       "warning": "Isto elimina permanentemente este cofre e todas as suas notas deste dispositivo. Não é possível anular esta ação.",
-      "deleteButton": "Eliminar este cofre"
+      "deleteButton": "Eliminar este cofre",
+      "detailsLabel": "Mais sobre como apagar este cofre"
     },
     "files": {
       "newNote": {
@@ -3755,13 +3613,11 @@
         "label": "Ficheiro predefinido para abrir",
         "noteLabel": "Nota a abrir no arranque",
         "notePlaceholder": "Selecione uma nota…",
-        "optionEmpty": "Nova nota",
         "optionLast": "Última aberta",
         "optionSpecific": "Nota específica",
         "saveError": "Não foi possível guardar a definição de arranque.",
         "searchEmpty": "Nenhuma nota encontrada.",
-        "searchPlaceholder": "Pesquisar notas…",
-        "untitledNote": "Sem título"
+        "searchPlaceholder": "Pesquisar notas…"
       },
       "sections": {
         "notes": "Notas e pastas",
@@ -3771,17 +3627,17 @@
     "focusMode": {
       "dimAria": "Esbater linhas inativas",
       "dimHelper": "No modo de foco (⇧⌘F), esbate todas as linhas exceto a que está a editar.",
-      "dimLabel": "Modo de foco · esbater linhas inativas",
+      "dimLabel": "Esbater linhas inativas",
       "off": "Desativado",
       "on": "Ativado",
       "saveError": "Não foi possível guardar a definição do modo de foco.",
       "typewriterAria": "Deslocamento tipo máquina de escrever",
       "typewriterHelper": "No modo de foco (⇧⌘F), mantém a linha ativa centrada verticalmente à medida que escreve.",
-      "typewriterLabel": "Modo de foco · deslocamento tipo máquina de escrever"
+      "typewriterLabel": "Deslocamento tipo máquina de escrever",
+      "typewriterHelperMobile": "Manter o cursor centrado verticalmente"
     },
     "hotkeys": {
       "addBindingAria": "Adicionar um atalho para {{command}}",
-      "cancel": "Cancelar",
       "capturePrompt": "Prima uma tecla…",
       "conflictIndicator": "⚠ conflito",
       "conflictTitle": "Também usado por {{commands}}",
@@ -3855,20 +3711,21 @@
       "on": "Ativado"
     },
     "toolbarCustomize": {
+      "errorLoad": "Não foi possível ler a disposição atual da sua barra de ferramentas, por isso estas linhas são só de leitura até reabrir este painel.",
       "errorSave": "Não foi possível guardar a disposição da barra de ferramentas.",
       "helper": "Escolha que botões de formatação aparecem na barra de ferramentas de seleção e a sua ordem.",
       "label": "Botões da barra de ferramentas",
+      "lastShownHint": "Mantenha pelo menos um",
+      "lastHiddenHint": "Mantenha pelo menos um oculto",
       "moveDown": "Mover para baixo",
-      "moveUp": "Mover para cima",
-      "pendingHint": "Brevemente"
+      "moveUp": "Mover para cima"
     },
     "ai": {
       "autoTagHelper": "Quando parar de escrever, um pequeno modelo no seu dispositivo lê a nota e sugere etiquetas no topo dela. Nada é adicionado até aceitar uma sugestão, a menos que ligue a linha abaixo.",
       "autoTagLabel": "Sugerir etiquetas automaticamente",
-      "autoTagUnavailable": "Ainda não está instalado nenhum modelo de etiquetas. Descarregue-o uma vez em Definições, IA, e o interruptor liga-se sozinho depois de estar instalado.",
+      "autoTagUnavailable": "Ainda não está instalado nenhum modelo de etiquetas. Quando estiver, ligue o interruptor em Definições, IA.",
       "consent": {
         "accept": "Enviar as minhas notas para {{provider}}",
-        "cancel": "Cancelar",
         "cannotVerifyLabel": "O que o Myne não consegue verificar",
         "revokeLabel": "Como anular isto",
         "scopeLabel": "Que dispositivos isto abrange",
@@ -3923,13 +3780,13 @@
       "modelNone": "Nenhum ficheiro selecionado",
       "modelSaveFailed": "Não foi possível guardar o caminho do modelo (tem de estar fora do seu cofre).",
       "modelTranscriptionLabel": "Modelo de voz para texto (transcrição)",
-      "modelsHelper": "Atribua o ficheiro que cada função usa quando vem de outro sítio que não a lista verificada acima: abra uma ligação para obter um no seu navegador e depois selecione-o aqui. Um modelo é executado no seu dispositivo; se, em vez disso, tiver indicado um fornecedor, é esse fornecedor que responde.",
+      "modelsHelper": "Atribua o ficheiro que cada função usa quando ele vem de outro sítio que não a lista verificada acima. Um modelo é executado no seu dispositivo; se, em vez disso, tiver indicado um fornecedor, é esse fornecedor que responde.",
       "providerHelper": "Em vez de executar um modelo aqui, o Myne pode enviar um pedido a um serviço que indique. As suas notas saem deste dispositivo quando isso acontece. “Nenhum” é a predefinição e significa que não é contactado nenhum serviço.",
       "providerKeyAdd": "cole a sua chave de API",
       "providerKeyLabel": "Chave de API",
       "providerKeyNone": "Não está guardada nenhuma chave, por isso ainda não é possível enviar nada.",
       "providerKeyRevoke": "Remover esta chave",
-      "providerKeyReplace": "cole uma chave nova para substituir a guardada",
+      "providerKeyReplace": "Substituir chave",
       "providerKeyStored": "Está guardada uma chave. O Myne nunca a volta a mostrar. Cole uma nova para a substituir.",
       "providerActive": "A responder agora: {{name}}",
       "providerLabel": "Fornecedor remoto",
@@ -3961,7 +3818,7 @@
       "mobileRevokeHelper": "Remove o fornecedor, a sua chave e a aprovação deste telemóvel em conjunto, deixando exatamente o estado de nunca ter sido configurado. Os outros dispositivos continuam a funcionar até os remover lá também.",
       "mobileApproveLabel": "Aprovar o envio neste telemóvel",
       "mobileApproveHelper": "O fornecedor e a sua chave vieram de outro dispositivo. Nada é enviado a partir deste telemóvel até ler o que será enviado e aprovar aqui.",
-      "historyBudgetHelper": "Quanto da conversa recente cada pedido leva, em caracteres. Deixe vazio para o valor predefinido. Um número maior permite que a IA acompanhe conversas mais longas e envia mais delas: com um fornecedor que não está neste dispositivo, isso é mais do seu texto a sair dele, em cada passo de uma execução.",
+      "historyBudgetHelper": "Deixe vazio para o valor predefinido. Um número maior permite que a IA acompanhe conversas mais longas e envia mais delas: com um fornecedor que não está neste dispositivo, isso é mais do seu texto a sair dele, em cada passo de uma execução.",
       "historyBudgetLabel": "Conversa enviada em cada pedido",
       "meetingPromptHelper": "A instrução que a passagem da IA da reunião usa para transformar uma transcrição em secções. Deixe-a vazia para usar a predefinição incorporada. Substitui o formato de saída predefinido, por isso, se a definir, peça você mesmo as secções que quer.",
       "meetingPromptLabel": "Instrução do resumo da reunião",
@@ -3969,7 +3826,6 @@
       "groupAdvanced": "Avançado",
       "excludedPickLabel": "Adicionar uma pasta a excluir",
       "excludedPickPlaceholder": "Escolher uma pasta…",
-      "modelShowInFolder": "Mostrar na pasta",
       "modelShowLocation": "Mostrar a localização de {{name}}",
       "downloadsLabel": "Descarregar modelos",
       "downloadsHelper": "Obtém um modelo a partir da própria origem do Myne. É verificado contra uma impressão digital incorporada na aplicação antes de ser usado, por isso uma descarga adulterada é rejeitada. Nada é obtido a menos que clique.",
@@ -3979,10 +3835,8 @@
       "downloadNotInstalled": "Não instalado",
       "downloadReinstall": "Descarregar",
       "downloadInstall": "Descarregar",
-      "modelRemove": "Remover",
       "downloading": "A descarregar…",
       "downloadingPercent": "A descarregar… {{percent}}%",
-      "downloadCancel": "Cancelar",
       "downloadFailed": "A descarga não terminou.",
       "downloadFailedChecksum": "A descarga não correspondeu à sua impressão digital e foi rejeitada. Tente novamente.",
       "sideloadDisclosure": "O modo de programador também lhe permite indicar ao Myne um ficheiro de modelo que obteve por si. Um ficheiro que descarregue de outro sítio não é verificado pelo Myne, por isso use apenas um em que confie.",
@@ -3999,14 +3853,13 @@
       "excludedFoldersEmpty": "Ainda não está nada excluído, por isso a IA pode ler todas as pastas deste cofre.",
       "excludedFoldersAdd": "Adicionar",
       "excludedFoldersAddLabel": "Pasta a excluir da IA",
-      "excludedFoldersRemove": "Remover",
       "excludedFoldersRemoveLabel": "Deixar de excluir {{folder}} da IA",
       "excludedFoldersMonotoneNotice": "Uma exclusão adicionada em qualquer dos seus dispositivos mantém-se até a remover em todos: as remoções aqui não viajam, por isso uma pasta que os seus outros dispositivos ainda excluem volta na próxima sincronização.",
       "catalogueOpen": "Descarregar um modelo",
       "catalogueColModel": "Modelo",
       "catalogueColState": "Estado",
       "providerInline": "As suas notas saem deste dispositivo assim que for indicado um serviço.",
-      "providerChooseHelper": "Um modelo pode ser executado neste dispositivo, ou o Myne pode enviar um pedido a um serviço que indique. As suas notas saem deste dispositivo quando isso acontece. “Neste dispositivo” é a predefinição e significa que não é contactado nenhum serviço.",
+      "providerChooseHelper": "Um modelo pode ser executado neste dispositivo, ou o Myne pode enviar um pedido a um serviço que indique. “Neste dispositivo” é a predefinição e significa que não é contactado nenhum serviço.",
       "providerChooseLabel": "Escolher fornecedor",
       "providerKeySave": "Guardar esta chave",
       "providerOnDevice": "Neste dispositivo",
@@ -4021,59 +3874,93 @@
       "externalAccess": {
         "label": "Acesso externo",
         "helperOff": "Desligado. Nenhuma ferramenta de IA pode alcançar este cofre através do `myne-mcp`.",
-        "explanationShared": "É o mesmo interruptor que Definições, acesso por CLI, acesso por Terminal. Uma porta, duas entradas: `myne` é conduzido por si, e `myne-mcp` é conduzido pela ferramenta de IA que configurar.",
-        "explanationLabel": "O nome de uma ligação é uma etiqueta, não uma palavra-passe. O Myne não consegue distinguir um programa de outro a correr sob a sua conta, e não verifica nada além da porta estar aberta.",
-        "explanationDevice": "As aprovações são guardadas neste dispositivo. Um segundo computador ou telefone começa sem nenhuma e tem de ser pedido de novo.",
+        "helperOn": "Ligado enquanto este cofre estiver desbloqueado. O Myne não consegue ver o que uma ferramenta ligada faz com o que lê.",
+        "empty": "Ainda não há nenhuma ligação",
         "outsideMyne": "O que uma ferramenta ligada faz com o que lê está fora do Myne: corre nesta máquina, tem o seu próprio acesso à rede, e o Myne não consegue ver para onde envia nada.",
+        "infoOneDoor": "Uma porta, duas formas de entrar: o mesmo interruptor abre o cliente de terminal `myne`, que é conduzido por si, e o `myne-mcp`, que é conduzido pela ferramenta que configurar.",
+        "infoNotACredential": "Um nome de ligação decide o que é partilhado com quem, não quem está a pedir: qualquer programa executado com a sua conta pode usar qualquer nome.",
+        "infoBudget": "As leituras têm um limite por ligação numa janela deslizante, e a contagem fica em memória: sair do Myne limpa-a. É um abrandamento, não um bloqueio.",
+        "accessLabel": "Pastas que esta ligação pode usar",
+        "accessNothing": "Ainda nenhuma",
         "readFailed": "Não foi possível ler a lista de ligações agora. O Myne não lhe disse que nada está aprovado.",
         "retry": "Tentar novamente",
-        "readSummary": "Pode ler {{count}} notas em {{folders}} pastas.",
-        "readSummary_one": "Pode ler {{count}} nota em {{folders}} pastas.",
-        "readSummary_other": "Pode ler {{count}} notas em {{folders}} pastas.",
-        "writeNone": "Pode escrever nada. Esta compilação concede apenas leituras.",
+        "readSummary": "Lê {{count}} notas em {{folders}} pastas.",
+        "readSummary_one": "Lê {{count}} nota em {{folders}} pastas.",
+        "readSummary_other": "Lê {{count}} notas em {{folders}} pastas.",
+        "readNothing": "Não lê nada: todas as pastas ficam de fora.",
+        "wholeVault": "Lê o cofre todo: nenhuma pasta fica de fora.",
+        "writeNone": "Não escreve em lado nenhum.",
+        "writeSummary": "Escreve em {{folders}}.",
+        "toolsAll": "Todas as ferramentas estão disponíveis.",
+        "toolsOff": "{{count}} ferramentas desligadas: {{verbs}}.",
+        "toolsOff_one": "{{count}} ferramenta desligada: {{verbs}}.",
+        "toolsOff_many": "{{count}} ferramentas desligadas: {{verbs}}.",
+        "toolsOff_other": "{{count}} ferramentas desligadas: {{verbs}}.",
         "whenLine": "Aprovada {{approved}}. Última utilização {{used}}.",
         "whenLineNever": "Aprovada {{approved}}. Sem utilização desde então.",
         "revoke": "Revogar",
         "revokeFailed": "Não foi possível revogar essa ligação. Pode continuar a poder ler o que lhe foi concedido.",
-        "snippetToggle": "Trecho de configuração",
-        "snippetHelper": "Cole isto na configuração MCP da sua ferramenta de IA. O nome tem de corresponder à ligação acima, porque é nesse nome que a aprovação se baseia.",
+        "editExclusions": "Alterar o que pode usar",
         "rootFolder": "Raiz do cofre",
-        "addConnection": "Aprovar uma ligação",
-        "dialogTitleNew": "Aprovar uma ligação",
-        "dialogTitle": "Aprovar {{name}} de novo",
+        "requestsTitle": "À sua espera",
+        "requestLineWrite": "{{connection}} quer escrever em {{folder}}.",
+        "requestLineWriteTyped": "{{connection}} quer escrever em {{folder}}: \"{{summary}}\"",
+        "requestLineRead": "{{connection}} quer ler {{folder}}.",
+        "requestAccept": "Permitir",
+        "requestDismiss": "Dispensar",
+        "requestAccepted": "{{connection}} pode agora usar {{folder}}.",
+        "requestStale": "Esse pedido já não se aplica. Nada mudou.",
+        "requestFailed": "Não foi possível decidir esse pedido. Nada mudou.",
+        "addConnection": "Adicionar uma ligação",
+        "step1Title": "Ferramenta",
+        "step2Title": "Configuração",
+        "step3Title": "Acesso",
+        "step1Question": "Que ferramenta se está a ligar?",
+        "otherClientsDetail": "o comando em bruto",
+        "otherClientsHelper": "Qualquer cliente MCP pode executar este comando. Dê-lhe o nome de ligação que definiu abaixo.",
+        "configPath": "Adicione isto a {{path}} e reinicie a ferramenta.",
         "nameLabel": "Nome da ligação",
-        "namePlaceholder": "claude-desktop",
-        "nameHelper": "O nome que o seu cliente envia. É uma etiqueta, não uma palavra-passe: qualquer programa nesta máquina pode usar qualquer nome que quiser, por isso isto decide o que é partilhado com quem, não quem está a pedir.",
-        "nameReserved": "Esse nome é reservado: um cliente configurado sem nome nenhum chega como `unnamed-client`, por isso aprová-lo aprovaria todos os clientes não configurados.",
-        "nameEmpty": "Uma ligação precisa de um nome, porque é nele que a concessão se baseia.",
-        "countsPending": "A calcular o que isso cobre…",
-        "countsNotes": "Partilha {{count}} notas em {{folders}} pastas.",
-        "countsNotes_one": "Partilha {{count}} nota em {{folders}} pastas.",
-        "countsNotes_other": "Partilha {{count}} notas em {{folders}} pastas.",
-        "countsExcluded_one": "{{count}} pasta excluída.",
-        "countsExcluded_other": "{{count}} pastas excluídas.",
+        "nameClaim": "Uma etiqueta, não uma palavra-passe: qualquer programa nesta máquina pode usar o nome que quiser.",
+        "clientToolsNote": "{{name}} também pode filtrar as ferramentas que usa. Isso é uma comodidade: o que este ecrã permite é o que o Myne aplica.",
+        "copySnippet": "Copiar a configuração",
+        "back": "Voltar",
+        "next": "Seguinte",
         "excludeLabel": "Deixar de fora",
-        "excludePlaceholder": "Nada deixado de fora",
-        "excludeSearch": "Encontrar uma pasta",
-        "excludeEmpty": "Nenhuma pasta corresponde.",
-        "excludeHelper": "Uma pasta que deixa de fora não é partilhada, nem nada dentro dela. Escolhe entre todas as pastas deste cofre, por isso este é o único sítio onde todo o cofre está em cima da mesa.",
         "approve": "Aprovar",
-        "grantRefused": "Esta concessão não caberia no orçamento de definições do cofre. Nada foi alterado. Revogue uma ligação que já não usa e tente de novo.",
         "grantFailed": "Não foi possível guardar a aprovação. Nada foi alterado.",
         "readSummary_many": "Pode ler {{count}} notas em {{folders}} pastas.",
-        "countsNotes_many": "Partilha {{count}} notas em {{folders}} pastas.",
-        "countsExcluded_many": "{{count}} pastas excluídas.",
         "verb": {
+          "note_search": "Pesquisar notas",
+          "note_read": "Ler uma nota",
+          "vault_list": "Listar pastas",
+          "vault_state": "Resumo do cofre",
+          "note_create": "Criar uma nota",
+          "note_append": "Acrescentar a uma nota",
+          "note_set_field": "Definir um campo da nota",
+          "note_move": "Mover uma nota",
+          "note_edit": "Editar uma nota",
           "attachment_list": "Listar ficheiros",
           "attachment_read": "Ler o texto de um ficheiro",
           "calendar_read": "Ler o calendário",
           "view_list": "Listar as vistas guardadas"
         },
+        "emptyBody": "Aprovar uma ligação é o que permite a uma ferramenta que instalou ler este cofre, com exceção das pastas que deixar de fora.",
+        "trademarks": "O Myne não está associado, apoiado nem patrocinado por nenhuma destas ferramentas. Os nomes e os logótipos pertencem aos respetivos proprietários.",
         "wholeVaultLabel": "Ler e escrever o cofre inteiro",
         "excludeNothing": "Nenhuma de fora",
+        "scopeLineAll": "Todas as pastas existentes são legíveis e escrevíveis, a menos que as deixe de fora abaixo. Uma pasta que criar mais tarde é legível, mas não escrevível até a indicar.",
+        "writeRestore": "Uma escrita mantém um ponto de restauro que pode reverter.",
         "scopeLine": "Alcança {{count}} notas em {{folders}} pastas, e pode alterar tudo dentro delas.",
+        "scopeLine_one": "Alcança {{count}} nota em {{folders}} pastas, e pode alterar tudo nas pastas que indicar.",
+        "scopeLine_many": "Alcança {{count}} notas em {{folders}} pastas, e pode alterar tudo nas pastas que indicar.",
+        "scopeLine_other": "Alcança {{count}} notas em {{folders}} pastas, e pode alterar tudo nas pastas que indicar.",
+        "findFolder": "Encontrar uma pasta",
+        "noFolderMatches": "Nenhuma pasta corresponde.",
+        "toolsLabel": "Ferramentas",
+        "toolUnavailable": "não incluída nesta versão",
         "toolsNote": "As leituras têm um limite: até {{count}} notas por cada {{minutes}} minutos.",
         "needsReapproval": "Aprovado por uma versão mais antiga, sob a regra contrária. Esta compilação não lê nada por ele até o aprovar outra vez.",
+        "approveAgain": "Aprovar novamente",
         "scopeLineWords": "Alcança as pastas que indicar, e pode alterar tudo dentro delas."
       },
       "autoApplyLabel": "Aplicar etiquetas sugeridas automaticamente",
@@ -4098,7 +3985,7 @@
       "residualPayment": "Se pagar pela sincronização alojada, o pagamento e a sua conta podem continuar a ser associados a si. O Tor muda de onde vem a ligação, não o rasto de faturação.",
       "residualScope": "No ambiente de trabalho, isto abrange o seu tráfego de sincronização e os seus pedidos a fornecedores de IA remotos. No telemóvel ainda não há encaminhamento através do Tor, por isso os seus pedidos a fornecedores vão diretamente. Nada mais neste dispositivo passa pelo Tor.",
       "residualsToggle": "O que isto não esconde",
-      "torHelper": "Esconde o seu endereço IP e a sua localização do servidor de sincronização, e esconde da sua rede e do seu fornecedor de Internet com que servidor sincroniza (e, no ambiente de trabalho, a que fornecedor de IA chega). Continuam a poder ver este dispositivo a ligar-se ao Tor. Não o torna anónimo perante o Myne e não esconde do servidor o que sincroniza nem quando.",
+      "torHelper": "No ambiente de trabalho, isto também esconde que fornecedor de IA alcança. Quem estiver a observar a rede continua a ver este dispositivo a ligar-se ao Tor. Não o torna anónimo perante o Myne e não esconde do servidor o que sincroniza nem quando.",
       "torLabel": "Encaminhar a sincronização e a IA do ambiente de trabalho através do Tor",
       "torInline": "Esconde o seu endereço IP e a sua localização do servidor de sincronização, e esconde da sua rede e do seu fornecedor de Internet com que servidor sincroniza."
     },
@@ -4107,7 +3994,7 @@
       "folderListFull": "Essa lista de pastas está cheia. Remova uma pasta dela antes de adicionar outra."
     },
     "reminders": {
-      "aria": "Mostrar lembretes de tarefas neste dispositivo",
+      "aria": "Lembretes de tarefas neste dispositivo",
       "exactAllow": "Permitir",
       "exactLabel": "Hora exata",
       "exactOn": "Ligado",
@@ -4127,8 +4014,6 @@
       "autoLockSearchPlaceholder": "Pesquisar durações…",
       "hideVaultNamesLabel": "Ocultar os nomes dos cofres no ecrã de bloqueio",
       "hideVaultNamesHelper": "Num dispositivo com um porta-chaves utilizável, o seletor de cofres mostra o nome de um cofre depois de este dispositivo o ter desbloqueado. Com isto ligado, cada cofre mostra antes um marcador de posição como Cofre 2, e esse número mantém-se com o cofre, seja qual for a ordem da lista.",
-      "hideVaultNamesErases": "Ligar isto destrói as chaves que tornam legíveis os nomes guardados aqui, por isso esses nomes não podem ser recuperados neste dispositivo, e não é escrito mais nenhum nome enquanto se mantiver ligado.",
-      "hideVaultNamesResidue": "Isto não abrange uma cópia feita anteriormente: uma cópia de segurança completa do sistema, uma imagem de disco ou qualquer outra cópia deste disco ao nível do sistema, feita enquanto os nomes estavam visíveis, contém tanto os nomes guardados como as respetivas chaves.",
       "hideVaultNamesUnavailable": "O Myne não consegue guardar nomes de cofres nesta cópia da aplicação, por isso não guarda aqui nenhum e esta opção não pode ser ligada. O seletor já mostra um marcador de posição para cada cofre.",
       "hideVaultNamesErrorRead": "Não foi possível ler a definição atual. Mude o interruptor para a voltar a definir.",
       "hideVaultNamesErrorSave": "Não foi possível guardar a definição, por isso está inalterada. Se a estava a ligar, alguns nomes guardados podem já ter sido destruídos; ligue-a novamente para concluir.",
@@ -4185,27 +4070,12 @@
       "setPin": "Definir PIN",
       "setupHelper": "O Touch ID é exclusivo do macOS e atualmente experimental (a aguardar verificação de hardware). O PIN funciona em todo o lado.",
       "title": "Desbloqueio rápido",
-      "useTouchId": "Usar o Touch ID",
-      "pinTooShort": "O PIN tem de ter, no mínimo, 6 dígitos.",
-      "pinMismatch": "Os PIN não coincidem.",
-      "pinOnToast": "O desbloqueio rápido por PIN está ativado",
       "setupError": "Não foi possível configurar o desbloqueio rápido.",
-      "turnedOffToast": "Desbloqueio rápido desativado",
       "turnOffError": "Não foi possível desativar o desbloqueio rápido",
-      "biometricOnToast": "O desbloqueio rápido por {{method}} está ativado",
       "biometricUnavailable": "{{method}} não está disponível neste dispositivo.",
-      "warningBanner": "Apenas uma barreira de conveniência. Com um PIN, a sua palavra-passe volta a ser necessária após reiniciar; uma verificação por impressão digital ou rosto também é aceite depois de reiniciar.",
-      "biometricToggleSubtitle": "Desbloquear com {{method}} após bloqueio automático",
-      "pinOnLead": "O desbloqueio rápido por PIN está ",
-      "pinOnEmphasis": "ativado",
-      "pinOnRest": ". Após o cofre se bloquear automaticamente, pode voltar a entrar com o seu PIN em vez da palavra-passe completa (apenas nesta sessão da aplicação). Um arranque a frio requer sempre a palavra-passe completa.",
-      "turnOffPin": "Desativar PIN",
       "pinSetupHelper": "Defina um PIN de 6 ou mais dígitos para voltar a desbloquear rapidamente após o bloqueio automático. O PIN protege uma chave local do dispositivo: nunca sai deste dispositivo e nunca toca na sua frase de recuperação.",
       "pinReplacesBiometric": " Definir um PIN substitui o desbloqueio por {{method}}.",
-      "pinPlaceholder6": "Pelo menos 6 dígitos",
-      "confirmPin": "Confirmar PIN",
-      "reenterPin": "Reintroduzir PIN",
-      "setupButton": "Configurar desbloqueio rápido",
+      "useBiometric": "Usar {{method}}",
       "errorBiometricAuthFailed": "Não foi possível configurar o Touch ID. Confirme que há uma impressão digital registada nas Definições do Sistema, ou use antes um PIN.",
       "biometricAuthFailed": "Não foi possível configurar {{method}}. Confirme que está ativado nas definições do seu dispositivo, ou use antes um PIN."
     },
@@ -4254,7 +4124,7 @@
       "mobileUnavailable": "A verificação ortográfica ainda não está disponível neste telemóvel: não há dicionário neste dispositivo, por isso o editor aqui não consegue sublinhar nada. Ligue-a antes a partir do seu computador."
     },
     "storage": {
-      "backupHelper": "As cópias de segurança permanecem tão encriptadas como o seu cofre, num único ficheiro .myne-backup verificado. O restauro funciona com a palavra-passe ou a frase de recuperação desse cofre, tal como o desbloqueio.",
+      "backupHelper": "As cópias de segurança permanecem tão encriptadas como o seu cofre, num único ficheiro .myne-backup verificado. O restauro funciona com a palavra-passe desse cofre, exatamente como no desbloqueio.",
       "backupLabel": "Cópia de segurança",
       "backUpVault": "Fazer cópia de segurança do cofre…",
       "exportAction": "Exportar…",
@@ -4264,14 +4134,10 @@
       "importHelper": "Traga notas do Obsidian, do Notion, do Evernote, de ficheiros HTML ou de um CSV. Tudo é importado e encriptado no local; os seus ficheiros originais permanecem intactos.",
       "importLabel": "Importar",
       "importObsidian": "Importar notas…",
-      "locationHelper": "Cada cofre é uma pasta de ficheiros encriptados dentro deste caminho. Prefira o botão Cópia de segurança abaixo em vez de cópias manuais: ele verifica o ficheiro gravado.",
-      "openInFiles": "Abrir nos Ficheiros",
       "webLocationHelper": "As suas notas ficam no armazenamento que este navegador reserva para este site, gerido pelo navegador. Não há nenhuma pasta para abrir. Limpar os dados deste site remove a cópia local; como este cliente sincroniza, iniciar sessão novamente volta a transferi-la.",
       "webLocationLabel": "Onde as suas notas são armazenadas",
-      "pathUnavailable": "Caminho indisponível",
       "restoreBackup": "Restaurar a partir de cópia de segurança…",
       "sections": {
-        "location": "Onde o cofre está",
         "backup": "Cópia de segurança e restauro",
         "transfer": "Importar e exportar"
       }
@@ -4304,15 +4170,14 @@
       "strong": "Forte",
       "tooWeak": "Demasiado fraca"
     },
-    "sync": {
-      "summary": {
-        "conflicts_many": "{{count}} conflitos"
-      }
-    },
+    "sync": {},
     "data": {
       "exported_one": "Exportada {{count}} nota → {{label}}",
       "exported_many": "Exportadas {{count}} notas → {{label}}",
       "exported_other": "Exportadas {{count}} notas → {{label}}",
+      "exportedChoose_one": "Exportada {{count}} nota. Escolha onde guardar uma cópia.",
+      "exportedChoose_many": "Exportadas {{count}} notas. Escolha onde guardar uma cópia.",
+      "exportedChoose_other": "Exportadas {{count}} notas. Escolha onde guardar uma cópia.",
       "exportNeedsApp": "A exportação precisa da aplicação (não da pré-visualização no navegador).",
       "exportFailed": "Não foi possível exportar o cofre.",
       "exportToMarkdown": "Exportar para Markdown",
@@ -4325,7 +4190,6 @@
       "vaultName": "Nome do cofre",
       "approveDevice": "Aprovar dispositivo"
     },
-    "done": "Concluído",
     "sectionOptions": "Opções",
     "footerTagline": "myne · encriptado neste dispositivo · código aberto",
     "editor": {
@@ -4340,18 +4204,11 @@
         "heading": "Um pequeno jabuti xereta",
         "bullet1": "Guarde meia dúzia de jarros de licor na caixa",
         "bullet2": "As zebras tolas saltam com uma rapidez irritante",
-        "spellCaption": "Verificação ortográfica",
-        "spellSample": "excessão",
         "dateTime": "Data e hora",
         "toolbar": "Barra de ferramentas",
-        "task": "Tarefas",
         "taskSampleOpen": "Enviar o relatório trimestral",
         "taskSampleDone": "Reservar o local"
       },
-      "defaultView": "Visualização predefinida",
-      "typewriter": "Deslocamento tipo máquina de escrever",
-      "typewriterSubtitle": "Manter o cursor centrado verticalmente",
-      "enableArchiving": "Ativar arquivamento",
       "taskChipColor": {
         "accent": "Destaque",
         "danger": "Vermelho",
@@ -4366,7 +4223,8 @@
         "label": "Prioridade só ícone"
       },
       "topics": {
-        "periodic": "Notas periódicas"
+        "periodic": "Notas periódicas",
+        "calendar": "Calendário"
       }
     },
     "search": {
@@ -4453,7 +4311,7 @@
         "memberPassword": "cofre partilhado palavra-passe membro desbloquear juntar frase",
         "bar": "barra inferior barra de estado indicadores personalizar reordenar ocultar mostrar barra de ferramentas",
         "vaultFormat": "formato do cofre atualização recuperação de uma frase aposentar cofre frase de recuperação migrar identidade",
-        "externalAccess": "acesso externo MCP myne-mcp Claude Desktop ligação aprovar âmbito revogar",
+        "externalAccess": "acesso externo MCP myne-mcp Claude Desktop Cursor VS Code Hermes cliente ligação aprovar âmbito revogar ferramentas orçamento",
         "diagnosticLog": "registo de diagnóstico registos depuração resolução de problemas relatório de falhas relatório de erros suporte diagnostic log logging debug"
       },
       "emptyBody": "Tente uma palavra mais curta, ou o nome de um painel."
@@ -4468,16 +4326,26 @@
       "time24": "24 horas",
       "time12": "12 horas",
       "zoneLabel": "Fuso horário",
-      "zoneHelper": "Que fuso decide o que conta como hoje e, por isso, que nota abrem as suas notas diárias, semanais e mensais. Deixe em branco para seguir este dispositivo. A escolha fixa-se por dispositivo: nenhum outro dispositivo a substitui, por isso definir um fuso aqui pode colocar este dispositivo num dia diferente dos seus outros dispositivos. As horas que escreve numa nota nunca são alteradas; 09:00 continua a ser 09:00 em qualquer lado.",
+      "zoneHelper": "Deixe em branco para seguir este dispositivo. A escolha fixa-se por dispositivo: nenhum outro dispositivo a substitui, por isso definir um fuso aqui pode colocar este dispositivo num dia diferente dos seus outros dispositivos. As horas que escreve numa nota nunca são alteradas; 09:00 continua a ser 09:00 em qualquer lado.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "O Myne não conhece esse fuso horário. Use um nome como Europe/Berlin.",
       "errorSave": "Não foi possível guardar essa definição.",
       "zoneInline": "Que fuso decide o que conta como hoje e, por isso, que nota abrem as suas notas diárias, semanais e mensais."
     },
+    "calendar": {
+      "anchorLabel": "Hora do lembrete de dia inteiro",
+      "anchorHelper": "A que hora do dia dispara o lembrete de um evento de dia inteiro. Um evento com hora conta a partir do seu próprio início.",
+      "coloursLabel": "Cores do calendário",
+      "coloursHelper": "Cada calendário é desenhado na cor que escolher. As cores vêm do tema, por isso mudar de tema também repinta o calendário.",
+      "coloursEmpty": "Ainda nenhum calendário tem cor. Adicione uma abaixo, ou dê um nome de calendário a um evento e ele aparece aqui.",
+      "newNameLabel": "Nome do novo calendário",
+      "newNamePlaceholder": "Trabalho",
+      "addColour": "Adicionar",
+      "saveFailed": "Não foi possível guardar essa definição. O seu cofre não foi alterado."
+    },
     "folderNotes": {
       "label": "Notas de pasta",
-      "helper": "Permite que uma nota funcione como índice da sua pasta: abre ao clicar duas vezes na pasta, e ligações de pasta como [[Projetos/]] apontam para ela. Desligado por predefinição. Desligar esconde os botões que criam notas de pasta e mostra as que já tem como notas normais; não altera nada em disco, por isso ligar de novo restaura-as exatamente.",
-      "errorSaveSetting": "Não foi possível guardar esta definição.",
+      "helper": "Desligado por predefinição. Desligá-lo esconde os botões que criam notas de pasta e mostra as que já tem como notas normais; não altera nada em disco, por isso voltar a ligá-lo restaura-as exatamente.",
       "inline": "Permite que uma nota funcione como índice da sua pasta: abre ao clicar duas vezes na pasta, e ligações de pasta como [[Projetos/]] apontam para ela."
     },
     "ribbonCustomize": {
@@ -4491,7 +4359,7 @@
       "searchEmpty": "Sem comandos correspondentes.",
       "searchPlaceholder": "Procurar comandos…",
       "searchResultsLabel": "Comandos correspondentes",
-      "showHelper": "Mostrar a fita esquerda neste dispositivo.",
+      "showHelper": "Apenas neste dispositivo.",
       "showLabel": "Mostrar fita esquerda",
       "emptyTitle": "Ainda não há nada fixado"
     },
@@ -4499,11 +4367,8 @@
       "heading": "O que o assistente lembra",
       "helper": "Factos que a IA aprendeu ao trabalhar consigo. Escreve-os ela própria (no máximo um por execução); vê e pode corrigir cada um. As entradas sincronizam com os seus outros dispositivos e permanecem encriptadas.",
       "empty": "As entradas aparecem aqui quando o assistente aprende algo durante uma execução.",
-      "editLabel": "Editar",
       "deleteLabel": "Apagar",
       "save": "Guardar",
-      "cancel": "Cancelar",
-      "cancelLabel": "Cancelar",
       "saveFailed": "Não foi possível guardar a entrada.",
       "deleteFailed": "Não foi possível apagar a entrada.",
       "entryUnreadable": "Não foi possível ler esta entrada. Continua guardada; apague-a aqui ou corrija-a nas Definições.",
@@ -4521,21 +4386,20 @@
       "personalitySavedToast": "Preferências de voz atualizadas.",
       "personalitySaveFailed": "Não foi possível guardar as preferências de voz.",
       "loadFailed": "Não foi possível carregar as memórias ou as preferências de voz. Nada foi alterado.",
-      "retryLabel": "Tentar novamente",
       "seed": {
-        "rowTitle": "Ensinar o Myne ao seu cofre",
         "rowHelper": "Construa memória a partir das suas notas uma vez, com revisão de cada linha antes de ser guardada.",
         "rowSeeded": "Criada em {{date}} · {{count}} entradas",
-        "start": "Ensinar o Myne ao seu cofre",
         "rebuild": "Reconstruir",
         "rebuildConfirm": "Substituir a semente de {{date}} ({{count}} entradas)?",
         "title": "Ensinar o Myne ao seu cofre",
         "candidatesTitle": "Rever o que o Myne aprendeu",
-        "close": "Fechar",
         "loading": "A ler o seu cofre…",
         "scopeIntro": "O Myne lê primeiro a forma do seu cofre: títulos de notas, pastas e etiquetas. Só pede texto de notas se precisar, e nunca de anexos.",
         "provider": "Fornecedor: {{provider}}",
         "estimatedChars": "Cerca de {{chars}} caracteres",
+        "excluded_one": "{{count}} nota deixada de fora porque a sua pasta está excluída da IA",
+        "excluded_many": "{{count}} notas deixadas de fora porque as suas pastas estão excluídas da IA",
+        "excluded_other": "{{count}} notas deixadas de fora porque as suas pastas estão excluídas da IA",
         "showPayload": "Mostrar exatamente o que será enviado",
         "hidePayload": "Ocultar o conteúdo",
         "consentLabel": "Enviar este esboço para {{provider}} (cerca de {{chars}} caracteres). Compreendo que o fornecedor o recebe.",
@@ -4573,7 +4437,7 @@
         },
         "phases": {
           "projecting": "A ler a forma do seu cofre…",
-          "asking": "A pedir temas ao modelo…",
+          "asking": "A pedir entradas de memória ao modelo…",
           "reading": "A ler as notas que o modelo pediu…",
           "finalizing": "A escrever as entradas…",
           "working": "A trabalhar…"
@@ -4584,16 +4448,16 @@
         "removeConfirm": "Remover todas as entradas desta semente?",
         "removedToast": "Entradas do seu cofre removidas.",
         "rowStale": "O cofre mudou desde esta semente",
-        "providerLocalName": "Provider: on this device",
-        "countNotes_one": "{{count}} note",
+        "providerLocalName": "Fornecedor: neste dispositivo",
+        "countNotes_one": "{{count}} nota",
         "countNotes_many": "{{count}} notes",
-        "countNotes_other": "{{count}} notes",
-        "countFolders_one": "{{count}} folder",
+        "countNotes_other": "{{count}} notas",
+        "countFolders_one": "{{count}} pasta",
         "countFolders_many": "{{count}} folders",
-        "countFolders_other": "{{count}} folders",
-        "countTags_one": "{{count}} tag",
+        "countFolders_other": "{{count}} pastas",
+        "countTags_one": "{{count}} etiqueta",
         "countTags_many": "{{count}} tags",
-        "countTags_other": "{{count}} tags"
+        "countTags_other": "{{count}} etiquetas"
       },
       "emptyTitle": "Ainda não há nada memorizado",
       "count": "{{used}} de {{cap}}",
@@ -4601,26 +4465,25 @@
     },
     "account": {
       "vaultsLabel": "Cofres nesta conta",
-      "vaultsHelper": "Os cofres que este dispositivo agrupa. O agrupamento é uma escolha organizativa por dispositivo, por isso não faz parte do conteúdo de nenhum cofre e não viaja com ele.",
+      "vaultsHelper": "Os cofres que este dispositivo agrupa. O agrupamento não faz parte do conteúdo de nenhum cofre.",
       "vaultsHelperShort": "O agrupamento fica neste dispositivo e não viaja com um cofre.",
       "vaultsCount_one": "{{count}} cofres",
       "vaultsCount_other": "{{count}} cofres",
       "vaultCorrupted": "Não foi possível ler os metadados deste cofre",
       "vaultUnreadable": "Não lido neste dispositivo",
-      "vaultDeviceOnly": "Só no dispositivo",
       "currentVault": "Este cofre",
       "unknownVault": "Outro cofre neste dispositivo",
       "numberLabel": "Número de conta",
       "numberHelper": "O número da sua identidade, não de um cofre. Derivado da sua frase de identidade, por isso não se perde e não precisa de ser guardado. Não é um segredo; use-o para suporte ou para passagem a um operador de servidor.",
       "numberUnavailable": "Não foi possível ler o número de conta neste dispositivo. Reabra as Definições para tentar de novo.",
       "numberEmpty": "Nenhuma identidade neste dispositivo. Adicione ou recupere uma em Sincronização para obter um número de conta.",
-      "numberCopy": "Copiar",
       "numberCopied": "Número de conta copiado",
       "numberCopyFailed": "Não foi possível copiar o número de conta",
       "copyAccountNumber": "Copiar número de conta",
       "standaloneHelper": "Este cofre não está agrupado sob uma conta neste dispositivo, por isso fica sozinho. O agrupamento é por dispositivo: outro dispositivo pode mostrá-lo dentro de um.",
       "unresolvedHelper": "A determinar que cofre está aberto…",
       "devicesNote": "Dispositivos, membros de cofres partilhados e a sua identidade são geridos em Sincronização.",
+      "noStoreHelper": "Este dispositivo não tem um porta-chaves do sistema, por isso não consegue manter o agrupamento de contas. Aqui os cofres abrem isoladamente, e outro dispositivo pode mostrá-los juntos.",
       "groupingError": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado.",
       "sections": {
         "grouping": "Esta conta"
@@ -4634,14 +4497,12 @@
       "openFilesRemain": "Ainda há ficheiros abertos com alterações não guardadas. Resolva-os e depois volte a desligar isto."
     },
     "memberPassword": {
-      "reminder": "Ainda não tem desbloqueio rápido neste dispositivo, por isso este cofre pede a sua frase de recuperação de cada vez.",
-      "reminderDismiss": "Agora não",
+      "reminder": "Defina uma para este dispositivo poder abrir o cofre outra vez.",
       "title": "Desbloqueio de cofre partilhado",
       "helperConfigured": "Este cofre partilhado abre com {{method}} guardado neste dispositivo.",
-      "helperNotConfigured": "Defina uma palavra-passe ou um PIN para não voltar a escrever a sua frase de recuperação de cada vez.",
+      "helperNotConfigured": "Defina uma palavra-passe ou um PIN para este dispositivo poder abrir o cofre outra vez. Sem isso, reabri-lo aqui exige um novo convite do proprietário.",
       "set": "Definir",
       "change": "Alterar",
-      "remove": "Remover",
       "label": "Palavra-passe do cofre",
       "methodPassword": "uma palavra-passe",
       "methodPin": "um PIN",
@@ -4650,8 +4511,8 @@
       "useBiometric": "Usar o Touch ID",
       "pinLabel": "PIN do cofre",
       "pinPlaceholder": "PIN, pelo menos {{count}} dígitos",
-      "setupHelper": "Pelo menos {{count}} carateres. Guardado apenas neste dispositivo; a sua frase de recuperação continua a abrir o cofre em qualquer lugar.",
-      "pinSetupHelper": "Pelo menos {{count}} dígitos. Guardado apenas neste dispositivo; a sua frase de recuperação continua a abrir o cofre em qualquer lugar.",
+      "setupHelper": "Pelo menos {{count}} carateres. Guardado apenas neste dispositivo. Se se esquecer dele, este dispositivo precisa de um novo convite do proprietário do cofre.",
+      "pinSetupHelper": "Pelo menos {{count}} dígitos. Guardado apenas neste dispositivo. Se se esquecer dele, este dispositivo precisa de um novo convite do proprietário do cofre.",
       "errorTooShort": "Use pelo menos {{count}} carateres/dígitos.",
       "errorGeneric": "Não foi possível definir a credencial. Tente novamente."
     },
@@ -4736,14 +4597,13 @@
       "emptyTitle": "Sem conflitos"
     },
     "deviceJoinQr": {
-      "accountLabel": "Número de conta",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "Não foi possível criar o QR. Tente novamente.",
       "generate": "Criar QR",
       "hint": "Cole o seu número de conta para criar um QR que o seu telemóvel possa ler. Preenche o servidor e o número de conta por si.",
       "invalidAccount": "Isto não parece um número de conta válido.",
       "notConfigured": "Configure primeiro um servidor de sincronização e depois crie um QR.",
-      "scanWithApp": "Ler com a aplicação iOS",
+      "scanWithApp": "Ler com a aplicação móvel",
       "title": "Iniciar sessão noutro dispositivo"
     },
     "devices": {
@@ -4751,7 +4611,6 @@
       "awaitingApproval_one": "{{count}} dispositivo a aguardar aprovação",
       "awaitingApproval_many": "{{count}} dispositivos a aguardar aprovação",
       "awaitingApproval_other": "{{count}} dispositivos a aguardar aprovação",
-      "loading": "A carregar…",
       "noDevices": "Ainda não há outros dispositivos",
       "notEnrolled": "Este dispositivo ainda não iniciou sessão. Se o acabou de adicionar, espere pela aprovação de um dispositivo que já esteja na sua conta; caso contrário, inicie sessão com “Iniciar sessão neste dispositivo”.",
       "platform": {
@@ -4765,15 +4624,12 @@
         "web": "Navegador",
         "windows": "PC Windows"
       },
-      "remove": "Remover",
       "removedElsewhere": "Este dispositivo foi removido da sua conta a partir de outro dispositivo.",
-      "rename": "Mudar o nome",
       "renameFailed": "Não foi possível guardar esse nome. Tente novamente.",
       "renameLabel": "Nome do dispositivo",
       "resetAndReAdd": "Repor e voltar a adicionar este dispositivo",
       "resetSyncOnThisDevice": "Repor a sincronização neste dispositivo",
       "shortName": "Dispositivo {{hex}}",
-      "thisDevice": "Este dispositivo",
       "reasonUnreachable": "o servidor não respondeu",
       "reasonUnexpected": "um erro inesperado",
       "reasonRejected": "o servidor rejeitou o início de sessão deste dispositivo",
@@ -4787,7 +4643,6 @@
       "verifyMatch": "Coincidem",
       "verifyMismatch": "Não coincidem",
       "verifyPending": "Este código aparece assim que o novo dispositivo concluir a sua primeira sincronização.",
-      "verifyChanged": "O código mudou enquanto o estava a ver. Compare novamente os dois ecrãs. Se continuar a mudar, pare e não continue.",
       "verifySyncing": "A sincronizar…",
       "verifyTitle": "Verificar o novo dispositivo",
       "verifyAction": "Comparar código",
@@ -4814,7 +4669,6 @@
       "invitePlaceholder": "O código que o operador do servidor lhe deu"
     },
     "enroll": {
-      "accountNumberLabel": "Número de conta",
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "A ligar…",
       "credentialTypeAria": "Tipo de credencial",
@@ -4832,64 +4686,21 @@
         "inviteCodeRequired": "Este servidor só aceita contas novas com um código de convite. Introduza o código que o respetivo operador lhe deu."
       },
       "mode": {
-        "password": "Palavra-passe",
-        "recovery": "Frase de recuperação"
+        "password": "Palavra-passe"
       },
       "passwordLabel": "Palavra-passe",
       "recoveryPhraseHint": "Introduza a sua frase de recuperação de 24 palavras.",
-      "recoveryPhraseLabel": "Frase de recuperação",
       "signInWith": "Iniciar sessão com",
       "submit": "Adicionar este dispositivo",
       "wordAria": "Palavra {{number}}"
     },
     "join": {
-      "accountLabel": "Número de conta",
       "cancel": "Cancelar",
-      "error": "Não foi possível adicionar este dispositivo. Verifique o URL do servidor, o número de conta e a palavra-passe, e se o servidor está acessível.",
-      "help": "Inicie sessão com o seu número de conta e palavra-passe. Este dispositivo vai sincronizar as suas notas assim que um dispositivo existente o aprovar. Não é necessária frase de recuperação.",
-      "passwordLabel": "Palavra-passe",
       "serverLabel": "Servidor de sincronização",
-      "serverPlaceholder": "https://your-server.example",
       "sasMatch": "Coincidem, continuar",
-      "sasMismatch": "Não coincidem, remover este dispositivo",
-      "submit": "Adicionar dispositivo",
       "submitting": "A adicionar…",
-      "title": "Adicionar este dispositivo a uma conta",
-      "verifyBody": "Verifique se este código coincide com o do dispositivo a partir do qual aprovou.",
-      "verifyChanged": "O código mudou enquanto o estava a ver. Compare novamente os dois ecrãs. Se continuar a mudar, pare e não continue.",
       "verifyTitle": "Verificar este dispositivo",
-      "waitingHint": "Mantenha esta janela aberta. Assim que for aprovado, aparece aqui um código de verificação para comparar com o seu outro dispositivo.",
-      "waitingTitle": "A aguardar aprovação",
-      "personListFailed": "Já está nesta conta, mas listar os seus cofres não terminou, por isso nenhum é mostrado ainda. Tente de novo, ou reabra este ecrã mais tarde.",
-      "personListRetry": "Listar os cofres de novo",
-      "sasAbortFailed": "Não foi possível desligar este dispositivo. Continua registado nesse servidor, por isso trate-o como não fiável: abra Definições → Sincronização e remova-o aí. As suas notas não foram apagadas.",
-      "backToWaiting": "Voltar a aguardar",
-      "codeBody": "Cole o código que o outro dispositivo está a mostrar. Um código de uma identidade adiciona este dispositivo a toda essa conta.",
-      "codeContinue": "Continuar",
-      "codeExpired": "Esse código expirou. Peça ao outro dispositivo para mostrar um novo.",
-      "codeInvalid": "Isso não é um código de junção do Myne.",
-      "codeLabel": "Código de junção",
-      "codeMemberUnsupported": "Esse código é para um cofre partilhado. Adicione este dispositivo a partir do ecrã de identidade, onde o cofre aparece nos seus convites.",
-      "codeOpen": "Tenho um código de junção",
-      "codeTitle": "Adicionar este dispositivo com um código",
-      "personMismatch": "Esse código é para uma identidade diferente da frase que escreveu. Verifique ambos e tente de novo.",
-      "personPendingBody": "Um dos seus outros dispositivos tem de aprovar este. Até o fazer, este dispositivo não pode abrir nenhum dos cofres da conta.",
-      "personPendingHint": "À espera de aprovação. Isto termina sozinho quando o outro dispositivo aprovar.",
-      "personPendingPhraseAgain": "Este dispositivo foi reiniciado antes da aprovação chegar, por isso a frase é necessária uma vez mais.",
-      "personPendingPhraseCta": "Escrever a frase de novo",
-      "personPendingTitle": "À espera de aprovação",
-      "personPhraseBody": "O código nomeou a identidade; as 24 palavras provam-na. Este dispositivo pedirá a palavra-passe de cada cofre quando o abrir.",
-      "personPhraseSubmit": "Adicionar este dispositivo",
-      "personPhraseTitle": "Escrever a sua frase de identidade",
-      "errorPhrase": "Não foi possível adicionar este dispositivo. Verifique o URL do servidor, o número de conta e a frase de recuperação, e se o servidor está acessível.",
-      "modePassword": "A minha palavra-passe",
-      "modePhrase": "A minha frase de recuperação",
-      "noDeviceBody": "Não tem outro dispositivo para aprovar este? Pode antes confirmar com a sua frase de recuperação.",
-      "phraseEscapeBody": "A sua frase de recuperação é a chave completa desta conta, por isso confirma este dispositivo sem aprovação de outro dispositivo. Mantém a palavra-passe que acabou de usar.",
-      "phraseTitle": "Confirmar com a sua frase de recuperação",
-      "phraseWarning": "A sua frase de recuperação é a chave completa desta conta, por isso este dispositivo é adicionado sem aprovação de outro dispositivo. Use-a apenas se não tiver outro dispositivo a partir do qual aprovar. A seguir vai definir uma nova palavra-passe.",
-      "usePhrase": "Usar a minha frase de recuperação",
-      "back": "Voltar"
+      "sasAbortFailed": "Não foi possível desligar este dispositivo. Continua registado nesse servidor, por isso trate-o como não fiável: abra Definições → Sincronização e remova-o aí. As suas notas não foram apagadas."
     },
     "panel": {
       "addDevice": {
@@ -4908,7 +4719,6 @@
         "helper": "Uma aprovação assina um dispositivo na sua conta. Ele passa a ver todos os cofres que possui, e cada cofre ainda abre com a sua própria palavra-passe."
       },
       "recovered": {
-        "close": "Fechar",
         "decrypting": "A desencriptar…",
         "deleteConfirmTitle": "Apagar esta nota recuperada?",
         "deleteConfirmWarning": "Isto apaga permanentemente a única cópia guardada neste dispositivo. Não é possível anular esta ação.",
@@ -4926,7 +4736,16 @@
       },
       "status": {
         "helper": "O Myne sincroniza as suas notas encriptadas entre os seus dispositivos. O servidor só armazena texto cifrado, que não consegue ler.",
-        "label": "Estado de sincronização"
+        "label": "Estado de sincronização",
+        "authorityIdentityClosed": "A sincronização retoma quando abrir a sua identidade neste dispositivo",
+        "authorityKeyMissing": "A sincronização retoma quando abrir a sua identidade e este dispositivo for reparado",
+        "authorityNoHeadContext": "Este dispositivo não consegue ler o suficiente do cofre para o assinar. As suas credenciais não são o problema.",
+        "authorityNoDeviceId": "Este dispositivo ainda não tem uma identidade própria, por isso o cofre não o consegue nomear.",
+        "authorityNoKeyAtRest": "Este dispositivo não tem nenhuma chave de assinatura. Abra a sua identidade neste dispositivo para criar uma.",
+        "authorityKeyUnreadable": "A chave de assinatura deste dispositivo existe, mas o porta-chaves do sistema não a conseguiu ler. Normalmente um reinício resolve, e até lá abrir a sua identidade funciona.",
+        "authorityNoBindingRow": "A chave de assinatura deste dispositivo ainda não está publicada no cofre. Abra a sua identidade neste dispositivo para a publicar.",
+        "authorityRowNamesDifferentKey": "O registo do cofre para este dispositivo indica uma chave diferente da que está guardada aqui. Abra a sua identidade neste dispositivo para o reparar.",
+        "authorityRowUnverified": "O registo do cofre para este dispositivo não é válido. Abra a sua identidade neste dispositivo para o assinar novamente."
       },
       "usage": {
         "helper": "Quantos dados encriptados esta conta armazena no servidor e quantos dispositivos têm sessão iniciada.",
@@ -4938,7 +4757,6 @@
         "label": "Identidade",
         "helper": "Uma identidade permite que as pessoas o convidem para um cofre, e permite que uma identidade seja proprietária de vários cofres.",
         "cta": "Adicionar uma identidade",
-        "codeLabel": "O seu código de identidade",
         "lockedHelper": "Este dispositivo contém uma identidade. Está bloqueada para esta sessão; desbloqueie-a com a sua frase de recuperação para assinar a sincronização e os convites.",
         "unregisteredHelper": "Esta identidade existe só neste dispositivo. Registá-la escreve-a no seu servidor de sincronização, que é o que permite que um convite lhe chegue.",
         "unlockedHelper": "Este dispositivo contém uma identidade, desbloqueada para esta sessão."
@@ -4961,8 +4779,7 @@
       "restoredToast": "Restaurada como uma nota nova."
     },
     "stale": {
-      "body": "O Myne não contacta o servidor de sincronização há vários dias. As suas notas estão a ser guardadas neste dispositivo, mas nada saiu daqui, por isso esta é a única cópia. Abra Definições → Sincronização para ver porquê.",
-      "dismiss": "Dispensar"
+      "body": "O Myne não contacta o servidor de sincronização há vários dias. As suas notas estão a ser guardadas neste dispositivo, mas nada saiu daqui, por isso esta é a única cópia. Abra Definições → Sincronização para ver porquê."
     },
     "status": {
       "awaitingApproval": "A aguardar aprovação",
@@ -4985,8 +4802,11 @@
       "syncing": "A sincronizar…",
       "syncNow": "Sincronizar agora",
       "errorIdentityLocked": "Desbloqueie a sua identidade para sincronizar",
+      "uploadsBlocked": "Carregamentos em pausa: este dispositivo não consegue assinar a cabeça do cofre",
       "errorTls": "Não foi possível verificar a ligação HTTPS do servidor de sincronização",
-      "unlockIdentityCta": "Desbloquear identidade"
+      "unlockIdentityCta": "Desbloquear identidade",
+      "errorDeviceKeyMissing": "A chave de assinatura que este dispositivo publicou não está aqui, por isso a sincronização não pode funcionar",
+      "repairDeviceCta": "Reparar este dispositivo"
     },
     "usage": {
       "devices": "Dispositivos",
@@ -5002,6 +4822,7 @@
       "serverSection": "Servidor",
       "serverNotSet": "Não definido",
       "statusLabel": "Estado",
+      "approvalCode": "Código de aprovação deste dispositivo",
       "hubHelp": "A sincronização mantém as suas notas atualizadas em todos os dispositivos. Tudo é encriptado neste dispositivo antes de ser enviado. O servidor nunca vê as suas notas.",
       "connectedTls": "Ligado através de TLS.",
       "connectedLocal": "Ligado na sua rede local.",
@@ -5016,7 +4837,6 @@
       "verifyBody": "Verifique se o mesmo código aparece no dispositivo que acabou de aprovar. Se coincidir, está na sua conta. Se não coincidir, remova o dispositivo.",
       "sasMismatch": "Não coincidem",
       "removeDeviceButton": "Remover dispositivo",
-      "keepDevice": "Manter",
       "notEnrolledHelp": "Este dispositivo ainda não está a sincronizar. Adicione-o a partir do ecrã anterior para ver os seus dispositivos.",
       "unauthenticated": "O acesso deste dispositivo foi revogado, provavelmente removido a partir de outro dispositivo.",
       "transportError": "Não foi possível contactar o servidor de sincronização. Verifique o endereço do servidor e o respetivo certificado HTTPS.",
@@ -5046,7 +4866,7 @@
     "memberRoster": {
       "loading": "A carregar membros…",
       "error": "Não foi possível ler a lista do cofre.",
-      "hint": "Membros deste cofre. Cada um entra com a sua própria identidade e credenciais.",
+      "hint": "Membros deste cofre. Cada um entra com a sua própria identidade e credenciais. Uma contagem de dispositivos é uma alegação assinada pelo membro, não uma prova de que é dono da máquina.",
       "empty": "Convide alguém para partilhar este cofre. Essa pessoa junta-se com a sua própria identidade.",
       "rotated": "Chave rotacionada",
       "keyChanged": "Chave alterada. Verifique com o proprietário.",
@@ -5054,7 +4874,6 @@
       "ownerBadge": "Proprietário",
       "memberBadge": "Membro",
       "invite": "Convidar membro",
-      "remove": "Remover",
       "removeConfirm": "Remover {{name}}? Assim que a rotação da chave terminar, perde o acesso a alterações futuras. Isto não apaga nada que já tenha copiado e não recupera conteúdo do seu dispositivo ou do seu fornecedor de IA.",
       "removalLimits": "Remover um membro apenas pararia o seu acesso a alterações futuras. Não apaga nada que já tenha copiado e não recupera conteúdo do seu dispositivo ou do seu fornecedor de IA.",
       "inviteReady": "Convite pronto para {{fingerprint}}…",
@@ -5069,18 +4888,20 @@
       "personLock": "Bloquear identidade",
       "personError": "Essa frase não abriu uma identidade de membro.",
       "inviteHint": "Cole o código de identidade do membro convidado (da sua página de identidade).",
-      "inviteCodeLabel": "O seu código de identidade",
       "untitledVault": "Cofre sem título",
       "inviteFailed": "Não foi possível criar o convite.",
       "inviteNotOnServer": "Este cofre ainda não está no seu servidor de sincronização. Publique-o e registe a sua identidade e convide de novo.",
       "removeFailed": "Não foi possível remover o membro.",
       "youBadge": "Você",
+      "deviceCount_one": "{{count}} alegação de dispositivo",
+      "deviceCount_many": "{{count}} alegações de dispositivo",
+      "deviceCount_other": "{{count}} alegações de dispositivo",
+      "deviceClaimsUnverified_one": "Uma alegação de dispositivo não pôde ser verificada: o membro que ela nomeia não a assinou.",
+      "deviceClaimsUnverified_many": "{{count}} alegações de dispositivo não puderam ser verificadas: o membro que cada uma nomeia não as assinou.",
+      "deviceClaimsUnverified_other": "{{count}} alegações de dispositivo não puderam ser verificadas: o membro que cada uma nomeia não as assinou.",
       "nameUnverified": "Nome não verificado",
       "nameLabel": "O seu nome a apresentar",
-      "nameEdit": "Mudar o nome",
       "nameSave": "Guardar",
-      "nameClear": "Limpar",
-      "nameCancel": "Cancelar",
       "nameErrorEmpty": "Introduza um nome, ou use Limpar para remover o seu.",
       "nameErrorTooLong": "Esse nome é demasiado longo.",
       "nameErrorUnreadable": "Não foi possível ler o repositório de nomes neste dispositivo. Nada foi guardado.",
@@ -5089,7 +4910,6 @@
       "nameErrorGeneric": "Não foi possível guardar o seu nome. Tente novamente.",
       "nameInviteCta": "Definir um nome",
       "noInvitations": "Ainda não foram enviados convites.",
-      "identityHeading": "A sua identidade",
       "membersHeading": "Membros",
       "emptyTitle": "Ainda não há membros",
       "personUnlockOpen": "Desbloquear",
@@ -5099,16 +4919,12 @@
       "shareConfirmBody": "Convidar alguém transforma este cofre num cofre partilhado: ganha uma chave de grupo, e as pessoas que convidar abrem o seu conteúdo com ela. Esta alteração é permanente e não há forma de voltar a um cofre de um só utilizador. Continue para escolher quem convidar.",
       "shareConfirmCta": "Partilhar e convidar",
       "shareFailed": "Não foi possível começar a partilhar este cofre.",
-      "identityForgetCta": "Esquecer esta identidade neste dispositivo",
       "identityForgetCheckbox": "Compreendo que esta identidade será removida deste dispositivo.",
       "identityForgetConfirm": "Esquecer a identidade",
-      "identityForgetCancel": "Mantê-la",
-      "identityForgetWarning": "Isto remove a identidade apenas deste dispositivo. A conta no servidor e qualquer cofre que ela possua ou a que se tenha juntado ficam intactos, e pode recuperar a identidade com a sua frase de 24 palavras noutro dispositivo. Os convites e as ações de lista de membros neste dispositivo vão precisar dela desbloqueada outra vez.",
       "identityForgetError": "Não foi possível esquecer a identidade. Tente novamente.",
       "invitationDeclined": "Recusado"
     },
     "deviceBindings": {
-      "title": "Dispositivos e membros",
       "errorLocked": "Desbloqueie o cofre para ler os seus dispositivos.",
       "errorUnshared": "Este cofre não está partilhado, por isso não contém associações de dispositivos.",
       "errorNoDeviceId": "Este dispositivo não foi adicionado à sua conta, por isso não tem uma identidade de dispositivo sob a qual se reclamar.",
@@ -5120,8 +4936,7 @@
       "title": "Escolha um nome a apresentar",
       "body": "É assim que os outros membros deste cofre o verão na lista de membros. A sua impressão digital fica ao lado, e pode alterar o nome mais tarde.",
       "label": "O seu nome a apresentar",
-      "checking": "A verificar o seu nome…",
-      "save": "Continuar"
+      "checking": "A verificar o seu nome…"
     },
     "memberJoinQr": {
       "error": "Não foi possível criar o código.",
@@ -5154,11 +4969,8 @@
       "folder": "Pasta",
       "insert": "Inserir",
       "noDueDate": "Sem data limite",
-      "priority": "Prioridade",
       "sort": "Ordenar por",
-      "sortDue": "Data limite",
       "sortPath": "Nota",
-      "sortPriority": "Prioridade",
       "status": "Estado",
       "statusDone": "Concluídas",
       "statusTodo": "Por fazer",
@@ -5173,7 +4985,6 @@
     },
     "filter": {
       "overdue": "Atrasadas",
-      "today": "Hoje",
       "upcoming": "Próximas"
     },
     "noteTitle": "Tarefas nesta nota",
@@ -5198,12 +5009,10 @@
       "untitled": "Tarefa sem título",
       "editFields": "Editar campos da tarefa"
     },
-    "title": "Tarefas",
     "axis": {
       "due": "Prazo",
       "folder": "Pasta",
       "note": "Nota",
-      "priority": "Prioridade",
       "sort": "Ordenar",
       "status": "Estado",
       "tag": "Etiqueta"
@@ -5211,9 +5020,7 @@
     "due": {
       "any": "Qualquer data",
       "later": "Mais tarde",
-      "none": "Sem data",
       "overdue": "Em atraso",
-      "today": "Hoje",
       "upcoming": "Próximas"
     },
     "filters": {
@@ -5230,30 +5037,22 @@
       "medium": "Média"
     },
     "section": {
-      "done": "Concluídas",
       "later": "Mais tarde",
-      "none": "Sem data",
       "overdue": "Em atraso",
-      "today": "Hoje",
       "upcoming": "Próximas"
     },
     "sort": {
-      "due": "Data de prazo",
       "dueDesc": "Data de prazo, mais recente primeiro",
-      "note": "Nota",
-      "priority": "Prioridade"
+      "note": "Nota"
     },
     "status": {
       "all": "Todas",
-      "done": "Concluídas",
       "undone": "Abertas"
     },
     "view": {
       "allFolders": "Todas as pastas",
-      "allNotes": "Todas as notas",
       "anyPriority": "Qualquer prioridade",
-      "anyTag": "Qualquer etiqueta",
-      "untitled": "Sem título"
+      "anyTag": "Qualquer etiqueta"
     },
     "search": {
       "label": "Procurar tarefas",
@@ -5267,9 +5066,7 @@
       "emptyBody": "Crie um modelo para reutilizar um esqueleto de nota: uma nota de reunião, um diário, uma nota de leitura. Escolha um quando criar uma nova nota.",
       "emptyTitle": "Ainda não há modelos",
       "listLabel": "Modelos",
-      "loading": "A carregar…",
       "newTemplate": "Novo modelo",
-      "newTemplateName": "Modelo sem título",
       "removeFromTemplates": "Remover dos modelos",
       "removeRowLabel": "Remover {{name}} dos modelos (mantém a nota)",
       "title": "Modelos de notas",
@@ -5281,7 +5078,6 @@
     "newAction": "Novo",
     "emptyAfter": " para criar um modelo de nota reutilizável e depois começar notas a partir dele (e escolher um como modelo da sua nota diária em Definições).",
     "use": "Usar",
-    "edit": "Editar",
     "deleteConfirm": "Eliminar este modelo?",
     "convertToNote": "Converter em nota"
   },
@@ -5289,8 +5085,6 @@
     "apply": "Aplicar tema",
     "applying": "A aplicar…",
     "byAuthor": "Esta ligação diz que é de {{author}}",
-    "cancel": "Cancelar",
-    "close": "Fechar",
     "collision": {
       "keepBoth": "Manter ambos e instalar como “{{name}}”",
       "question": "Já tem um tema chamado “{{name}}”.",
@@ -5313,7 +5107,6 @@
   },
   "unlock": {
     "backToPicker": "Escolher um cofre diferente",
-    "continue": "Continuar",
     "decrypting": "A desencriptar…",
     "deleteLink": "Perdeu a palavra-passe e a frase de recuperação? Apague o cofre e comece de novo",
     "memberRemoveLink": "Remover este cofre deste dispositivo",
@@ -5321,8 +5114,6 @@
       "alreadyUnlocked": "O cofre já está desbloqueado.",
       "inProgress": "Operação em curso.",
       "kdfMemoryExceedsHost": "Este cofre precisa de {{required}} MiB de memória para abrir, mais do que este navegador lhe consegue dar ({{available}} MiB). O cofre está bem; abra-o na aplicação de ambiente de trabalho do Myne.",
-      "unexpected": "Erro inesperado. Tente novamente, por favor.",
-      "vaultNotFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor.",
       "vaultUpgraded": "Este cofre foi atualizado para um formato mais recente que esta versão do Myne ainda não suporta. Os seus dados estão bem. Atualize o Myne para a versão mais recente para o abrir.",
       "openAsImportSource": "Uma importação está a ler este cofre neste momento. Termine ou cancele essa importação e depois desbloqueie este cofre."
     },
@@ -5337,8 +5128,8 @@
       "wrongCredential": "Incorreto. Resta(m) {{remaining}} tentativa(s).",
       "showPin": "Mostrar PIN",
       "hidePin": "Ocultar PIN",
-      "waitingForTouchId": "Waiting for Touch ID…",
-      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
+      "waitingForTouchId": "A aguardar o Touch ID…",
+      "waitingForTouchIdHint": "Responda ao pedido do sistema para desbloquear. Se não aparecer nenhum pedido, use antes a sua palavra-passe."
     },
     "recoveryInterruptedBanner": "O fluxo de recuperação foi interrompido. Defina primeiro uma nova palavra-passe.",
     "recoveryInterruptedBody": "Defina primeiro uma nova palavra-passe e depois volte a selar o seu cofre.",
@@ -5353,7 +5144,6 @@
       "metaChangedExternally": "O cofre foi modificado noutra sessão. Desbloqueie novamente, por favor."
     },
     "title": "Desbloquear o seu cofre",
-    "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de um backup.",
     "unlockFailedGeneric": "Não foi possível desbloquear. Tente novamente.",
     "biometricTooManyAttempts": "Demasiadas tentativas de {{biometric}}. Use a sua palavra-passe.",
     "pinIncorrect_one": "PIN incorreto. Resta {{count}} tentativa.",
@@ -5381,16 +5171,12 @@
     "deletePartialError": "Não foi possível remover alguns ficheiros. O cofre já não é utilizável. Continue para recomeçar.",
     "failClosedEyebrow": "Não é possível abrir o cofre",
     "restoreHint": "Restaurar a partir de uma cópia de segurança ainda não está disponível no telemóvel.",
-    "memberHint": "Este cofre é partilhado consigo. Desbloqueie-o com a sua própria frase de recuperação.",
     "memberSubtitle": "Abrir este cofre partilhado.",
-    "memberPhraseLabel": "Frase de recuperação",
+    "memberNoCredential": "Este cofre partilhado foi criado noutro dispositivo. Para o abrir aqui, aceite um novo convite do proprietário do cofre: este dispositivo não tem nenhuma palavra-passe para ele, e a frase de recuperação já não desbloqueia um cofre partilhado.",
     "memberSubmit": "Desbloquear",
-    "memberError": "Essa frase não abriu este cofre partilhado.",
     "memberPasswordHint": "Este cofre foi partilhado consigo. Desbloqueie-o com a palavra-passe que definiu neste dispositivo.",
     "memberPasswordLabel": "Palavra-passe do cofre",
     "memberPasswordError": "Essa palavra-passe não abriu este cofre partilhado.",
-    "memberUsePhrase": "Usar antes a frase de recuperação",
-    "memberUseFast": "Usar antes o desbloqueio rápido",
     "memberPinHint": "Este cofre foi partilhado consigo. Desbloqueie-o com o PIN que definiu neste dispositivo.",
     "memberPinLabel": "PIN do cofre",
     "memberPinPlaceholder": "PIN do cofre (pelo menos {{count}} dígitos)",
@@ -5400,6 +5186,7 @@
     "restoreCta": "Restaurar a partir de uma cópia de segurança",
     "ioErrorHint": "Tente novamente, ou volte a abrir o Myne.",
     "identityPhraseLink": "Usar a sua frase de identidade",
+    "passwordOnlyNote": "Este cofre abre apenas com a sua palavra-passe. Não existe nenhuma frase de recuperação para ele.",
     "identityPhrase": {
       "title": "Desbloquear com a sua frase de identidade",
       "body": "Este cofre abre com a sua palavra-passe ou com a sua frase de identidade. Se guardou uma frase de cofre separada para ele, essa foi aposentada e já não o abre. Abrir com as 24 palavras que anotou para a sua identidade desbloqueia também a sua identidade para esta sessão, por isso a sincronização corre sem um segundo pedido.",
@@ -5416,13 +5203,11 @@
   "vault": {
     "ioBanner": {
       "cannotRead": "Não foi possível ler o ficheiro do cofre.",
-      "notFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor.",
       "permissionDenied": "Sem permissão para aceder ao ficheiro do cofre. Verifique as permissões do ficheiro."
     }
   },
   "vaultCreation": {
     "briefing": {
-      "back": "Voltar",
       "continue": "Continuar para a criação do cofre",
       "eyebrow": "Novo cofre",
       "heading": "Antes de criar o seu cofre",
@@ -5439,15 +5224,14 @@
           "why": "A sua palavra-passe é a entrada para a chave que desencripta as suas notas. Nunca sai deste dispositivo, e nada nos nossos servidores a consegue reproduzir. É isso que mantém as suas notas privadas, e a razão pela qual não a podemos repor por si."
         },
         "phrase-backup": {
-          "ackLabel": "Compreendo que a minha frase de recuperação é a única cópia de segurança.",
-          "statement": "A sua frase de recuperação é a sua única cópia de segurança.",
-          "why": "Se esquecer a sua palavra-passe, a frase de recuperação de 24 palavras é a única forma de voltar a entrar. {{lostBothSecrets}} Escreva a frase e guarde-a num local seguro."
+          "ackLabel": "Compreendo que nada mais me deixa voltar a entrar neste cofre.",
+          "statement": "Guarde o que o Myne lhe mostrar. Nada mais o deixa voltar a entrar.",
+          "why": "Um cofre criado com a sua identidade desbloqueada abre apenas com a sua palavra-passe: a sua frase de identidade prova quem é num dispositivo novo, e não abre nenhum cofre. Um cofre criado num dispositivo sem identidade traz, em vez disso, uma frase de recuperação de 24 palavras, e aí é essa frase a única forma de voltar a entrar. {{lostBothSecrets}} Anote o que este fluxo lhe mostrar e guarde-o num local seguro."
         }
       },
       "why": "Porquê?"
     },
     "confirm": {
-      "back": "Voltar",
       "heading": "Confirme a sua frase de recuperação",
       "intro": "Escreva as palavras nestas quatro posições, para verificar que as guardou.",
       "mismatch": "Não corresponde à palavra {{pos}}.",
@@ -5469,31 +5253,24 @@
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "Tente novamente.",
         "title": "Número de conta inválido"
       },
       "aeadFailure": {
-        "body": "Tente novamente.",
         "title": "A encriptação falhou"
       },
       "csprng": {
-        "body": "Tente novamente.",
         "title": "Não foi possível gerar dados aleatórios seguros"
       },
       "invalidPassword": {
-        "body": "Tente novamente.",
         "title": "Palavra-passe inválida"
       },
       "invalidVaultMeta": {
-        "body": "Tente novamente.",
         "title": "Erro no formato do cofre"
       },
       "ioOther": {
-        "body": "Tente novamente.",
         "title": "Não foi possível guardar o cofre"
       },
       "joinFailure": {
-        "body": "Tente novamente.",
         "title": "Algo correu mal"
       },
       "kdfFailure": {
@@ -5505,7 +5282,6 @@
         "title": "Espaço em disco insuficiente"
       },
       "notFound": {
-        "body": "Tente novamente.",
         "title": "Pasta do cofre em falta"
       },
       "passwordTooShort": {
@@ -5553,7 +5329,6 @@
         "title": "Descartar a criação do cofre?"
       },
       "genericError": {
-        "body": "Tente novamente.",
         "title": "Algo correu mal"
       },
       "provisionFailed": {
@@ -5562,17 +5337,14 @@
       }
     },
     "password": {
-      "back": "Voltar",
       "heading": "Escolha uma palavra-passe mestra",
       "helperLead": "O Myne não armazena a sua palavra-passe nem a sua frase de recuperação.",
-      "submit": "Gerar frase de recuperação",
-      "eyebrowLabel": "Palavra-passe mestra"
+      "submit": "Gerar frase de recuperação"
     },
     "phrase": {
       "clipboardNotCleared": "O seu navegador não permite que o Myne limpe depois a área de transferência, por isso essas 24 palavras ficam lá até copiar outra coisa. Cole-as no seu gestor de palavras-passe e depois copie qualquer coisa.",
       "copied": "Copiado. O Myne limpa-a ao fim de 30 segundos, mesmo que avance, desde que a aplicação se mantenha em execução.",
       "copiedNoAutoClear": "Copiado. O Myne não pode limpar aqui a área de transferência, por isso as palavras ficam lá até copiar outra coisa.",
-      "copy": "Copiar",
       "extensionNotice": "As extensões do navegador com acesso a este site conseguem ler o que está nesta página. Se não tiver a certeza sobre todas as extensões deste perfil, use a aplicação de ambiente de trabalho ou um perfil de navegador limpo para este passo.",
       "copyFailed": "Não foi possível copiar. Use antes “Guardar como ficheiro”.",
       "downloadStarted": "Enviado para os descarregamentos do seu navegador. Verifique se chegou: o navegador decide onde o ficheiro vai, e o Myne não consegue ver se chegou.",
@@ -5583,42 +5355,31 @@
       "sessionOnlyNotice": "Este navegador não guarda a sua frase após uma recarga, por isso ser-lhe-á pedida de novo as 24 palavras. Guarde-as num lugar seguro."
     },
     "ready": {
-      "backedUp": "Cópia de segurança feita",
-      "backingUp": "A fazer cópia de segurança…",
-      "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "A cópia de segurança não foi concluída. Não ficou nenhum ficheiro. Pode fazer cópia de segurança a qualquer momento em Definições → Armazenamento.",
-      "backupFilterName": "Cópia de segurança do Myne",
-      "backUpNow": "Fazer cópia de segurança agora",
       "body": "As suas notas são encriptadas e armazenadas neste dispositivo. Guarde a sua palavra-passe e o seu kit de recuperação num local seguro: são a única forma de voltar a entrar.",
       "decrypting": "A desencriptar…",
       "done": "Abrir o cofre",
-      "heading": "O seu cofre está pronto",
-      "showFolder": "Mostrar pasta do cofre"
+      "heading": "O seu cofre está pronto"
     },
     "sessionLost": {
       "startOver": "Começar de novo"
     },
     "kit": {
-      "accountFor": "Número de conta — quando adicionar outro dispositivo",
-      "back": "Voltar",
+      "accountFor": "Número de conta: para quando adicionar outro dispositivo",
       "continue": "Já guardei isto, confirmar frase",
       "copied": "O kit está na sua área de transferência. O Myne limpa-a dentro de 30 segundos, mesmo que avance, desde que a aplicação continue a ser executada.",
       "copiedNoAutoClear": "Copiado. O Myne não consegue limpar a sua área de transferência aqui, por isso o kit fica nela até copiar outra coisa.",
-      "copy": "Copiar",
       "copyFailed": "Não foi possível copiar. Use antes “Guardar kit de recuperação”.",
       "documentTitle": "Kit de recuperação do Myne",
       "downloadStarted": "Enviado para as transferências do seu navegador. Confirme que o kit chegou: é o seu navegador que decide para onde vai o ficheiro, e o Myne não consegue ver se isso aconteceu.",
       "eyebrowLabel": "Kit de recuperação",
       "heading": "Guarde o seu kit de recuperação",
       "intro": "O ficheiro que está prestes a guardar é exatamente isto. É mostrado uma vez.",
-      "phraseFor": "Frase de recuperação — se se esquecer da palavra-passe",
+      "phraseFor": "Frase de recuperação: para o caso de se esquecer da palavra-passe",
       "save": "Guardar kit de recuperação",
       "saveFailed": "Não foi possível guardar o ficheiro. Copie antes o kit, ou anote as duas partes.",
       "savedToFile": "Guardado. É um ficheiro de texto simples que contém os dois segredos, por isso guarde-o num sítio onde só você o possa ler."
     },
     "name": {
-      "back": "Voltar",
-      "continue": "Continuar",
       "eyebrowLabel": "Dar um nome ao cofre",
       "heading": "Como devemos chamar este cofre?",
       "helper": "O nome é guardado encriptado com o cofre. Neste dispositivo é mostrado no seletor de cofres no arranque antes de desbloquear, por isso qualquer pessoa que veja esse ecrã consegue lê-lo; oculte os nomes dos cofres nas Definições para desligar isso. Pode alterá-lo mais tarde.",
@@ -5629,13 +5390,10 @@
   },
   "vaultPicker": {
     "createAnother": "Criar outro cofre",
-    "deviceOnly": "Só no dispositivo",
     "heading": "Escolha um cofre",
-    "joinDevice": "Adicionar este dispositivo a uma conta",
     "loading": "A carregar os seus cofres…",
     "noneLoaded": "Não foi possível carregar nenhum cofre neste momento.",
     "openedRelative": "aberto {{rel}}",
-    "restoreFromBackup": "Restaurar a partir de cópia de segurança",
     "subline": "Tem mais do que um cofre neste dispositivo. Escolha um para desbloquear.",
     "vaultFallback": "Cofre {{n}}",
     "accountError": "Não foi possível ler o agrupamento de contas neste dispositivo.",
@@ -5655,7 +5413,6 @@
       "errors": {
         "cancelledVaultLocked": "Recuperação cancelada: o cofre estava bloqueado.",
         "operationInProgress": "Operação em curso. Aguarde, por favor.",
-        "unexpected": "Erro inesperado. Tente novamente, por favor.",
         "weakPassword": "A nova palavra-passe deve ter pelo menos 12 carateres."
       },
       "eyebrow": "Recuperação · Nova palavra-passe",
@@ -5677,8 +5434,7 @@
       "accountInvalid": "Número de conta inválido. Verifique e tente novamente.",
       "accountLabel": "Número de conta (opcional)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (opcional)",
-      "body": "Escolha o cofre que quer recuperar com a sua frase de recuperação de 24 palavras. Também pode escrever o seu número de conta para ir diretamente para ele.",
-      "cancel": "Cancelar",
+      "body": "Escolha o cofre que quer recuperar. Um cofre que ainda traz a sua própria frase de recuperação pode ser recuperado com essas 24 palavras; um que não traga di-lo quando o escolher. Também pode escrever o seu número de conta para ir diretamente para ele.",
       "checking": "A verificar…",
       "loadFailed": "Não foi possível carregar nenhum cofre neste momento.",
       "loading": "A carregar os seus cofres…",
@@ -5701,8 +5457,6 @@
   "vaultSwitcher": {
     "chipFallback": "Cofre",
     "createAnother": "Criar outro cofre",
-    "deviceOnly": "Só no dispositivo",
-    "joinDevice": "Adicionar este dispositivo a uma conta",
     "switching": "a mudar…",
     "switchVaultLabel": "Mudar de cofre",
     "vaultFallback": "Cofre {{n}}"
@@ -5764,15 +5518,16 @@
     "heroLine2": "pertencem",
     "heroLine3": "apenas a si.",
     "lede": "Markdown, encriptado neste dispositivo antes de sequer sair dele. Sem e-mail de conta. Sem servidores que possam ler uma palavra.",
-    "residueBanner": "Ficheiros residuais de uma eliminação interrompida ({{n}}). Limpe-os antes de criar um cofre.",
+    "residueBanner": "Ficheiros residuais de uma eliminação interrompida ({{n}}). Já estão ilegíveis, por isso limpá-los apenas os remove deste dispositivo.",
+    "residueGated": "Ainda está aqui uma pasta de cofre que este dispositivo não consegue abrir ({{n}}). Se já a apagou, esta é a parte que essa eliminação não conseguiu terminar.",
+    "residueGatedDelete": "Apagá-la permanentemente",
+    "residueGatedHint": "Escreva DELETE para confirmar",
     "cleanUpFiles": "Limpar ficheiros residuais",
     "connect": "Ligar à minha conta",
     "tagline": "Notas markdown encriptadas. Sem email no registo.",
     "startAction": "Criar a sua identidade e cofre",
     "startBody": "Comece de novo neste dispositivo: uma identidade nova e depois o cofre que lhe pertence.",
-    "restoreTitle": "Restaurar a partir de uma cópia de segurança",
     "restoreBody": "Abra um ficheiro .myne-backup que guardou anteriormente.",
-    "joinTitle": "Adicionar este dispositivo a uma conta",
     "joinBody": "Use um cofre que já tem noutro dispositivo.",
     "invitedTitle": "Fui convidado para um cofre",
     "invitedBody": "Configure a identidade a que o convite foi endereçado. Não precisa de um cofre próprio.",
@@ -5858,28 +5613,15 @@
     "accountError": "Não foi possível ler o agrupamento de contas neste dispositivo."
   },
   "join": {
-    "transportError": "Não foi possível contactar esse servidor de sincronização. Verifique o endereço e a sua ligação e tente novamente.",
-    "passwordPlaceholder": "A palavra-passe do seu cofre",
     "waitingHint": "Mantenha este ecrã aberto. Assim que for aprovado, aparece aqui um código de verificação para comparar com o seu outro dispositivo.",
     "verifyBody": "Verifique se este código é o mesmo que aparece no dispositivo a partir do qual aprovou.",
-    "verifyChanged": "O código mudou enquanto o estava a ver. Compare novamente os dois ecrãs. Se continuar a mudar, pare e não continue.",
     "removing": "A remover…",
     "sasMismatch": "Não coincidem, remover este dispositivo",
-    "title": "Ligar à sua conta",
-    "lead": "Introduza os dados da sua conta para trazer as suas notas para este dispositivo. Tudo permanece encriptado de ponta a ponta.",
-    "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Verifique bem este número. Não parece correto.",
-    "approvalHint": "As suas notas aparecem assim que aprovar este dispositivo a partir de um dispositivo que já tem a sua conta.",
-    "connectingSubtitle": "A obter a sua conta e a desbloquear o seu cofre neste dispositivo.",
     "qr": {
-      "confirmAccount": "Conta",
-      "confirmServer": "Servidor",
-      "confirmTitle": "Adicionar este dispositivo?",
-      "continue": "Continuar",
       "expired": "Este QR expirou. Mostre um novo no seu outro dispositivo e leia-o outra vez.",
       "invalid": "Isso não é um QR de dispositivo do Myne.",
+      "legacyAccount": "Este código é de um tipo de conta mais antigo. Peça um convite ao proprietário do cofre.",
       "newerVersion": "Este QR é de uma versão mais recente do Myne. Atualize a aplicação e tente novamente.",
-      "scan": "Ler QR",
       "scanFailed": "Não foi possível ler. Tente novamente ou introduza os seus dados manualmente.",
       "scanUnavailable": "A leitura não está disponível neste dispositivo. Introduza os seus dados abaixo."
     }
@@ -5892,7 +5634,7 @@
     "phraseCopied": "Copiado. Fica neste dispositivo e o sistema descarta-a ao fim de 30 segundos.",
     "phraseCopyFailed": "Não foi possível copiar. Use antes “Guardar num ficheiro”.",
     "savedToFile": "Guardado em {{label}}",
-    "savedToShareSheet": "Guardado dentro do Myne, onde o gestor de ficheiros do sistema não lhe consegue chegar. É um ficheiro de texto simples, por isso, se usar o menu de partilha para colocar uma cópia num local a que consiga aceder, escolha um local que só você consiga ler, e não um serviço na nuvem. Toque novamente em Guardar se tiver fechado o menu.",
+    "savedToShareSheet": "Guardado dentro do Myne, onde nenhum navegador de ficheiros o consegue abrir. É um ficheiro de texto simples, por isso, se o sistema lhe perguntou onde colocar uma cópia e escolheu um local, escolha um sítio a que só você tenha acesso em vez de um serviço na nuvem. Toque novamente em Guardar para trazer a oferta de volta.",
     "savedFileWritten": "Guardado dentro do Myne. É um ficheiro de texto simples, por isso mantenha qualquer cópia que faça num local que só você consiga ler. Este dispositivo não indicou a partir de onde o ficheiro pode ser acedido, por isso trate-o como acessível apenas a partir da aplicação até ter verificado.",
     "saveFileError": "Não foi possível guardar o ficheiro.",
     "stepLabel": "Criar um cofre · {{current}} de {{total}}",
@@ -5905,7 +5647,6 @@
     "showSecondHalf": "Mostrar palavras 13-24",
     "saveToFile": "Guardar num ficheiro",
     "writtenThemDown": "Já as escrevi",
-    "typebackTitle": "Confirme a sua frase",
     "typebackLead": "Introduza estas quatro palavras da frase de recuperação que acabou de guardar.",
     "wordMismatch": "Não corresponde à palavra #{{pos}}",
     "backToPhrase": "Voltar à frase",
@@ -5916,8 +5657,7 @@
     "unlockingSubtitle": "A abrir o seu cofre.",
     "readyTitle": "O seu cofre está pronto",
     "readyBody": "Tudo o que escrever a partir de agora é encriptado neste dispositivo antes de ser armazenado ou sincronizado.",
-    "openVault": "Abrir cofre",
-    "backUpNow": "Fazer backup agora"
+    "openVault": "Abrir cofre"
   },
   "web": {
     "openElsewhere": {
@@ -5965,6 +5705,15 @@
       }
     }
   },
+  "approvalWait": {
+    "approversIntro": "Estes dispositivos podem aprovar este:",
+    "noApprovers": "Nenhum outro dispositivo desta conta o pode aprovar agora. Abra o Myne num dispositivo que já tenha acesso e volte aqui.",
+    "pendingStartOver": "Começar de novo com outra conta",
+    "sasMatch": "Coincidem, continuar",
+    "sasMismatch": "Não coincidem",
+    "verifyBody": "Verifique se este código é o mesmo nos dois dispositivos antes de continuar. Se não for, pare: há um problema na ligação, não na sua palavra-passe.",
+    "verifyTitle": "Compare este código"
+  },
   "screenCaptureEscape": {
     "disableBody": "A proteção contra captura de ecrã pede ao sistema operativo que mantenha esta janela fora das capturas de ecrã e das gravações de ecrã. É eficaz no Windows 10 (atualização de maio de 2020) e posterior; o macOS e o Linux não oferecem uma API de sistema para isto, por isso aí não é possível bloquear a captura. Onde funciona, também esconde a janela de software de ambiente de trabalho remoto e de lupas de ecrã, e é por isso que existe esta saída.",
     "disableConfirm": "Desativar a proteção",
@@ -5980,7 +5729,6 @@
     "savedForNextLaunch": "Guardado. Esta sessão continua com a proteção desativada porque foi iniciada com --disable-screen-capture-protection, por isso ela volta da próxima vez que abrir o Myne sem essa opção."
   },
   "identitySetup": {
-    "doneCta": "Concluído",
     "error": "Não foi possível configurar a identidade. Tente novamente.",
     "intro": "Uma identidade permite que as pessoas enderecem um convite a si antes de possuir um cofre. Não cria nenhum cofre nem guarda notas.",
     "pending": "Este dispositivo está à espera de que outro dispositivo da conta o aprove.",
@@ -5988,9 +5736,7 @@
     "recoverCta": "Recuperar uma identidade",
     "recoverIntro": "Frase de recuperação da identidade",
     "recovered": "Identidade recuperada.",
-    "title": "Criar uma identidade",
     "errorAlreadyHeld": "Este dispositivo já contém uma identidade. Recupere-a com a sua frase de recuperação, ou esqueça-a e crie uma nova.",
-    "forgetCancel": "Mantê-la",
     "forgetConfirm": "Esquecer e criar nova",
     "forgetCta": "Esquecer esta identidade e criar uma nova",
     "forgetWarning": "Isto apaga a identidade contida neste dispositivo. Se não anotou a sua frase de recuperação de 24 palavras, ela perdeu-se: este dispositivo vai perder o acesso a qualquer cofre que ela possua ou a que se tenha juntado, até a recuperar com essa frase. Continue apenas se tiver a certeza.",
@@ -6003,10 +5749,7 @@
     "recoverTitle": "Já tenho uma",
     "recoverHint": "Recupere-a neste dispositivo com a sua frase de recuperação de 24 palavras.",
     "recoverAction": "Recuperar",
-    "back": "Voltar",
-    "phraseTitle": "Guarde a sua frase de identidade",
-    "phraseContinue": "Continuar",
-    "confirmTitle": "Confirmar a sua frase"
+    "phraseTitle": "Guarde a sua frase de identidade"
   },
   "personIdentityCode": {
     "copy": "Copiar código de identidade",
@@ -6021,8 +5764,6 @@
     "invitesLoading": "A verificar convites…",
     "invitesPending": "Este dispositivo está à espera de aprovação. Os convites aparecem aqui quando outro dispositivo seu o aprovar.",
     "invitesUnregistered": "Esta identidade ainda não está registada num servidor de sincronização, por isso nenhum convite pode chegar-lhe.",
-    "noInvites": "Ainda não há convites.",
-    "subtitle": "Tem uma identidade neste dispositivo, por isso as pessoas podem convidá-lo para um cofre. Não precisa de criar um para ser convidado.",
     "accept": "Aceitar",
     "acceptHint": "Cole o código de identidade do proprietário (partilha-o quando o convida).",
     "acceptOwnerCodeLabel": "Código de identidade do proprietário",
@@ -6031,7 +5772,6 @@
     "acceptError": "Não foi possível aceitar o convite.",
     "shareCodeHeading": "O seu código de convite",
     "shareCodeHint": "Partilhe este código com quem o convidar. Contém apenas informação pública (o seu id de identidade e chaves públicas), nunca a sua frase.",
-    "title": "A sua identidade",
     "acceptPasswordNote": "Escolha uma palavra-passe para este dispositivo. É separada da palavra-passe do proprietário do cofre e da sua frase de recuperação: desbloqueia este cofre neste dispositivo, e a sua frase continua a ser a forma portátil de voltar a entrar.",
     "acceptErrorNotFound": "Este convite já não está disponível. Pode já ter sido usado ou retirado. Peça ao proprietário que envie um novo convite.",
     "acceptErrorNotEnrolled": "Este dispositivo não é a identidade a que este convite se destinava. Abra a identidade para a qual o convite foi enviado e depois aceite.",
@@ -6042,7 +5782,7 @@
     "join": "Adicionar a este dispositivo",
     "joinHint": "Este cofre já foi partilhado com a sua identidade. Introduza a sua frase de recuperação para o instalar neste dispositivo.",
     "joinPhraseLabel": "A sua frase de recuperação",
-    "joinPasswordNote": "Escolha uma palavra-passe para este dispositivo. É separada da palavra-passe do proprietário do cofre: desbloqueia este cofre aqui, e a sua frase de recuperação continua a ser a forma portátil de voltar a entrar.",
+    "joinPasswordNote": "Escolha uma palavra-passe para este dispositivo. É separada da palavra-passe do proprietário do cofre, e é a única forma de entrar neste cofre neste dispositivo: se a perder, peça um novo convite ao proprietário.",
     "joinSubmit": "Adicionar e desbloquear",
     "joinError": "Não foi possível adicionar o cofre a este dispositivo.",
     "joinErrorAlreadyHeld": "Este dispositivo já contém este cofre, por isso não há nada para adicionar. Abra o cofre que já tem aqui.",
@@ -6051,14 +5791,9 @@
     "joinErrorNotConfigured": "A sincronização não está configurada neste dispositivo. Configure o seu servidor de sincronização e tente novamente.",
     "joinErrorUnauthenticated": "A sua identidade não tem sessão iniciada neste dispositivo. Desbloqueie a sua identidade e tente novamente.",
     "joinErrorTransport": "Não foi possível alcançar o servidor de sincronização, ou este cofre ainda não está publicado lá. Verifique a sua ligação e tente novamente.",
-    "forgetCancel": "Mantê-la",
     "forgetCheckbox": "Compreendo que esta identidade será removida deste dispositivo.",
     "forgetConfirm": "Esquecer a identidade",
-    "forgetCta": "Esquecer esta identidade neste dispositivo",
     "forgetError": "Não foi possível esquecer a identidade. Tente novamente.",
-    "forgetWarning": "Isto remove a identidade apenas deste dispositivo. A conta no servidor e qualquer cofre que ela possua ou a que se tenha juntado ficam intactos, e pode recuperar a identidade com a sua frase de 24 palavras noutro dispositivo. Se não guardou essa frase, este dispositivo não a conseguirá recuperar.",
-    "registerCta": "Registar esta identidade",
-    "registerContinue": "Continuar",
     "registerSubmit": "Registar",
     "registerError": "Não foi possível registar. Verifique a frase e o endereço do servidor e tente novamente.",
     "registerServerLabel": "Endereço do servidor de sincronização",
@@ -6067,7 +5802,6 @@
     "registerInviteCodeLabel": "Código de convite do servidor",
     "registerInviteCodeHint": "Só se o seu servidor pedir um.",
     "registerServerError": "Não foi possível alcançar esse servidor. Verifique o endereço e tente novamente. As suas palavras continuam aqui.",
-    "accountNumberHeading": "Número de conta",
     "accountNumberHint": "Derivado da sua frase de identidade, por isso não se pode perder, e não é um segredo. Use-o para suporte ou para passagem a um operador de servidor.",
     "copyAccountNumber": "Copiar número de conta",
     "registerPhraseLabel": "A sua frase de identidade, 24 palavras",
@@ -6096,7 +5830,6 @@
     },
     "download": "Descarregar",
     "downloading": "A descarregar…",
-    "cancel": "Cancelar",
     "complete": "Pronto",
     "retry": "Tentar novamente",
     "skip": "Ignorar",
@@ -6119,7 +5852,6 @@
     },
     "deeplink": {
       "body": "Fica fora de qualquer cofre, por isso o Myne não o vai encriptar.",
-      "cancel": "Cancelar",
       "confirm": "Abrir",
       "failed": "Não foi possível abrir o ficheiro. Pode ter sido movido ou alterado.",
       "title": "Abrir este ficheiro local?"
@@ -6140,7 +5872,6 @@
     "unsaved": "Alterações não guardadas"
   },
   "update": {
-    "banner": {},
     "notice": {
       "available": "O Myne {{version}} está disponível.",
       "consequence": "Atualizar bloqueia o seu cofre e reinicia o Myne. As suas notas abertas são guardadas primeiro.",
@@ -6152,41 +5883,39 @@
       "confirmTitle": "Atualizar e reiniciar o Myne?",
       "confirmBody": "O seu cofre será bloqueado e o Myne será reiniciado. Descarregar e instalar pode demorar alguns minutos numa ligação lenta.",
       "confirmPrimary": "Bloquear cofre e atualizar",
-      "cancel": "Cancelar",
       "pill": "Atualização disponível"
     },
     "updating": {
       "eyebrow": "A atualizar",
-      "heading": "A atualizar o Myne",
       "version": "Versão {{version}}",
-      "caption": "A descarregar e a instalar a nova versão.",
-      "hint": "O Myne reinicia sozinho quando isto terminar. Deixe a janela aberta."
+      "progressLabel": "Progresso da atualização",
+      "bytes": "{{done}} transferidos",
+      "bytesOfTotal": "{{done}} de {{total}}"
+    },
+    "phase": {
+      "starting": "A preparar",
+      "downloading": "A transferir",
+      "verifying": "A verificar",
+      "installing": "A instalar"
     },
     "failed": {
-      "eyebrow": "A atualização não terminou",
       "heading": "A atualização não terminou",
       "caption": "O Myne {{version}} continua em execução e as suas notas não foram alteradas.",
-      "hint": "Tentar novamente recomeça a descarga.",
-      "retry": "Tentar novamente",
       "back": "Voltar ao desbloqueio",
       "manual": "Se continuar a acontecer, transfira a nova versão em myne.md e instale-a à mão. A aplicação que tem agora fica intacta."
     }
   },
   "identityFlow": {
-    "title": "Criar uma identidade",
-    "lead": "Uma identidade permite que as pessoas o convidem para um cofre, e permite que uma identidade seja proprietária de muitos cofres. Precisa de um servidor de sincronização para guardar as suas notas encriptadas e o alcançar.",
-    "start": "Criar uma identidade",
-    "skip": "Agora não, usar apenas este dispositivo",
-    "back": "Voltar",
-    "serverUnreachable": "Não foi possível alcançar esse servidor. Verifique o endereço e tente novamente.",
-    "createFailed": "Não foi possível criar a identidade. Verifique o servidor de sincronização e tente novamente.",
-    "server": {
-      "title": "Escolha um servidor de sincronização",
-      "lead": "As suas notas permanecem encriptadas neste dispositivo antes de o deixarem. O servidor guarda apenas texto cifrado.",
-      "urlLabel": "Endereço do servidor",
-      "connect": "Ligar",
-      "connecting": "A ligar…"
+    "fork": {
+      "lead": "Traga a identidade que já tem para este dispositivo, ou comece uma nova.",
+      "words": "Introduzir as minhas 24 palavras",
+      "wordsBody": "A frase de identidade que guardou quando a criou. Não é uma frase de cofre.",
+      "code": "Ler o código do meu outro dispositivo",
+      "codeBody": "Um dispositivo que já tem a sua identidade mostra um código; este entra na conta e aguarda a sua aprovação."
     },
+    "forget": {},
+    "lead": "Uma identidade permite que as pessoas o convidem para um cofre, e permite que uma identidade seja proprietária de muitos cofres. Precisa de um servidor de sincronização para guardar as suas notas encriptadas e o alcançar.",
+    "createFailed": "Não foi possível criar a identidade. Verifique o servidor de sincronização e tente novamente.",
     "held": {
       "title": "Já existe uma identidade neste dispositivo",
       "lead": "Este dispositivo já contém uma identidade. Esquecê-la faz este dispositivo perder o acesso a qualquer cofre que ela possua ou a que se tenha juntado, até a recuperar com a sua frase de 24 palavras. Se não guardou essa frase, não é possível recuperá-la.",
@@ -6205,17 +5934,15 @@
       "typebackLead": "Introduza estas quatro palavras da frase de identidade que acabou de guardar.",
       "wordNumber": "Palavra n.º {{position}}",
       "wordMismatch": "Isso não corresponde à palavra n.º {{pos}}.",
-      "continue": "Continuar"
+      "registerCta": "Guardar e registar",
+      "registerLater": "Mais tarde",
+      "registerHint": "Registar acrescenta esta identidade a {{server}}, o servidor de sincronização que este dispositivo já usa, para que as pessoas a possam convidar e os seus cofres possam sincronizar. Mais tarde mantém-na apenas neste dispositivo, e o ecrã inicial da identidade pode registá-la depois."
     },
+    "typeback": {},
     "home": {
-      "title": "A sua identidade",
       "lead": "As pessoas podem convidá-lo para um cofre. Não precisa de ser proprietário de um cofre para ser convidado.",
-      "codeLabel": "O seu código de identidade",
       "invitesHeading": "Convites",
-      "noInvites": "Ainda não há convites.",
       "inviteHint": "Abra este convite a partir do seletor de cofres para se juntar com a sua frase de identidade.",
-      "forgetHeading": "Este dispositivo",
-      "forget": "Esquecer esta identidade neste dispositivo",
       "forgetCheckbox": "Compreendo que esta identidade será removida deste dispositivo. A conta no servidor sobrevive e a frase recupera-a.",
       "vaultHeading": "Os seus cofres",
       "vaultHint": "A sua identidade pode ter quantos cofres quiser. Cada um tem a sua própria palavra-passe.",
@@ -6223,21 +5950,31 @@
       "registerHint": "Esta identidade ainda não está registada, por isso ninguém o pode convidar e nada sincroniza."
     },
     "register": {
-      "title": "Registar esta identidade",
-      "open": "Registar esta identidade",
       "cta": "Registar",
       "working": "A registar…",
       "failed": "Não foi possível registar esta identidade. Fica neste dispositivo e pode tentar novamente."
     },
     "personJoin": {
+      "inviteLabel": "Código de convite",
+      "inviteHint": "Só se o seu servidor pedir um. A maioria dos servidores deixa entrar um dispositivo que já tem a conta.",
       "title": "Adicionar este telefone à sua conta",
       "lead": "Escreva as 24 palavras da conta de onde veio este código. Depois, um dispositivo já existente aprova este telefone, por isso uma frase sozinha não consegue adicionar um.",
       "phraseLabel": "Frase de identidade",
       "cta": "Adicionar este telefone",
       "working": "A adicionar este telefone…",
       "mismatch": "Essas palavras pertencem a uma identidade diferente da deste código.",
+      "error": {
+        "held": "Este dispositivo já contém uma identidade diferente, por isso não consegue selar esta. Esqueça-a neste dispositivo primeiro e adicione-a novamente.",
+        "inviteRequired": "O seu servidor só admite contas novas com um código de convite. Escreva o código que ele lhe deu e tente novamente.",
+        "inviteInvalid": "Esse código de convite não corresponde ao que o seu servidor espera.",
+        "deviceLimit": "A sua conta atingiu o limite de dispositivos. Remova um dispositivo num dispositivo que já tenha a conta e tente novamente.",
+        "alreadyInstalled": "Este dispositivo já foi admitido nessa conta. Abra-a em vez de a adicionar novamente.",
+        "awaitingApproval": "Este dispositivo foi adicionado e aguarda aprovação num dispositivo que já tem a sua conta.",
+        "accountFrozen": "O seu servidor congelou esta conta. Nada do que escrever aqui muda isso; contacte quem gere o servidor.",
+        "notConfigured": "Defina primeiro o endereço do servidor e depois adicione este dispositivo.",
+        "transport": "Não foi possível contactar o seu servidor. A sua identidade não mudou; tente novamente quando a ligação voltar."
+      },
       "failed": "Não foi possível adicionar este telefone. Verifique as palavras e tente novamente.",
-      "pendingTitle": "À espera de aprovação",
       "pendingLead": "Este telefone foi adicionado e está à espera. Aprove-o num dispositivo que já tenha a sua conta, e este ecrã termina sozinho.",
       "pendingHint": "Nada a fazer aqui até o outro dispositivo aprovar.",
       "sessionEnded": "A espera terminou quando a aplicação fechou. Escreva as suas 24 palavras de novo para continuar.",
@@ -6245,7 +5982,12 @@
       "finishingTitle": "A terminar este dispositivo",
       "finishingLead": "Este telefone foi adicionado à sua conta. Os seus cofres estão a ser obtidos agora; cada um ainda pede a sua própria palavra-passe.",
       "listFailed": "Este telefone foi adicionado, mas os cofres da sua conta não chegaram. Verifique a ligação e tente novamente.",
-      "listRetry": "Obter os cofres novamente"
+      "listRetry": "Obter os cofres novamente",
+      "noVaults": "Este telefone foi adicionado, mas nenhum dos seus cofres pôde ser trazido para ele. Abra esta conta num dispositivo que já tenha um e tente novamente.",
+      "vaultsNoneOnServer": "A sua conta ainda não tem cofres no servidor. Um cofre aparece aqui quando o dispositivo que o contém o publicar.",
+      "vaultsNotHere_one": "{{count}} cofre desta conta não pôde ser trazido para este telefone. Abra esta conta mais uma vez para tentar novamente.",
+      "vaultsNotHere_many": "{{count}} cofres desta conta não puderam ser trazidos para este telefone. Abra esta conta mais uma vez para tentar novamente.",
+      "vaultsNotHere_other": "{{count}} cofres desta conta não puderam ser trazidos para este telefone. Abra esta conta mais uma vez para tentar novamente."
     },
     "unlock": {
       "title": "Desbloquear a sua identidade",
@@ -6263,18 +6005,191 @@
       "working": "A recuperar…",
       "failed": "Não foi possível recuperar uma identidade neste dispositivo. Verifique as 24 palavras e tente novamente."
     },
-    "typeback": {
-      "title": "Confirmar a sua frase"
-    },
     "joinFromQr": {
       "notFound": "Este código nomeia um cofre que não está nos seus convites neste dispositivo. Peça ao proprietário do cofre que volte a enviar o convite para esta identidade."
     }
   },
   "calendar": {
+    "view": {
+      "label": "Vista de calendário",
+      "month": "Mês",
+      "week": "Semana",
+      "day": "Dia",
+      "agenda": "Agenda"
+    },
+    "allDay": "Todo o dia",
+    "untitled": "Evento sem título",
+    "locked": "Desbloqueie o cofre para ver o calendário.",
+    "loadFailed": "Não foi possível ler o calendário. O seu cofre não foi alterado.",
+    "capture": {
+      "on": "Adicionar um evento em {{date}}"
+    },
+    "unreadable": {
+      "heading_one": "{{count}} evento não pôde ser lido",
+      "heading_many": "{{count}} eventos não puderam ser lidos",
+      "heading_other": "{{count}} eventos não puderam ser lidos",
+      "start-missing": "não tem início",
+      "start-unreadable": "o início não é uma data que esta aplicação consiga ler",
+      "end-unreadable": "o fim não é uma data que esta aplicação consiga ler",
+      "end-before-start": "termina antes de começar",
+      "end-time-without-start-time": "tem uma hora de fim e nenhuma hora de início",
+      "calendar-unreadable": "o nome do calendário não é utilizável"
+    },
+    "agendaRange": "Os próximos {{days}} dias",
+    "prev": "Anterior",
+    "next": "Seguinte",
+    "today": "Hoje",
+    "more": "+{{count}} mais",
+    "weekday": {
+      "monday": "Seg",
+      "tuesday": "Ter",
+      "wednesday": "Qua",
+      "thursday": "Qui",
+      "friday": "Sex",
+      "saturday": "Sáb",
+      "sunday": "Dom"
+    },
+    "resize": "Redimensionar {{title}}",
+    "refused": {
+      "value-changed": "Esse evento mudou noutro dispositivo. O calendário mostra onde a nota diz que ele está.",
+      "start-missing": "Essa nota já não tem uma hora de início, por isso não está no calendário.",
+      "base-mismatch": "A nota mudou enquanto o calendário escrevia. Nada foi substituído."
+    },
+    "weekdayLong": {
+      "monday": "segunda-feira",
+      "tuesday": "terça-feira",
+      "wednesday": "quarta-feira",
+      "thursday": "quinta-feira",
+      "friday": "sexta-feira",
+      "saturday": "sábado",
+      "sunday": "domingo"
+    },
     "form": {
+      "title": "Novo evento",
+      "openNote": "Abrir a nota",
+      "eventTitle": "Título do evento",
+      "starts": "Começa",
+      "startDate": "Data de início",
+      "startTime": "Hora de início, ou todo o dia",
+      "ends": "Termina",
+      "endDate": "Data de fim, ou deixe vazio para um único dia",
+      "endTime": "Hora de fim",
+      "addEnd": "Adicionar um fim",
+      "clearEnd": "Remover o fim",
+      "allDay": "Todo o dia",
+      "timed": "A uma hora",
+      "endBeforeStart": "O evento não pode terminar antes de começar. Altere a data de fim.",
+      "repeat": "Repete",
+      "repeatNever": "Nunca",
+      "repeatInterval": "A cada",
+      "repeatWeekdays": "Num dia da semana",
+      "repeatDayOfMonth": "Num dia do mês",
+      "repeatCount": "Quantas vezes",
+      "repeatUnit": "Por quanto tempo",
+      "repeatWeekday": "Dia da semana",
+      "repeatDay": "Dia do mês",
+      "repeatLastDay": "O último dia",
+      "repeatOrdinal": "Qual deles",
+      "decrease": "Diminuir {{label}}",
+      "increase": "Aumentar {{label}}",
+      "remindLabel": "Lembrar",
+      "remind": "Lembrar-me, no máximo {{days}} dias antes",
+      "remindNone": "Sem lembrete",
+      "leadBeyondHorizon": "Um lembrete alcança no máximo {{days}} dias de antecedência. Escolha uma antecedência mais curta.",
+      "titleRequired": "Dê um título ao evento.",
+      "save": "Guardar evento",
+      "unit": {
+        "day": "Dias",
+        "week": "Semanas",
+        "month": "Meses",
+        "year": "Anos"
+      },
+      "ordinal": {
+        "first": "Primeiro",
+        "second": "Segundo",
+        "third": "Terceiro",
+        "fourth": "Quarto",
+        "last": "Último"
+      },
+      "lead": {
+        "10m": "10 minutos antes",
+        "30m": "30 minutos antes",
+        "1h": "1 hora antes",
+        "2h": "2 horas antes",
+        "1d": "1 dia antes",
+        "2d": "2 dias antes",
+        "7d": "1 semana antes",
+        "1m": "1 minuto antes"
+      },
+      "noTime": "Sem hora",
+      "hour": "Hora",
+      "minute": "Minuto",
+      "editTitle": "Editar evento",
+      "calendarLabel": "Calendário",
+      "noCalendar": "Sem calendário",
       "calendarPlaceholder": "Dê um nome a um calendário, por exemplo Pessoal",
       "calendarRequired": "Dê um calendário ao evento. É o que dá cor ao evento e é o que esta vista consegue desligar."
     },
+    "occurrenceOf": "Uma ocorrência de uma série, em {{date}}",
+    "occurrence": {
+      "thisIsOne": "Esta é uma ocorrência de uma série, em {{date}}. Para a alterar, edite a série ou adicione uma ocorrência única neste dia.",
+      "editSeries": "Editar a série",
+      "addOneOff": "Adicionar uma ocorrência única neste dia",
+      "skip": "Cancelar esta",
+      "retime": "Começar esta às",
+      "retimeHint": "Só este dia muda. O resto da série mantém a sua própria hora.",
+      "retimeSave": "Alterar a hora"
+    },
+    "import": "Importar um ficheiro .ics",
+    "export": "Exportar como .ics",
+    "imported": "Importados {{count}} eventos de {{filename}}",
+    "importRefused": {
+      "too-large": "Esse ficheiro é maior do que o Myne lê (1 MiB). Só um ficheiro de calendário desse tamanho é um cofre inteiro, não um horário.",
+      "malformed-property": "Esse ficheiro não é um calendário .ics: há uma linha que não é NAME:value nem NAME;param:value.",
+      "unreadable-start": "Esse ficheiro contém uma hora de início que o Myne não consegue ler, por isso nada foi importado.",
+      "unknown-zone": "Esse ficheiro indica um fuso horário que este dispositivo não conhece, por isso nada foi importado.",
+      "value-shape-mismatch": "Esse ficheiro marca um evento como data e também lhe dá uma hora, por isso nada foi importado.",
+      "unreadable-rule": "Esse ficheiro repete segundo uma regra que o Myne não suporta, por isso nada foi importado.",
+      "missing-start": "Esse ficheiro tem um evento sem hora de início, e um evento sem início não é um lugar num calendário.",
+      "no-events": "Esse ficheiro não contém nenhum evento."
+    },
+    "exported": "Escritos {{count}} eventos em {{filename}}",
+    "exportFailed": "Não foi possível escrever esse ficheiro .ics.",
+    "exportEmpty": "Ainda não há nada no calendário para exportar.",
+    "importedSkipped": "Importados {{count}} eventos de {{filename}}, e deixados de fora os {{skipped}} que este cofre já tem",
+    "title": "Calendário",
+    "close": "Fechar o calendário",
+    "noEvents": "Nada neste dia",
+    "conflict": "sobrepõe-se a outro evento",
+    "composer": {
+      "title": "Novo evento",
+      "titleLabel": "O que é?",
+      "start": "Começa",
+      "end": "Termina (opcional)",
+      "badTime": "Uma hora escreve-se como 09:00, em formato de 24 horas.",
+      "create": "Adicionar ao calendário",
+      "cancel": "Cancelar",
+      "createFailed": "Não foi possível guardar o evento.",
+      "repeatNever": "Uma vez",
+      "repeatDaily": "Diariamente",
+      "repeatWeekly": "Semanalmente",
+      "repeatMonthly": "Mensalmente",
+      "remindNone": "Sem lembrete",
+      "calendarLabel": "Calendário (um nome)",
+      "refused": "Este evento mudou noutro sítio, por isso nada foi guardado. Reabra-o.",
+      "date": "Data",
+      "badDate": "Use AAAA-MM-DD."
+    },
+    "skipFailed": "Não foi possível cancelar essa ocorrência. Continua no calendário.",
+    "taskRow": "Uma tarefa com data limite {date}",
+    "composeOn": "Adicionar um evento em {date}",
+    "calendarsToggle": "Calendários visíveis",
+    "calendarsToggleHelper": "Desmarque um para o retirar desta vista. Nada é apagado.",
     "calendarsToggleFailed": "Esse calendário não foi alterado. Ficou como estava."
+  },
+  "identityForget": {
+    "body": "Isto remove a identidade apenas deste dispositivo. A conta no servidor e qualquer cofre que ela possua ou a que se tenha juntado ficam intactos, e pode recuperar a identidade com a sua frase de 24 palavras noutro dispositivo.",
+    "savedPhraseTail": "Se não guardou essa frase, este dispositivo não conseguirá recuperá-la.",
+    "rosterTail": "Os convites e as ações sobre a lista de membros neste dispositivo vão precisar dela desbloqueada novamente."
   }
 }
