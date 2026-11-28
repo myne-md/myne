@@ -715,7 +715,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
       ]);
       setAsked(null);
     }
-  }, [draft, agent.running, grant, t, ensureCapability, openTurns, activeId, readingDevice]);
+  }, [draft, agent.running, grant, t, ensureCapability, openTurns, activeId, readingDevice, deviceDocs]);
 
   const stop = useCallback(() => {
     // The id may genuinely be null: the window between `beginRun()` and the

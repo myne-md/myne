@@ -935,6 +935,7 @@ export function ChatComposer({
     if (files.length === 0) return;
     if (readingDevice) {
       event.preventDefault();
+      setAttachmentError(t("agent.attachments.readingInProgress"));
       return;
     }
     event.preventDefault();

@@ -846,6 +846,38 @@ describe("AiChatFlow: turn diff and revert icons (myne-md/myne#741)", () => {
     expect(documents).toEqual([{ name: "receipt.png", text: "TOTAL 42.00" }]);
   });
 
+  it("does not send a removed device reading", async () => {
+    mockReadEphemeralFile.mockResolvedValue({
+      name: "receipt.png",
+      text: "TOTAL 42.00",
+      status: "ok",
+      char_count: 11,
+      truncated: false,
+    });
+    agentStart.mockResolvedValue(finished("Added to your expenses."));
+    mount();
+
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "receipt.png", { type: "image/png" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("ai.composer-device-attachment")).toBeTruthy());
+
+    // Withdraw consent for that reading before sending.
+    fireEvent.click(screen.getByTestId("ai.composer-device-attachment-remove"));
+
+    await waitFor(() => expect(screen.queryByTestId("ai.composer-device-attachment")).toBeNull());
+
+    type("add this to my expenses");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    const documents = agentStart.mock.calls[0]![5] as Array<{ name: string; text: string }>;
+    expect(documents).toEqual([]);
+  });
+
   it("refuses a file it cannot read with the reason, and sends nothing", async () => {
     mockReadEphemeralFile.mockResolvedValue({
       name: "scan.pdf",

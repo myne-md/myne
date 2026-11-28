@@ -86,7 +86,8 @@
       "readingDevice": "Reading on this device…",
       "deviceOnly": "Read on this device, never saved",
       "deviceUnsupported": "{{name}} is not a file the agent can read. Photos, PDFs and plain text work.",
-      "deviceFailed": "That file could not be read. Nothing was sent."
+      "deviceFailed": "That file could not be read. Nothing was sent.",
+      "readingInProgress": "Finish the file reading first, then paste again."
     },
     "progress": {
       "working": "Working",
