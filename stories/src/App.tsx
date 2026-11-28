@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Input } from "@app/components/primitives/Input";
 import { Button } from "@app/components/primitives/Button";
+import { HOVER_TRANSITION, hoverSurface } from "@app/components/primitives/hoverSurface";
 import { MyneMark } from "@app/components/primitives/MyneMark";
 import { Select } from "@app/components/primitives/Select";
 import { Icon } from "@app/components/primitives/Icon";
@@ -196,6 +197,25 @@ const RAIL_STYLE: CSSProperties = {
   background: "var(--bg-2)",
 };
 
+/**
+ * A rail row is CHROME, not a quiet action inside a card.
+ *
+ * Idle rows rest flat and answer a pointer by deepening to `--bg-3`, the canon's
+ * clickable-surface affordance and what `hoverSurface` exists for. The ghost
+ * variant's resting fill (`--paper-3` at 70%, 2026-10-23) is right for the
+ * quietest action in a dialog or a card and wrong for a rail: thirty rows
+ * stacked make a wall of capsules with no affordance left, and it eats the hover
+ * step (70% to 100% of the same ramp is about two units of contrast, so the
+ * feedback the canon requires is invisible). The sheet exempts `role="menuitem"`
+ * for exactly this reason; a rail row is that same shape, so this surface opts
+ * out at the call site rather than widening the sheet's exclusion list by one
+ * entry per idiom. The selected row keeps `primary`, which is a selection.
+ */
+const RAIL_ROW_REST: CSSProperties = {
+  background: "transparent",
+  transition: HOVER_TRANSITION,
+};
+
 const GROUP_TITLE_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -375,16 +395,19 @@ function TreeRow({
 
   if (sole) {
     const story = node.stories[0];
+    const selected = story.id === selectedId;
     return (
       <Button
         type="button"
-        variant={story.id === selectedId ? "primary" : "ghost"}
+        variant={selected ? "primary" : "ghost"}
         style={{
           width: "100%",
           justifyContent: "flex-start",
           gap: "var(--space-2)",
           paddingInlineStart: `calc(var(--space-2) + ${indent})`,
+          ...(selected ? {} : RAIL_ROW_REST),
         }}
+        {...(selected ? {} : hoverSurface())}
         onClick={() => onSelect(story.id)}
         data-story-id={story.id}
         data-testid={`stories.item.${node.surface}`}
@@ -404,24 +427,29 @@ function TreeRow({
         <Icon name={entryIcon(node.group)} size={12} />
         {node.name}
       </div>
-      {node.stories.map((story) => (
+      {node.stories.map((story) => {
+        const selected = story.id === selectedId;
+        return (
         <Button
           key={story.id}
           type="button"
-          variant={story.id === selectedId ? "primary" : "ghost"}
+          variant={selected ? "primary" : "ghost"}
           style={{
             width: "100%",
             justifyContent: "flex-start",
             gap: "var(--space-2)",
             paddingInlineStart: `calc(var(--space-5) + ${indent})`,
+            ...(selected ? {} : RAIL_ROW_REST),
           }}
+          {...(selected ? {} : hoverSurface())}
           onClick={() => onSelect(story.id)}
           data-story-id={story.id}
           data-testid={`stories.item.${node.surface}.${story.state}`}
         >
           {story.state}
         </Button>
-      ))}
+        );
+      })}
       {node.children.map((child) => (
         <TreeRow
           key={child.surface}
@@ -1193,7 +1221,11 @@ function nearestNeighbourGap(target: HTMLElement, rect: DOMRect): string {
           onClick={() => select("documentation/welcome/introduction")}
           title="Go to the Welcome page"
           data-testid="stories.wordmark"
-          style={{ justifyContent: "flex-start" }}
+          // The mark is a PLACE, not one of the quiet actions a dialog's ghost
+          // fill exists to make findable; a capsule around a logo reads as a
+          // button. Flat at rest, `--bg-3` under the pointer.
+          style={{ justifyContent: "flex-start", ...RAIL_ROW_REST }}
+          {...hoverSurface()}
         >
           <MyneMark size={20} />
           Myne
@@ -1509,11 +1541,22 @@ function nearestNeighbourGap(target: HTMLElement, rect: DOMRect): string {
                 onClick={() => setTab(entry.id)}
                 role="tab"
                 aria-selected={active}
+                // The idiom the editor's right-panel strip and the settings
+                // modal already use (`SettingsTabs`): a label over an underline,
+                // flat at rest, hover answered with INK rather than a fill.
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.color = "var(--fg-2)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.color = "var(--fg-3)";
+                }}
                 style={{
+                  background: "transparent",
                   borderBlockEnd: active ? "2px solid var(--accent)" : "2px solid transparent",
                   borderRadius: 0,
                   color: active ? "var(--fg-1)" : "var(--fg-3)",
                   fontWeight: active ? "var(--weight-semibold)" : "var(--weight-medium)",
+                  transition: "color var(--duration-fast) var(--ease-standard)",
                 }}
                 data-testid={`stories.tab.${entry.id}`}
               >

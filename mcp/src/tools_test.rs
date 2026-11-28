@@ -8,7 +8,7 @@ use crate::tools::catalog;
 
 /// Written out here on purpose rather than derived from [`catalog`]. A roster
 /// compared against a second copy of itself cannot fail on the drift it exists
-/// for, so the expected set is a literal that a fourteenth verb has to edit.
+/// for, so the expected set is a literal that a thirteenth verb has to edit.
 const EXPECTED_TOOLS: [&str; 13] = [
     "note_search",
     "note_read",

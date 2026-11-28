@@ -12,7 +12,7 @@ export interface SourceReference {
 
 export const SOURCE_MAP: Record<string, SourceReference> = {
   "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 181 },
-  "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 212 },
+  "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 213 },
   "ActionStatus": { file: "src/components/ActionStatus.tsx", line: 153 },
   "AgentConversationView": { file: "src/notes/agent/AgentConversationView.tsx", line: 66 },
   "AgentFootprint": { file: "src/notes/agent/components/AgentFootprint.tsx", line: 132 },
@@ -208,7 +208,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "SettingsSearch": { file: "src/components/settings/search/SettingsSearch.tsx", line: 84 },
   "SettingsSearchResults": { file: "src/components/settings/search/SettingsSearchResults.tsx", line: 62 },
   "SettingsSection": { file: "src/components/settings/SettingsSection.tsx", line: 155 },
-  "SettingsTabs": { file: "src/components/settings/SettingsTabs.tsx", line: 211 },
+  "SettingsTabs": { file: "src/components/settings/SettingsTabs.tsx", line: 209 },
   "SidebarSearchRow": { file: "src/notes/components/SidebarSearchRow.tsx", line: 62 },
   "Skeleton": { file: "src/components/primitives/Skeleton.tsx", line: 31 },
   "SkipToContent": { file: "src/components/SkipToContent.tsx", line: 63 },

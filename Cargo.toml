@@ -32,7 +32,7 @@
 # anchor describe the artefact mobile actually ships. The in-repo Tauri plugins are
 # listed explicitly rather than left to cargo's automatic path-dependency
 # membership, because this list is the documented source of truth (AGENTS.md).
-members = ["src-tauri", "protocol", "core", "format", "decrypt", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "mcp", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-device-key", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders", "mobile/src-tauri/tauri-plugin-sensitive-clipboard", "mobile/src-tauri/tauri-plugin-save-file"]
+members = ["src-tauri", "protocol", "core", "format", "decrypt", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "mcp", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-device-key", "mobile/src-tauri/tauri-plugin-label-store", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders", "mobile/src-tauri/tauri-plugin-sensitive-clipboard", "mobile/src-tauri/tauri-plugin-save-file"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

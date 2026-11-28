@@ -149,6 +149,10 @@ pub mod rng;
 /// Top-level rather than under `plugins/` for the reason `vault_label` is:
 /// the plugin, the setup hook and the lock path all consume it and none owns it.
 pub mod screen_capture_override;
+// The two facts every Secret Service caller must agree about (myne-md/myne#1091): item
+// attributes and the closed failure classification. Linux-only, like the dependency.
+#[cfg(target_os = "linux")]
+pub(crate) mod secret_service_shared;
 pub mod task;
 // The full-text search engine (MYS1) + its encrypted persistence/reconcile core.
 // Top-level (not under `plugins/`) mirroring the desktop `mod search;` it

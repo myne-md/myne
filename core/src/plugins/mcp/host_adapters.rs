@@ -137,6 +137,23 @@ impl McpNoteSource for VaultNoteSource<'_> {
         }
     }
 
+    /// The by-id verbs' facts, read from the note's own bytes: the index above is
+    /// the WebView's, so this is the answer for a note it has not indexed yet. It
+    /// decrypts ONE note, and only after the index has already missed it.
+    async fn derived_note(
+        &self,
+        note_id: &str,
+    ) -> Result<Option<super::tools::NoteFacts>, McpToolError> {
+        match self.read_body(note_id).await {
+            Ok(body) => Ok(super::tools::note_facts_from_body(&body)),
+            // Only "there is no such note" reads as absence. Every other failure
+            // stays a failure: a locked vault answered as `None` would tell a
+            // caller its note is gone.
+            Err(McpToolError::UnknownNote { .. }) => Ok(None),
+            Err(other) => Err(other),
+        }
+    }
+
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, McpToolError> {
         self.ensure_unlocked().await?;
         // De-duplicated by note id, highest rank kept. One note can own several
@@ -214,9 +231,22 @@ impl McpNoteSource for VaultNoteSource<'_> {
             ) => Err(McpToolError::CalendarWindowTooWide {
                 max_days: u32::try_from(max_days).unwrap_or(u32::MAX),
             }),
+            // A window the calendar could not read is the caller's own malformed
+            // range, and it has its own reason: folding it into "this device cannot
+            // answer right now" told the caller to unlock a vault that is already
+            // unlocked, which is a loop with no exit (myne-md/myne#1231).
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::CalendarWindowUnreadable,
+            ) => Err(McpToolError::CalendarWindowUnreadable),
             // Everything else is "this device cannot answer right now": a locked
-            // vault, an unreadable meta, an index that is not there.
-            Err(_) => Err(McpToolError::VaultUnavailable),
+            // vault, an unreadable meta, an index that is not there. Spelled out
+            // rather than left to a wildcard, so a variant added to the calendar's
+            // own error type cannot silently inherit the wrong sentence.
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::SlotNotUnlocked
+                | crate::plugins::vault_indices::error::VaultIndicesError::InvalidVaultMeta
+                | crate::plugins::vault_indices::error::VaultIndicesError::PersistIo,
+            ) => Err(McpToolError::VaultUnavailable),
         }
     }
 
@@ -229,8 +259,8 @@ impl McpNoteSource for VaultNoteSource<'_> {
             .saved_views
             .into_iter()
             .map(|view| ViewRow {
-                view_id: view.id,
-                name: view.name,
+                view_id: view.id.clone(),
+                name: view.name.clone(),
                 view_type: match view.view_type {
                     protocol::saved_view::ViewType::Table => "table",
                     protocol::saved_view::ViewType::Cards => "cards",
@@ -238,6 +268,11 @@ impl McpNoteSource for VaultNoteSource<'_> {
                     protocol::saved_view::ViewType::Board => "board",
                 }
                 .to_string(),
+                // The same predicate the field write uses, so "approved" here and the
+                // refusal there cannot disagree: one implementation, in the protocol
+                // crate, reading the same stored map.
+                approved: protocol::view_manifest::is_view_approved(&prefs.view_approvals, &view),
+                write_fields: view.write_fields.clone(),
             })
             .collect())
     }
@@ -460,6 +495,58 @@ impl VaultNoteWriter<'_> {
     }
 }
 
+/// The host's field-write refusals, mapped onto the closed set a caller can act on.
+///
+/// A free function rather than a closure inside the trait impl so the mapping can
+/// be tested variant by variant: a caller told `vault_unavailable` for "the view is
+/// not approved" retries forever, which is the failure the calendar window had
+/// (myne-md/myne#1231) and this is the same shape of hole.
+///
+/// The two deliberate collapses, both stated: `FieldChanged` becomes
+/// [`McpToolError::NoteChanged`] because the next action is identical (read the
+/// note again), and the five "this device cannot answer right now" variants become
+/// [`McpToolError::VaultUnavailable`] because the caller's request is fine and no
+/// differently-worded request would be served.
+pub(super) fn set_field_refusal(
+    error: crate::plugins::notes::error::NoteSetFieldError,
+    note: &str,
+    view: &str,
+    field: &str,
+) -> McpToolError {
+    use crate::plugins::notes::error::NoteSetFieldError;
+    match error {
+        NoteSetFieldError::NotApproved => McpToolError::ViewNotApproved {
+            view_id: view.to_string(),
+        },
+        NoteSetFieldError::FieldNotDeclared => McpToolError::FieldNotWritable {
+            field: field.to_string(),
+        },
+        NoteSetFieldError::FieldReserved => McpToolError::FieldReserved {
+            field: field.to_string(),
+        },
+        NoteSetFieldError::InvalidField => McpToolError::InvalidField {
+            field: field.to_string(),
+        },
+        NoteSetFieldError::ValueTooLarge => McpToolError::ValueTooLarge,
+        NoteSetFieldError::FieldChanged => McpToolError::NoteChanged {
+            note_id: note.to_string(),
+        },
+        NoteSetFieldError::LiveSessionOpen => McpToolError::NoteOpenInEditor {
+            note_id: note.to_string(),
+        },
+        NoteSetFieldError::InvalidNoteId | NoteSetFieldError::NoteNotFound => {
+            McpToolError::UnknownNote {
+                note_id: note.to_string(),
+            }
+        }
+        NoteSetFieldError::VaultLocked
+        | NoteSetFieldError::CannotDecrypt
+        | NoteSetFieldError::PrefsUnreadable
+        | NoteSetFieldError::Io { .. }
+        | NoteSetFieldError::JoinFailure => McpToolError::VaultUnavailable,
+    }
+}
+
 #[async_trait]
 impl super::intent::McpNoteWriter for VaultNoteWriter<'_> {
     async fn capture_restore_point(
@@ -531,6 +618,50 @@ impl super::intent::McpNoteWriter for VaultNoteWriter<'_> {
             );
             McpToolError::VaultUnavailable
         })
+    }
+
+    /// The host's own field write, with its refusals mapped onto the closed set an
+    /// external caller can act on.
+    ///
+    /// **Every refusal keeps its own name**, which is the whole reason this maps
+    /// rather than folds: "the view is not approved" and "the field is a marker"
+    /// and "the value changed" have three different next actions, and a caller
+    /// told `vault_unavailable` for all three would retry forever. The one
+    /// deliberate collapse is `FieldChanged` onto [`McpToolError::NoteChanged`]:
+    /// same next action (read the note again), and the surface already has that
+    /// word for it.
+    async fn set_field(
+        &self,
+        note: &str,
+        view: &str,
+        field: &str,
+        expected_value: Option<&str>,
+        value: &str,
+    ) -> Result<(), McpToolError> {
+        match crate::plugins::notes::commands::note_set_field_from_host(
+            self.host,
+            self.state,
+            self.hooks,
+            note.to_string(),
+            view.to_string(),
+            field.to_string(),
+            expected_value.map(str::to_string),
+            value.to_string(),
+            self.io,
+            self.registry,
+        )
+        .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                tracing::warn!(
+                    target: "myne_core::mcp",
+                    event = "mcp_set_field_refused",
+                    error_kind = crate::plugins::notes::error::note_set_field_error_kind(&error)
+                );
+                Err(set_field_refusal(error, note, view, field))
+            }
+        }
     }
 
     async fn overwrite_note(

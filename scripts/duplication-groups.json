@@ -763,6 +763,20 @@
         "copies": 7,
         "verdict": "justified",
         "reason": "A normalised-skeleton false positive across seven PrefsView fixture literals: the matcher ignores field names, so it sees the same shape repeated once per test that needs a populated view. The fixtures deliberately spell out every member (no `..Default::default()`) so a new prefs member fails to compile until each test's expectation is decided, which is the compile-time drift lock the sync classification relies on. Consolidating them into one builder would restore the silent default the lock exists to prevent (myne-md/myne#1074)."
+      },
+      {
+        "id": "mcp/src/tool_list.rs #1",
+        "lines": 39,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "The catalog is a CONSTANT EXPRESSION by design: scripts/check-mcp-tool-surface.mjs refuses format!/concat!/include_str!/env! in this file, because a description a note or the environment could contribute to is the tool-poisoning path the surface exists to close. So the repeated json! envelope cannot be factored into a builder, and what the detector sees is one hand-written literal per verb, which is what makes a verb reviewable in one place. myne-md/myne#1232."
+      },
+      {
+        "id": "mcp/src/tool_list.rs #2",
+        "lines": 35,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "The catalog is a CONSTANT EXPRESSION by design: scripts/check-mcp-tool-surface.mjs refuses format!/concat!/include_str!/env! in this file, because a description a note or the environment could contribute to is the tool-poisoning path the surface exists to close. So the repeated json! envelope cannot be factored into a builder, and what the detector sees is one hand-written literal per verb, which is what makes a verb reviewable in one place. myne-md/myne#1232."
       }
     ],
     "baseline": [
@@ -815,7 +829,6 @@
       "core/src/plugins/live/session_test.rs #3",
       "core/src/plugins/live/session_test.rs #4",
       "core/src/plugins/live/session_test.rs #5",
-      "core/src/plugins/mcp/anchor_test.rs",
       "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #1",
       "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #2",
       "core/src/plugins/memory/commands.rs",
@@ -912,7 +925,6 @@
       "editor/src/slash/plugin.ts + editor/src/template-tokens/plugin.ts + editor/src/wikilink/picker.ts #2",
       "editor/src/slash/plugin.ts + editor/src/wikilink/picker.ts #1",
       "editor/src/slash/plugin.ts + editor/src/wikilink/picker.ts #2",
-      "mcp/src/tool_list.rs",
       "mobile/src/app/flows/AiHistorySheet.tsx + mobile/src/app/flows/MemorySheet.tsx",
       "mobile/src/app/flows/AttachmentsSheet.tsx",
       "mobile/src/app/flows/CreateVaultFlow.tsx + mobile/src/app/flows/IdentityFlow.tsx",

@@ -48,7 +48,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::error::McpToolError;
-use super::scope::{folder_key_of, ConnectionScope};
+use super::scope::ConnectionScope;
 use super::tools::McpNoteSource;
 use super::write_scope::{WriteRoute, WriteScope};
 use crate::folder_key::canonical_input_folder;
@@ -77,6 +77,53 @@ pub struct NoteAppendRequest {
     pub note_id: String,
     /// Markdown to add at the end.
     pub markdown: String,
+}
+
+/// `note_set_field`'s arguments, exactly as the compiled catalog declares them.
+///
+/// `view_id` is what makes this verb safe to offer. A note's properties are
+/// writable only through a saved view that DECLARES the field writable and is
+/// approved on this device, which is the host's rule (`notes::commands::
+/// note_set_field_from_host`) and not one this surface may relax: a view is data
+/// that can arrive from another person's file, so the authority to write a
+/// property is the host's. A wire verb with no view would have to invent that
+/// authority, which is why this one carries the id a caller gets from `view_list`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoteSetFieldRequest {
+    /// The note whose field changes.
+    pub note_id: String,
+    /// The saved view whose approved declaration authorises this write, as
+    /// `view_list` reports it.
+    pub view_id: String,
+    /// The frontmatter field to set. Must be a plain key.
+    ///
+    /// Two names are refused: the five working-set markers (`trashed`, `deleted`,
+    /// `archived`, `template`, `conflict`), because setting one is how a note leaves
+    /// the note list and this surface has no delete; and `folder`, because that is a
+    /// move and `note_move` is the verb that checks both the folder a note leaves and
+    /// the one it lands in.
+    pub field: String,
+    /// The value to give the field.
+    pub value: String,
+    /// The value the caller believes is on disk. Omit it to mean "the field is
+    /// absent". A mismatch is refused rather than overwritten, which is how a
+    /// concurrent change to the same field is caught without new machinery.
+    #[serde(default)]
+    pub expected_value: Option<String>,
+}
+
+/// What a field write answered with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFieldNote {
+    /// The note that changed.
+    pub note_id: String,
+    /// The field that was set, echoed so a caller that sent several writes can
+    /// tell the answers apart.
+    pub field: String,
+    /// The folder the note lives in, canonical (`projects/`, the root as `""`).
+    pub folder: String,
 }
 
 /// What a create answered with.
@@ -159,6 +206,25 @@ pub trait McpNoteWriter: Send + Sync {
         note: &str,
         plaintext: &str,
         expected_base_hash_hex: &str,
+    ) -> Result<(), McpToolError>;
+    /// Set one frontmatter field through an approved view's declaration.
+    ///
+    /// The view's approval, its `write_fields` list, the reserved-marker refusal
+    /// and the value precondition are the host's checks, not this surface's: the
+    /// splice is quoting-sensitive and `frontmatter_patch::set_string_field` is
+    /// the one implementation of it (`notes::commands::note_set_field`'s own doc
+    /// says this verb is what it exists for).
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one call, five facts, no struct: the caller has all five already"
+    )]
+    async fn set_field(
+        &self,
+        note: &str,
+        view: &str,
+        field: &str,
+        expected_value: Option<&str>,
+        value: &str,
     ) -> Result<(), McpToolError>;
 }
 
@@ -254,6 +320,64 @@ pub async fn note_append(
     }))
 }
 
+/// `note_set_field`: one frontmatter field, through a view that declares it.
+///
+/// The order is [`gate_existing`]'s, then the write. Nothing is re-derived here
+/// about which fields are writable: the host command owns the approval, the
+/// declaration, the reserved-marker refusal and the value precondition, and a
+/// second copy of any of them would be a second answer to a consent question.
+/// What this function adds is the two scopes and the restore point.
+pub async fn note_set_field(
+    read: &ConnectionScope,
+    write: &WriteScope,
+    request: NoteSetFieldRequest,
+    source: &dyn McpNoteSource,
+    writer: &dyn McpNoteWriter,
+) -> Result<WriteAnswer<SetFieldNote>, McpToolError> {
+    read.require_granted()?;
+    write.require_granted()?;
+    // Two field names this verb may not carry, checked before the note because both
+    // are request facts: a refusal costs no read and no restore point, and neither can
+    // become a proposal for something the surface will not do.
+    //
+    // `folder` is a MOVE, and this gate reads the note's CURRENT folder only, so a
+    // view declaring it writable would let a caller land the note anywhere — outside
+    // the write grant included. `note_edit` refuses the same outcome as
+    // [`McpToolError::EditWouldMove`], and the wording fits here too.
+    //
+    // The markers are the app's own working-set roster, and setting one is a delete in
+    // the only sense this surface could have. The host reserves three of the five and
+    // refuses them even when a view declares them; the two it does not reserve
+    // (`template`, `conflict`) are refused here, so the promise holds for all five.
+    let field = request.field.trim();
+    if field == "folder" {
+        return Err(McpToolError::EditWouldMove);
+    }
+    if crate::plugins::agent::hide::WORKING_SET_FIELDS.contains(&field) {
+        return Err(McpToolError::FieldReserved {
+            field: request.field.clone(),
+        });
+    }
+    let folder_key = match gate_existing(read, write, &request.note_id, source, writer).await? {
+        Gate::Queued(folder) => return Ok(WriteAnswer::Queued { folder }),
+        Gate::Writable(folder) => folder,
+    };
+    writer
+        .set_field(
+            &request.note_id,
+            &request.view_id,
+            &request.field,
+            request.expected_value.as_deref(),
+            &request.value,
+        )
+        .await?;
+    Ok(WriteAnswer::Applied(SetFieldNote {
+        note_id: request.note_id,
+        field: request.field,
+        folder: folder_key,
+    }))
+}
+
 /// What the shared gate decided about a write that targets an EXISTING note.
 pub(super) enum Gate {
     /// Both scopes allow it and a restore point was taken.
@@ -280,12 +404,25 @@ pub(super) async fn check_existing(
     source: &dyn McpNoteSource,
 ) -> Result<Gate, McpToolError> {
     let records = source.records().await?;
-    let record = records
-        .get(note_id)
-        .ok_or_else(|| McpToolError::UnknownNote {
+    // The same seam the read verbs use: the index when it carries the note, the
+    // note itself when it does not. Without it a write against a note created a
+    // moment ago by another connection (or by `myne new`, or by a sync pull)
+    // answered `unknown_note`, which turned the write surface into a set of verbs
+    // that only worked on notes somebody had already opened in the editor.
+    let Some(facts) = super::tools::facts_for(&records, source, note_id).await? else {
+        return Err(McpToolError::UnknownNote {
             note_id: note_id.to_string(),
-        })?;
-    let folder_key = folder_key_of(record);
+        });
+    };
+    // The liveness rule before the scope, as every read verb applies it: a write gate
+    // that CONFIRMED a hidden note instead would let a client change a note it cannot
+    // read, and the fallback above is what made that reachable for unindexed notes.
+    if !facts.live {
+        return Err(McpToolError::UnknownNote {
+            note_id: note_id.to_string(),
+        });
+    }
+    let folder_key = facts.folder_key();
     if !read.covers_key(&folder_key) {
         return Err(McpToolError::OutOfScopeNote {
             note_id: note_id.to_string(),
