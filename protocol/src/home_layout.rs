@@ -369,7 +369,10 @@ mod tests {
         // client in another order still parses to the value a save would produce.
         let bytes = br#"[{"id":"q","kind":"markdown","options":{"z":"1","a":"2"}}]"#;
         let (parsed, _) = parse_home_cards_array(bytes).unwrap();
-        assert_eq!(parsed, alloc::vec![with_options("q", "markdown", &[("a", "2"), ("z", "1")])]);
+        assert_eq!(
+            parsed,
+            alloc::vec![with_options("q", "markdown", &[("a", "2"), ("z", "1")])]
+        );
         let mut out = Vec::new();
         push_home_cards(&mut out, &parsed);
         let (again, _) = parse_home_cards_array(&out).unwrap();
@@ -393,7 +396,10 @@ mod tests {
         );
         let (parsed, _) = parse_home_cards_array(bytes.as_bytes()).unwrap();
         // The half-quote is gone; the rest of the widget's settings survive.
-        assert_eq!(parsed, alloc::vec![with_options("q", "markdown", &[("align", "left")])]);
+        assert_eq!(
+            parsed,
+            alloc::vec![with_options("q", "markdown", &[("align", "left")])]
+        );
     }
 
     #[test]
@@ -410,7 +416,9 @@ mod tests {
             .collect();
         assert!(!home_cards_are_writable(&cards));
         // And the sum is what caught it: every single card is within its own bound.
-        assert!(cards.iter().all(|c| c.options.len() <= MAX_HOME_CARD_OPTIONS));
+        assert!(cards
+            .iter()
+            .all(|c| c.options.len() <= MAX_HOME_CARD_OPTIONS));
         assert!(home_options_bytes(&cards) > MAX_HOME_OPTIONS_BYTES);
     }
 

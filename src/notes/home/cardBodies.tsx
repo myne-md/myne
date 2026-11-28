@@ -757,9 +757,20 @@ function SyncStatusBody({ card }: { card: HomeCard }) {
   const { status, syncNow, busy } = useSyncStatus();
   // One mapping for every client: the sentence a home widget shows is the same
   // one the sync panel shows (myne-md/myne#1027).
-  const view = syncStatusView(status, t);
+  // `status` is null until the first read resolves, and a story host that never
+  // answers leaves it undefined: the shared mapping takes null, so normalise
+  // rather than letting a missing field crash the widget.
+  // A status SHAPE this build does not know (a newer host, or a host that answers
+  // with nothing) leaves the shared mapping with no arm to take and no view to
+  // return, and a card that crashes the board over that is worse than one that
+  // says nothing. Normalised here rather than in the mapping, because every other
+  // consumer renders the mapping's own answer and this one has to survive a host.
+  const view = syncStatusView(status ?? null, t) ?? null;
   return (
     <>
+      {view === null ? (
+        <Empty text={t("notes.home.cards.syncStatusHint")} />
+      ) : (
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <span
           style={{
@@ -772,7 +783,8 @@ function SyncStatusBody({ card }: { card: HomeCard }) {
         />
         <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>{view.label}</span>
       </div>
-      {view.syncNowUseful && (
+      )}
+      {view !== null && view.syncNowUseful && (
         <Button variant="ghost" disabled={busy} onClick={() => void syncNow()}>
           {t("notes.home.cards.syncNow")}
         </Button>
