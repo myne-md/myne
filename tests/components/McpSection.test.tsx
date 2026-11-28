@@ -397,7 +397,7 @@ describe("the approval dialog", () => {
     expect(screen.getByTestId("settings.mcp-whole-vault").getAttribute("data-whole-vault")).toBe(
       "true",
     );
-    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("Every folder");
+    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain("Every existing folder");
     // Whole-vault-off: the counted paragraph renders the plural scopeLine, so
     // the new two-sentence wording must reach the screen (not the retired
     // three-clause text).
@@ -538,6 +538,8 @@ describe("the approval dialog", () => {
 
     const scope = await screen.findByTestId("settings.mcp-scope-line");
     await waitFor(() => expect(scope.textContent).toContain("create later"));
+    expect(scope.textContent).toContain("readable and writable");
+    expect(scope.textContent).toContain("not writable until you name it");
     expect(
       (screen.getByTestId("settings.mcp-approve") as HTMLButtonElement).disabled,
     ).toBe(false);

@@ -3928,7 +3928,7 @@
         "wholeVaultLabel": "Read and write the whole vault",
         "excludeLabel": "Leave out",
         "excludeNothing": "None left out",
-        "scopeLineAll": "Every folder, including ones you create later, is readable. Leave one out below to exclude it from reads and writes. Only the folders you name are writable.",
+        "scopeLineAll": "Every existing folder is readable and writable unless you leave it out below. A folder you create later is readable, but not writable until you name it.",
         "writeRestore": "A write keeps a restore point you can take back."
       },
       "autoApplyLabel": "Apply suggested tags automatically",
