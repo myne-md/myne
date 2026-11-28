@@ -3937,7 +3937,6 @@
         },
         "wholeVaultLabel": "Læs og skriv hele boksen",
         "excludeNothing": "Intet holdt udenfor",
-        "scopeLineAll": "Når hver note i boksen, også i mapper du opretter senere, og kan ændre enhver af dem.",
         "scopeLine": "Når {{count}} noter i {{folders}} mapper og kan ændre alt i dem.",
         "toolsNote": "Læsning har et budget: op til {{count}} noter pr. {{minutes}} minutter.",
         "needsReapproval": "Godkendt af en ældre version, under den modsatte regel. Denne build læser intet for den, før du godkender igen.",

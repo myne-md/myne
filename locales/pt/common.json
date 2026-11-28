@@ -4071,7 +4071,6 @@
         },
         "wholeVaultLabel": "Ler e escrever o cofre inteiro",
         "excludeNothing": "Nenhuma de fora",
-        "scopeLineAll": "Alcança cada nota do cofre, incluindo as de pastas que criar mais tarde, e pode alterar qualquer uma delas.",
         "scopeLine": "Alcança {{count}} notas em {{folders}} pastas, e pode alterar tudo dentro delas.",
         "toolsNote": "As leituras têm um limite: até {{count}} notas por cada {{minutes}} minutos.",
         "needsReapproval": "Aprovado por uma versão mais antiga, sob a regra contrária. Esta compilação não lê nada por ele até o aprovar outra vez.",

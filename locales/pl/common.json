@@ -4205,7 +4205,6 @@
         },
         "wholeVaultLabel": "Czytaj i zapisuj cały sejf",
         "excludeNothing": "Nic nie pominięto",
-        "scopeLineAll": "Dociera do każdej notatki w sejfie, także w folderach utworzonych później, i może zmienić każdą z nich.",
         "scopeLine": "Dociera do {{count}} notatek w {{folders}} folderach i może zmienić wszystko, co zawierają.",
         "toolsNote": "Odczyty są limitowane: do {{count}} notatek na {{minutes}} minut.",
         "needsReapproval": "Zatwierdzone przez starszą wersję, według odwrotnej reguły. Ta kompilacja nic dla niego nie czyta, dopóki nie zatwierdzisz ponownie.",

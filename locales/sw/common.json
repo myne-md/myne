@@ -3937,7 +3937,6 @@
         },
         "wholeVaultLabel": "Soma na uandike kasha zima",
         "excludeNothing": "Hakuna kilichoachwa nje",
-        "scopeLineAll": "Inafikia kila noti kwenye kasha, ikiwa ni pamoja na folda unazounda baadaye, na inaweza kubadilisha yoyote.",
         "scopeLine": "Inafikia noti {{count}} katika folda {{folders}}, na inaweza kubadilisha chochote ndani yao.",
         "toolsNote": "Usomaji una kikomo: hadi noti {{count}} kwa kila dakika {{minutes}}.",
         "needsReapproval": "Ilidhinishwa na toleo la zamani chini ya kanuni iliyo kinyume. Toleo hili halisomi chochote kwa ajili yake hadi uidhinishe tena.",

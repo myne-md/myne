@@ -3937,7 +3937,6 @@
         },
         "wholeVaultLabel": "De hele kluis lezen en schrijven",
         "excludeNothing": "Niets buiten gelaten",
-        "scopeLineAll": "Bereikt elke notitie in de kluis, ook in mappen die je later aanmaakt, en kan ze allemaal wijzigen.",
         "scopeLine": "Bereikt {{count}} notities in {{folders}} mappen, en kan alles daarin wijzigen.",
         "toolsNote": "Lezen is begroot: tot {{count}} notities per {{minutes}} minuten.",
         "needsReapproval": "Goedgekeurd door een oudere versie, onder de omgekeerde regel. Deze build leest er niets voor tot je opnieuw goedkeurt.",

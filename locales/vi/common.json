@@ -3937,7 +3937,6 @@
         },
         "wholeVaultLabel": "Đọc và ghi toàn bộ kho",
         "excludeNothing": "Không để ra ngoài",
-        "scopeLineAll": "Với tới mọi ghi chú trong kho, kể cả trong thư mục bạn tạo sau này, và có thể thay đổi bất kỳ ghi chú nào.",
         "scopeLine": "Với tới {{count}} ghi chú trong {{folders}} thư mục, và có thể thay đổi mọi thứ trong đó.",
         "toolsNote": "Lượt đọc có hạn mức: tối đa {{count}} ghi chú mỗi {{minutes}} phút.",
         "needsReapproval": "Được một phiên bản cũ phê duyệt theo quy tắc ngược lại. Bản dựng này không đọc gì cho nó cho tới khi bạn phê duyệt lại.",

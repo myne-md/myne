@@ -4071,7 +4071,6 @@
         },
         "wholeVaultLabel": "Leggi e scrivi tutto il caveau",
         "excludeNothing": "Nessuna esclusa",
-        "scopeLineAll": "Raggiunge ogni nota del caveau, comprese quelle nelle cartelle che creerai dopo, e può modificarle tutte.",
         "scopeLine": "Raggiunge {{count}} note in {{folders}} cartelle e può cambiare qualunque cosa al loro interno.",
         "toolsNote": "Le letture hanno un budget: fino a {{count}} note ogni {{minutes}} minuti.",
         "needsReapproval": "Approvato da una versione precedente, con la regola opposta. Questa build non legge nulla per lui finché non lo approvi di nuovo.",

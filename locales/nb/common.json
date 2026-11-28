@@ -3932,7 +3932,6 @@
         "excludeNothing": "Ingenting holdt utenfor",
         "needsReapproval": "Godkjent av en eldre versjon, under den motsatte regelen. Denne builden leser ingenting for den før du godkjenner på nytt.",
         "scopeLine": "Når {{count}} notater i {{folders}} mapper, og kan endre alt i dem.",
-        "scopeLineAll": "Når hvert notat i hvelvet, også i mapper du lager senere, og kan endre hvilket som helst av dem.",
         "scopeLineWords": "Når mappene du oppgir, og kan endre alt i dem.",
         "toolsNote": "Lesing har et budsjett: opptil {{count}} notater per {{minutes}} minutter.",
         "verb": {

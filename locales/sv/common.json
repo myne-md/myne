@@ -3937,7 +3937,6 @@
         },
         "wholeVaultLabel": "Läs och skriv hela valvet",
         "excludeNothing": "Inget utanför",
-        "scopeLineAll": "Når varje anteckning i valvet, även i mappar du skapar senare, och kan ändra vilken som helst av dem.",
         "scopeLine": "Når {{count}} anteckningar i {{folders}} mappar och kan ändra allt i dem.",
         "toolsNote": "Läsningar har en budget: upp till {{count}} anteckningar per {{minutes}} minuter.",
         "needsReapproval": "Godkänd av en äldre version, under den motsatta regeln. Den här bygget läser inget för den förrän du godkänner igen.",
