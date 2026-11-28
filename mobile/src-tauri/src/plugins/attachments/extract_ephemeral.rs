@@ -24,9 +24,6 @@ pub enum EphemeralSource {
         bytes: Vec<u8>,
         filename: Option<String>,
     },
-    Path {
-        path: String,
-    },
 }
 
 #[derive(Debug, Serialize)]
@@ -108,21 +105,6 @@ fn read_source(source: EphemeralSource) -> Result<(Zeroizing<Vec<u8>>, Option<St
                 return Err("oversize".to_string());
             }
             Ok((Zeroizing::new(bytes), filename))
-        }
-        EphemeralSource::Path { path } => {
-            let p = std::path::PathBuf::from(path);
-            let name = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|s| s.to_string());
-            let len = std::fs::metadata(&p)
-                .map_err(|_| "unreadable".to_string())?
-                .len();
-            if len as usize > MAX_ATTACHMENT_IMPORT_LEN {
-                return Err("oversize".to_string());
-            }
-            let bytes = std::fs::read(&p).map_err(|_| "unreadable".to_string())?;
-            Ok((Zeroizing::new(bytes), name))
         }
     }
 }

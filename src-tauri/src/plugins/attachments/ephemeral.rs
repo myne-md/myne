@@ -28,18 +28,13 @@ use zeroize::Zeroizing;
 
 /// Where the bytes came from. The webview sends `bytes` (a picked file, a pasted
 /// image, a capture from `<input capture>`) in the SAME shape `attachment_import`
-/// takes, so one marshalling contract serves both; `path` exists for the drag and
-/// drop lane, where the host already holds a path and copying 64 MiB through the
-/// webview would be a copy for nothing.
+/// takes, so one marshalling contract serves both.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EphemeralSource {
     Bytes {
         bytes: Vec<u8>,
         filename: Option<String>,
-    },
-    Path {
-        path: String,
     },
 }
 
@@ -64,8 +59,6 @@ pub struct EphemeralExtract {
 pub enum EphemeralError {
     /// The payload is larger than an attachment may ever be.
     Oversize { cap_bytes: usize },
-    /// The path lane could not read its file.
-    Unreadable,
 }
 
 impl std::fmt::Display for EphemeralError {
@@ -73,7 +66,6 @@ impl std::fmt::Display for EphemeralError {
         // DENY-list clean: no path, no raw io::Error.
         match self {
             Self::Oversize { cap_bytes } => write!(f, "oversize:{cap_bytes}"),
-            Self::Unreadable => f.write_str("unreadable"),
         }
     }
 }
@@ -123,25 +115,6 @@ fn read_source(
                 });
             }
             Ok((Zeroizing::new(bytes), filename))
-        }
-        EphemeralSource::Path { path } => {
-            let p = std::path::PathBuf::from(path);
-            let name = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|s| s.to_string());
-            // A size probe first: a multi-GB file would otherwise be read into
-            // RAM in full before the cap could refuse it.
-            let len = std::fs::metadata(&p)
-                .map_err(|_| EphemeralError::Unreadable)?
-                .len();
-            if len as usize > MAX_ATTACHMENT_IMPORT_LEN {
-                return Err(EphemeralError::Oversize {
-                    cap_bytes: MAX_ATTACHMENT_IMPORT_LEN,
-                });
-            }
-            let bytes = std::fs::read(&p).map_err(|_| EphemeralError::Unreadable)?;
-            Ok((Zeroizing::new(bytes), name))
         }
     }
 }
@@ -203,35 +176,6 @@ mod tests {
             filename: None,
         });
         assert!(matches!(read, Err(EphemeralError::Oversize { .. })));
-    }
-
-    #[test]
-    fn a_path_that_does_not_exist_is_unreadable() {
-        let err = read_source(EphemeralSource::Path {
-            path: "/nonexistent/myne/definitely-not-here.txt".into(),
-        })
-        .unwrap_err();
-        assert!(matches!(err, EphemeralError::Unreadable));
-    }
-
-    #[test]
-    fn a_real_file_reads_through_the_path_lane() {
-        let dir = std::env::temp_dir().join("myne-ephemeral-test");
-        std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("groceries.md");
-        std::fs::write(&file, "- milk\n- bread\n").unwrap();
-        let out = attachment_extract_ephemeral_blocking(EphemeralSource::Path {
-            path: file.to_string_lossy().into_owned(),
-        });
-        assert_eq!(out.status, "ok");
-        assert!(out.text.contains("milk"));
-        assert_eq!(out.name, "groceries.md");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    fn attachment_extract_ephemeral_blocking(source: EphemeralSource) -> EphemeralExtract {
-        let (bytes, filename) = read_source(source).expect("source reads");
-        extract_ephemeral(filename, &bytes)
     }
 
     #[test]
