@@ -70,6 +70,14 @@ in this repository.
   vulnerability.
 - Commits carry a `Signed-off-by:` trailer (DCO). The project does not use a
   CLA.
+- GitHub text is for the next developer. A PR body states what changed and why
+  in two or three sentences, then the commands you ran. Use one thought per
+  sentence, active voice and no em or en dashes. Open with what the PR does,
+  not with a commit count or a tagline. Use plain bullets instead of bolded
+  commit subjects as headings.
+- Do not open a stacked PR. Start every branch at the default branch and target
+  every PR at the default branch. If a change depends on unmerged work, wait for
+  it to land or keep both changes in the same PR.
 - Run the narrowest relevant check before committing: `pnpm test <path>` for a
   TypeScript change, `cargo test -p <crate>` for Rust, and the repo guards in
   `scripts/` when a path or licence changes.

@@ -530,6 +530,31 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "settings/accountpanel/no-store",
+    group: "settings",
+    surface: "AccountPanel",
+    state: "no-store",
+    description:
+      "Settings → Account on a device with no OS store for the grouping: the account number still renders, and one sentence names the reason the roster is absent. It is the state a Linux desktop with no Secret Service daemon or a Windows build whose DPAPI store is unreachable takes, and the shape this catalogue never had, which is why a blank panel shipped unnoticed (myne-md/myne#1091). Look for the number's copy control being present and for the sentence naming the machine rather than the vault.",
+    tags: ["settings", "account", "device-local", "no-store", "account-number", "linux"],
+    fixture: {
+      description: "one unlocked vault whose device has no OS store for the grouping",
+      handlers: {
+        ...PREFS_FIXTURE.handlers,
+        "plugin:account|account_list": () => [],
+        "plugin:vault-label|vault_label_keychain_status": () => ({ available: false }),
+        // A real number, because the description promises the copy control and the
+        // panel renders that control only for a non-null value.
+        "plugin:sync|sync_person_account_number": () => "XX95H84N8WE46C6KXRN2",
+      },
+    },
+    render: () => (
+      <Frame>
+        <AccountPanel vaultId={FIXTURE_VAULT_ID} />
+      </Frame>
+    ),
+  },
+  {
     id: "settings/browserextensionspanel/default",
     // A `role="switch"` whose value is unresolved: this story does not answer
     // the command that drives the install toggle, so `checked` is not a boolean

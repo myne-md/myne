@@ -103,7 +103,7 @@ function connection(overrides: Record<string, unknown> = {}) {
       { verb: "vault_state", enabled: true, availableInBuild: true, isWrite: false },
       { verb: "note_create", enabled: true, availableInBuild: true, isWrite: true },
       { verb: "note_append", enabled: true, availableInBuild: true, isWrite: true },
-      { verb: "note_set_field", enabled: false, availableInBuild: false, isWrite: false },
+      { verb: "note_set_field", enabled: true, availableInBuild: true, isWrite: true },
       { verb: "note_move", enabled: true, availableInBuild: true, isWrite: true },
       { verb: "note_edit", enabled: true, availableInBuild: true, isWrite: true },
       // The four reads that joined in myne-md/myne#1077, in the host catalog's own
@@ -409,12 +409,20 @@ describe("the approval dialog", () => {
     );
     fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
-    // The switches are the host's catalog, and one verb this build cannot serve
-    // is off with a reason rather than offered as a control that does nothing.
-    expect(screen.getAllByTestId("settings.mcp-tool")).toHaveLength(13);
-    expect(
-      (screen.getByTestId("settings.mcp-tool-note_set_field") as HTMLInputElement).disabled,
-    ).toBe(true);
+    // The switches are the host's catalog, and every one of them is a verb this
+    // build serves. The bank once carried a row that could be turned on and then
+    // answered version skew, which `mcp/src/surface_test.rs` now makes impossible.
+    const toolRows = screen.getAllByTestId("settings.mcp-tool");
+    expect(toolRows).toHaveLength(13);
+    // Not one row is disabled, because not one row is a verb this build cannot
+    // serve: `mcp/src/surface_test.rs` makes the advertised-and-unserved state
+    // unreachable.
+    for (const row of toolRows) {
+      const verb = row.getAttribute("data-verb") as string;
+      expect(
+        (screen.getByTestId(`settings.mcp-tool-${verb}`) as HTMLInputElement).disabled,
+      ).toBe(false);
+    }
 
     // Leave one folder out, which under this reading is the exclusion list.
     fireEvent.click(screen.getByTestId("settings.mcp-access-picker-toggle"));
@@ -720,7 +728,7 @@ describe("the approval dialog", () => {
       "claude-desktop",
       ["Private/"],
       ["Projects/", "Projects/New/", "Work/"],
-      ["note_create", "note_append", "note_move", "note_edit"],
+      ["note_create", "note_append", "note_set_field", "note_move", "note_edit"],
     );
   });
 
@@ -748,7 +756,7 @@ describe("the approval dialog", () => {
       "claude-desktop",
       ["Private/", "Projects/New/", "Work/"],
       ["Projects/"],
-      ["note_create", "note_append", "note_move", "note_edit"],
+      ["note_create", "note_append", "note_set_field", "note_move", "note_edit"],
     );
   });
 

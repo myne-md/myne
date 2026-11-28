@@ -14,6 +14,7 @@
 //! hold two documents for the same note FIRST, so a fixture that could not reach
 //! the duplicated state would fail here rather than pass and prove nothing.
 
+use super::error::McpToolError;
 use super::host_adapters::{door_call, DoorContext, VaultNoteSource};
 use super::tools::{McpCallOutcome, McpNoteSource};
 use crate::host::test_host::TestHost;
@@ -64,6 +65,114 @@ fn source<'a>(
         indices,
         search,
         io: &StdVaultIo,
+    }
+}
+
+// ── a bad window is the caller's problem, not the vault's ──────────────────
+
+/// A reversed calendar range is answered with its OWN reason.
+///
+/// The host distinguished it already (`VaultIndicesError::CalendarWindowUnreadable`,
+/// myne-md/myne#1037); this door folded every non-`TooWide` failure into
+/// `vault_unavailable`, whose sentence tells the caller to unlock the vault and
+/// retry. For a `from` later than `to` that is the wrong next action and a loop with
+/// no exit, so the reason has to survive the mapping (myne-md/myne#1231).
+#[test]
+fn a_reversed_calendar_window_names_the_window_rather_than_the_vault() {
+    let (state, rt) = unlocked_state();
+    let host = TestHost::new(std::env::temp_dir());
+    let indices = VaultIndicesState::default();
+    let search = SearchIndexState::default();
+    let source = source(&host, &state, &indices, &search);
+
+    let error = rt
+        .block_on(source.calendar("2026-12-31", "2026-01-01"))
+        .expect_err("a window whose end precedes its start cannot be answered");
+
+    assert_eq!(
+        error,
+        McpToolError::CalendarWindowUnreadable,
+        "a reversed range must not be reported as a locked vault"
+    );
+    let sentence = error.message();
+    assert!(
+        !sentence.contains("unlock the vault"),
+        "the sentence sends the caller to unlock a vault that is already unlocked: {sentence}"
+    );
+    assert!(
+        sentence.contains("start") && sentence.contains("end"),
+        "the sentence must name the bound the caller got wrong: {sentence}"
+    );
+}
+
+/// And the window that IS too wide keeps its own reason, so the two refusals are
+/// not one refusal wearing two names.
+#[test]
+fn a_window_wider_than_the_bound_still_names_the_bound() {
+    let (state, rt) = unlocked_state();
+    let host = TestHost::new(std::env::temp_dir());
+    let indices = VaultIndicesState::default();
+    let search = SearchIndexState::default();
+    let source = source(&host, &state, &indices, &search);
+
+    let error = rt
+        .block_on(source.calendar("2020-01-01", "2026-01-01"))
+        .expect_err("six years is wider than this surface reads in one call");
+
+    match error {
+        McpToolError::CalendarWindowTooWide { max_days } => {
+            assert_eq!(max_days, 366, "the bound the pane and the phone use");
+        }
+        other => panic!("expected a width refusal, got {other:?}"),
+    }
+}
+
+// ── every field-write refusal keeps its own name ───────────────────────────
+
+/// The field write's mapping, variant by variant.
+///
+/// Written as a list of (host refusal, expected wire reason) rather than as a
+/// match, because the assertion that matters is not "it compiles" but "each of the
+/// fourteen arrives as the reason whose sentence names the right next action". The
+/// calendar window's reversed range reached a client as "unlock the vault" for
+/// exactly this reason (myne-md/myne#1231); a field write has more ways to be
+/// refused than a date range does.
+#[test]
+fn every_field_write_refusal_is_mapped_to_the_reason_it_earned() {
+    use crate::io_failure_kind::IoFailureKind;
+    use crate::plugins::notes::error::NoteSetFieldError;
+
+    let cases: Vec<(NoteSetFieldError, &str)> = vec![
+        (NoteSetFieldError::NotApproved, "view_not_approved"),
+        (NoteSetFieldError::FieldNotDeclared, "field_not_writable"),
+        (NoteSetFieldError::FieldReserved, "field_reserved"),
+        (NoteSetFieldError::InvalidField, "invalid_field"),
+        (NoteSetFieldError::ValueTooLarge, "value_too_large"),
+        (NoteSetFieldError::FieldChanged, "note_changed"),
+        (NoteSetFieldError::LiveSessionOpen, "note_open_in_editor"),
+        (NoteSetFieldError::InvalidNoteId, "unknown_note"),
+        (NoteSetFieldError::NoteNotFound, "unknown_note"),
+        (NoteSetFieldError::VaultLocked, "vault_unavailable"),
+        (NoteSetFieldError::CannotDecrypt, "vault_unavailable"),
+        (NoteSetFieldError::PrefsUnreadable, "vault_unavailable"),
+        (
+            NoteSetFieldError::Io {
+                io_error_kind: IoFailureKind::Other,
+            },
+            "vault_unavailable",
+        ),
+        (NoteSetFieldError::JoinFailure, "vault_unavailable"),
+    ];
+    for (error, expected) in cases {
+        let described = format!("{error:?}");
+        let mapped = super::host_adapters::set_field_refusal(error, "n", "v", "status");
+        assert_eq!(
+            mapped.reason(),
+            expected,
+            "{described} was mapped to {} instead of {expected}, and a caller acts on the \
+             reason",
+            mapped.reason()
+        );
     }
 }
 

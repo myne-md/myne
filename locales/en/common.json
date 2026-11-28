@@ -3225,6 +3225,7 @@
       "standaloneHelper": "This vault is not grouped under an account on this device, so it stands on its own. Grouping is per device: another device may show it inside one.",
       "unresolvedHelper": "Working out which vault is open…",
       "devicesNote": "Devices, shared-vault members and your identity are managed in Sync.",
+      "noStoreHelper": "This device has no OS key store, so it cannot keep the account grouping. Vaults open on their own here, and another device may show them together.",
       "groupingError": "Could not read the account grouping on this device. Nothing was changed."
     },
     "vault": {
@@ -5888,6 +5889,7 @@
     },
     "form": {
       "title": "New event",
+      "openNote": "Open note",
       "eventTitle": "Event title",
       "starts": "Starts",
       "startDate": "Start date",

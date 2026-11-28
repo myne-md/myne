@@ -20,6 +20,7 @@ import { CMEditor } from "@myne/editor";
 import i18n from "../i18n";
 import { Icon } from "../components/primitives/Icon";
 import { Button } from "../components/primitives/Button";
+import { hoverSurface } from "../components/primitives/hoverSurface";
 import { IconButton } from "../components/primitives/IconButton";
 import { StatusMark } from "../components/Spinner";
 import { MIN_TARGET } from "../components/primitives/targetSize";
@@ -219,6 +220,7 @@ export function PlainFileScreen() {
             alignItems: "center",
             gap: "var(--space-1)",
             overflowX: "auto",
+            overflowY: "hidden",
             minWidth: 0,
           }}
         >
@@ -253,16 +255,17 @@ export function PlainFileScreen() {
                 {/* The tab WIDGET: `<Button variant="ghost">` carrying
                     `role="tab"`, so it is the primitive rather than a
                     hand-rolled control while keeping the tab semantics. The
-                    variant supplies the hover surface; the inline style strips
-                    the button padding and inherits the tab's own type, so the
-                    row keeps painting the active-tab background
-                    (myne-md/myne#788). */}
+                    inline style strips the button padding and inherits the
+                    tab's type, so the row keeps painting the active-tab
+                    background (myne-md/myne#788). Hover is asked for here,
+                    because `role="tab"` is exempt from ghost's resting fill. */}
                 <Button
                   variant="ghost"
                   role="tab"
                   aria-selected={isActive}
                   data-testid="plain-file.tab"
                   onClick={() => setActive(file.handle)}
+                  {...hoverSurface()}
                   style={{
                     ...MIN_TARGET,
                     padding: 0,

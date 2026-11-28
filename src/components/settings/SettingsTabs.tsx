@@ -145,23 +145,21 @@ const BAND_STYLE: CSSProperties = {
   borderBottom: "1px solid var(--line-1)",
   background: "var(--bg-2)",
   overflowX: "auto",
+  // An unpaired `overflow-x` computes `overflow-y` to `auto`, which put a
+  // scrollbar over the tabs (2026-11-27); `TabStrip` pairs them for this reason.
+  overflowY: "hidden",
 };
 
-// Inline tabs, not boxed ones (myne-md/myne#885 visual pass): a label and an
-// underline, the idiom the editor's right-panel strip already uses, so the app has
-// one answer to "which tab is this". The underline is the accent because the
-// active topic is a selection in the same sense as the sidebar's active row,
-// which `docs/design/README.md` already gives the accent; a `--paper-3` box read
-// as a pressed button rather than as a place.
-//
-// The underline is ONE element that slides between tabs (see `INDICATOR_STYLE`),
-// not a border per tab, so a topic change moves the mark rather than blinking it
-// off one tab and on another. `borderRadius: 0` because a rounded corner under
-// an underline is a box again. The inline `background` overrides the ghost
-// variant's hover fill on purpose; hover answers with ink instead (below).
-//
-// Idle tabs are `--fg-3`, a step dimmer than the active `--fg-1` with `--fg-2`
-// left between them for hover, so the three states are three distinct inks.
+// Inline tabs, not boxed ones (myne-md/myne#885): a label and an underline, the
+// idiom the editor's right-panel strip already uses, so the app has one answer
+// to "which tab is this". The underline is the accent, and it is ONE element
+// that slides (see `INDICATOR_STYLE`) rather than a border per tab, so a topic
+// change moves the mark instead of blinking it off one tab and on another.
+// `borderRadius: 0` because a rounded corner under an underline is a box again,
+// and the inline `background` overrides the ghost variant's hover fill on
+// purpose: hover answers with ink (below). Idle tabs are `--fg-3`, a step dimmer
+// than the active `--fg-1` with `--fg-2` between them, so the three states are
+// three distinct inks.
 const TAB_BASE_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
   background: "transparent",

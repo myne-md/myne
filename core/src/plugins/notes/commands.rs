@@ -1851,10 +1851,20 @@ fn patch_one_field(
     expected_value: Option<&str>,
 ) -> Result<Vec<u8>, NoteSetFieldError> {
     let current = super::frontmatter_patch::read_string_field(plaintext, field);
-    let current_cmp = current
-        .as_deref()
-        .map(super::frontmatter_patch::compare_key);
-    if current_cmp != expected_value.map(str::to_string) {
+    // An omitted expectation means the field is ABSENT, so the KEY answers it: the
+    // reader's `None` also covers a block scalar, and comparing two of those would
+    // let a caller overwrite a multi-line property it believed was not there.
+    let matches = match expected_value {
+        None => !super::frontmatter_patch::has_field(plaintext, field),
+        Some(expected) => {
+            current
+                .as_deref()
+                .map(super::frontmatter_patch::compare_key)
+                .as_deref()
+                == Some(expected)
+        }
+    };
+    if !matches {
         tracing::debug!(
             stage = "value_guard",
             outcome = "mismatch",
@@ -4601,6 +4611,25 @@ mod tests {
                 "other keys survive: {after}"
             );
             assert!(after.contains("status: done"), "field created: {after}");
+        }
+
+        /// "Omit the expected value to mean the field is absent" is a promise about
+        /// the KEY: a block-scalar property reads as no scalar, so without a
+        /// presence check an omitted expectation would overwrite it.
+        #[test]
+        fn a_block_scalar_is_present_and_refuses_an_absent_expectation() {
+            let (tmp, state) = seed(
+                "set-field-block-scalar",
+                "---\nstatus: |\n  one\n  two\n---\n\nbody\n",
+                view(&["status"]),
+                approved(),
+                false,
+            );
+            let before = read_note(tmp.path());
+            let err = set_field(&tmp, &state, VIEW_ID, "status", None, "done")
+                .expect_err("a block scalar is a present field, not an absent one");
+            assert_eq!(err, NoteSetFieldError::FieldChanged);
+            assert_eq!(read_note(tmp.path()), before, "nothing may be written");
         }
 
         /// The CRDT arm: the same command, the same checks, no snapshot (its
