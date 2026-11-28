@@ -32,7 +32,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ArchiveSettings": { file: "src/components/settings/ArchiveSettings.tsx", line: 29 },
   "AttachmentCompressionSettings": { file: "src/components/settings/AttachmentCompressionSettings.tsx", line: 33 },
   "AttachmentOcrSettings": { file: "src/components/settings/AttachmentOcrSettings.tsx", line: 30 },
-  "AttachmentPickerDialog": { file: "src/notes/components/AttachmentPickerDialog.tsx", line: 45 },
+  "AttachmentPickerDialog": { file: "src/notes/components/AttachmentPickerDialog.tsx", line: 50 },
   "AttachmentsLibrary": { file: "src/components/attachments/AttachmentsLibrary.tsx", line: 308 },
   "AttachmentSyncProgress": { file: "src/components/attachments/AttachmentSyncProgress.tsx", line: 147 },
   "AttachmentThumbnail": { file: "src/components/attachments/AttachmentThumbnail.tsx", line: 188 },

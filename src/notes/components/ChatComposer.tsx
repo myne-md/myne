@@ -821,7 +821,10 @@ export function ChatComposer({
         setReadingDocs(false);
       }
     }
-    attachments = attachments.slice(0, MAX_RUN_ATTACHMENTS);
+    if (attachments.length > MAX_RUN_ATTACHMENTS) {
+      setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
+      return;
+    }
     setMessage("");
     setBusy(true);
     try {
@@ -930,6 +933,10 @@ export function ChatComposer({
   ): Promise<void> {
     const files = Array.from(event.clipboardData?.files ?? []);
     if (files.length === 0) return;
+    if (readingDevice) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     setAttachmentError(null);
     const room = MAX_RUN_ATTACHMENTS - attachedDocs.length - deviceDocs.length - pasting.length;
@@ -1379,6 +1386,7 @@ export function ChatComposer({
           icon="plus"
           label={t("agent.attachments.attach")}
           tooltip
+          disabled={readingDevice}
           expanded={attachmentPickerOpen}
           testId="ai.composer-attach"
           onClick={() => setAttachmentPickerOpen(true)}
@@ -1536,6 +1544,7 @@ export function ChatComposer({
         open={attachmentPickerOpen}
         onClose={() => setAttachmentPickerOpen(false)}
         selectedIds={attachedDocs.map((doc) => doc.id)}
+        reservedSlots={deviceDocs.length + pasting.length}
         onPick={(entries) => {
           // **Merge, not replace** (review round five). The picker lists the
           // LIBRARY, so a file already attached from a paste is not among its
@@ -1545,12 +1554,19 @@ export function ChatComposer({
           setAttachedDocs((docs) => {
             const byId = new Map(docs.map((doc) => [doc.id, doc]));
             for (const entry of entries) byId.set(entry.id, entry);
-            return [...byId.values()].slice(
-              0,
-              Math.max(0, MAX_RUN_ATTACHMENTS - deviceDocs.length - pasting.length),
-            );
+            const merged = [...byId.values()];
+            if (
+              merged.length + deviceDocs.length + pasting.length >
+              MAX_RUN_ATTACHMENTS
+            ) {
+              setAttachmentError(
+                t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }),
+              );
+              return docs;
+            }
+            setAttachmentError(null);
+            return merged;
           });
-          setAttachmentError(null);
         }}
       />
     </div>
