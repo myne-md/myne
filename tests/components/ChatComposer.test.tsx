@@ -1612,3 +1612,38 @@ describe("ChatComposer: device readings are capped (myne-md/myne#58)", () => {
     );
   });
 });
+
+describe("ChatComposer: device readings keyed by id (myne-md/myne#58)", () => {
+  it("two files sharing a basename render two chips; removing one leaves the other and sends the survivor", async () => {
+    readEphemeralFile.mockResolvedValue({
+      name: "image.jpg",
+      text: "hi",
+      status: "ok",
+      char_count: 2,
+      truncated: false,
+    });
+    agentStart.mockResolvedValue(STEP);
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = [
+      new File(["x"], "image.jpg", { type: "image/jpeg" }),
+      new File(["y"], "image.jpg", { type: "image/jpeg" }),
+    ];
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(2),
+    );
+    const removes = screen.getAllByTestId("ai.composer-device-attachment-remove");
+    fireEvent.click(removes[0]);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(1),
+    );
+    type("go");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    const documents = agentStart.mock.calls[0]![5] as Array<{ name: string; text: string }>;
+    expect(documents).toEqual([{ name: "image.jpg", text: "hi" }]);
+  });
+});

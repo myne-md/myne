@@ -402,7 +402,7 @@ export function ChatComposer({
   const [attachedDocs, setAttachedDocs] = useState<CatalogEntry[]>([]);
   /** Read for this message and never stored; `{ name, text }` is the payload an
    *  imported document contributes, so the run cannot tell them apart. */
-  const [deviceDocs, setDeviceDocs] = useState<EphemeralReading[]>([]);
+  const [deviceDocs, setDeviceDocs] = useState<(EphemeralReading & { id: string })[]>([]);
   const [readingDevice, setReadingDevice] = useState(false);
   const deviceInput = useRef<HTMLInputElement | null>(null);
   const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
@@ -903,7 +903,13 @@ export function ChatComposer({
       }
       if (readings.length > 0)
         setDeviceDocs((rows) =>
-          [...rows, ...readings].slice(
+          [
+            ...rows,
+            ...readings.map((reading) => ({
+              ...reading,
+              id: crypto.randomUUID(),
+            })),
+          ].slice(
             0,
             Math.max(0, MAX_RUN_ATTACHMENTS - attachedDocs.length - pasting.length),
           ),
@@ -1269,7 +1275,7 @@ export function ChatComposer({
           ))}
           {deviceDocs.map((doc) => (
             <span
-              key={doc.name}
+              key={doc.id}
               data-testid="ai.composer-device-attachment"
               data-device-name={doc.name}
               style={{
@@ -1298,7 +1304,7 @@ export function ChatComposer({
                 label={t("agent.attachments.remove", { name: doc.name })}
                 iconSize={12}
                 testId="ai.composer-device-attachment-remove"
-                onClick={() => setDeviceDocs((rows) => rows.filter((row) => row.name !== doc.name))}
+                onClick={() => setDeviceDocs((rows) => rows.filter((row) => row.id !== doc.id))}
               />
             </span>
           ))}

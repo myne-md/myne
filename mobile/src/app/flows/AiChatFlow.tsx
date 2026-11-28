@@ -305,7 +305,7 @@ export function AiChatFlow({
   /** Read for this message and never stored: a receipt photographed on the way
    *  into a question. `{ name, text }` is the payload an imported document
    *  contributes, so the run cannot tell the two apart. */
-  const [deviceDocs, setDeviceDocs] = useState<EphemeralReading[]>([]);
+  const [deviceDocs, setDeviceDocs] = useState<(EphemeralReading & { id: string })[]>([]);
   const [readingDevice, setReadingDevice] = useState(false);
   /** Why the last pickup produced nothing. A caption above the composer, which
    *  is where the chips that would have appeared are. */
@@ -602,7 +602,13 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           }
           readings.push(reading);
         }
-        if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings].slice(0, MAX_RUN_ATTACHMENTS));
+        if (readings.length > 0)
+          setDeviceDocs((rows) =>
+            [
+              ...rows,
+              ...readings.map((reading) => ({ ...reading, id: crypto.randomUUID() })),
+            ].slice(0, MAX_RUN_ATTACHMENTS),
+          );
       } finally {
         setReadingDevice(false);
         // Or picking the same file twice fires no `change` event.
@@ -1083,7 +1089,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
       {deviceDocs.length > 0 || readingDevice || deviceError !== null ? (
         <div data-testid="ai.composer-device-attachments" style={DEVICE_CHIPS_STYLE}>
           {deviceDocs.map((doc) => (
-            <span key={doc.name} data-testid="ai.composer-device-attachment" data-device-name={doc.name}>
+            <span key={doc.id} data-testid="ai.composer-device-attachment" data-device-name={doc.name}>
               <Icon name="file-text" size={12} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {doc.name}
@@ -1094,7 +1100,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
                 full={false}
                 data-testid="ai.composer-device-attachment-remove"
                 aria-label={t("agent.attachments.remove", { name: doc.name })}
-                onClick={() => setDeviceDocs((rows) => rows.filter((row) => row.name !== doc.name))}
+                onClick={() => setDeviceDocs((rows) => rows.filter((row) => row.id !== doc.id))}
                 style={{ padding: "0 var(--space-1)", height: 24 }}
               >
                 <Icon name="x" size={12} />
