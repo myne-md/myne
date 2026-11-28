@@ -252,11 +252,6 @@ export function minSpanOf(kind: string): number {
   return homeCardSpec(kind)?.minSpan ?? 1;
 }
 
-/** The label key for a kind, falling back to the "unknown" label. */
-export function homeCardLabelKey(kind: string): string {
-  return homeCardSpec(kind)?.labelKey ?? "notes.home.cards.unknown";
-}
-
 /**
  * The default surface: what a vault that has never arranged one gets.
  *
@@ -306,7 +301,7 @@ export function resolveHomeCards(
  * `kind` identifies the renderer and `id` identifies the card, which is exactly
  * the distinction the codec's comment draws.
  */
-export function nextCardId(kind: string, taken: readonly HomeCard[]): string {
+function freshId(kind: string, taken: readonly HomeCard[]): string {
   const used = new Set(taken.map((card) => card.id));
   if (!used.has(kind)) return kind;
   for (let n = 2; ; n += 1) {
@@ -319,7 +314,7 @@ export function nextCardId(kind: string, taken: readonly HomeCard[]): string {
 export function newHomeCard(kind: string, taken: readonly HomeCard[]): HomeCard {
   const spec = homeCardSpec(kind);
   return {
-    id: nextCardId(kind, taken),
+    id: freshId(kind, taken),
     kind,
     span: spec?.defaultSpan ?? 1,
     options: { ...(spec?.defaultOptions ?? {}) },

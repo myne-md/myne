@@ -42,7 +42,7 @@ import { useWorkspace } from "../workspaceContext";
 import { createNote } from "../createNote";
 import { recentNoteIds } from "../recentNotes";
 import type { HomeCard } from "../../lib/prefs";
-import { homeCardSpec } from "./homeCards";
+
 import { useHomeLayout } from "./HomeLayoutContext";
 
 /** How many rows a widget shows before it stops being a summary. */
@@ -900,20 +900,5 @@ export const HOME_CARD_DEFS: Readonly<Record<string, HomeCardDef>> = {
   "sync-status": { Body: SyncStatusBody },
   "agent-prompt": { Body: AgentPromptBody, HeaderAction: CardHeaderAction },
 };
-
-/** Every kind this module can draw, for the registry/renderer agreement test. */
-export function renderedKinds(): readonly string[] {
-  return Object.keys(HOME_CARD_DEFS);
-}
-
-/** Whether a kind has a renderer in this build. */
-export function hasRenderer(kind: string): boolean {
-  return HOME_CARD_DEFS[kind] !== undefined;
-}
-
-/** The widget's title, resolved through the registry (kept here for the surface). */
-export function cardLabelKey(kind: string): string {
-  return homeCardSpec(kind)?.labelKey ?? "notes.home.cards.unknown";
-}
 
 export type { HomeCard };
