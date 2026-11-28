@@ -821,6 +821,7 @@ export function ChatComposer({
         setReadingDocs(false);
       }
     }
+    attachments = attachments.slice(0, MAX_RUN_ATTACHMENTS);
     setMessage("");
     setBusy(true);
     try {
@@ -869,7 +870,7 @@ export function ChatComposer({
   async function readDeviceFiles(files: File[]): Promise<void> {
     if (files.length === 0) return;
     setAttachmentError(null);
-    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length - deviceDocs.length;
+    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length - deviceDocs.length - pasting.length;
     if (room <= 0) {
       setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
       return;
@@ -897,7 +898,13 @@ export function ChatComposer({
         }
         readings.push(reading);
       }
-      if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings].slice(0, MAX_RUN_ATTACHMENTS));
+      if (readings.length > 0)
+        setDeviceDocs((rows) =>
+          [...rows, ...readings].slice(
+            0,
+            Math.max(0, MAX_RUN_ATTACHMENTS - attachedDocs.length - pasting.length),
+          ),
+        );
     } finally {
       setReadingDevice(false);
       // Or picking the same file twice fires no `change` event.
@@ -925,7 +932,7 @@ export function ChatComposer({
     if (files.length === 0) return;
     event.preventDefault();
     setAttachmentError(null);
-    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length;
+    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length - deviceDocs.length - pasting.length;
     if (room <= 0) {
       setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
       return;
@@ -968,7 +975,10 @@ export function ChatComposer({
         });
       }
       setAttachedDocs((docs) =>
-        [...docs, ...imported].slice(0, MAX_RUN_ATTACHMENTS),
+        [...docs, ...imported].slice(
+          0,
+          Math.max(0, MAX_RUN_ATTACHMENTS - deviceDocs.length - pasting.length),
+        ),
       );
     } catch {
       // **A batch that fails part-way leaves the files it already stored with
@@ -1535,7 +1545,10 @@ export function ChatComposer({
           setAttachedDocs((docs) => {
             const byId = new Map(docs.map((doc) => [doc.id, doc]));
             for (const entry of entries) byId.set(entry.id, entry);
-            return [...byId.values()].slice(0, MAX_RUN_ATTACHMENTS);
+            return [...byId.values()].slice(
+              0,
+              Math.max(0, MAX_RUN_ATTACHMENTS - deviceDocs.length - pasting.length),
+            );
           });
           setAttachmentError(null);
         }}
