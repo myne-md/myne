@@ -590,7 +590,7 @@ export function CalendarPane({
           rendered: { start: row.start, end: row.end, allDay: row.allDay },
         });
       }}
-      // An event opens its form; a task opens the note it is a line inside.
+      // An event opens its form; a task opens the note it is a line in.
       onClick={() => {
         if (row.task !== undefined) {
           ws.openNewTabInFocused(row.noteId);
@@ -1316,6 +1316,11 @@ export function CalendarPane({
           mode="edit"
           initial={formFromRow(editing)}
           calendars={calendars}
+          onOpenNote={() => {
+            const noteId = editing.noteId;
+            setEditing(null);
+            ws.openNewTabInFocused(noteId);
+          }}
           onClose={() => setEditing(null)}
           onSubmit={async (values) => {
             const plan = planEventForm(values);

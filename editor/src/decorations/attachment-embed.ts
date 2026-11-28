@@ -225,12 +225,33 @@ function resolveEmbedNode(
  * the estimate exists only until the first measure corrects it.
  */
 class BlockEmbedFrame extends LineHeightWidget {
-  constructor(private readonly inner: WidgetType) {
+  /** Whether the caret's line is this embed's, as the field last built it. */
+  private active: boolean;
+
+  constructor(private inner: WidgetType, active: boolean) {
     super();
+    this.active = active;
   }
 
+  /** `active` IS compared: two decorations that compare equal are the same one to
+   *  CodeMirror, which then never re-reads the tile and never calls
+   *  {@link updateDOM}. The comparison costs a DOM reuse, not a rebuild. */
   eq(other: BlockEmbedFrame): boolean {
-    return other.inner.constructor === this.inner.constructor && this.inner.eq(other.inner);
+    return (
+      this.active === other.active &&
+      other.inner.constructor === this.inner.constructor &&
+      this.inner.eq(other.inner)
+    );
+  }
+
+  updateDOM(dom: HTMLElement, _view: EditorView, old: BlockEmbedFrame): boolean {
+    // Reuse previous DOM only when the embed *inside* is unchanged: an
+    // active toggle keeps the <img>; warmed URL/layout/retarget must rebuild.
+    if (old.inner.constructor !== this.inner.constructor) return false;
+    if (!this.inner.eq(old.inner)) return false;
+    this.inner = old.inner;
+    dom.classList.toggle("cm-embed-active", this.active);
+    return true;
   }
 
   get estimatedHeight(): number {
@@ -239,7 +260,13 @@ class BlockEmbedFrame extends LineHeightWidget {
 
   toDOM(view: EditorView): HTMLElement {
     const wrap = document.createElement("div");
-    wrap.className = "cm-attachment-block";
+    // A block replace covers its whole LINE, so CodeMirror draws this wrapper
+    // where the line's element would be and a line decoration has nothing to land
+    // on: the class lives here, from the flag the set was built with.
+    wrap.className = this.active
+      ? "cm-attachment-block cm-embed-active"
+      : "cm-attachment-block";
+    wrap.dataset.embedWidget = this.inner.constructor.name;
     wrap.appendChild(this.inner.toDOM(view));
     return wrap;
   }
@@ -435,9 +462,19 @@ function unaffectedByPlainTyping(value: DecorationSet, tr: Transaction): boolean
   return safe;
 }
 
-const blockEmbedField = StateField.define<DecorationSet>({
+/** The decorations, plus what a caret move needs to repaint them without walking
+ *  the document again. */
+interface BlockEmbeds {
+  decos: DecorationSet;
+  /** One entry per block embed: the line it covers, and the widget it draws. */
+  embeds: readonly { from: number; to: number; inner: WidgetType }[];
+  /** The `from` of every embed line the selection covered when this was built. */
+  active: readonly number[];
+}
+
+const blockEmbedField = StateField.define<BlockEmbeds>({
   create(state) {
-    return buildBlockEmbedDecorations(state, state.field(catalogField, false) ?? null);
+    return buildBlockEmbeds(state, state.field(catalogField, false) ?? null);
   },
   update(value, tr) {
     // Not `value.map(tr.changes)` on the else branch: a mapped block decoration
@@ -449,23 +486,53 @@ const blockEmbedField = StateField.define<DecorationSet>({
       !catalogChanged(tr) &&
       syntaxTree(tr.startState) === syntaxTree(tr.state)
     ) {
-      return value;
+      // Only the caret can have moved, and it changes what this paints.
+      // Repainting reuses the stored widgets: no doc walk per arrow key.
+      return tr.selection ? repaintActiveEmbeds(value, tr.state) : value;
     }
-    if (unaffectedByPlainTyping(value, tr)) return value;
-    return buildBlockEmbedDecorations(tr.state, tr.state.field(catalogField, false) ?? null);
+    if (unaffectedByPlainTyping(value.decos, tr)) return value;
+    return buildBlockEmbeds(tr.state, tr.state.field(catalogField, false) ?? null);
   },
-  provide: (f) => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f, (v) => v.decos),
 });
 
-function buildBlockEmbedDecorations(
-  state: EditorState,
-  catalog: CatalogState,
+/** The same embeds, with `active` recomputed from the caret. */
+function repaintActiveEmbeds(value: BlockEmbeds, state: EditorState): BlockEmbeds {
+  const active = value.embeds
+    .filter((embed) => selectionOnLine(state, embed.from))
+    .map((embed) => embed.from);
+  if (
+    active.length === value.active.length &&
+    active.every((from, index) => from === value.active[index])
+  ) {
+    return value;
+  }
+  return { decos: decorateBlockEmbeds(value.embeds, active), embeds: value.embeds, active };
+}
+
+function decorateBlockEmbeds(
+  embeds: readonly { from: number; to: number; inner: WidgetType }[],
+  active: readonly number[],
 ): DecorationSet {
-  // Added straight into the builder, with no intermediate array and no sort:
-  // this is ONE walk from 0 to the document's end, so nodes arrive in document
-  // order already and a sort could never reorder anything. The inline builder
-  // sorts because it walks several viewport ranges in turn.
   const builder = new RangeSetBuilder<Decoration>();
+  for (const embed of embeds) {
+    builder.add(
+      embed.from,
+      embed.to,
+      Decoration.replace({
+        widget: new BlockEmbedFrame(embed.inner, active.includes(embed.from)),
+        block: true,
+      }),
+    );
+  }
+  return builder.finish();
+}
+
+function buildBlockEmbeds(state: EditorState, catalog: CatalogState): BlockEmbeds {
+  // ONE walk from 0 to the document's end, so nodes arrive in document order
+  // already and nothing needs a sort. The inline builder sorts because it walks
+  // several viewport ranges in turn.
+  const embeds: { from: number; to: number; inner: WidgetType }[] = [];
   syntaxTree(state).iterate({
     from: 0,
     to: state.doc.length,
@@ -475,14 +542,66 @@ function buildBlockEmbedDecorations(
       const inner = resolveEmbedNode(state, catalog, node, true);
       if (inner === null) return false;
       const line = state.doc.lineAt(node.from);
-      builder.add(
-        line.from,
-        line.to,
-        Decoration.replace({ widget: new BlockEmbedFrame(inner), block: true }),
-      );
+      embeds.push({ from: line.from, to: line.to, inner });
       return false;
     },
   });
+  const active = embeds
+    .filter((embed) => selectionOnLine(state, embed.from))
+    .map((embed) => embed.from);
+  return { decos: decorateBlockEmbeds(embeds, active), embeds, active };
+}
+
+/** The lines of the INLINE attachment embeds the caret is on (2026-11-27: the
+ *  embed whose line the caret reaches wears the app's edge). A line decoration
+ *  from its own plugin, not a rebuild of the embeds: rebuilding constructs new
+ *  widgets, which is the flash `#604` is about. The block form has no line
+ *  element, so `BlockEmbedFrame` marks itself instead. */
+/** Whether `pos`'s line is part of a selection range: an embed is atomic, so the
+ *  caret lands beside it on the same line rather than inside it. */
+function selectionOnLine(state: EditorState, pos: number): boolean {
+  const line = state.doc.lineAt(pos);
+  return state.selection.ranges.some((range) =>
+    range.empty
+      ? range.head >= line.from && range.head <= line.to
+      : range.from <= line.to && range.to >= line.from,
+  );
+}
+
+function buildActiveEmbedLines(
+  state: EditorState,
+  ranges: readonly { from: number; to: number }[],
+): DecorationSet {
+  const lines = new Set<number>();
+  const overlaps = (lineFrom: number, lineTo: number): boolean =>
+    state.selection.ranges.some((range) =>
+      range.empty
+        ? range.head >= lineFrom && range.head <= lineTo
+        : range.from <= lineTo && range.to >= lineFrom,
+    );
+  for (const { from, to } of ranges) {
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        if (node.name !== "Wikilink") return undefined;
+        if (attachmentEmbedId(state, node.node) === null) return false;
+        // A block replace has no line element to land on (see `BlockEmbedFrame`).
+        if (embedIsAlone(state, node.from, node.to)) return false;
+        const first = state.doc.lineAt(node.from);
+        const last = state.doc.lineAt(Math.max(node.from, node.to - 1));
+        for (let number = first.number; number <= last.number; number++) {
+          const line = state.doc.line(number);
+          if (overlaps(line.from, line.to)) lines.add(line.from);
+        }
+        return false;
+      },
+    });
+  }
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const from of [...lines].sort((a, b) => a - b)) {
+    builder.add(from, from, Decoration.line({ class: "cm-embed-active" }));
+  }
   return builder.finish();
 }
 
@@ -519,6 +638,20 @@ export function attachmentEmbedDecorations(): readonly Extension[] {
               update.state.field(catalogField),
               update.view.visibleRanges,
             );
+          }
+        }
+      },
+      { decorations: (v) => v.decorations },
+    ),
+    ViewPlugin.fromClass(
+      class {
+        decorations: DecorationSet;
+        constructor(view: EditorView) {
+          this.decorations = buildActiveEmbedLines(view.state, view.visibleRanges);
+        }
+        update(update: ViewUpdate) {
+          if (update.selectionSet || update.docChanged || update.viewportChanged) {
+            this.decorations = buildActiveEmbedLines(update.state, update.view.visibleRanges);
           }
         }
       },
