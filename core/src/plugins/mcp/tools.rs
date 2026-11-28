@@ -154,6 +154,10 @@ impl NoteFacts {
 /// The facts a note's own bytes carry: one function rather than one per call site,
 /// so the adapter and the test doubles cannot pick different helpers and stop
 /// testing the same thing.
+///
+/// `host_adapters`, its only non-test caller, is `not(wasm32)`: the door is a
+/// desktop socket. Compiling this there is dead code, which `-D warnings` refuses.
+#[cfg(any(not(target_arch = "wasm32"), test))]
 pub(super) fn note_facts_from_body(body: &str) -> Option<NoteFacts> {
     use crate::plugins::notes::frontmatter_patch::read_string_field;
     use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};

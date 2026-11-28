@@ -97,7 +97,7 @@
     "core/src/plugins/mcp/queue_test.rs": 31,
     "core/src/plugins/mcp/scope.rs": 212,
     "core/src/plugins/mcp/scope_test.rs": 60,
-    "core/src/plugins/mcp/tools.rs": 500,
+    "core/src/plugins/mcp/tools.rs": 503,
     "core/src/plugins/mcp/tools_test.rs": 180,
     "core/src/plugins/mcp/view.rs": 216,
     "core/src/plugins/mcp/view_test.rs": 59,
