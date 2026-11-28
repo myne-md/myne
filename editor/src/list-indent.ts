@@ -39,7 +39,13 @@
 // editor's unit and every other language keeps its own indentation service.
 
 import { indentLess, indentMore } from "@codemirror/commands";
-import type { StateCommand } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  Transaction,
+  type Extension,
+  type StateCommand,
+} from "@codemirror/state";
 
 /** Leading-whitespace width of `text`, counting a tab as the next multiple of 4. */
 function indentWidth(text: string): number {
@@ -293,3 +299,33 @@ function floorSelection(
     head: Math.max(head, floor),
   };
 }
+
+/** Whatever outdented, the caret must not rest in front of the marker
+ *  (myne-md/myne#1085: #1064's report through another door — a rebound chord or
+ *  any route into `indentLess` leaves it at the line start). A filter, because
+ *  the defect is the state any command can leave behind; selection-only
+ *  transactions are left alone, so a click before the marker stays a choice. */
+export const floorCaretInsideListItems: Extension = EditorState.transactionFilter.of(
+  (tr) => {
+    if (!tr.docChanged) return tr;
+    let moved = false;
+    const ranges = tr.newSelection.ranges.map((range) => {
+      const line = tr.newDoc.lineAt(range.head);
+      const floor = line.from + itemContentColumn(line.text);
+      if (floor === line.from) return range;
+      const head = Math.max(range.head, floor);
+      const anchor = Math.max(range.anchor, floor);
+      if (head === range.head && anchor === range.anchor) return range;
+      moved = true;
+      return EditorSelection.range(anchor, head);
+    });
+    if (!moved) return tr;
+    const userEvent = tr.annotation(Transaction.userEvent);
+    return tr.startState.update({
+      changes: tr.changes,
+      selection: EditorSelection.create(ranges, tr.newSelection.mainIndex),
+      ...(userEvent === undefined ? {} : { userEvent }),
+      scrollIntoView: tr.scrollIntoView,
+    });
+  },
+);

@@ -162,6 +162,7 @@ import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
 import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
 import { continueListMarkup } from "./list-continuation";
+import { floorCaretInsideListItems } from "./list-indent";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
@@ -432,6 +433,7 @@ export function myneExtensions(opts?: {
     // so Mod-a's scoped select-all shadows defaultKeymap's selectAll (earlier
     // wins), exactly as the old inline `myneKeyBindings` did.
     editorKeymapCompartment.of(editorKeymapSurface(opts?.keymapOverrides ?? {})),
+    floorCaretInsideListItems,
     keymap.of([
       // Fixed (never listed / rebindable): Escape collapses a multi-selection
       // (widget-nav, guarded so it falls through when not multi), and Mod-u is
