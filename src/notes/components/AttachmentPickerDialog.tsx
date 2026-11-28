@@ -37,6 +37,11 @@ export interface AttachmentPickerDialogProps {
   /** Ids already attached to this run, so reopening shows the current choice as
    *  the choice rather than as a fresh list. */
   selectedIds?: readonly string[];
+  /** Slots already claimed by other attachment lanes (device readings and
+   *  in-flight pastes) that this picker must NOT count toward its own budget.
+   *  The cap is one combined room, so the picker's `atCap` and toggle limit
+   *  subtract these from MAX_RUN_ATTACHMENTS. Defaults to 0. */
+  reservedSlots?: number;
   /** Where the rows come from. Defaults to the vault's attachment library; a
    *  test or a story supplies its own so neither needs a vault to render. */
   load?: () => Promise<CatalogEntry[]>;
@@ -47,6 +52,7 @@ export function AttachmentPickerDialog({
   onClose,
   onPick,
   selectedIds = [],
+  reservedSlots = 0,
   load = catalogList,
 }: AttachmentPickerDialogProps) {
   const { t } = useTranslation();
@@ -90,13 +96,13 @@ export function AttachmentPickerDialog({
     () => (rows === null ? [] : rows.filter((row) => picked.has(row.id))),
     [rows, picked],
   );
-  const atCap = chosen.length >= MAX_RUN_ATTACHMENTS;
+  const atCap = chosen.length + reservedSlots >= MAX_RUN_ATTACHMENTS;
 
   function toggle(id: string): void {
     setPicked((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
-      else if (next.size < MAX_RUN_ATTACHMENTS) next.add(id);
+      else if (next.size < MAX_RUN_ATTACHMENTS - reservedSlots) next.add(id);
       return next;
     });
   }

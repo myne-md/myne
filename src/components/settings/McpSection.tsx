@@ -24,7 +24,7 @@
 // what a connected tool does with what it reads is outside Myne (the switch); a
 // name is a label, not a password (the name field); approvals are on this device
 // (the list footer); what is shared grows with the vault (the scope line); writing
-// is a named list and every write keeps a restore point (the write disclosure).
+// is a named list and every write keeps a restore point (the scope paragraph).
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -62,6 +62,7 @@ import { Input } from "../primitives/Input";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { MultiSelectBox } from "../primitives/MultiSelectBox";
+import { listFolderPaths } from "../../notes/listFolderPaths";
 import { ScrollArea } from "../primitives/ScrollArea";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
@@ -92,6 +93,24 @@ const ROW_STYLE: CSSProperties = {
   borderTop: "1px solid var(--line-1)",
 };
 
+const REQUEST_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexWrap: "wrap",
+  gap: "var(--space-3)",
+  padding: "var(--space-3)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+};
+// A request is a decision, not a scope line: own surface, buttons beside it.
+const REQUEST_LINE_STYLE: CSSProperties = {
+  ...HELPER_STYLE,
+  color: "var(--fg-1)",
+  flex: "1 1 240px",
+  minWidth: 0,
+};
 const ROW_HEAD_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -377,9 +396,6 @@ export function McpSection({
     return () => onDialogOpenChange?.(false);
   }, [flow !== null, onDialogOpenChange]);
 
-  // The count the scope step states, recomputed by the host as folders are
-  // ticked. Deliberately decorative: a missing count costs the number and never
-  // the accept (see the file header).
   // What the one list means to the grant underneath: the selected folders are the
   // write scope, and every folder it does not name is excluded from reads, so one
   // list answers both questions. A folder created later is in neither, which keeps
@@ -421,6 +437,7 @@ export function McpSection({
   }, [flow?.step, derived.excluded]);
 
   const pending = view?.writeRequests ?? [];
+  const folderLabels = useFolderLabels();
 
   const startNew = () =>
     setFlow({
@@ -613,11 +630,11 @@ export function McpSection({
           {pending.map((request) => (
             <div
               key={`${request.connection}\u0000${request.folder}\u0000${request.kind}`}
-              style={ROW_STYLE}
+              style={REQUEST_STYLE}
               data-testid="settings.mcp-request"
               data-kind={request.kind}
             >
-              <p style={HELPER_STYLE}>
+              <p style={REQUEST_LINE_STYLE}>
                 {request.kind === "read"
                   ? t("settings.ai.externalAccess.requestLineRead", {
                       connection: request.connection,
@@ -730,7 +747,9 @@ export function McpSection({
                             : {}),
                       }}
                     >
-                      {done ? <Icon name="circle-check" size={14} /> : String(step)}
+                      {/* The disc is already the shape; `circle-check` inside it
+                          drew a second, thinner circle. */}
+                      {done ? <Icon name="check" size={13} /> : String(step)}
                     </span>
                     <span
                       style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
@@ -857,12 +876,18 @@ export function McpSection({
           )}
 
           {flow.step === 3 && (
-            <div data-testid="settings.mcp-step-scope">
+            <div
+              data-testid="settings.mcp-step-scope"
+              // A column with a gap, not a stack of blocks: the row, its one
+              // paragraph and the folder list used to sit edge to edge.
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
+            >
               <SettingRow
                 testId="settings.mcp-whole-vault"
+                helperTestId="settings.mcp-scope-line"
                 stateAttrs={{ "data-whole-vault": String(flow.wholeVault) }}
                 label={t("settings.ai.externalAccess.wholeVaultLabel")}
-                helper={t("settings.ai.externalAccess.wholeVaultHelper")}
+                helper={`${scopeLine} ${t("settings.ai.externalAccess.writeRestore")}`}
                 control={(helperId) => (
                   <Switch
                     checked={flow.wholeVault}
@@ -887,19 +912,9 @@ export function McpSection({
                 )}
               />
 
-              <p style={HELPER_STYLE} data-testid="settings.mcp-scope-line">
-                {scopeLine}
-              </p>
-              {/* A guarantee rather than a restatement of a control, so it stays:
-                  a write is recoverable, and that is the fact that decides whether
-                  the person switches a write verb on at all. */}
-              <p style={HELPER_STYLE} data-testid="settings.mcp-write-restore">
-                {t("settings.ai.externalAccess.writeRestore")}
-              </p>
-
               <MultiSelectBox
                 collapsible
-                options={folderOptions(view?.folders ?? [], t)}
+                options={folderOptions(view?.folders ?? [], folderLabels, t)}
                 selected={flow.access}
                 onChange={(next) =>
                   setFlow((current) => (current === null ? current : { ...current, access: next }))
@@ -1011,7 +1026,18 @@ export function McpSection({
             >
               <div style={ROW_HEAD_STYLE}>
                 <span style={NAME_STYLE}>{row.name}</span>
+                {/* Both acts on the line that names the connection (2026-11-27). */}
                 <div style={ACTIONS_STYLE}>
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => startEdit(row)}
+                    data-testid="settings.mcp-edit"
+                  >
+                    {row.legacy
+                      ? t("settings.ai.externalAccess.approveAgain")
+                      : t("settings.ai.externalAccess.editExclusions")}
+                  </Button>
                   <Button
                     variant="secondary"
                     disabled={busy}
@@ -1030,32 +1056,17 @@ export function McpSection({
                   ? t("settings.ai.externalAccess.writeNone")
                   : t("settings.ai.externalAccess.writeSummary", {
                       count: row.writeFolders.length,
-                      folders: row.writeFolders.join(", "),
+                      folders: row.writeFolders.map(folderName).join(", "),
                     })}
               </p>
               <p style={HELPER_STYLE} data-testid="settings.mcp-tools-scope">
                 {toolsLine(row, t)}
               </p>
               <WhenLine row={row} />
-              <div style={ACTIONS_STYLE}>
-                <Button
-                  variant="secondary"
-                  onClick={() => startEdit(row)}
-                  data-testid="settings.mcp-edit"
-                >
-                  {row.legacy
-                    ? t("settings.ai.externalAccess.approveAgain")
-                    : t("settings.ai.externalAccess.editExclusions")}
-                </Button>
-              </div>
             </div>
           ))}
-          <p style={HELPER_STYLE} data-testid="settings.mcp-device-claim">
-            {t("settings.ai.externalAccess.deviceClaim")}
-          </p>
-          {/* The primary lives in the zero state, so a second connection needs its
-              own way back in: without this the list would be the last word for
-              anyone who ever approved one. */}
+          {/* The primary lives in the zero state, so a second connection needs a
+              way back in: the list cannot be the last word. */}
           <div style={{ marginTop: "var(--space-2)" }}>
             <Button
               variant="secondary"
@@ -1128,13 +1139,39 @@ function toolRoster(
   }));
 }
 
+function useFolderLabels(): ReadonlyMap<string, string> {
+  const [labels, setLabels] = useState<ReadonlyMap<string, string>>(new Map());
+  useEffect(() => {
+    let live = true;
+    void listFolderPaths()
+      .then((paths) => {
+        if (live) setLabels(new Map(paths.map((f) => [f.path, f.label])));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return labels;
+}
+
+function folderName(folder: string): string {
+  const trimmed = folder.replace(/\/+$/, "");
+  const cut = trimmed.lastIndexOf("/");
+  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
+}
+
 function folderOptions(
   folders: readonly string[],
+  labels: ReadonlyMap<string, string>,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): SelectOption<string>[] {
   return folders.map((folder) => ({
     value: folder,
-    label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
+    label:
+      folder === ""
+        ? t("settings.ai.externalAccess.rootFolder")
+        : (labels.get(folder) ?? folderName(folder)),
   }));
 }
 
@@ -1142,7 +1179,7 @@ function folderLabel(
   folder: string,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder;
+  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folderName(folder);
 }
 
 function verbLabel(

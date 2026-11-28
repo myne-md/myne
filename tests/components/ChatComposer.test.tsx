@@ -49,6 +49,11 @@ vi.mock("../../src/lib/agent-run", () => ({
   agentPreviewGrant: (...a: unknown[]) => agentPreviewGrant(...a),
 }));
 
+const readEphemeralFile = vi.fn();
+vi.mock("../../src/lib/ephemeralAttachment", () => ({
+  readEphemeralFile: (...a: unknown[]) => readEphemeralFile(...a),
+}));
+
 import {
   ChatComposer,
   VAULT_SCOPE_SENTINEL,
@@ -1529,5 +1534,116 @@ describe("ChatComposer: the draft belongs to its conversation (myne-md/myne#913)
     expect(
       (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
     ).toBe("");
+  });
+});
+
+describe("ChatComposer: send is gated while a device read is in flight", () => {
+  it("disables Send while readingDevice is true", async () => {
+    let resolveRead: ((r: unknown) => void) | undefined;
+    readEphemeralFile.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    mount();
+    type("hello");
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const file = new File(["x"], "a.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+    await act(async () => {
+      resolveRead?.({ name: "a.txt", text: "hi", status: "ok", char_count: 2, truncated: false });
+      await Promise.resolve();
+    });
+  });
+});
+
+describe("ChatComposer: device readings are capped (myne-md/myne#58)", () => {
+  it("caps a multi-file pick at MAX_RUN_ATTACHMENTS and disables the device control while reading", async () => {
+    const resolvers: Array<(r: unknown) => void> = [];
+    readEphemeralFile.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = Array.from({ length: 6 }, (_, i) =>
+      new File(["x"], `f${i}.txt`, { type: "text/plain" }),
+    );
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-device") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+    // Reads happen sequentially; resolve each as it starts, capping at 4.
+    for (let i = 0; i < 4; i++) {
+      await waitFor(() => expect(resolvers.length).toBe(i + 1));
+      await act(async () => {
+        resolvers[i]({ name: `f${i}.txt`, text: "hi", status: "ok", char_count: 2, truncated: false });
+        await Promise.resolve();
+      });
+    }
+    // No fifth read should have started (cap).
+    await new Promise((r) => setTimeout(r, 50));
+    expect(resolvers.length).toBe(4);
+    await waitFor(() =>
+      expect(
+        screen.getAllByTestId("ai.composer-device-attachment").length,
+      ).toBe(4),
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-device") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+  });
+});
+
+describe("ChatComposer: device readings keyed by id (myne-md/myne#58)", () => {
+  it("two files sharing a basename render two chips; removing one leaves the other and sends the survivor", async () => {
+    readEphemeralFile.mockResolvedValue({
+      name: "image.jpg",
+      text: "hi",
+      status: "ok",
+      char_count: 2,
+      truncated: false,
+    });
+    agentStart.mockResolvedValue(STEP);
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = [
+      new File(["x"], "image.jpg", { type: "image/jpeg" }),
+      new File(["y"], "image.jpg", { type: "image/jpeg" }),
+    ];
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(2),
+    );
+    const removes = screen.getAllByTestId("ai.composer-device-attachment-remove");
+    fireEvent.click(removes[0]);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(1),
+    );
+    type("go");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    const documents = agentStart.mock.calls[0]![5] as Array<{ name: string; text: string }>;
+    expect(documents).toEqual([{ name: "image.jpg", text: "hi" }]);
   });
 });

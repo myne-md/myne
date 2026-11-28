@@ -48,6 +48,14 @@ const {
   mockChatsAppendTurn: vi.fn(),
 }));
 
+const { mockReadEphemeralFile } = vi.hoisted(() => ({
+  mockReadEphemeralFile: vi.fn(),
+}));
+
+vi.mock("@myne/ephemeral-attachment", () => ({
+  readEphemeralFile: (...a: unknown[]) => mockReadEphemeralFile(...a),
+}));
+
 vi.mock("../../src/lib/chats", () => ({
   chatsList: mockChatsList,
   chatsRead: mockChatsRead,
@@ -801,5 +809,163 @@ describe("AiChatFlow: turn diff and revert icons (myne-md/myne#741)", () => {
     await waitFor(() => expect(screen.getByTestId("ai.undo-result")).toBeTruthy());
     // "The run was undone" otherwise reads as covering the notes it created.
     expect(screen.getByTestId("ai.undo-result").textContent).toContain("left in place");
+  });
+
+  it("sends a photographed file as its reading, without importing it", async () => {
+    mockReadEphemeralFile.mockResolvedValue({
+      name: "receipt.png",
+      text: "TOTAL 42.00",
+      status: "ok",
+      char_count: 11,
+      truncated: false,
+    });
+    agentStart.mockResolvedValue(finished("Added to your expenses."));
+    mount();
+
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "receipt.png", { type: "image/png" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    // The chip says where it was read, which is the whole promise of the lane.
+    await waitFor(() => expect(screen.getByTestId("ai.composer-device-attachment")).toBeTruthy());
+    expect(screen.getByTestId("ai.composer-device-attachment").getAttribute("data-device-name")).toBe(
+      "receipt.png",
+    );
+
+    type("add this to my expenses");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    // The run carries the READING, not an attachment id: nothing was imported,
+    // so there is no id to carry and the vault never saw the file.
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    // Argument 6 (0-based 5) is the documents array: task, grant, language,
+    // history, settings, documents.
+    const documents = agentStart.mock.calls[0]![5] as Array<{ name: string; text: string }>;
+    expect(documents).toEqual([{ name: "receipt.png", text: "TOTAL 42.00" }]);
+  });
+
+  it("does not send a removed device reading", async () => {
+    mockReadEphemeralFile.mockResolvedValue({
+      name: "receipt.png",
+      text: "TOTAL 42.00",
+      status: "ok",
+      char_count: 11,
+      truncated: false,
+    });
+    agentStart.mockResolvedValue(finished("Added to your expenses."));
+    mount();
+
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "receipt.png", { type: "image/png" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("ai.composer-device-attachment")).toBeTruthy());
+
+    // Withdraw consent for that reading before sending.
+    fireEvent.click(screen.getByTestId("ai.composer-device-attachment-remove"));
+
+    await waitFor(() => expect(screen.queryByTestId("ai.composer-device-attachment")).toBeNull());
+
+    type("add this to my expenses");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    const documents = agentStart.mock.calls[0]![5] as Array<{ name: string; text: string }>;
+    expect(documents).toEqual([]);
+  });
+
+  it("refuses a file it cannot read with the reason, and sends nothing", async () => {
+    mockReadEphemeralFile.mockResolvedValue({
+      name: "scan.pdf",
+      text: "",
+      status: "unsupported",
+      char_count: 0,
+      truncated: false,
+    });
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { files: [new File([new Uint8Array([1])], "scan.pdf", { type: "application/pdf" })] },
+      });
+    });
+    await waitFor(() => expect(screen.getByTestId("ai.composer-device-error")).toBeTruthy());
+    expect(screen.queryByTestId("ai.composer-device-attachment")).toBeNull();
+  });
+
+  it("caps device chips at MAX_RUN_ATTACHMENTS when more files are picked at once", async () => {
+    mockReadEphemeralFile.mockImplementation((file: File) => Promise.resolve({
+      name: file.name,
+      text: "reading " + file.name,
+      status: "ok",
+      char_count: 8,
+      truncated: false,
+    }));
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = Array.from({ length: 6 }, (_, i) =>
+      new File([new Uint8Array([i + 1])], `doc-${i + 1}.txt`, { type: "text/plain" }),
+    );
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+    });
+    await waitFor(() => expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(4));
+    expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(4);
+  });
+
+  it("keeps Send disabled while a device read is still in flight", async () => {
+    // readEphemeralFile never resolves: the reading is still running, so the
+    // composer must not let a stale draft be sent over it.
+    mockReadEphemeralFile.mockImplementation(() => new Promise(() => {}));
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { files: [new File([new Uint8Array([1, 2, 3])], "receipt.png", { type: "image/png" })] },
+      });
+    });
+    // The pending indicator shows the read is in flight.
+    await waitFor(() => expect(screen.getByTestId("ai.composer-device-pending")).toBeTruthy());
+    type("add this to my expenses");
+    expect((screen.getByTestId("ai.composer-send") as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe("AiChatFlow: device readings keyed by id (myne-md/myne#58)", () => {
+  it("two files sharing a basename render two chips; removing one leaves the other and sends the survivor", async () => {
+    mockReadEphemeralFile.mockResolvedValue({
+      name: "image.jpg",
+      text: "hi",
+      status: "ok",
+      char_count: 2,
+      truncated: false,
+    });
+    agentStart.mockResolvedValue(finished("done"));
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = [
+      new File(["x"], "image.jpg", { type: "image/jpeg" }),
+      new File(["y"], "image.jpg", { type: "image/jpeg" }),
+    ];
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(2),
+    );
+    const removes = screen.getAllByTestId("ai.composer-device-attachment-remove");
+    fireEvent.click(removes[0]);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-device-attachment").length).toBe(1),
+    );
+    type("go");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    const documents = agentStart.mock.calls[0]![5] as Array<{ name: string; text: string }>;
+    expect(documents).toEqual([{ name: "image.jpg", text: "hi" }]);
   });
 });
