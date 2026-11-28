@@ -661,6 +661,14 @@ const ROSTER = [
       "The same two-line rung-4 wrapper over `myne-core`'s device-key ladder, one per HOST, and that is the design rather than a copy (myne-md/myne#938 tasks 9 and 10): the ladder's policy (when a key is read, what a refusal means, when the fallback is silent) lives once in `core/src/plugins/sync/device_identity.rs`, and each host supplies the store its platform actually has. Desktop's file is the Windows DPAPI arm (user scope, app entropy, write-then-rename); mobile's installs the Kotlin `KeystoreProvider` over the Android Keystore. Sharing either would mean one client carrying the other's platform code. What must not drift is the provider contract and the fail-closed rule, both of which are in core.",
   },
   {
+    a: "src-tauri/src/label_store.rs",
+    b: "mobile/src-tauri/src/label_store.rs",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "The same short dispatch over `myne-core`'s label-store seam, one per HOST, and that is the design rather than a copy (myne-md/myne#1091): the policy (which keys exist, when one is minted, what a refusal means, when the fallback to the neutral label is silent) lives once in `core/src/vault_label/key.rs`, and each host installs the store its platform actually has. Desktop's arm is the Windows DPAPI store (user scope, app entropy, one file per item under `device-keys/`); mobile's is the Android Keystore bridge over its own Kotlin plugin, with its own wrapping-key alias and prefs namespace. Sharing either would mean one client carrying the other's platform code, and the ONE arm that differs is the one naming a module its own crate contains. It is a twin of device_key.rs by construction, for the same reason and in the same shape.",
+  },
+  {
     a: "src/lib/account-number-format.ts",
     b: "mobile/src/lib/account-number-format.ts",
     verdict: "decision",

@@ -165,6 +165,20 @@ impl McpNoteWriter for Writer {
         Ok("new-note".into())
     }
 
+    async fn set_field(
+        &self,
+        note: &str,
+        view: &str,
+        field: &str,
+        expected_value: Option<&str>,
+        value: &str,
+    ) -> Result<(), McpToolError> {
+        self.log.lock().expect("writer log").push(format!(
+            "set_field:{note}:{view}:{field}={value}:expected={expected_value:?}"
+        ));
+        Ok(())
+    }
+
     async fn overwrite_note(
         &self,
         note: &str,

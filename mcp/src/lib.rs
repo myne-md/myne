@@ -74,6 +74,8 @@ mod protocol_test;
 #[cfg(test)]
 mod serve_test;
 #[cfg(test)]
+mod surface_test;
+#[cfg(test)]
 mod tools_test;
 #[cfg(test)]
 mod transport_test;

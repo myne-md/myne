@@ -35,12 +35,28 @@ pub use myne_core::export_naming;
 mod device_key;
 #[cfg(windows)]
 mod device_key_dpapi;
+// DPAPI, once for both device-local key families; each caller passes its own entropy.
+#[cfg(windows)]
+mod dpapi;
+// The entropy strings themselves, compiled on every host so their separation is TESTED
+// where DPAPI is not (myne-md/myne#1091 review).
+mod dpapi_entropy;
 // One streamed SHA-256 over a file (myne-md/myne#991), shared by the model
 // store's weights fingerprint and the diagnostic block's build digest. Here
 // rather than inside either caller so the loop and its non-regular-file guard
 // exist once.
 mod file_digest;
+// The Windows half of the label store's platform reach (myne-md/myne#1091).
+mod label_store;
+// Compiled where it is USED (Windows) and where it is TESTED (any host's test build).
+#[cfg(any(windows, test))]
+mod label_keychain_dpapi;
+// The file layer the Windows store seals into. Compiled where it is USED (Windows) and
+// where it is TESTED (any host's test build), because the part that can lose a name is
+// the part worth testing, and DPAPI exists on neither this host nor CI.
 mod hooks;
+#[cfg(any(windows, test))]
+mod label_store_files;
 // myne-md/myne#860: the diagnostic log's runtime. Installed in `Builder::setup`
 // because the file layer needs an `AppHandle` to resolve the platform log
 // directory, and that hook is the earliest one that has it.
@@ -704,6 +720,9 @@ pub fn run() {
             // process: a second provider would be a second device key, and the
             // device's binding follows one key. A no-op off Windows.
             device_key::install(app.handle());
+            // myne-md/myne#1091: the Windows DPAPI store for the two device-local LABEL
+            // keys. A no-op off Windows, where `core`'s own arms answer.
+            label_store::install(app.handle());
             // MYND-29: app-level live in-RAM search-index state, updated
             // incrementally by the notes lifecycle (create/update/delete) and
             // queried by the search command; cleared on lock (Task 8).
