@@ -802,7 +802,6 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
       "connections",
       "revoke",
       "developer-mode",
-      "device-local",
     ],
     fixture: MCP_FIXTURE,
     render: () => (

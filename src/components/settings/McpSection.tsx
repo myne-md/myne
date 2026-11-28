@@ -18,13 +18,13 @@
 // The host resolves the exclusion set at the write either way, so the count is the
 // friendly extra and the claim is the sentence that renders without it.
 //
-// # The five claims that survive
+// # The four claims that survive
 //
 // One line each, at the decision each belongs to, and none behind a disclosure:
 // what a connected tool does with what it reads is outside Myne (the switch); a
-// name is a label, not a password (the name field); approvals are on this device
-// (the list footer); what is shared grows with the vault (the scope line); writing
-// is a named list and every write keeps a restore point (the scope paragraph).
+// name is a label, not a password (the name field); what is shared grows with the
+// vault (the scope paragraph); writing is a named list and every write keeps a
+// restore point (the same paragraph).
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -535,7 +535,7 @@ export function McpSection({
         onShowToast?.(
           widened
             ? t("settings.ai.externalAccess.requestAccepted", {
-                folder: folderLabel(request.folder, t),
+                folder: folderLabel(request.folder, t, folderLabels),
                 connection: request.connection,
               })
             : t("settings.ai.externalAccess.requestStale"),
@@ -638,17 +638,17 @@ export function McpSection({
                 {request.kind === "read"
                   ? t("settings.ai.externalAccess.requestLineRead", {
                       connection: request.connection,
-                      folder: folderLabel(request.folder, t),
+                      folder: folderLabel(request.folder, t, folderLabels),
                     })
                   : request.summary.length > 0
                     ? t("settings.ai.externalAccess.requestLineWriteTyped", {
                         connection: request.connection,
-                        folder: folderLabel(request.folder, t),
+                        folder: folderLabel(request.folder, t, folderLabels),
                         summary: request.summary,
                       })
                     : t("settings.ai.externalAccess.requestLineWrite", {
                         connection: request.connection,
-                        folder: folderLabel(request.folder, t),
+                        folder: folderLabel(request.folder, t, folderLabels),
                       })}
               </p>
               <div style={ACTIONS_STYLE}>
@@ -1056,7 +1056,7 @@ export function McpSection({
                   ? t("settings.ai.externalAccess.writeNone")
                   : t("settings.ai.externalAccess.writeSummary", {
                       count: row.writeFolders.length,
-                      folders: row.writeFolders.map(folderName).join(", "),
+                      folders: row.writeFolders.map((f) => folderLabel(f, t, folderLabels)).join(", "),
                     })}
               </p>
               <p style={HELPER_STYLE} data-testid="settings.mcp-tools-scope">
@@ -1145,7 +1145,21 @@ function useFolderLabels(): ReadonlyMap<string, string> {
     let live = true;
     void listFolderPaths()
       .then((paths) => {
-        if (live) setLabels(new Map(paths.map((f) => [f.path, f.label])));
+        if (!live) return;
+        const counts = new Map<string, number>();
+        for (const entry of paths) {
+          counts.set(entry.label, (counts.get(entry.label) ?? 0) + 1);
+        }
+        const resolved = new Map<string, string>();
+        for (const entry of paths) {
+          resolved.set(
+            entry.path,
+            (counts.get(entry.label) ?? 0) > 1
+              ? entry.path.replace(/\/+$/, "")
+              : entry.label,
+          );
+        }
+        setLabels(resolved);
       })
       .catch(() => undefined);
     return () => {
@@ -1153,12 +1167,6 @@ function useFolderLabels(): ReadonlyMap<string, string> {
     };
   }, []);
   return labels;
-}
-
-function folderName(folder: string): string {
-  const trimmed = folder.replace(/\/+$/, "");
-  const cut = trimmed.lastIndexOf("/");
-  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
 }
 
 function folderOptions(
@@ -1171,15 +1179,19 @@ function folderOptions(
     label:
       folder === ""
         ? t("settings.ai.externalAccess.rootFolder")
-        : (labels.get(folder) ?? folderName(folder)),
+        : (labels.get(folder) ?? folder.replace(/\/+$/, "")),
   }));
 }
 
 function folderLabel(
   folder: string,
   t: (key: string, options?: Record<string, unknown>) => string,
+  labels?: ReadonlyMap<string, string>,
 ): string {
-  return folder === "" ? t("settings.ai.externalAccess.rootFolder") : folderName(folder);
+  if (folder === "") return t("settings.ai.externalAccess.rootFolder");
+  const resolved = labels?.get(folder);
+  if (resolved !== undefined) return resolved;
+  return folder.replace(/\/+$/, "");
 }
 
 function verbLabel(
