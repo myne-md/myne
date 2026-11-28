@@ -28,15 +28,18 @@
 //!
 //! ## Platform status
 //!
-//! Apple (macOS / iOS) has a real backend here. Every other target returns
-//! [`VaultLabelError::KeychainUnavailable`], which is a first-class state
-//! rather than a failure: the store then writes nothing, and the picker falls
-//! back to the neutral label. Wiring the Linux secret service or the Windows
-//! credential store means adding a dependency, which is a security decision in
-//! its own right (root `AGENTS.md`) and not something to slip in behind a
-//! feature. What must never happen on those platforms is the other fallback,
-//! writing the name in plaintext, because it would look identical on screen
-//! while voiding the erase guarantee.
+//! This crate reaches Apple's keychain itself, and reaches every other platform's
+//! store **through the host**, the way the device signing key already does: the
+//! Windows store is a DPAPI blob the host has a path for, and the Android store sits
+//! behind a Kotlin plugin this crate must not take a JNI dependency on. A host
+//! installs its store once at startup ([`install_host_keychain`]);
+//! [`platform_keychain`] answers that store when one is installed and this crate's
+//! own arm otherwise. Where no store answers at all, the platform returns
+//! [`VaultLabelError::KeychainUnavailable`], which is a first-class state rather
+//! than a failure: the store writes nothing, and the picker falls back to the
+//! neutral label. What must never happen on any platform is the other fallback,
+//! writing the name in plaintext, because it would look identical on screen while
+//! voiding the erase guarantee.
 //!
 //! ⚠️ **UNVERIFIED on hardware**, like its two siblings: compile-checked on
 //! macOS/iOS, but the keychain accessibility and non-prompting behaviour cannot
@@ -47,6 +50,7 @@
 
 use crate::vault_id::VaultId;
 use crate::vault_label::error::VaultLabelError;
+use std::sync::OnceLock;
 use zeroize::Zeroizing;
 
 /// Length of a per-vault wrap key (256-bit XChaCha20-Poly1305 key).
@@ -62,8 +66,9 @@ pub const KEYCHAIN_SERVICE: &str = "md.myne.vaultlabel";
 /// The keychain operations this store needs, behind a trait for the same reason
 /// `quick_unlock::apple`'s `KeychainOps` is. The per-vault account routing, the
 /// property the erase guarantee rests on, has to be testable on a machine with
-/// no keychain at all, which is what CI runs on. [`platform_keychain`] returns
-/// the only production implementation.
+/// no keychain at all, which is what CI runs on. [`platform_keychain`] returns the
+/// production implementation: a host's installed store where one platform's
+/// store is out of this crate's reach, otherwise this crate's own arm.
 pub trait LabelKeychain: Send + Sync {
     /// Read an item. `Ok(None)` is "no such item", which is an ordinary answer
     /// (this vault has never been unlocked here, or its key was destroyed) and
@@ -355,15 +360,72 @@ impl LabelKeychain for UnavailableKeychain {
     }
 }
 
-/// The keychain this platform actually has. Apple gets the real one; everything
-/// else gets [`UnavailableKeychain`]. See the module header for why a plaintext
-/// fallback is not the other option.
+/// A store the HOST supplies, for a platform whose store this crate cannot
+/// reach itself. One static, shared by [`installed_keychain`] and
+/// [`install_host_keychain`]: two locals would be two slots, so an install would
+/// succeed and every read would still see `None`.
+static HOST_KEYCHAIN: OnceLock<Box<dyn LabelKeychain>> = OnceLock::new();
+
+/// Install the host's OS store. **First call wins**, and a second is refused with
+/// a warning rather than silently replacing the first.
+///
+/// Two stores would be two sets of label keys, so whichever install lost the race
+/// would silently orphan every name the other one sealed: the picker would fall
+/// back to `Vault N` for a vault whose key exists in the store nobody is reading.
+/// A host calls this once, from its startup path.
+pub fn install_host_keychain(provider: Box<dyn LabelKeychain>) {
+    if HOST_KEYCHAIN.set(provider).is_err() {
+        tracing::warn!(
+            stage = "vault_label_key",
+            event = "host_keychain_already_installed",
+            "a second vault-label store was refused; two stores would hold two sets \
+             of label keys and orphan every name the other one sealed"
+        );
+    }
+}
+
+/// The installed host store, if the host registered one.
+fn installed_keychain() -> Option<&'static dyn LabelKeychain> {
+    HOST_KEYCHAIN.get().map(|boxed| &**boxed)
+}
+
+/// The keychain this platform actually has: the host's installed store when there
+/// is one, otherwise this crate's own arm. Apple gets the real one; everything
+/// else gets [`UnavailableKeychain`] until a host installs a store. See the module
+/// header for why a plaintext fallback is not the other option.
 pub fn platform_keychain() -> &'static dyn LabelKeychain {
+    select(installed_keychain())
+}
+
+/// The selection [`platform_keychain`] makes, with the installed store passed in
+/// so the rule is testable without installing anything process-wide. The lifetime
+/// is the caller's rather than `'static`: an installed store lives for the process
+/// and this crate's own arm is a unit struct in static memory, so the production
+/// call still answers `&'static`, while a test can pass its own local fake.
+fn select(installed: Option<&dyn LabelKeychain>) -> &dyn LabelKeychain {
+    match installed {
+        Some(provider) => provider,
+        None => builtin_keychain(),
+    }
+}
+
+/// This crate's own arm: the platforms it can reach without a host.
+///
+/// Apple's keychain and the Linux Secret Service are both reachable in-process, so
+/// they answer here. Windows and Android cannot be: DPAPI needs a sealing path the
+/// host owns and the Keystore sits behind a Kotlin plugin, so those arrive through
+/// [`install_host_keychain`] and this function answers [`UnavailableKeychain`] until
+/// a host installs one.
+fn builtin_keychain() -> &'static dyn LabelKeychain {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
         &imp::AppleKeychain
     }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(target_os = "linux")]
+    {
+        &crate::vault_label::key_secret_service::SecretServiceKeychain
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "linux")))]
     {
         &UnavailableKeychain
     }
@@ -586,6 +648,39 @@ mod tests {
         assert_eq!(
             destroy_key(&none, vault(VAULT_A)),
             Err(VaultLabelError::KeychainUnavailable)
+        );
+    }
+
+    #[test]
+    fn with_no_host_store_the_crates_own_arm_answers() {
+        // The selection rule, tested without installing anything process-wide: a
+        // `OnceLock` install is one-shot per process, so a test that installed one
+        // would answer for every test after it.
+        assert!(
+            std::ptr::eq(select(None), builtin_keychain()),
+            "an install-free process must answer with this crate's own arm"
+        );
+    }
+
+    #[test]
+    fn an_installed_host_store_answers_instead_of_the_crates_own_arm() {
+        // The failure this catches is the quiet one: the seam resolves to the
+        // built-in arm while a host believes it installed its store, so the picker
+        // shows `Vault N` on a platform whose store works and nothing says why.
+        let fake = FakeKeychain::empty();
+        fake.store("host-owned", b"sealed")
+            .expect("seed the host store");
+        let selected = select(Some(&fake));
+
+        assert!(!std::ptr::eq(selected, builtin_keychain()));
+        assert_eq!(
+            selected
+                .get("host-owned")
+                .expect("the host store answers")
+                .expect("the seeded item is there")
+                .as_slice(),
+            b"sealed",
+            "the item must come from the installed store, not from the crate's arm"
         );
     }
 }

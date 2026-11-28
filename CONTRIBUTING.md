@@ -64,6 +64,14 @@ primitive ratchets, the i18n catalogues), and `pre-push` runs the full local bat
 same checks plus the lanes that need a container. [`scripts/repo-guards.md`](scripts/repo-guards.md)
 says what each one blocks and, more usefully, what it catches that no compiler would.
 
+## Writing the pull request
+
+The PR body is for the next developer. State what changed and why in two or three
+sentences, then the commands you ran. The rules in [`AGENTS.md`](AGENTS.md#rules)
+cover the voice and the base branch. Use one thought per sentence, active voice and
+no em or en dashes. Do not open with a tagline or a commit count. Do not use bolded
+commit subjects as headings, and do not stack a PR on another open branch.
+
 ## What your contribution is licensed under
 
 Inbound equals outbound. Code is **AGPL-3.0**; the `docs/` subtree is **CC-BY-4.0** so that the

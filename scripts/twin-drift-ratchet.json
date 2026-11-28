@@ -74,6 +74,7 @@
     "core/src/inference/state.rs::mobile/src-tauri/src/plugins/local_inference/state.rs",
     "src-tauri/src/device_key.rs::mobile/src-tauri/src/device_key.rs",
     "src-tauri/src/hooks.rs::mobile/src-tauri/src/hooks.rs",
+    "src-tauri/src/label_store.rs::mobile/src-tauri/src/label_store.rs",
     "src-tauri/src/lib.rs::mobile/src-tauri/src/lib.rs",
     "src-tauri/src/main.rs::mobile/src-tauri/src/main.rs",
     "src-tauri/src/navigation.rs::mobile/src-tauri/src/navigation.rs",

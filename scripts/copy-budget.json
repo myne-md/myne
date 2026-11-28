@@ -172,7 +172,7 @@
   "surfaces": {
     "src/components/settings/settingsTopics.ts": 182,
     "src/components/settings/AboutPanel.tsx": 1163,
-    "src/components/settings/AccountPanel.tsx": 1057,
+    "src/components/settings/AccountPanel.tsx": 1203,
     "src/components/settings/AiModelCatalogue.tsx": 410,
     "src/components/settings/AiOnboardingSurface.tsx": 511,
     "src/components/settings/AiPanel.tsx": 3808,

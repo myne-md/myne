@@ -75,6 +75,39 @@ pub enum McpToolError {
     /// make unexpressible.
     #[serde(rename = "calendar_window_too_wide")]
     CalendarWindowTooWide { max_days: u32 },
+    /// A calendar window whose bounds the calendar could not read: `from` later
+    /// than `to`, or a bound that is not a date the app parses.
+    ///
+    /// Separate from [`Self::VaultUnavailable`] for one reason: that reason tells a
+    /// caller to unlock the vault and try again, which is the wrong next action for
+    /// a reversed range and sends it round a loop it cannot leave. The host had the
+    /// distinction already (`VaultIndicesError::CalendarWindowUnreadable`) and this
+    /// door threw it away in a catch-all, so every such call answered
+    /// `vault_unavailable` and read as a locked vault (myne-md/myne#1231).
+    #[serde(rename = "calendar_window_unreadable")]
+    CalendarWindowUnreadable,
+    /// The saved view a field write named is not approved on this device, or it
+    /// is approved at a different version than the one stored. Both read the same
+    /// way, because nothing approved THIS definition.
+    #[serde(rename = "view_not_approved")]
+    ViewNotApproved { view_id: String },
+    /// The approved view does not declare this field as writable, so the write has
+    /// no authority behind it. The caller's next action is to name a field the
+    /// view offers, or a view that offers this one.
+    #[serde(rename = "field_not_writable")]
+    FieldNotWritable { field: String },
+    /// The field is one of the working-set markers. Refused even when a view
+    /// declares it: this surface has no delete, and a property write that can hide
+    /// a note is a delete wearing another name.
+    #[serde(rename = "field_reserved")]
+    FieldReserved { field: String },
+    /// The field name is not a plain YAML key, so no reader could find it again.
+    #[serde(rename = "invalid_field")]
+    InvalidField { field: String },
+    /// The value would push the note past the plaintext cap. The disk is fine; the
+    /// value is what does not fit.
+    #[serde(rename = "value_too_large")]
+    ValueTooLarge,
     /// A write named a title that is empty once trimmed. Refused rather than
     /// written, because a note with no title has no name in the sidebar and the
     /// caller cannot find it again to fix it.
@@ -197,6 +230,12 @@ impl McpToolError {
             McpToolError::UnknownFile { .. } => "unknown_file",
             McpToolError::OutOfScopeFile { .. } => "out_of_scope_file",
             McpToolError::CalendarWindowTooWide { .. } => "calendar_window_too_wide",
+            McpToolError::CalendarWindowUnreadable => "calendar_window_unreadable",
+            McpToolError::ViewNotApproved { .. } => "view_not_approved",
+            McpToolError::FieldNotWritable { .. } => "field_not_writable",
+            McpToolError::FieldReserved { .. } => "field_reserved",
+            McpToolError::InvalidField { .. } => "invalid_field",
+            McpToolError::ValueTooLarge => "value_too_large",
             McpToolError::EmptyTitle => "empty_title",
             McpToolError::EmptyAppend => "empty_append",
             McpToolError::AnchorNotFound => "anchor_not_found",
@@ -258,12 +297,37 @@ impl McpToolError {
                  Myne app."
             }
             McpToolError::CalendarWindowTooWide { .. } => {
-                "That date range is wider than this surface reads in one call: ask for a shorter \
+                "That date range is wider than Myne reads in one call: ask for a shorter \
                  range, at most a year at a time."
+            }
+            McpToolError::CalendarWindowUnreadable => {
+                "That date range could not be read: the start has to be on or before the end, \
+                 both as dates, and nothing about the vault is wrong, so unlocking Myne will \
+                 not help."
             }
             McpToolError::OutOfScopeFolder { .. } => {
                 "That folder is one the user left out of this connection's approval: ask the user \
                  to stop leaving it out, under Settings, AI, in the Myne app."
+            }
+            McpToolError::ViewNotApproved { .. } => {
+                "That saved view is not approved on this device, or its definition changed: ask \
+                 the user to approve it under Settings, AI, in the Myne app, or call view_list for \
+                 a view that is already approved."
+            }
+            McpToolError::FieldNotWritable { .. } => {
+                "The view does not declare that field as writable: call view_list to see the \
+                 views this vault has, and set a field the approved view writes."
+            }
+            McpToolError::FieldReserved { .. } => {
+                "That field is one of the markers that move a note out of Myne's note list, and no \
+                 tool here may set one: a property write must not be able to hide a note."
+            }
+            McpToolError::InvalidField { .. } => {
+                "That field name is not one Myne can write and read back: send a plain key made of \
+                 letters, digits, underscores and dashes."
+            }
+            McpToolError::ValueTooLarge => {
+                "That value is too large for one note in Myne: send a shorter value."
             }
             McpToolError::EmptyTitle => {
                 "The new note had no title: send a title with the create, since a note that cannot \
@@ -329,17 +393,20 @@ impl McpToolError {
                 // echoes nothing it does not have. The remedy names where the switch
                 // is, because the connection tab is one tab in a panel the agent
                 // cannot see.
-                match verb.as_str() {
-                    "note_create" | "note_append" | "note_edit" | "note_move" => {
-                        "That change was switched off for this connection in Myne: ask the user to \
-                         turn it back on under Settings, AI, External access, then call this tool \
-                         again."
-                    }
-                    _ => {
-                        "Reading through that tool was switched off for this connection in Myne: \
-                         ask the user to turn it back on under Settings, AI, External access, then \
-                         call this tool again."
-                    }
+                //
+                // Asked of the dispatch table, not of a list written out here: the
+                // hand-enumerated copy this replaced named the four write verbs that
+                // existed then, so the fifth answered with the reading sentence.
+                if crate::plugins::mcp::tools::ToolName::from_wire(verb)
+                    .is_some_and(crate::plugins::mcp::tools::ToolName::is_write)
+                {
+                    "That change was switched off for this connection in Myne: ask the user to \
+                     turn it back on under Settings, AI, External access, then call this tool \
+                     again."
+                } else {
+                    "Reading through that tool was switched off for this connection in Myne: \
+                     ask the user to turn it back on under Settings, AI, External access, then \
+                     call this tool again."
                 }
             }
             McpToolError::BudgetExhausted {
@@ -384,6 +451,27 @@ mod tests {
             McpToolError::OutOfScopeNote {
                 note_id: "n".into(),
             },
+            McpToolError::UnknownFile {
+                attachment_id: "aa".into(),
+            },
+            McpToolError::OutOfScopeFile {
+                attachment_id: "aa".into(),
+            },
+            McpToolError::CalendarWindowTooWide { max_days: 366 },
+            McpToolError::CalendarWindowUnreadable,
+            McpToolError::ViewNotApproved {
+                view_id: "v1".into(),
+            },
+            McpToolError::FieldNotWritable {
+                field: "status".into(),
+            },
+            McpToolError::FieldReserved {
+                field: "trashed".into(),
+            },
+            McpToolError::InvalidField {
+                field: "a b".into(),
+            },
+            McpToolError::ValueTooLarge,
             McpToolError::EmptyTitle,
             McpToolError::EmptyAppend,
             McpToolError::AnchorNotFound,
@@ -413,6 +501,56 @@ mod tests {
             },
             McpToolError::VaultUnavailable,
         ]
+    }
+
+    #[test]
+    fn the_roster_covers_every_variant() {
+        // A property test is only as good as its roster, and this one had silently
+        // fallen four variants behind the enum: the calendar pair and the two file
+        // reasons were never checked, so a bad label there would have shipped as a
+        // generic `refused`. The length is a literal on purpose — a variant added
+        // without adding it here fails this count rather than quietly going
+        // unchecked.
+        assert_eq!(
+            all().len(),
+            30,
+            "the roster and the enum disagree: add the new variant to both"
+        );
+        let mut reasons: Vec<&str> = all().iter().map(McpToolError::reason).collect();
+        reasons.sort_unstable();
+        let unique = reasons.len();
+        reasons.dedup();
+        assert_eq!(
+            unique,
+            reasons.len(),
+            "two variants share one wire label, so a client cannot tell them apart"
+        );
+    }
+
+    #[test]
+    fn a_disabled_write_verb_is_told_it_was_a_change_and_a_read_verb_a_read() {
+        // Walks the catalog, so a sixth verb lands covered: the sentence decides the
+        // next action a person is asked to take.
+        for verb in crate::plugins::mcp::tools::CATALOG_VERBS {
+            let is_write = crate::plugins::mcp::tools::ToolName::from_wire(verb)
+                .is_some_and(crate::plugins::mcp::tools::ToolName::is_write);
+            let message = McpToolError::VerbDisabled {
+                verb: verb.to_string(),
+            }
+            .message();
+            assert_eq!(
+                message.starts_with("That change was switched off"),
+                is_write,
+                "{verb} answered with the wrong kind of switch: {message}"
+            );
+        }
+        // And a name the catalog does not carry still reads as a read, which is the
+        // conservative half: nothing was changed by a verb this build does not serve.
+        assert!(McpToolError::VerbDisabled {
+            verb: "note_delete".into()
+        }
+        .message()
+        .starts_with("Reading through that tool"));
     }
 
     #[test]
@@ -459,8 +597,17 @@ mod tests {
                 "{:?} is more than one sentence: {message}",
                 error.reason()
             );
+            // "Names the product, or the call it can make next." The second half
+            // used to be spelled `message.contains("note_search")`, which is true of
+            // exactly one sentence's worth of advice: `unknown_file` says "call
+            // attachment_list" and failed a rule that meant to allow it, so the
+            // narrower rule would have pushed copy towards the one tool name it
+            // recognised. Asking the catalog instead is the rule the doc states.
+            let names_a_tool = crate::plugins::mcp::tools::CATALOG_VERBS
+                .iter()
+                .any(|verb| message.contains(verb));
             assert!(
-                message.contains("Myne") || message.contains("note_search"),
+                message.contains("Myne") || names_a_tool,
                 "{:?} must name the product or the next call: {message}",
                 error.reason()
             );
