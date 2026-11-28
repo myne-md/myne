@@ -24,7 +24,7 @@
 // drops `data-theme`.
 
 import { applyOrnamentAttributes, clearOrnamentAttributes } from "@myne/ornaments";
-import { readAppearanceCanon } from "@myne/theme-canon";
+import { readAppearanceCanon, isDarkBackground } from "@myne/theme-canon";
 import { clampPalette, readMeasureDefaults } from "@myne/theme-measure";
 
 import { HAS_TAURI } from "./app-window";
@@ -73,7 +73,9 @@ export function applyCustomTheme(palette: ThemePalette): void {
   // would otherwise expose. Read through the shared module so desktop and mobile
   // cannot disagree about what a partial theme looks like.
   const canon = readAppearanceCanon(root, palette);
+  const dark = isDarkBackground(palette["--paper"] ?? "");
   root.removeAttribute("data-theme");
+  root.style.setProperty("color-scheme", dark ? "dark" : "light");
 
   const { applied } = clampPalette(palette, measureDefaults);
   // Ornament selections reach CSS as root attributes (CSS cannot branch on a
@@ -100,6 +102,7 @@ export function applyCustomTheme(palette: ThemePalette): void {
 export function clearCustomTheme(): void {
   const root = document.documentElement;
   for (const key of appliedCustomKeys) root.style.removeProperty(key);
+  root.style.removeProperty("color-scheme");
   appliedCustomKeys = [];
   // Off with the palette: a leftover attribute would keep a locked screen wearing
   // the vault's ornament (A6), exactly like a leftover variable.
