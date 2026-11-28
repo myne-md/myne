@@ -42,7 +42,6 @@ import { indentLess, indentMore } from "@codemirror/commands";
 import {
   EditorSelection,
   EditorState,
-  Transaction,
   type Extension,
   type StateCommand,
 } from "@codemirror/state";
@@ -301,31 +300,34 @@ function floorSelection(
 }
 
 /** Whatever outdented, the caret must not rest in front of the marker
- *  (myne-md/myne#1085: #1064's report through another door — a rebound chord or
- *  any route into `indentLess` leaves it at the line start). A filter, because
- *  the defect is the state any command can leave behind; selection-only
- *  transactions are left alone, so a click before the marker stays a choice. */
+ *  (myne-md/myne#1085: #1064's report through another door — a rebound chord or any
+ *  route into `indentLess` leaves it at the line start). A filter, because the
+ *  defect is the state any command can leave behind; selection-only transactions
+ *  are left alone, and each endpoint is floored against its OWN line so a
+ *  multi-line selection stays a selection. */
 export const floorCaretInsideListItems: Extension = EditorState.transactionFilter.of(
   (tr) => {
     if (!tr.docChanged) return tr;
+    const floored = (pos: number): number => {
+      const line = tr.newDoc.lineAt(pos);
+      const at = line.from + itemContentColumn(line.text);
+      return at === line.from ? pos : Math.max(pos, at);
+    };
     let moved = false;
     const ranges = tr.newSelection.ranges.map((range) => {
-      const line = tr.newDoc.lineAt(range.head);
-      const floor = line.from + itemContentColumn(line.text);
-      if (floor === line.from) return range;
-      const head = Math.max(range.head, floor);
-      const anchor = Math.max(range.anchor, floor);
+      const head = floored(range.head);
+      const anchor = floored(range.anchor);
       if (head === range.head && anchor === range.anchor) return range;
       moved = true;
       return EditorSelection.range(anchor, head);
     });
     if (!moved) return tr;
-    const userEvent = tr.annotation(Transaction.userEvent);
-    return tr.startState.update({
-      changes: tr.changes,
-      selection: EditorSelection.create(ranges, tr.newSelection.mainIndex),
-      ...(userEvent === undefined ? {} : { userEvent }),
-      scrollIntoView: tr.scrollIntoView,
-    });
+    return [
+      tr,
+      {
+        selection: EditorSelection.create(ranges, tr.newSelection.mainIndex),
+        sequential: true,
+      },
+    ];
   },
 );

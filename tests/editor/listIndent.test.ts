@@ -8,6 +8,7 @@
 // lists.
 
 import { describe, expect, it } from "vitest";
+import { indentLess } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
@@ -374,5 +375,27 @@ describe("floorCaretInsideListItems", () => {
       selection: { anchor: 2 },
     }).state;
     expect(typed.selection.main.head).toBe(2);
+  });
+
+  it("keeps a multi-line selection a selection", () => {
+    // A range spanning two list lines outdents as a range; the floor must not
+    // collapse it onto the head's line.
+    const doc = "  - [ ] a\n  - [ ] b";
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0, head: doc.length },
+      extensions: [
+        markdown({ base: markdownLanguage }),
+        indentUnit.of("  "),
+        floorCaretInsideListItems,
+      ],
+    });
+    let outdented = state;
+    indentLess({ state, dispatch: (tr) => { outdented = tr.state; } });
+    const sel = outdented.selection.main;
+    expect(sel.from).toBeLessThan(sel.to);
+    expect(outdented.doc.lineAt(sel.from).number).not.toBe(
+      outdented.doc.lineAt(sel.to).number,
+    );
   });
 });
