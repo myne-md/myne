@@ -221,13 +221,13 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -237,7 +237,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -327,7 +327,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -516,6 +516,11 @@ describe("check-twin-inventory", () => {
     // derived, because this one is what fails when an entry is added to the TREE
     // without one being added here.
     //
+    // 134 to 135: myne-md/myne#1091 put the label store's host dispatch on both clients, a
+    // twin pair for the same reason and in the same shape as `device_key.rs` above: one
+    // short `install` per host, and the ONE arm that differs is the one naming a module its
+    // own crate contains.
+    //
     // 132 to 134: the device-key rungs (myne-md/myne#938 tasks 9 and 10) put the same
     // dispatch file in two hosts and the same ceremony binding in two clients. The
     // sweep cannot see either pair: `src-tauri/src/device_key.rs` and
@@ -539,7 +544,7 @@ describe("check-twin-inventory", () => {
     // same read a missing file does. The drift ratchet locks the convergence in,
     // which is what keeps the pair from re-appearing on the desktop side without
     // somebody deciding to bring the surface back.
-    expect(ROSTER.length).toBe(134);
+    expect(ROSTER.length).toBe(135);
   });
 
   it("keeps `screen` narrow", () => {
