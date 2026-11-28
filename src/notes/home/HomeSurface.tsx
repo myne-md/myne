@@ -40,6 +40,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
+import { MIN_TARGET } from "../../components/primitives/targetSize";
 import { Icon } from "../../components/primitives/Icon";
 import { setHomeCards, type HomeCard } from "../../lib/prefs";
 import { usePrefs } from "../../hooks/usePrefs";
@@ -488,8 +489,9 @@ function CardFrame({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 20,
-            height: 20,
+            // The FLOOR, not a style: the glyph inside stays 14, the target is the
+            // published minimum (WCAG 2.2 AA SC 2.5.8, which PRODUCT.md commits to).
+            ...MIN_TARGET,
             marginInlineStart: "calc(var(--space-2) * -1)",
             border: "none",
             borderRadius: "var(--radius-1)",
@@ -540,8 +542,7 @@ function CardFrame({
           position: "absolute",
           insetInlineEnd: 0,
           insetBlockEnd: 0,
-          width: 18,
-          height: 18,
+          ...MIN_TARGET,
           border: "none",
           background: "transparent",
           cursor: "nwse-resize",

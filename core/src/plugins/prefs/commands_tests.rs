@@ -2964,11 +2964,13 @@ fn set_home_cards_writes_the_order_and_refuses_what_the_reader_would_skip() {
                 id: "recent-notes".into(),
                 kind: "recent-notes".into(),
                 span: 1,
+                options: Vec::new(),
             },
             protocol::home_layout::HomeCard {
                 id: "card-from-the-future".into(),
                 kind: "future-kind".into(),
                 span: 2,
+                options: Vec::new(),
             },
         ];
         set_home_cards_with_dir(
@@ -2994,6 +2996,7 @@ fn set_home_cards_writes_the_order_and_refuses_what_the_reader_would_skip() {
             id: "x".into(),
             kind: "k".into(),
             span: 9,
+            options: Vec::new(),
         }];
         let refused = set_home_cards_with_dir(
             tmp.path(),
