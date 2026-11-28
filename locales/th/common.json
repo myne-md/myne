@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "คำขอ {{count}} ครั้ง",
       "runSummaryNotes_one": "อ่านโน้ต {{count}} รายการ",
       "runSummaryNotes_other": "อ่านโน้ต {{count}} รายการ",
-      "runSummaryOffDevice_one": "โน้ตของคุณราว {{count}} อักขระถูกส่งไปยังผู้ให้บริการ",
-      "runSummaryOffDevice_other": "โน้ตของคุณราว {{count}} อักขระถูกส่งไปยังผู้ให้บริการ",
       "runSummaryOnDevice": "ไม่มีข้อมูลออกจากอุปกรณ์นี้",
       "appendFlag": "เพิ่มต่อท้าย",
       "diffCurrent": "ตอนนี้ในโน้ต",

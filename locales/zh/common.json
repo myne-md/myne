@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} 次请求",
       "runSummaryNotes_one": "已读取 {{count}} 篇笔记",
       "runSummaryNotes_other": "已读取 {{count}} 篇笔记",
-      "runSummaryOffDevice_one": "你的笔记中约 {{count}} 个字符已发送给服务商",
-      "runSummaryOffDevice_other": "你的笔记中约 {{count}} 个字符已发送给服务商",
       "runSummaryOnDevice": "没有任何内容离开本设备",
       "appendFlag": "追加到末尾",
       "diffCurrent": "现在在笔记中",

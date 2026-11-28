@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "maombi {{count}}",
       "runSummaryNotes_one": "dokezo {{count}} limesomwa",
       "runSummaryNotes_other": "madokezo {{count}} yamesomwa",
-      "runSummaryOffDevice_one": "takriban herufi {{count}} ya madokezo yako ilitumwa kwa mtoa huduma",
-      "runSummaryOffDevice_other": "takriban herufi {{count}} za madokezo yako zilitumwa kwa mtoa huduma",
       "runSummaryOnDevice": "hakuna kilichotoka kwenye kifaa hiki",
       "appendFlag": "huongeza mwishoni",
       "diffCurrent": "Sasa kwenye notisi",

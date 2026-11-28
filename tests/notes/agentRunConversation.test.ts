@@ -64,6 +64,8 @@ import { __resetChatPersistForTest, parseTranscript } from "../../src/notes/ai/c
 const COPY = {
   scopeLabel: "This note",
   startFailed: "start failed",
+  modelCannotEdit: "model cannot edit",
+  stillWorking: "still working",
   autoApplyFailed: "auto apply failed",
   providerRejected: "provider rejected",
   scopeExcluded: "scope excluded",
@@ -161,6 +163,8 @@ describe("a failed leg reports its OWN cause (myne-md/myne#848)", () => {
     providerRejected: "PROVIDER",
     scopeExcluded: "EXCLUDED",
     rootGrant: "ROOT",
+    modelCannotEdit: "MODEL",
+    stillWorking: "WORKING",
     generic: "GENERIC",
     byCause: (cause: string) => `CAUSE:${cause}`,
   };
@@ -201,6 +205,17 @@ describe("a failed leg reports its OWN cause (myne-md/myne#848)", () => {
         copy,
       ),
     ).toBe("GENERIC");
+  });
+
+  it("names the model when the backend cannot make agent edits", () => {
+    // `NoModel` and `LocalModelMissing` both map to this tag host-side, and both
+    // used to reach the user as "The agent could not start." — a sentence with no
+    // cause and no next step (2026-11-27, reported as that sentence repeating).
+    expect(legFailureSentence({ kind: "EditFormatUnsupported" }, copy)).toBe("MODEL");
+  });
+
+  it("says to wait when a step arrives while the run is still working", () => {
+    expect(legFailureSentence({ kind: "StepAlreadyRunning" }, copy)).toBe("WORKING");
   });
 
   it("falls back for a tag it cannot name, rather than guessing", () => {

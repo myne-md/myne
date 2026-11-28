@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} ਬੇਨਤੀਆਂ",
       "runSummaryNotes_one": "{{count}} ਨੋਟ ਪੜ੍ਹਿਆ",
       "runSummaryNotes_other": "{{count}} ਨੋਟ ਪੜ੍ਹੇ",
-      "runSummaryOffDevice_one": "ਤੁਹਾਡੇ ਨੋਟਾਂ ਦਾ ਲਗਭਗ {{count}} ਅੱਖਰ ਪ੍ਰਦਾਤਾ ਨੂੰ ਭੇਜਿਆ ਗਿਆ",
-      "runSummaryOffDevice_other": "ਤੁਹਾਡੇ ਨੋਟਾਂ ਦੇ ਲਗਭਗ {{count}} ਅੱਖਰ ਪ੍ਰਦਾਤਾ ਨੂੰ ਭੇਜੇ ਗਏ",
       "runSummaryOnDevice": "ਕੁਝ ਵੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਬਾਹਰ ਨਹੀਂ ਗਿਆ",
       "appendFlag": "ਅੰਤ ਵਿੱਚ ਜੋੜਦਾ ਹੈ",
       "diffCurrent": "ਹੁਣ ਨੋਟ ਵਿੱਚ",

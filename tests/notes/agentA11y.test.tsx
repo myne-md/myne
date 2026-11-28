@@ -101,8 +101,9 @@ describe("a change the user did not navigate to is announced", () => {
     fireEvent.click(screen.getByTestId("agent.hub-rename"));
     const input = screen.getByTestId("agent.hub-rename-input");
     fireEvent.change(input, { target: { value: "New name" } });
+    // The field is the whole control: Enter saves, there is no confirm button.
     await act(async () => {
-      fireEvent.click(screen.getByTestId("agent.hub-rename-confirm"));
+      fireEvent.keyDown(input, { key: "Enter" });
     });
     await waitFor(() =>
       expect(screen.getByTestId("agent.hub-announcer").textContent).toContain("New name"),

@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "リクエスト{{count}}件",
       "runSummaryNotes_one": "読み取ったノート{{count}}件",
       "runSummaryNotes_other": "読み取ったノート{{count}}件",
-      "runSummaryOffDevice_one": "ノートの約{{count}}文字がプロバイダーに送信されました",
-      "runSummaryOffDevice_other": "ノートの約{{count}}文字がプロバイダーに送信されました",
       "runSummaryOnDevice": "このデバイスの外には何も出ていません",
       "appendFlag": "末尾に追加",
       "diffCurrent": "現在のノート内",

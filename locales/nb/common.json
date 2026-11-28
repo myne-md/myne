@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} forespørsler",
       "runSummaryNotes_one": "{{count}} notat lest",
       "runSummaryNotes_other": "{{count}} notater lest",
-      "runSummaryOffDevice_one": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
-      "runSummaryOffDevice_other": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
       "runSummaryOnDevice": "ingenting forlot denne enheten",
       "appendFlag": "legges til på slutten",
       "diffCurrent": "I noten nå",

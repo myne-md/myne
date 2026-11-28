@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} درخواست",
       "runSummaryNotes_one": "{{count}} یادداشت خوانده شد",
       "runSummaryNotes_other": "{{count}} یادداشت خوانده شد",
-      "runSummaryOffDevice_one": "حدود {{count}} نویسه از یادداشت‌های شما به ارائه‌دهنده فرستاده شد",
-      "runSummaryOffDevice_other": "حدود {{count}} نویسه از یادداشت‌های شما به ارائه‌دهنده فرستاده شد",
       "runSummaryOnDevice": "چیزی از این دستگاه خارج نشد",
       "appendFlag": "به انتها افزوده می‌شود",
       "diffCurrent": "اکنون در یادداشت",

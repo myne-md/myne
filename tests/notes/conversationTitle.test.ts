@@ -86,6 +86,8 @@ const LONG_TURN = "a".repeat(200);
 const COPY = {
   scopeLabel: "This note",
   startFailed: "start failed",
+  modelCannotEdit: "model cannot edit",
+  stillWorking: "still working",
   autoApplyFailed: "auto apply failed",
   providerRejected: "provider rejected",
   scopeExcluded: "scope excluded",

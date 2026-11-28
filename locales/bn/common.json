@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}}টি অনুরোধ",
       "runSummaryNotes_one": "{{count}}টি নোট পড়া হয়েছে",
       "runSummaryNotes_other": "{{count}}টি নোট পড়া হয়েছে",
-      "runSummaryOffDevice_one": "আপনার নোটের প্রায় {{count}}টি অক্ষর প্রোভাইডারের কাছে পাঠানো হয়েছে",
-      "runSummaryOffDevice_other": "আপনার নোটের প্রায় {{count}}টি অক্ষর প্রোভাইডারের কাছে পাঠানো হয়েছে",
       "runSummaryOnDevice": "কিছুই এই ডিভাইস ছাড়েনি",
       "appendFlag": "শেষে যোগ করে",
       "diffCurrent": "এই মুহূর্তে নোটে",

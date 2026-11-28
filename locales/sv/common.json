@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} begäranden",
       "runSummaryNotes_one": "{{count}} anteckning läst",
       "runSummaryNotes_other": "{{count}} anteckningar lästa",
-      "runSummaryOffDevice_one": "ungefär {{count}} tecken av dina anteckningar skickades till leverantören",
-      "runSummaryOffDevice_other": "ungefär {{count}} tecken av dina anteckningar skickades till leverantören",
       "runSummaryOnDevice": "inget lämnade den här enheten",
       "appendFlag": "läggs till i slutet",
       "diffCurrent": "I notisen nu",

@@ -233,22 +233,24 @@ pub struct WriteAdapter<'a, R: Runtime> {
 impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
     async fn create_note(&self, note: &ProposedNote) -> Result<String, AgentError> {
         // The body the model proposed, with its title and folder rendered as the
-        // ordinary frontmatter a hand-typed note carries. No new format: a note
-        // an agent created is byte-shaped like any other.
-        let mut plaintext = String::from("---\n");
-        plaintext.push_str(&format!("title: {}\n", note.title));
-        if let Some(folder) = note.folder.as_deref().filter(|f| !f.is_empty()) {
-            // **Quoted, for the same reason `move_note` quotes its destination**
-            // (myne-md/myne#848): the excluded-folder clamp reads this line with
-            // the Rust scalar reader while the app reads it with js-yaml, and an
-            // unquoted `#` makes the two disagree. A folder this verb cannot
-            // write faithfully is refused rather than written differently.
-            let scalar = crate::plugins::agent::edit::yaml_folder_scalar(folder)
-                .map_err(|_| AgentError::WriteFailed)?;
-            plaintext.push_str(&format!("folder: {scalar}\n"));
-        }
-        plaintext.push_str("---\n\n");
-        plaintext.push_str(&note.body);
+        // ordinary frontmatter a hand-typed note carries.
+        // **Quoted, for the same reason `move_note` quotes its destination**
+        // (myne-md/myne#848): the excluded-folder clamp reads this line with the
+        // Rust scalar reader while the app reads it with js-yaml, and an unquoted
+        // `#` makes the two disagree. A folder this verb cannot write faithfully
+        // is refused rather than written differently.
+        let folder_scalar = match note.folder.as_deref().filter(|f| !f.is_empty()) {
+            Some(folder) => Some(
+                crate::plugins::agent::edit::yaml_folder_scalar(folder)
+                    .map_err(|_| AgentError::WriteFailed)?,
+            ),
+            None => None,
+        };
+        let plaintext = crate::plugins::notes::new_note_frontmatter::compose_new_note(
+            &note.title,
+            folder_scalar.as_deref(),
+            &note.body,
+        );
         note_create_from_host(&self.host, self.state, &self.hooks, plaintext, &StdVaultIo)
             .await
             .map_err(|err| {

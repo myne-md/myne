@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} درخواستیں",
       "runSummaryNotes_one": "{{count}} نوٹ پڑھا گیا",
       "runSummaryNotes_other": "{{count}} نوٹس پڑھے گئے",
-      "runSummaryOffDevice_one": "آپ کے نوٹس کا تقریباً {{count}} حرف فراہم کنندہ کو بھیجا گیا",
-      "runSummaryOffDevice_other": "آپ کے نوٹس کے تقریباً {{count}} حروف فراہم کنندہ کو بھیجے گئے",
       "runSummaryOnDevice": "کچھ بھی اس آلے سے باہر نہیں گیا",
       "appendFlag": "آخر میں شامل کرتا ہے",
       "diffCurrent": "ابھی نوٹ میں",
