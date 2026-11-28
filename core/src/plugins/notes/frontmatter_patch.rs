@@ -73,7 +73,8 @@ pub enum FrontmatterPatchError {
 /// absent key, an empty value, a block scalar (`|` / `>`) and a structurally
 /// damaged value all read as `None`. A caller comparing against an expected
 /// value therefore treats every one of them as a mismatch rather than as a
-/// match, which is the fail-closed direction for a precondition.
+/// match, which is the fail-closed direction for a precondition. A precondition
+/// of ABSENCE is a different question and gets [`has_field`].
 pub fn read_string_field(plaintext: &[u8], field: &str) -> Option<String> {
     if !is_plain_key(field) {
         return None;
@@ -82,6 +83,24 @@ pub fn read_string_field(plaintext: &[u8], field: &str) -> Option<String> {
     let text = core::str::from_utf8(frontmatter).ok()?;
     let (_, value_portion) = find_key_line(text, field)?;
     parse_scalar(value_portion).map(|v| v.nfc().collect())
+}
+
+/// Whether the note carries `<field>` at all, whatever its value reads as.
+///
+/// The presence half of [`read_string_field`]: asserting absence means the KEY,
+/// and that reader's `None` also covers a block scalar, an empty value and a
+/// damaged value.
+pub fn has_field(plaintext: &[u8], field: &str) -> bool {
+    if !is_plain_key(field) {
+        return false;
+    }
+    let Some(frontmatter) = extract_title_slices(plaintext).frontmatter_bytes else {
+        return false;
+    };
+    let Ok(text) = core::str::from_utf8(frontmatter) else {
+        return false;
+    };
+    find_key_line(text, field).is_some()
 }
 
 /// Replace one top-level frontmatter field with `value`, read back as exactly

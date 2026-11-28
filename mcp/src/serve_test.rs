@@ -38,7 +38,12 @@ fn two_requests_get_two_replies_and_eof_ends_the_loop() {
     assert_eq!(replies.len(), 2);
     assert_eq!(replies[0]["id"], 1);
     assert_eq!(replies[1]["id"], 2);
-    assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 13);
+    // Against the compiled catalog, not a second literal: the question here is
+    // whether discovery over a pipe answers the whole roster, not how big it is.
+    assert_eq!(
+        replies[1]["result"]["tools"].as_array().unwrap().len(),
+        crate::tools::catalog().len()
+    );
 }
 
 #[test]

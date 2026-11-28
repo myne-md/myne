@@ -37,12 +37,14 @@
 //!
 //! ## What is not here yet
 //!
-//! Three of the five write verbs the compiled catalog offers (`note_set_field`,
-//! `note_move`, `note_edit`) are still tasks 15 and 16 of the same feature.
-//! Until they land, [`tools::ToolName::from_wire`] answers `None` for each of them
-//! and the door reports version skew. Recording that here rather than letting a
-//! reader infer it: a verb the catalog advertises and the host refuses looks
-//! identical to a scope bug from the client's side.
+//! Nothing. The surface is the thirteen verbs the catalog advertises, and
+//! `note_set_field` is one of them: it carries a `view_id`, because the host's
+//! field write is VIEW-scoped (the field must be declared writable by a view
+//! approved on this device, and a marker is refused), so the view is where the
+//! authority comes from rather than something this surface invents. It was
+//! advertised here for a while with no dispatch arm, which is what
+//! `mcp/src/surface_test.rs` now makes impossible; this paragraph stays so a
+//! reader can tell a deliberate absence from a forgotten verb.
 //!
 //! The write half is an ALLOW list where the read half beside it is a DENY list
 //! ([`write_scope`]), an empty write grant means "nowhere" where an empty exclusion

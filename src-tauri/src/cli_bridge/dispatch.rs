@@ -590,6 +590,25 @@ mod app_seam {
         app: AppHandle<R>,
     }
 
+    /// Whether a served call changed bytes an editor may be holding open.
+    ///
+    /// A refusal and a queued proposal wrote nothing, so they must not ask the
+    /// WebView to reload; a read changed nothing either. The write half is asked of
+    /// the DISPATCH TABLE rather than of a list here, so a sixth write verb is
+    /// covered the day it lands — the roster-drift defect this surface exists to
+    /// remove.
+    fn call_wrote_bytes(outcome: &McpCallOutcome, tool: &str) -> bool {
+        use myne_core::plugins::mcp::tools::ToolName;
+        if !ToolName::from_wire(tool).is_some_and(ToolName::is_write) {
+            return false;
+        }
+        matches!(
+            outcome,
+            McpCallOutcome::Result(value)
+                if value.get("isError").and_then(serde_json::Value::as_bool) != Some(true)
+        )
+    }
+
     impl<R: Runtime> AppNoteLister<R> {
         pub fn new(app: AppHandle<R>) -> Self {
             Self { app }
@@ -940,7 +959,7 @@ mod app_seam {
             };
             let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
             let io = myne_core::vault_io::StdVaultIo;
-            tauri::async_runtime::block_on(door_call(
+            let outcome = tauri::async_runtime::block_on(door_call(
                 DoorContext {
                     host: &host,
                     state: state.inner(),
@@ -955,7 +974,71 @@ mod app_seam {
                     tool: &request.tool,
                     arguments: &request.arguments,
                 },
-            ))
+            ));
+            // A served write lands on disk under a WebView that may hold the same
+            // note open, and the field write is read-patch-write: a pane keeping its
+            // pre-write body would rewrite it on the next autosave. The refresh
+            // chain is the one the CLI and the agent already trigger (#258) —
+            // relist, reindex, reload the open pane behind its own dirty guard — so
+            // this is a third writer of one condition rather than a fourth
+            // mechanism. Best-effort, like those: a failed emit leaves the editor
+            // where it was and must not fail a write that already landed.
+            if call_wrote_bytes(&outcome, &request.tool) {
+                self.notify_notes_changed();
+            }
+            outcome
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::call_wrote_bytes;
+        use myne_core::plugins::mcp::tools::McpCallOutcome;
+        use serde_json::json;
+
+        /// The event asks the WebView to relist, reindex and reload its open pane
+        /// behind the dirty guard, so it is owed exactly when bytes changed: not by a
+        /// read, not by a refusal, not by a proposal that wrote nothing, and not by a
+        /// verb this build does not serve.
+        #[test]
+        fn only_a_served_write_asks_the_editor_to_reload() {
+            let served = |value| McpCallOutcome::Result(value);
+            assert!(call_wrote_bytes(
+                &served(json!({ "isError": false })),
+                "note_set_field"
+            ));
+            assert!(call_wrote_bytes(
+                &served(json!({ "isError": false })),
+                "note_append"
+            ));
+            assert!(!call_wrote_bytes(
+                &served(json!({ "isError": true })),
+                "note_set_field"
+            ));
+            assert!(!call_wrote_bytes(
+                &served(json!({ "isError": false })),
+                "note_read"
+            ));
+            assert!(!call_wrote_bytes(
+                &McpCallOutcome::QueueProposal {
+                    verb: "note_create",
+                    folder: "projects/".to_string(),
+                    summary: "a note".to_string(),
+                },
+                "note_create"
+            ));
+            assert!(!call_wrote_bytes(
+                &McpCallOutcome::Refused(
+                    myne_core::plugins::mcp::error::McpToolError::UnknownNote {
+                        note_id: "01a2".to_string(),
+                    }
+                ),
+                "note_edit"
+            ));
+            assert!(!call_wrote_bytes(
+                &served(json!({ "isError": false })),
+                "note_delete"
+            ));
         }
     }
 }

@@ -17,4 +17,5 @@
     <exclude domain="external" path="Documents" />
     <exclude domain="file" path="person-auth.json" />
     <exclude domain="sharedpref" path="md.myne.devicekey" />
+    <exclude domain="sharedpref" path="md.myne.labelstore" />
 </full-backup-content>

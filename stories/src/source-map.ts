@@ -12,7 +12,7 @@ export interface SourceReference {
 
 export const SOURCE_MAP: Record<string, SourceReference> = {
   "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 181 },
-  "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 212 },
+  "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 213 },
   "ActionStatus": { file: "src/components/ActionStatus.tsx", line: 153 },
   "AgentConversationView": { file: "src/notes/agent/AgentConversationView.tsx", line: 66 },
   "AgentFootprint": { file: "src/notes/agent/components/AgentFootprint.tsx", line: 132 },
