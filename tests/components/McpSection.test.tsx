@@ -428,7 +428,7 @@ describe("the approval dialog", () => {
     expect(setMcpConnectionGrant).toHaveBeenCalledWith(
       "claude-desktop",
       ["Private/"],
-      ["Projects/", "Projects/New/", "Work/"],
+      ["Projects/", "Work/"],
       ["note_edit"],
     );
   });
@@ -554,6 +554,13 @@ describe("the approval dialog", () => {
     // it is empty until they use it, and the grant says so rather than naming
     // every folder (myne-md/myne#1077, task 19).
     readMcpExternalAccess.mockResolvedValue(view([]));
+    readMcpGrantPreview.mockResolvedValue({
+      noteCount: 40,
+      folderCount: 4,
+      excludedCount: 0,
+      excludedFolders: [],
+      folders: ["", "Private/", "Projects/", "Projects/New/", "Work/"],
+    });
     renderSection();
     await screen.findByTestId("settings.mcp-add");
     fireEvent.click(screen.getByTestId("settings.mcp-add"));
@@ -568,6 +575,35 @@ describe("the approval dialog", () => {
     expect(excluded).toEqual([]);
     // Every folder the vault has, and the root sentinel is not a folder.
     expect(write).toEqual(["Private/", "Projects/", "Projects/New/", "Work/"]);
+  });
+
+  it("approves the default whole-vault connection when a folder is AI-excluded", async () => {
+    // A folder left out of Myne's own AI must not be submitted as writable:
+    // the host rejects the whole approval when any write folder is inside that
+    // quiet union, so the derivation has to take the readable set from the
+    // preview rather than from every folder in the view.
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    readMcpGrantPreview.mockResolvedValue({
+      noteCount: 40,
+      folderCount: 3,
+      excludedCount: 1,
+      excludedFolders: ["Private/"],
+      folders: ["", "Projects/", "Projects/New/", "Work/"],
+    });
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
+    fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
+    await screen.findByTestId("settings.mcp-step-scope");
+
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    const [name, excluded, write] = setMcpConnectionGrant.mock.calls[0];
+    expect(name).toBe("claude-desktop");
+    expect(excluded).toEqual([]);
+    expect(write).toEqual(["Projects/", "Projects/New/", "Work/"]);
+    expect(write).not.toContain("Private/");
   });
 
   it("shows the switch bank on a vault that has never approved a connection", async () => {

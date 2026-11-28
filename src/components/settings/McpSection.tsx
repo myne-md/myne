@@ -408,11 +408,13 @@ export function McpSection({
     const chosen = new Set(flow.access);
     if (flow.wholeVault) {
       // The list is the exclusions, and every folder it does not name is granted.
+      // Write scope comes from the host's readable set (preview.folders), which
+      // already excludes the quiet union (AI/CLI excluded folders); deriving
+      // from view.folders would submit folders the host rejects.
+      const readable = preview?.folders ?? known;
       return {
         excluded: flow.access,
-        // The root sentinel (`""`) is not a folder a write scope names; it is what
-        // the picker shows for "the vault root", and the grant derives it.
-        write: known.filter((folder) => folder !== "" && !chosen.has(folder)),
+        write: readable.filter((folder) => folder !== "" && !chosen.has(folder)),
       };
     }
     return {
