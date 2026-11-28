@@ -403,7 +403,7 @@ describe("the approval dialog", () => {
     // three-clause text).
     fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
     expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain(
-      "can change anything in them",
+      "can change anything in the folders you name",
     );
     fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
