@@ -319,7 +319,11 @@ export function HomeSurface() {
               // columns left over in a row is filled by the next card instead of
               // leaving a gap, which is what the old independent column stacks did.
               gridAutoFlow: "row dense",
-              alignItems: "start",
+              // **Equal heights across a row** (owner, 2026-11-27). Stretch is the
+              // grid's default and it is the honest one: two cards side by side at
+              // different heights read as a layout accident, and a row is the unit
+              // the eye scans. `start` sized every card to its own content, which is
+              // right for masonry and wrong for a board.
               gap: "var(--space-3)",
             }}
           >
