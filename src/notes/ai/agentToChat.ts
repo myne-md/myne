@@ -107,6 +107,9 @@ export interface LegFailureCopy {
    * scope at all, and the only place "the scope could not be widened" is true.
    */
   rootGrant: string;
+  modelCannotEdit: string;
+  stillWorking: string;
+
   /** Nothing more specific is known. */
   generic: string;
   /**
@@ -139,6 +142,8 @@ export function legFailureSentence(
   if (tag === "RootGrant") return copy.rootGrant;
   if (tag === "EmptyGrant") return copy.scopeExcluded;
   if (tag === "ProviderRejected") return copy.providerRejected;
+  if (tag === "EditFormatUnsupported") return copy.modelCannotEdit;
+  if (tag === "StepAlreadyRunning") return copy.stillWorking;
   // The shared taxonomy next, for the failures whose FIX it names, a gate
   // refusal above all, since the host already said which gate it was and the
   // generic sentence throws that away.
@@ -152,6 +157,8 @@ export interface AgentRunCopy {
   scopeLabel: string;
   /** The sentence for a start that never landed. */
   startFailed: string;
+  modelCannotEdit: string;
+  stillWorking: string;
   /** The sentence for a leg that stopped after it started. */
   legFailed: string;
   /** The sentence for a folder grant the host refused as the vault root. */
@@ -379,9 +386,9 @@ export async function startAgentRun(
     settleRunIntoChat(result, epoch);
     if (auto) await autoApplyRun(epoch, copy, onNotesWritten);
   } catch (failure) {
-    // **The same epoch check the success path gets, spelled out.** On the
-    // success path it is transitive: `settleRunIntoChat` returns early when
-    // `settleStep` rejects the epoch, so the transcript write never happens.
+    // **The same epoch check the success path gets, spelled out.** There it is
+    // transitive: `settleRunIntoChat` returns early when `settleStep` rejects
+    // the epoch, so the transcript write never happens.
     // The failure path had no equivalent, and `failAgentTurn` writes onto
     // whatever `lastAgentIndex` finds, so run one's "the agent could not start"
     // was stamped as an error onto run two's live turn while run two was still
@@ -404,9 +411,8 @@ export async function startAgentRun(
     // the excluded folders", and everything else.
     const sentence = legFailureSentence(failure, {
       ...copy,
-      // The start's own generic: a leg that never landed has not "stopped", it
-      // never started.
-      generic: copy.startFailed,
+      // What the run reached decides which generic is true (2026-11-27).
+      generic: getAgent().view === null ? copy.startFailed : copy.legFailed,
     });
     failRun(sentence);
     failAgentTurn(sentence);

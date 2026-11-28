@@ -808,29 +808,27 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     expect(summary).toContain("agentTurn.proposed:4");
     expect(summary).toContain("agentTurn.newNotes:1");
 
-    // The three figures the review screen reports, one click away
-    // (myne-md/myne#848). The third is the one the remote arm's compensating
-    // control rests on (decisions/ai/0515), so "the run stayed local" must
-    // not render as a zero character count, and it must still be REACHABLE,
-    // which is why this expands rather than looking for it on the line.
+    // The figures the review screen reports, one click away (myne-md/myne#848),
+    // plus the local statement: a run that never left this device says so, which
+    // is why this expands rather than looking for it on the line.
     fireEvent.click(screen.getByTestId("agentFootprint.disclosure"));
     const cost = screen.getByTestId("agentFootprint.runCost").textContent ?? "";
     expect(cost).toContain("runSummaryRequests:3");
     expect(cost).toContain("runSummaryNotes:6");
     expect(cost).toContain("agent.review.runSummaryOnDevice");
-    expect(cost).not.toContain("runSummaryOffDevice");
   });
 
-  it("keeps a remote run's off-device character count distinct from a local one", () => {
+  it("reports a remote run's requests and reads, without a character count", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({ ...SUMMARY, charsOffDevice: 0 });
     render(<AiChatTab />);
-    // Remote, and nothing was sent. Not the same statement as "it stayed here",
-    // and collapsing the two is what this asserts against.
+    // Remote, so the local statement is absent (2026-11-27: the off-device
+    // character count was dropped from the line, and the local case kept).
     fireEvent.click(screen.getByTestId("agentFootprint.disclosure"));
-    expect(screen.getByTestId("agentFootprint.runCost").textContent).toContain(
-      "runSummaryOffDevice:0",
-    );
+    const cost = screen.getByTestId("agentFootprint.runCost").textContent ?? "";
+    expect(cost).toContain("runSummaryRequests:3");
+    expect(cost).toContain("runSummaryNotes:6");
+    expect(cost).not.toContain("agent.review.runSummaryOnDevice");
   });
 
   it("shows the scope the task was sent under, on the user's own turn", () => {

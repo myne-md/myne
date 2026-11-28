@@ -432,6 +432,13 @@ export function AgentReview({
       agent.applied.notesCreated.length +
       (agent.applied.settingsChanged?.length ?? 0);
 
+  /** Nothing left to DECIDE: an automatic run has already applied, and a reader
+   *  can empty the card by hand. At zero neither act can do anything
+   *  (2026-11-27: "Reject all 0" beside "Approve 0 changes" under "2 changes
+   *  applied"), so the pair is not drawn. Undo is not a decision and stays. */
+  const undoable = agent.applied !== null && hasAnythingToUndo(agent.applied);
+  const hasDecision = proposedTotal > 0 || hasApprovedWork;
+
   return (
     <div
       ref={cardRef}
@@ -684,110 +691,113 @@ export function AgentReview({
 
       </div>
 
-      <footer
-        className="myne-review-region"
-        style={{
-          display: "flex",
-          // **The two acts share one line, and they shrink before they stack**
-          // (issue #970, item 13, twice). The first pass forbade a break inside a
-          // label, which stopped "Reject / all 2" but only moved the problem: the
-          // row still exceeded the panel's width, so `flexWrap` put the whole
-          // primary act on a line of its own and the user read the pair as
-          // stacked, not side by side. A footer with exactly two closing acts
-          // does not wrap at all: the row is `nowrap`, both buttons may shrink
-          // (`minWidth: 0` and a content basis), and the space between them is a
-          // spacer that absorbs the slack rather than a `space-between` that
-          // keeps the gap fixed while the labels fight for the rest.
-          flexWrap: "nowrap",
-          alignItems: "center",
-          gap: "var(--space-2)",
-          // Equal on all four sides, per the same read: the side inset was wider
-          // than the vertical one, which pushed the pair in from the card's edge.
-          padding: "var(--space-3)",
-          borderTop: "1px solid var(--line-1)",
-        }}
-      >
-        {/* **The acts, and nothing else.** The run's cost line used to sit here
-            too, which is the third place the same figures appeared: the turn's
-            own footprint already reports the run (myne-md/myne#848 moved it
-            there for the settled and the running case alike), and a second copy
-            in the footer made a decision card carry the run's discharge as well.
-            A reader who wants the figures opens them on the line that owns
-            them. */}
-        {agent.applied && hasAnythingToUndo(agent.applied) ? (
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => void undo()}
-            data-testid="agentReview.undo"
-          >
-            {t("agent.review.undo")}
-          </Button>
-        ) : null}
-        {/* `flex: 1` with a zero basis, so it eats the slack when there is room
-            and disappears when there is not (a `flex: 1` spacer with a content
-            basis keeps a line of its own and pushes both acts down). */}
-        <span style={{ flex: "1 1 0", minWidth: 0 }} />
-        <Button
-          variant="ghost"
-          // **Gated on "the proposal holds anything", not on the edit rows**
-          // (myne-md/myne#894, from the review). `rows` is edits only, and the ×
-          // that used to be the always-enabled way out is gone, so a settings-only
-          // proposal (which this surface renders on purpose, myne-md/myne#850)
-          // painted Reject all disabled, "Approve 0 changes" disabled, and nothing
-          // else: a decision card whose every control was dead.
-          disabled={busy || !anythingProposed}
-          /* **Reject all IS the exit** (myne-md/myne#894, on the user's read:
-             "drop the ×, reject all will do that job"). The card has exactly two
-             ways out, approve, or reject, and a third control that only
-             dismissed the proposal was the one that needed the rule "closing
-             discards a proposal you have not applied" spelled out beside it. So
-             rejecting everything and closing are one act, and the rule is
-             unchanged: the run is dropped, nothing is written. */
-          onClick={() => {
-            // Every verb, not the edits alone: "reject all" that left a proposed
-            // new note or setting untouched would be a control whose name is
-            // false. The per-row toggles are current at render, so this only
-            // touches the ones still kept.
-            rejectAll(rows.map((r) => r.index));
-            agent.proposal.newNotes.forEach((_, i) => {
-              if (!agent.rejectedNewNotes.has(i)) toggleNewNote(i);
-            });
-            (agent.proposal.settings ?? []).forEach((_, i) => {
-              if (!agent.rejectedSettings.has(i)) toggleSetting(i);
-            });
-            // Before the close, because closing drops the run: the outcome has to
-            // be recorded while the card still knows which run it is about.
-            onDecision?.("rejected");
-            onClose();
+      {undoable || hasDecision || (agent.applied === null && anythingProposed) ? (
+        <footer
+          className="myne-review-region"
+          style={{
+            display: "flex",
+            // **The two acts share one line, and they shrink before they stack**
+            // (issue #970, item 13, twice). The first pass forbade a break inside a
+            // label, which stopped "Reject / all 2" but only moved the problem: the
+            // row still exceeded the panel's width, so `flexWrap` put the whole
+            // primary act on a line of its own and the user read the pair as
+            // stacked, not side by side. A footer with exactly two closing acts
+            // does not wrap at all: the row is `nowrap`, both buttons may shrink
+            // (`minWidth: 0` and a content basis), and the space between them is a
+            // spacer that absorbs the slack rather than a `space-between` that
+            // keeps the gap fixed while the labels fight for the rest.
+            flexWrap: "nowrap",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            // Equal on all four sides, per the same read: the side inset was wider
+            // than the vertical one, which pushed the pair in from the card's edge.
+            padding: "var(--space-3)",
+            borderTop: "1px solid var(--line-1)",
           }}
-          data-testid="agentReview.rejectAll"
-          style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
         >
-          {/* **The count, like the sibling control has** (myne-md/myne#894, from
-              review). This is the one act that drops the whole proposal, it is
-              now the only exit, and "Reject all" understated what one click
-              discards: the number is the reader's only notice of the size.
-              A digit beside the label rather than a plural inside the catalog
-              string, which is what a `{{count}}` here would cost 31 catalogs. */}
-          {t("agent.review.rejectAll")}
-          <span
-            data-testid="agentReview.rejectAllCount"
-            style={{ color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}
-          >
-            {proposedTotal}
-          </span>
-        </Button>
-        <Button
-          variant="primary"
-          disabled={busy || !hasApprovedWork}
-          onClick={() => void approveAll()}
-          data-testid="agentReview.approveAll"
-          style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
-        >
-          {t("agent.review.approveAll", { count: approveAllCount })}
-        </Button>
-      </footer>
+          {/* **The acts, and nothing else.** The run's cost line used to sit here
+              too, a third copy of figures the turn's own footprint reports. */}
+          {undoable ? (
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void undo()}
+              data-testid="agentReview.undo"
+            >
+              {t("agent.review.undo")}
+            </Button>
+          ) : null}
+          {hasDecision || (agent.applied === null && anythingProposed) ? (
+            <>
+              {/* `flex: 1` with a zero basis, so it eats the slack when there is room
+                  and disappears when there is not (a `flex: 1` spacer with a content
+                  basis keeps a line of its own and pushes both acts down). */}
+              <span style={{ flex: "1 1 0", minWidth: 0 }} />
+              <Button
+                variant="ghost"
+                // **Gated on "the proposal holds anything", not on the edit rows**
+                // (myne-md/myne#894, from the review). `rows` is edits only, and the ×
+                // that used to be the always-enabled way out is gone, so a settings-only
+                // proposal (which this surface renders on purpose, myne-md/myne#850)
+                // painted Reject all disabled, "Approve 0 changes" disabled, and nothing
+                // else: a decision card whose every control was dead.
+                disabled={busy || !anythingProposed}
+                /* **Reject all IS the exit** (myne-md/myne#894, on the user's read:
+                   "drop the ×, reject all will do that job"). The card has exactly two
+                   ways out, approve, or reject, and a third control that only
+                   dismissed the proposal was the one that needed the rule "closing
+                   discards a proposal you have not applied" spelled out beside it. So
+                   rejecting everything and closing are one act, and the rule is
+                   unchanged: the run is dropped, nothing is written. */
+                onClick={() => {
+                  // Every verb, not the edits alone: "reject all" that left a proposed
+                  // new note or setting untouched would be a control whose name is
+                  // false. The per-row toggles are current at render, so this only
+                  // touches the ones still kept.
+                  rejectAll(rows.map((r) => r.index));
+                  agent.proposal.newNotes.forEach((_, i) => {
+                    if (!agent.rejectedNewNotes.has(i)) toggleNewNote(i);
+                  });
+                  (agent.proposal.settings ?? []).forEach((_, i) => {
+                    if (!agent.rejectedSettings.has(i)) toggleSetting(i);
+                  });
+                  // Before the close, because closing drops the run: the outcome has to
+                  // be recorded while the card still knows which run it is about.
+                  onDecision?.("rejected");
+                  onClose();
+                }}
+                data-testid="agentReview.rejectAll"
+                style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
+              >
+                {/* **The count, like the sibling control has** (myne-md/myne#894, from
+                    review). This is the one act that drops the whole proposal, it is
+                    now the only exit, and "Reject all" understated what one click
+                    discards: the number is the reader's only notice of the size.
+                    A digit beside the label rather than a plural inside the catalog
+                    string, which is what a `{{count}}` here would cost 31 catalogs. */}
+                {t("agent.review.rejectAll")}
+                <span
+                  data-testid="agentReview.rejectAllCount"
+                  style={{ color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}
+                >
+                  {proposedTotal}
+                </span>
+              </Button>
+              {hasDecision ? (
+                <Button
+                  variant="primary"
+                  disabled={busy || !hasApprovedWork}
+                  onClick={() => void approveAll()}
+                  data-testid="agentReview.approveAll"
+                  style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
+                >
+                  {t("agent.review.approveAll", { count: approveAllCount })}
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+        </footer>
+      ) : null}
     </div>
   );
 }

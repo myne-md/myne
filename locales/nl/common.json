@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} verzoeken",
       "runSummaryNotes_one": "{{count}} notitie gelezen",
       "runSummaryNotes_other": "{{count}} notities gelezen",
-      "runSummaryOffDevice_one": "ongeveer {{count}} teken van je notities is naar de provider verzonden",
-      "runSummaryOffDevice_other": "ongeveer {{count}} tekens van je notities zijn naar de provider verzonden",
       "runSummaryOnDevice": "niets heeft dit apparaat verlaten",
       "appendFlag": "wordt aan het einde toegevoegd",
       "diffCurrent": "In de notitie nu",

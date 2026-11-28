@@ -188,8 +188,6 @@
       "runSummaryRequests_other": "{{count}} kérés",
       "runSummaryNotes_one": "{{count}} jegyzet elolvasva",
       "runSummaryNotes_other": "{{count}} jegyzet elolvasva",
-      "runSummaryOffDevice_one": "a jegyzeteidből körülbelül {{count}} karakter lett elküldve a szolgáltatónak",
-      "runSummaryOffDevice_other": "a jegyzeteidből körülbelül {{count}} karakter lett elküldve a szolgáltatónak",
       "runSummaryOnDevice": "semmi sem hagyta el ezt az eszközt",
       "appendFlag": "a végére kerül",
       "diffCurrent": "Jegyzetben most",
