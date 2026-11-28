@@ -897,7 +897,7 @@ export function ChatComposer({
         }
         readings.push(reading);
       }
-      if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings]);
+      if (readings.length > 0) setDeviceDocs((rows) => [...rows, ...readings].slice(0, MAX_RUN_ATTACHMENTS));
     } finally {
       setReadingDevice(false);
       // Or picking the same file twice fires no `change` event.
@@ -1361,6 +1361,7 @@ export function ChatComposer({
           icon="image-plus"
           label={t("agent.attachments.fromDevice")}
           tooltip
+          disabled={readingDevice}
           testId="ai.composer-device"
           onClick={() => deviceInput.current?.click()}
         />

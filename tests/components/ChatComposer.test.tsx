@@ -1565,3 +1565,50 @@ describe("ChatComposer: send is gated while a device read is in flight", () => {
     });
   });
 });
+
+describe("ChatComposer: device readings are capped (myne-md/myne#58)", () => {
+  it("caps a multi-file pick at MAX_RUN_ATTACHMENTS and disables the device control while reading", async () => {
+    const resolvers: Array<(r: unknown) => void> = [];
+    readEphemeralFile.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    mount();
+    const input = screen.getByTestId("ai.composer-device-input") as HTMLInputElement;
+    const files = Array.from({ length: 6 }, (_, i) =>
+      new File(["x"], `f${i}.txt`, { type: "text/plain" }),
+    );
+    await act(async () => {
+      fireEvent.change(input, { target: { files } });
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-device") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+    // Reads happen sequentially; resolve each as it starts, capping at 4.
+    for (let i = 0; i < 4; i++) {
+      await waitFor(() => expect(resolvers.length).toBe(i + 1));
+      await act(async () => {
+        resolvers[i]({ name: `f${i}.txt`, text: "hi", status: "ok", char_count: 2, truncated: false });
+        await Promise.resolve();
+      });
+    }
+    // No fifth read should have started (cap).
+    await new Promise((r) => setTimeout(r, 50));
+    expect(resolvers.length).toBe(4);
+    await waitFor(() =>
+      expect(
+        screen.getAllByTestId("ai.composer-device-attachment").length,
+      ).toBe(4),
+    );
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-device") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+  });
+});
