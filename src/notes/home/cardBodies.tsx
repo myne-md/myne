@@ -383,7 +383,7 @@ function MarkdownBody({ card }: { card: HomeCard }) {
   const { setOptions } = useHomeLayout();
   const stored = card.options?.markdown ?? "";
   const [draft, setDraft] = useState(stored);
-  const [editing, setEditing] = useState(stored === "");
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     setDraft(stored);

@@ -101,7 +101,9 @@ export const HOME_CARD_SPECS: readonly HomeCardSpec[] = [
     descriptionKey: "notes.home.cards.quickCaptureHint",
     icon: "pencil",
     group: "capture",
-    defaultSpan: 1,
+    // Two quarters: a field and its button in one quarter is a field with no room
+    // to show what you typed.
+    defaultSpan: 2,
   },
   {
     kind: "markdown",
@@ -270,7 +272,7 @@ export const DEFAULT_HOME_CARDS: readonly HomeCard[] = [
   { id: "start-chat", kind: "start-chat", span: 4, options: {} },
   { id: "recent-notes", kind: "recent-notes", span: 2, options: {} },
   { id: "todays-tasks", kind: "todays-tasks", span: 2, options: {} },
-  { id: "quick-capture", kind: "quick-capture", span: 1, options: {} },
+  { id: "quick-capture", kind: "quick-capture", span: 2, options: {} },
   { id: "calendar-agenda", kind: "calendar-agenda", span: 2, options: {} },
   { id: "files-preview", kind: "files-preview", span: 2, options: {} },
   { id: "favorites", kind: "favorites", span: 1, options: {} },

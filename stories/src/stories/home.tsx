@@ -80,7 +80,7 @@ export const HOME_STORIES: StoryDescriptor[] = [
     state: "default",
     fixture: prefsFixture(null),
     description:
-      "The home surface on a vault that has never been arranged: the default eleven cards, each with a real empty state.",
+      "The board on a vault that has never been arranged: the default widgets, each with a real empty state, on the 12-column grid.",
     tags: ["home", "surface", "cards", "empty"],
     render: () => <Home />,
   },
@@ -90,14 +90,15 @@ export const HOME_STORIES: StoryDescriptor[] = [
     surface: "HomeSurface",
     state: "arranged",
     fixture: prefsFixture([
+      { id: "start-chat", kind: "start-chat", span: 4 },
       { id: "recent-notes", kind: "recent-notes", span: 2 },
-      { id: "todays-tasks", kind: "todays-tasks", span: 1 },
-      { id: "calendar-agenda", kind: "calendar-agenda", span: 1 },
-      { id: "recent-files", kind: "recent-files", span: 1 },
+      { id: "todays-tasks", kind: "todays-tasks", span: 2 },
+      { id: "quick-capture", kind: "quick-capture", span: 1 },
+      { id: "files-preview", kind: "files-preview", span: 3 },
     ]),
     description:
-      "An arrangement a person made: four cards, one of them spanning both columns, in their own order.",
-    tags: ["home", "surface", "cards", "arranged", "span"],
+      "A bento arrangement: a full-width chat bar, a half-width pair, a quarter and a three-quarter card, packed with dense flow so no column is left with a hole.",
+    tags: ["home", "surface", "bento", "arranged", "span"],
     render: () => <Home />,
   },
   {
@@ -115,14 +116,14 @@ export const HOME_STORIES: StoryDescriptor[] = [
     render: () => <Home />,
   },
   {
-    id: "home/open-on-start",
+    id: "home/empty",
     group: "screens",
     surface: "HomeSurface",
-    state: "open-on-start",
-    fixture: prefsFixture(null, true),
+    state: "empty",
+    fixture: prefsFixture([]),
     description:
-      "The same surface with the device-local open-on-start switch on, as the settings row renders it.",
-    tags: ["home", "surface", "preference", "start"],
-    render: () => <Home openOnStart />,
+      "A board a person emptied on purpose: one sentence and the one control that helps, because an empty board is a state and not a bug.",
+    tags: ["home", "surface", "empty"],
+    render: () => <Home />,
   },
 ];
