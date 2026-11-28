@@ -1,18 +1,17 @@
-// What a run cost, in the three figures the user is entitled to (myne#529).
+// What a run cost, in the figures the user is entitled to (myne#529).
 //
 // **One component because the sentence is load-bearing, not decorative.**
 // `design-notes/ai/0515` records this line as the compensating control for
-// the remote arm having no volume bound: "the residual is disclosed rather than
-// capped: a finished run reports the requests it made, the notes it read, and
-// how much text left the device". A control that is worded in two places is a
-// control that is worded differently in two places, and the two copies had
+// the remote arm having no volume bound. A control that is worded in two places
+// is a control that is worded differently in two places, and the two copies had
 // already drifted on their separator before this file existed.
 //
-// The third figure is the one the argument actually rests on, which is why
-// `null` and `0` are kept apart all the way to the screen: "the run stayed on
-// this device" and "the run was remote and sent nothing" are different
-// statements, and collapsing them into a zero would report the second as the
-// first.
+// **The off-device character count is gone** (2026-11-27, on the owner's read:
+// "this about-x-characters thing is not needed"). It was the longest clause on
+// a line that is read at a glance and the one figure nobody acted on. What
+// stays is the distinction the sentence still needs: `null` means the run never
+// left this device, and it is kept apart from a remote run that sent nothing —
+// a remote run now reports its requests and its reads only.
 
 import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
@@ -36,15 +35,14 @@ export function RunCostLine({
   style,
 }: RunCostLineProps) {
   const { t } = useTranslation();
+  const parts = [
+    t("agent.review.runSummaryRequests", { count: iterations }),
+    t("agent.review.runSummaryNotes", { count: notesRead }),
+  ];
+  if (charsOffDevice === null) parts.push(t("agent.review.runSummaryOnDevice"));
   return (
     <span data-testid={testId} style={style}>
-      {t("agent.review.runSummaryRequests", { count: iterations })}
-      {", "}
-      {t("agent.review.runSummaryNotes", { count: notesRead })}
-      {", "}
-      {charsOffDevice === null
-        ? t("agent.review.runSummaryOnDevice")
-        : t("agent.review.runSummaryOffDevice", { count: charsOffDevice })}
+      {parts.join(", ")}
     </span>
   );
 }

@@ -598,16 +598,14 @@ impl super::intent::McpNoteWriter for VaultNoteWriter<'_> {
     ) -> Result<String, McpToolError> {
         let folder_scalar = Self::scalar(folder)?;
         let title_scalar = Self::scalar(title)?;
-        // The ordinary frontmatter a hand-typed note carries, in the app's own key
-        // order: no new on-disk shape, and nothing here that the notes plugin would
-        // treat differently from a note the person created.
-        let mut plaintext = String::from("---\n");
-        plaintext.push_str(&format!("title: {title_scalar}\n"));
-        if !folder.trim().is_empty() {
-            plaintext.push_str(&format!("folder: {folder_scalar}\n"));
-        }
-        plaintext.push_str("---\n\n");
-        plaintext.push_str(body);
+        // The ordinary frontmatter a hand-typed note carries, in the app's own
+        // key order — plus any fields a body opening with its own block carries,
+        // merged rather than left to render as text (`compose_new_note`).
+        let plaintext = crate::plugins::notes::new_note_frontmatter::compose_new_note(
+            &title_scalar,
+            Some(&folder_scalar),
+            body,
+        );
         crate::plugins::notes::commands::note_create_from_host(
             self.host, self.state, self.hooks, plaintext, self.io,
         )

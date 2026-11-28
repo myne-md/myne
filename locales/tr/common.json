@@ -183,8 +183,6 @@
       "runSummaryRequests_other": "{{count}} istek",
       "runSummaryNotes_one": "{{count}} not okundu",
       "runSummaryNotes_other": "{{count}} not okundu",
-      "runSummaryOffDevice_one": "notlarınızın yaklaşık {{count}} karakteri sağlayıcıya gönderildi",
-      "runSummaryOffDevice_other": "notlarınızın yaklaşık {{count}} karakteri sağlayıcıya gönderildi",
       "runSummaryOnDevice": "hiçbir şey bu cihazdan çıkmadı",
       "appendFlag": "sona ekler",
       "diffCurrent": "Not içinde şimdi",

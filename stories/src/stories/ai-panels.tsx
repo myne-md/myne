@@ -27,6 +27,7 @@ import {
   currentRunEpoch,
   markConversationUnread,
   openRun,
+  settleApply,
   settleStep,
 } from "@app/notes/agent/agentStore";
 
@@ -203,7 +204,15 @@ function SeededProgress() {
  * `--paper-2` and padding: a card's job in this design is to sit INSIDE another
  * surface, and mounting it on a bare stage would hide whether that reads.
  */
-function SeededCard({ width }: { width: number }) {
+function SeededCard({
+  width,
+  autoApplied = false,
+}: {
+  width: number;
+  /** Settle the apply itself, the way "Apply automatically" does: no click, and
+   *  nothing left to decide when the card renders. */
+  autoApplied?: boolean;
+}) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     beginRun(null);
@@ -216,34 +225,55 @@ function SeededCard({ width }: { width: number }) {
           modelGrants: 0,
           cancelled: false,
         },
-        proposal: {
-          edits: [
-            {
-              noteId: "n1",
-              // The row this story discloses, so the diff mode is what the pair
-              // shows rather than a claim about a card whose rows are closed
-              // (myne-md/myne#894, from review).
-              kind: "replace",
-              anchor: "The draft lists three dates and no owners.",
-              replacement: "The draft lists three dates, each with an owner.",
+        proposal: autoApplied
+          ? {
+              // The automatic path applies EDITS without keeping the card, so
+              // the run a report like "2 changes applied" leaves behind is a
+              // pair of CREATES: a created note holds the review open, which is
+              // what made the reported card still be on screen at all.
+              edits: [],
+              newNotes: [
+                {
+                  title: "Berlin Brandenburg to Istanbul Sabiha Gokcen",
+                  body: "Departs 17:05, arrives 20:00.",
+                  folder: null,
+                },
+                {
+                  title: "Istanbul Sabiha Gokcen to Berlin Brandenburg",
+                  body: "Departs 15:00, arrives 17:50.",
+                  folder: null,
+                },
+              ],
+              summary: "Added both flights to the calendar.",
+            }
+          : {
+              edits: [
+                {
+                  noteId: "n1",
+                  // The row this story discloses, so the diff mode is what the
+                  // pair shows rather than a claim about a card whose rows are
+                  // closed (myne-md/myne#894, from review).
+                  kind: "replace",
+                  anchor: "The draft lists three dates and no owners.",
+                  replacement: "The draft lists three dates, each with an owner.",
+                },
+                {
+                  noteId: "n2",
+                  kind: "replace",
+                  anchor: "Two notes still need a source list.",
+                  replacement: "Two notes still need a source list and a date.",
+                },
+                {
+                  noteId: "n2",
+                  kind: "append",
+                  anchor: "",
+                  replacement: "\n\nFollow-ups are listed in the project note.",
+                },
+              ],
+              newNotes: [],
+              summary:
+                "Analyzed all 23 notes in 00 - INBOX/ and rehomed each according to your PARA structure.",
             },
-            {
-              noteId: "n2",
-              kind: "replace",
-              anchor: "Two notes still need a source list.",
-              replacement: "Two notes still need a source list and a date.",
-            },
-            {
-              noteId: "n2",
-              kind: "append",
-              anchor: "",
-              replacement: "\n\nFollow-ups are listed in the project note.",
-            },
-          ],
-          newNotes: [],
-          summary:
-            "Analyzed all 23 notes in 00 - INBOX/ and rehomed each according to your PARA structure.",
-        },
         end: { kind: "finished" },
         iterations: 2,
         notesRead: 23,
@@ -253,9 +283,27 @@ function SeededCard({ width }: { width: number }) {
       },
       currentRunEpoch(),
     );
+    if (autoApplied) {
+      settleApply(
+        {
+          applied: 0,
+          refused: [],
+          refusedNewNotes: [],
+          notesWritten: [],
+          notesCreated: ["new-1", "new-2"],
+          // A created note keeps no restore point, and the reported screen
+          // showed no Undo either.
+          restorePoints: [],
+        },
+        [],
+        currentRunEpoch(),
+        [],
+        [0, 1],
+      );
+    }
     setReady(true);
     return () => clearAgentForLock();
-  }, []);
+  }, [autoApplied]);
 
   // **The disclosed row is what the pair exists to show.** Two cards whose rows
   // are closed render the same DOM, which is what the review measured: the mode
@@ -398,7 +446,7 @@ export const AI_STORIES: StoryDescriptor[] = [
     surface: "RunCostLine",
     state: "default",
     description:
-      "What a run cost, in one line: model round-trips, notes read, and the characters of note text that left the device, the figure the remote arm's disclosure rests on, and \"stayed on this device\" when none did.",
+      "What a run cost, in one line: model round-trips, notes read, and, for a run that never left this device, that it stayed here. The off-device character count was dropped on 2026-11-27.",
     tags: ["notes", "ai", "agent", "cost", "disclosure", "summary"],
     render: () => (
       <div style={{ padding: "var(--space-3)", color: "var(--fg-2)" }}>
@@ -459,6 +507,16 @@ export const AI_STORIES: StoryDescriptor[] = [
       "The review card at the width the AI chat panel actually gives it, where the two closing acts and their counts have to share one line. The pair of them wrapping is the bug this state exists to hold shut.",
     tags: ["notes", "ai", "agent", "review", "footer", "narrow", "wrap"],
     render: () => <SeededCard width={340} />,
+  },
+  {
+    id: "ai-panel/agentreview/auto-applied",
+    group: "components",
+    surface: "AgentReview",
+    state: "auto-applied",
+    description:
+      "The card under \"Apply automatically\": the run has already written its two new notes, so there is nothing left to decide and the footer carries no decision at all (2026-11-27, reported as \"Reject all 0\" beside \"Approve 0 changes\").",
+    tags: ["notes", "ai", "agent", "review", "auto-apply", "footer"],
+    render: () => <SeededCard width={420} autoApplied />,
   },
   {
     id: "ai-panel/agentreview/in-a-centre-pane",

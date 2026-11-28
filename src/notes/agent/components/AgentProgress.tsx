@@ -230,6 +230,8 @@ export function AgentProgress() {
                 failRun(
                   legFailureSentence(failure, {
                     providerRejected: t("agent.composer.providerRejected"),
+                    modelCannotEdit: t("agent.composer.modelCannotEdit"),
+                    stillWorking: t("agent.composer.stillWorking"),
                     scopeExcluded: t(providerErrorKey("empty_grant")),
                     rootGrant: t("agent.progress.expandFailed"),
                     generic: t("agent.progress.legFailed"),

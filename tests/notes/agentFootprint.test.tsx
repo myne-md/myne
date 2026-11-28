@@ -85,15 +85,16 @@ describe("AgentFootprint", () => {
     expect(detail.textContent).toContain("agent.review.runSummaryNotes:6");
     // Null stays null: the local statement, not a zero count.
     expect(detail.textContent).toContain("agent.review.runSummaryOnDevice");
-    expect(detail.textContent).not.toContain("agent.review.runSummaryOffDevice");
   });
 
-  it("keeps a remote run's zero apart from a local run", () => {
+  it("leaves the local statement off a remote run", () => {
     show({ figures: { ...FIGURES, charsOffDevice: 0 } });
     fireEvent.click(screen.getByTestId("agentFootprint.disclosure"));
-    expect(screen.getByTestId("agentFootprint.detail").textContent).toContain(
-      "agent.review.runSummaryOffDevice:0",
-    );
+    // The off-device character count is no longer printed (2026-11-27), so the
+    // remote case is the two figures and nothing about the device.
+    const detail = screen.getByTestId("agentFootprint.detail").textContent ?? "";
+    expect(detail).toContain("agent.review.runSummaryRequests:3");
+    expect(detail).not.toContain("agent.review.runSummaryOnDevice");
   });
 
   it("renders a memory write as ONE chip carrying the count", () => {

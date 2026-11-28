@@ -224,18 +224,43 @@ describe("AgentHubList", () => {
     );
   });
 
-  it("renames through the command and re-fetches", async () => {
+  /** The field IS the rename (2026-11-27): no confirm button beside it, so the
+   *  save has to come from the field's own two gestures — Enter, and leaving. */
+  async function openRename() {
+    await openRowMenu();
+    fireEvent.click(screen.getByTestId("agent.hub-rename"));
+    return screen.getByTestId("agent.hub-rename-input");
+  }
+
+  it("renames on Enter and re-fetches", async () => {
     mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
     mockChatsRename.mockResolvedValue(undefined);
     render(<AgentHubList onOpenFocus={() => {}} />);
-    await openRowMenu();
-    fireEvent.click(screen.getByTestId("agent.hub-rename"));
-    const input = screen.getByTestId("agent.hub-rename-input");
+    const input = await openRename();
     fireEvent.change(input, { target: { value: "Renamed" } });
-    fireEvent.click(screen.getByTestId("agent.hub-rename-confirm"));
+    fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(mockChatsRename).toHaveBeenCalledWith("c1", "Renamed"));
     // Re-fetched, not patched locally.
     expect(mockChatsList).toHaveBeenCalledTimes(2);
+  });
+
+  it("renames when the field loses focus, and drops the edit on Escape", async () => {
+    mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
+    mockChatsRename.mockResolvedValue(undefined);
+    render(<AgentHubList onOpenFocus={() => {}} />);
+    let input = await openRename();
+    fireEvent.change(input, { target: { value: "Renamed" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(mockChatsRename).toHaveBeenCalledWith("c1", "Renamed"));
+
+    // Escape is not a save: the field closes and the blur it causes writes
+    // nothing. Asserted on the second rename's absence.
+    mockChatsRename.mockClear();
+    input = await openRename();
+    fireEvent.change(input, { target: { value: "Discarded" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    fireEvent.blur(input);
+    expect(mockChatsRename).not.toHaveBeenCalled();
   });
 
   it("filters by title and shows a distinct filtered-empty state", async () => {
@@ -311,15 +336,36 @@ describe("AgentHubList", () => {
     expect(anchor.getAttribute("title")).toBeNull();
   });
 
-  it("deletes through the command after an inline confirm", async () => {
+  it("deletes through the command after a DIALOG confirm", async () => {
     mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
     mockChatsDelete.mockResolvedValue(undefined);
     render(<AgentHubList onOpenFocus={() => {}} />);
     await openRowMenu();
     fireEvent.click(screen.getByTestId("agent.hub-delete"));
+    // **A dialog, not a confirmation grown in the row** (2026-11-27): the app's
+    // one destructive-confirmation surface, which is what gives it the danger
+    // button, the focus trap and Escape. The row itself is untouched, so the
+    // list below it does not move.
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog.textContent).toContain(
+      "editor.chrome.rightPanel.aiChat.historyDeleteTitle",
+    );
+    expect(screen.getByTestId("agent.hub-delete-cancel")).toBeTruthy();
+
     fireEvent.click(screen.getByTestId("agent.hub-delete-confirm"));
     await waitFor(() => expect(mockChatsDelete).toHaveBeenCalledWith("c1"));
     expect(mockChatsList).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("cancels the delete without touching the conversation", async () => {
+    mockChatsList.mockResolvedValue([row("c1", "One", 1)]);
+    render(<AgentHubList onOpenFocus={() => {}} />);
+    await openRowMenu();
+    fireEvent.click(screen.getByTestId("agent.hub-delete"));
+    fireEvent.click(screen.getByTestId("agent.hub-delete-cancel"));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(mockChatsDelete).not.toHaveBeenCalled();
   });
 });
 
