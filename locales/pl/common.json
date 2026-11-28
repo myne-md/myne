@@ -4208,7 +4208,6 @@
           "view_list": "Wyświetl zapisane widoki"
         },
         "wholeVaultLabel": "Czytaj i zapisuj cały sejf",
-        "wholeVaultHelper": "Każdy folder, w tym te, które utworzysz później. Jeśli pominiesz folder poniżej, zostanie pominięty zarówno przy odczycie, jak i zapisie.",
         "excludeNothing": "Nic nie pominięto",
         "scopeLineAll": "Dociera do każdej notatki w sejfie, także w folderach utworzonych później, i może zmienić każdą z nich.",
         "scopeLine": "Dociera do {{count}} notatek w {{folders}} folderach i może zmienić wszystko, co zawierają.",

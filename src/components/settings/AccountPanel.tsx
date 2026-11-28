@@ -69,6 +69,7 @@ import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { vaultDisplayNameById } from "../../lib/vaultDisplayName";
 import { formatPersonAccountNumber } from "@myne/client-core/person-account";
 import { personAccountNumber } from "../../lib/personAccount";
+import { readKeychainStatus, type KeychainStatus } from "../../lib/vault-label";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { toast } from "../toast/toastStore";
@@ -226,6 +227,11 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
   // both used to end in the same silent absence.
   const [accountNumber, setAccountNumber] = useState<string | null>(null);
   const [numberUnavailable, setNumberUnavailable] = useState(false);
+  // Whether this device has a usable OS store at all, which is a DIFFERENT question
+  // from whether this vault is in a group (myne-md/myne#1091). "unknown" is the honest
+  // answer when the question itself went unanswered, and it renders the neutral
+  // standalone sentence rather than claiming the machine cannot store anything.
+  const [keychain, setKeychain] = useState<KeychainStatus>("unknown");
 
   useEffect(() => {
     let cancelled = false;
@@ -254,6 +260,12 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
           ),
         () => {
           if (!cancelled) setNumberUnavailable(true);
+        },
+      );
+      void readKeychainStatus().then(
+        (next) => !cancelled && setKeychain(next),
+        () => {
+          /* "unknown" is already the state, and a rejection is not an answer */
         },
       );
       try {
@@ -355,78 +367,84 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
         <p data-testid="settings.account-unresolved" style={HELPER_STYLE}>
           {t("settings.account.unresolvedHelper")}
         </p>
-      ) : !groupingKnown ? (
-        <p data-testid="settings.account-standalone" style={HELPER_STYLE}>
-          {t("settings.account.standaloneHelper")}
-        </p>
-      ) : (
-        <SettingsSection title={t("settings.account.sections.grouping")}>
-          {/* The account number, first: derived from the identity phrase, so it
-              cannot be lost and needs no saving, but it is the value support and
-              a self-host operator ask for, and it now stands where the account
-              name used to (`design-notes/ui/0728`).
+) : null}
 
-              Rendered in EVERY grouping state, with an honest empty line when
-              the device holds no identity: the settings search entry for it is
-              not gated (the registry's only runtime axes are developer mode and
-              member-vault), and a hit that lands on a row which does not exist
-              degrades to a silent panel switch. `ControlBlock` rather than
-              `SettingRow` because a 27-character monospace value is the
-              "long value rendered inline" exception the row's own header names. */}
-          <ControlBlock
-            label={t("common.accountnumber")}
-            anchorId="account.number"
-            testId="settings.account-number-row"
-            helper={
-              accountNumber !== null
-                ? t("settings.account.numberHelper")
-                : numberUnavailable
-                  ? t("settings.account.numberUnavailable")
-                  : t("settings.account.numberEmpty")
-            }
-            control={
-              accountNumber !== null ? (
-                <div style={INPUT_ROW_STYLE}>
-                  <Input
-                    readOnly
-                    data-testid="settings.account-number"
-                    aria-label={t("common.accountnumber")}
-                    value={accountNumber}
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "var(--text-sm)",
-                      color: "var(--fg-1)",
-                      flex: 1,
-                      minWidth: 0,
-                      userSelect: "all",
-                    }}
-                  />
-                  <IconButton
-                    icon="copy"
-                    label={t("settings.account.copyAccountNumber")}
-                    bordered
-                    tooltip
-                    confirmed={numberCopied}
-                    testId="settings.account-number-copy"
-                    onClick={copyAccountNumber}
-                  />
-                  <p
-                    role="status"
-                    aria-live="polite"
-                    data-testid="settings.account-number-copy-status"
-                    style={VISUALLY_HIDDEN}
-                  >
-                    {numberCopied ? t("settings.account.numberCopied") : ""}
-                  </p>
-                </div>
-              ) : (
-                <p data-testid="settings.account-number-empty" style={HELPER_STYLE}>
-                  {t("settings.account.numberEmpty")}
+      {/* The person account number, ABOVE the state decision (myne-md/myne#1091).
+          It is derived from the recovery phrase, so it depends on none of the
+          states below: a device that cannot keep a grouping, a vault still
+          resolving and a record that would not read all used to swallow it, and
+          the settings search entry that targets it is static, so on those
+          machines the hit landed on a panel that rendered nothing. */}
+      {loaded && vaultId !== null ? (
+        <ControlBlock
+          label={t("common.accountnumber")}
+          anchorId="account.number"
+          testId="settings.account-number-row"
+          helper={
+            accountNumber !== null
+              ? t("settings.account.numberHelper")
+              : numberUnavailable
+                ? t("settings.account.numberUnavailable")
+                : t("settings.account.numberEmpty")
+          }
+          control={
+            accountNumber !== null ? (
+              <div style={INPUT_ROW_STYLE}>
+                <Input
+                  readOnly
+                  data-testid="settings.account-number"
+                  aria-label={t("common.accountnumber")}
+                  value={accountNumber}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--fg-1)",
+                    flex: 1,
+                    minWidth: 0,
+                    userSelect: "all",
+                  }}
+                />
+                <IconButton
+                  icon="copy"
+                  label={t("settings.account.copyAccountNumber")}
+                  bordered
+                  tooltip
+                  confirmed={numberCopied}
+                  testId="settings.account-number-copy"
+                  onClick={copyAccountNumber}
+                />
+                <p
+                  role="status"
+                  aria-live="polite"
+                  data-testid="settings.account-number-copy-status"
+                  style={VISUALLY_HIDDEN}
+                >
+                  {numberCopied ? t("settings.account.numberCopied") : ""}
                 </p>
-              )
-            }
-          />
+              </div>
+            ) : (
+              <p data-testid="settings.account-number-empty" style={HELPER_STYLE}>
+                {t("settings.account.numberEmpty")}
+              </p>
+            )
+          }
+        />
+      ) : null}
 
+      {!loaded ? null : vaultId !== null && loadError === null && !groupingKnown ? (
+        keychain === "unavailable" ? (
+          <p data-testid="settings.account-no-store" style={HELPER_STYLE}>
+            {t("settings.account.noStoreHelper")}
+          </p>
+        ) : (
+          <p data-testid="settings.account-standalone" style={HELPER_STYLE}>
+            {t("settings.account.standaloneHelper")}
+          </p>
+        )
+      ) : null}
+
+      {loadError !== null || !loaded || vaultId === null || !groupingKnown ? null : (
+        <SettingsSection title={t("settings.account.sections.grouping")}>
           {/* The roster. The count moved into the row's control slot and the
               paragraph of semantics moved into `explanation`, which `SettingRow`
               renders behind the `?` beside the label and associates with the row

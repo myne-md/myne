@@ -3938,7 +3938,6 @@
           "view_list": "Lista sparade vyer"
         },
         "wholeVaultLabel": "Läs och skriv hela valvet",
-        "wholeVaultHelper": "Varje mapp, även de du skapar senare. Om du lämnar en mapp utanför nedan är den utanför både för läsning och skrivning.",
         "excludeNothing": "Inget utanför",
         "scopeLineAll": "Når varje anteckning i valvet, även i mappar du skapar senare, och kan ändra vilken som helst av dem.",
         "scopeLine": "Når {{count}} anteckningar i {{folders}} mappar och kan ändra allt i dem.",
@@ -4172,8 +4171,7 @@
       "strong": "Starkt",
       "tooWeak": "För svagt"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Exporterade {{count}} anteckning → {{label}}",
       "exported_other": "Exporterade {{count}} anteckningar → {{label}}",

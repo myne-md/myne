@@ -99,6 +99,35 @@ describe("the event form's end", () => {
   });
 });
 
+describe("reaching the note behind the event", () => {
+  // An event is a markdown note with frontmatter, and the form edits the
+  // frontmatter: the body was unreachable from the one surface that names the
+  // event (2026-11-27, on the owner's read).
+  it("offers the note when editing, and only when editing", async () => {
+    let opened = 0;
+    const editing = await render(
+      <CalendarEventForm
+        initial={TIMED}
+        mode="edit"
+        onOpenNote={() => {
+          opened += 1;
+        }}
+        onClose={() => undefined}
+      />,
+    );
+    await press(at(editing.host, "calendar.form.openNote"));
+    expect(opened).toBe(1);
+    editing.cleanup();
+
+    // A create has no note yet, so the control is not there to promise one.
+    const creating = await render(
+      <CalendarEventForm initial={TIMED} onOpenNote={() => undefined} onClose={() => undefined} />,
+    );
+    expect(at(creating.host, "calendar.form.openNote")).toBeNull();
+    creating.cleanup();
+  });
+});
+
 describe("the all-day choice", () => {
   it("gives the end a time of its own when the clock comes back", async () => {
     // A day-long span, as a note carries one: no times at either end.

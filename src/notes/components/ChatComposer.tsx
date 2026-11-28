@@ -74,6 +74,7 @@ import {
 } from "../../lib/attachments";
 import type { RunAttachment } from "../../lib/agent-run-core";
 import { AttachmentPickerDialog, MAX_RUN_ATTACHMENTS } from "./AttachmentPickerDialog";
+import { readEphemeralFile, type EphemeralReading } from "../../lib/ephemeralAttachment";
 import { AttachmentThumbnail } from "../../components/attachments/AttachmentThumbnail";
 import { useConversationEpoch } from "../ai/chatStore";
 import { useIndexNonce } from "../indexNonce";
@@ -383,6 +384,7 @@ export function ChatComposer({
   useEffect(() => {
     if (!agent.running) return;
     setAttachedDocs([]);
+    setDeviceDocs([]);
     setAttachmentError(null);
   }, [agent.running]);
   const [message, setMessage] = useState("");
@@ -398,6 +400,11 @@ export function ChatComposer({
    * exactly the kind of inherited permission `decisions/ai/0518` refuses.
    */
   const [attachedDocs, setAttachedDocs] = useState<CatalogEntry[]>([]);
+  /** Read for this message and never stored; `{ name, text }` is the payload an
+   *  imported document contributes, so the run cannot tell them apart. */
+  const [deviceDocs, setDeviceDocs] = useState<(EphemeralReading & { id: string })[]>([]);
+  const [readingDevice, setReadingDevice] = useState(false);
+  const deviceInput = useRef<HTMLInputElement | null>(null);
   const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
   /** Why the picked documents could not be sent. Rendered under the row, so a
    *  file that has no extractable text is a sentence rather than a message that
@@ -622,6 +629,7 @@ export function ChatComposer({
   useEffect(() => {
     setAttached(null);
     setAttachedDocs([]);
+    setDeviceDocs([]);
     setAttachmentError(null);
     setPasting([]);
     setMessage("");
@@ -677,7 +685,7 @@ export function ChatComposer({
    */
   const scopeEmpty = preview !== null && preview !== "failed" && preview.noteCount === 0;
   const blocked =
-    empty || busy || probing || refused || scopeEmpty || readingDocs || pasting.length > 0;
+    empty || busy || probing || refused || scopeEmpty || readingDocs || readingDevice || pasting.length > 0;
 
   // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
   // rather than counted from newlines, so a long wrapped line grows too.
@@ -769,7 +777,11 @@ export function ChatComposer({
     // vault read happens; a read that fails has to leave the message in the box
     // and say why, rather than sending a run that answers about a file it never
     // received.
-    let attachments: RunAttachment[] = [];
+    // Already text, so no vault read and no await.
+    let attachments: RunAttachment[] = deviceDocs.map((doc) => ({
+      name: doc.name,
+      text: doc.text,
+    }));
     if (attachedDocs.length > 0) {
       setReadingDocs(true);
       setAttachmentError(null);
@@ -789,7 +801,7 @@ export function ChatComposer({
           );
           return;
         }
-        attachments = read.map((entry, i) => ({
+        attachments = [...attachments, ...read.map((entry, i) => ({
           name: entry.name,
           text: entry.extracted!.text,
           // The transcript's chip needs the id and the MIME hint; `read` was
@@ -801,13 +813,17 @@ export function ChatComposer({
                 id: attachedDocs[i]!.id,
                 contentType: attachedDocs[i]!.content_type,
               }),
-        }));
+        }))];
       } catch {
         setAttachmentError(t("agent.attachments.failed"));
         return;
       } finally {
         setReadingDocs(false);
       }
+    }
+    if (attachments.length > MAX_RUN_ATTACHMENTS) {
+      setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
+      return;
     }
     setMessage("");
     setBusy(true);
@@ -852,6 +868,59 @@ export function ChatComposer({
     }
   }
 
+  /** Read a picked or photographed file WITHOUT importing it: the host
+   *  extracts on this device, so no blob and no catalog row exist afterwards. */
+  async function readDeviceFiles(files: File[]): Promise<void> {
+    if (files.length === 0) return;
+    setAttachmentError(null);
+    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length - deviceDocs.length - pasting.length;
+    if (room <= 0) {
+      setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
+      return;
+    }
+    const batch = files.slice(0, room);
+    setReadingDevice(true);
+    try {
+      const readings: EphemeralReading[] = [];
+      for (const file of batch) {
+        let reading: EphemeralReading;
+        try {
+          reading = await readEphemeralFile(file);
+        } catch {
+          setAttachmentError(t("agent.attachments.deviceFailed"));
+          continue;
+        }
+        if (reading.status !== "ok" || reading.text.trim() === "") {
+          // Named, because "a file has no text" is not actionable for three.
+          setAttachmentError(
+            reading.status === "unsupported"
+              ? t("agent.attachments.deviceUnsupported", { name: reading.name })
+              : t("agent.attachments.noText", { name: reading.name }),
+          );
+          continue;
+        }
+        readings.push(reading);
+      }
+      if (readings.length > 0)
+        setDeviceDocs((rows) =>
+          [
+            ...rows,
+            ...readings.map((reading) => ({
+              ...reading,
+              id: crypto.randomUUID(),
+            })),
+          ].slice(
+            0,
+            Math.max(0, MAX_RUN_ATTACHMENTS - attachedDocs.length - pasting.length),
+          ),
+        );
+    } finally {
+      setReadingDevice(false);
+      // Or picking the same file twice fires no `change` event.
+      if (deviceInput.current !== null) deviceInput.current.value = "";
+    }
+  }
+
   /**
    * **A pasted file belongs to THIS conversation** (myne-md/myne#913).
    *
@@ -870,9 +939,14 @@ export function ChatComposer({
   ): Promise<void> {
     const files = Array.from(event.clipboardData?.files ?? []);
     if (files.length === 0) return;
+    if (readingDevice) {
+      event.preventDefault();
+      setAttachmentError(t("agent.attachments.readingInProgress"));
+      return;
+    }
     event.preventDefault();
     setAttachmentError(null);
-    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length;
+    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length - deviceDocs.length - pasting.length;
     if (room <= 0) {
       setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
       return;
@@ -915,7 +989,10 @@ export function ChatComposer({
         });
       }
       setAttachedDocs((docs) =>
-        [...docs, ...imported].slice(0, MAX_RUN_ATTACHMENTS),
+        [...docs, ...imported].slice(
+          0,
+          Math.max(0, MAX_RUN_ATTACHMENTS - deviceDocs.length - pasting.length),
+        ),
       );
     } catch {
       // **A batch that fails part-way leaves the files it already stored with
@@ -1119,7 +1196,11 @@ export function ChatComposer({
           composer already shows one row of controls and a file is content
           rather than a setting. Each chip is removable on its own; the error
           line sits here too, since this is the row a file is added to. */}
-      {attachedDocs.length > 0 || pasting.length > 0 || attachmentError !== null ? (
+      {attachedDocs.length > 0 ||
+      deviceDocs.length > 0 ||
+      readingDevice ||
+      pasting.length > 0 ||
+      attachmentError !== null ? (
         <div
           data-testid="ai.composer-attachments"
           style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-1)" }}
@@ -1192,6 +1273,60 @@ export function ChatComposer({
               />
             </span>
           ))}
+          {deviceDocs.map((doc) => (
+            <span
+              key={doc.id}
+              data-testid="ai.composer-device-attachment"
+              data-device-name={doc.name}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-2)",
+                padding: "var(--space-1) var(--space-2)",
+                borderRadius: "var(--radius-1)",
+                background: "var(--bg-2)",
+                border: "1px solid var(--line-1)",
+                fontSize: "var(--text-xs)",
+                maxWidth: "100%",
+              }}
+            >
+              <Icon name="file-text" size={12} />
+              <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {doc.name}
+                </span>
+                <span style={{ ...CAPTION_STYLE, color: "var(--fg-3)" }}>
+                  {t("agent.attachments.deviceOnly")}
+                </span>
+              </span>
+              <IconButton
+                icon="x"
+                label={t("agent.attachments.remove", { name: doc.name })}
+                iconSize={12}
+                testId="ai.composer-device-attachment-remove"
+                onClick={() => setDeviceDocs((rows) => rows.filter((row) => row.id !== doc.id))}
+              />
+            </span>
+          ))}
+          {readingDevice ? (
+            <span
+              data-testid="ai.composer-device-pending"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-2)",
+                padding: "var(--space-1) var(--space-2)",
+                borderRadius: "var(--radius-1)",
+                background: "var(--bg-2)",
+                border: "1px dashed var(--line-2)",
+                fontSize: "var(--text-xs)",
+                color: "var(--fg-3)",
+              }}
+            >
+              <Spinner size={14} />
+              <span>{t("agent.attachments.readingDevice")}</span>
+            </span>
+          ) : null}
           {pasting.map((entry) => (
             <span
               key={entry}
@@ -1234,10 +1369,31 @@ export function ChatComposer({
             control rather than an entry in the scope menu, because scope is a
             PERMISSION and a document is CONTEXT: the agent reads this file and
             can never write it (myne-md/myne#913). */}
+        <input
+          ref={deviceInput}
+          type="file"
+          accept="image/*,application/pdf,.md,.txt,.docx"
+          capture="environment"
+          multiple
+          hidden
+          data-testid="ai.composer-device-input"
+          onChange={(event) => {
+            void readDeviceFiles(Array.from(event.currentTarget.files ?? []));
+          }}
+        />
+        <IconButton
+          icon="image-plus"
+          label={t("agent.attachments.fromDevice")}
+          tooltip
+          disabled={readingDevice}
+          testId="ai.composer-device"
+          onClick={() => deviceInput.current?.click()}
+        />
         <IconButton
           icon="plus"
           label={t("agent.attachments.attach")}
           tooltip
+          disabled={readingDevice}
           expanded={attachmentPickerOpen}
           testId="ai.composer-attach"
           onClick={() => setAttachmentPickerOpen(true)}
@@ -1395,6 +1551,7 @@ export function ChatComposer({
         open={attachmentPickerOpen}
         onClose={() => setAttachmentPickerOpen(false)}
         selectedIds={attachedDocs.map((doc) => doc.id)}
+        reservedSlots={deviceDocs.length + pasting.length}
         onPick={(entries) => {
           // **Merge, not replace** (review round five). The picker lists the
           // LIBRARY, so a file already attached from a paste is not among its
@@ -1404,9 +1561,19 @@ export function ChatComposer({
           setAttachedDocs((docs) => {
             const byId = new Map(docs.map((doc) => [doc.id, doc]));
             for (const entry of entries) byId.set(entry.id, entry);
-            return [...byId.values()].slice(0, MAX_RUN_ATTACHMENTS);
+            const merged = [...byId.values()];
+            if (
+              merged.length + deviceDocs.length + pasting.length >
+              MAX_RUN_ATTACHMENTS
+            ) {
+              setAttachmentError(
+                t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }),
+              );
+              return docs;
+            }
+            setAttachmentError(null);
+            return merged;
           });
-          setAttachmentError(null);
         }}
       />
     </div>

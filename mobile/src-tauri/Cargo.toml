@@ -95,6 +95,10 @@ tauri-plugin-screen-guard = { path = "tauri-plugin-screen-guard" }
 # decision 4, rung 2 on Android; identity-seat-portability task 9). Same shape as
 # the screen-guard bridge: Rust-only, no WebView commands, no capability grant.
 tauri-plugin-device-key = { path = "tauri-plugin-device-key" }
+# myne-md/myne#1091: the Keystore bridge for the two device-local label keys. Its own
+# crate, own wrapping-key alias and own prefs namespace, so one family's wipe cannot
+# take another's key.
+tauri-plugin-label-store = { path = "tauri-plugin-label-store" }
 # MYND-511: in-repo Android OS-share-sheet (ACTION_SEND) receiver for the
 # share-import feature (SF3). Committed Kotlin under the plugin's own `android/`
 # (gitignored `gen/android` cannot carry committed code). Rust-only WebView

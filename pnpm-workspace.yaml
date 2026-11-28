@@ -52,6 +52,14 @@ minimumReleaseAgeExclude:
   - '@tauri-apps/cli-win32-ia32-msvc@2.12.1'
   - '@tauri-apps/cli-win32-x64-msvc@2.12.1'
   - '@tauri-apps/cli@2.12.1'
+  - '@earendil-works/pi-agent-core@1.7.0'
+  - '@earendil-works/pi-ai@1.7.0'
+  - '@earendil-works/pi-codemode@1.7.0'
+  - '@earendil-works/pi-coding-agent@1.7.0'
+  - '@earendil-works/pi-mcp@1.7.0'
+  - '@earendil-works/pi-schema@1.7.0'
+  - '@earendil-works/pi-telemetry@1.7.0'
+  - '@earendil-works/pi-tui@1.7.0'
 
 overrides:
   dompurify: 3.4.17

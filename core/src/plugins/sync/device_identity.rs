@@ -869,10 +869,7 @@ mod imp {
     /// Borrowed `&str` keys, not `String`: the crate's `search_items` / `create_item`
     /// take `HashMap<&str, &str>`, and both constants are `&'static str` anyway.
     fn attributes() -> HashMap<&'static str, &'static str> {
-        HashMap::from([
-            ("service", DEVICE_KEYCHAIN_SERVICE),
-            ("username", DEVICE_KEYCHAIN_ACCOUNT),
-        ])
+        crate::secret_service_shared::attributes(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT)
     }
 
     /// A DH session, so the secret crosses the bus encrypted rather than in the clear.
@@ -999,21 +996,9 @@ mod imp {
         );
     }
 
-    /// The closed classification of a Secret Service failure, as a `&'static str`.
+    /// The closed classification, from the one place that owns it (myne-md/myne#1091).
     fn error_label(e: &secret_service::Error) -> &'static str {
-        use secret_service::Error;
-        match e {
-            Error::Crypto(_) => "crypto",
-            Error::Zbus(_) => "zbus",
-            Error::ZbusFdo(_) => "zbus_fdo",
-            Error::Zvariant(_) => "zvariant",
-            Error::Locked => "locked",
-            Error::NoResult => "no_result",
-            Error::Prompt => "prompt",
-            Error::PromptDisconnected => "prompt_disconnected",
-            Error::Unavailable => "unavailable",
-            _ => "unclassified",
-        }
+        crate::secret_service_shared::error_class(e)
     }
 }
 

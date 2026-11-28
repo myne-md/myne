@@ -4073,7 +4073,6 @@
           "view_list": "Elenca le viste salvate"
         },
         "wholeVaultLabel": "Leggi e scrivi tutto il caveau",
-        "wholeVaultHelper": "Ogni cartella, comprese quelle che creerai dopo. Se ne lasci fuori una qui sotto, resta fuori sia dalle letture sia dalle scritture.",
         "excludeNothing": "Nessuna esclusa",
         "scopeLineAll": "Raggiunge ogni nota del caveau, comprese quelle nelle cartelle che creerai dopo, e può modificarle tutte.",
         "scopeLine": "Raggiunge {{count}} note in {{folders}} cartelle e può cambiare qualunque cosa al loro interno.",

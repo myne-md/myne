@@ -37,10 +37,20 @@
              carry is undecryptable on the other side; excluding it means a restore
              starts from rung 4 (no device key) instead of decrypting garbage. -->
         <exclude domain="sharedpref" path="md.myne.devicekey" />
+        <!-- The label store's sealed items (myne-md/myne#1091): one blob per vault name plus
+             the account record, under a Keystore wrapping key that never leaves the device.
+             Same reasoning as the line above, and the same consequence: a restore starts
+             from no cached names rather than decrypting garbage. -->
+        <exclude domain="sharedpref" path="md.myne.labelstore" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="external" path="Documents" />
         <exclude domain="file" path="person-auth.json" />
         <exclude domain="sharedpref" path="md.myne.devicekey" />
+        <!-- The label store's sealed items (myne-md/myne#1091): one blob per vault name plus
+             the account record, under a Keystore wrapping key that never leaves the device.
+             Same reasoning as the line above, and the same consequence: a restore starts
+             from no cached names rather than decrypting garbage. -->
+        <exclude domain="sharedpref" path="md.myne.labelstore" />
     </device-transfer>
 </data-extraction-rules>

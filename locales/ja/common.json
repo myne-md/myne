@@ -3938,7 +3938,6 @@
           "view_list": "保存したビューを一覧"
         },
         "wholeVaultLabel": "保管庫全体を読み書き",
-        "wholeVaultHelper": "すべてのフォルダ（後から作成するフォルダも含む）。下でフォルダを外すと、読み取りも書き込みも外れます。",
         "excludeNothing": "除外なし",
         "scopeLineAll": "保管庫のすべてのノート（後から作成するフォルダも含む）に届き、どれでも変更できます。",
         "scopeLine": "{{folders}} 個のフォルダ内の {{count}} 件のノートに届き、その中のすべてを変更できます。",
@@ -4172,8 +4171,7 @@
       "strong": "強い",
       "tooWeak": "弱すぎます"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "ノート{{count}}件をエクスポートしました → {{label}}",
       "exported_other": "ノート{{count}}件をエクスポートしました → {{label}}",

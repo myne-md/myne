@@ -35,6 +35,12 @@ vi.mock("../../src/lib/personAccount", () => ({
   writeSyncEndpoint: vi.fn(),
 }));
 vi.mock("../../src/lib/clipboard", () => ({ copyText: vi.fn() }));
+// Whether this device can keep a grouping at all is a different question from whether
+// this vault is in one (myne-md/myne#1091), and the panel asks it separately.
+const readKeychainStatus = vi.fn();
+vi.mock("../../src/lib/vault-label", () => ({
+  readKeychainStatus: (...a: unknown[]) => readKeychainStatus(...a),
+}));
 vi.mock("../../src/platform/clipboardManager", () => ({ writeText: vi.fn() }));
 vi.mock("../../src/components/toast/toastStore", () => ({ toast: vi.fn() }));
 vi.mock("../../src/lib/vault-list", async (importOriginal) => ({
@@ -82,6 +88,7 @@ beforeEach(() => {
   listAccounts.mockReset().mockResolvedValue([ACCOUNT]);
   listVaults.mockReset().mockResolvedValue({ ok: VAULTS });
   personAccountNumber.mockReset().mockResolvedValue(null);
+  readKeychainStatus.mockReset().mockResolvedValue("available");
 });
 
 afterEach(cleanup);
@@ -149,12 +156,37 @@ describe("AccountPanel — the number took the name's place", () => {
 });
 
 describe("AccountPanel — states that are not 'an account'", () => {
-  it("a standalone vault says so instead of rendering the grouping", async () => {
+  it("a standalone vault says so instead of rendering the grouping, and still shows the number", async () => {
+    // The number is derived from the recovery phrase and depends on no grouping state, so
+    // hiding it here was the Linux shape: one sentence and a blank panel, with the settings
+    // search entry for the number landing on nothing (myne-md/myne#1091).
     listAccounts.mockResolvedValue([]);
     renderPanel();
     await screen.findByTestId("settings.account-standalone");
-    expect(screen.queryByTestId("settings.account-number-row")).toBeNull();
+    expect(await screen.findByTestId("settings.account-number-row")).toBeTruthy();
+    expect(screen.queryByTestId("settings.account-no-store")).toBeNull();
     expect(screen.queryByTestId("settings.account-vaults")).toBeNull();
+  });
+
+  it("a device with no OS store names the reason instead of claiming the vault stands alone", async () => {
+    // The Linux-with-no-keyring shape. "This vault is in no group" is a claim about the
+    // VAULT; the truth is a limitation of the MACHINE, and the two need different words.
+    listAccounts.mockResolvedValue([]);
+    readKeychainStatus.mockResolvedValue("unavailable");
+    renderPanel();
+    await screen.findByTestId("settings.account-no-store");
+    expect(await screen.findByTestId("settings.account-number-row")).toBeTruthy();
+    expect(screen.queryByTestId("settings.account-standalone")).toBeNull();
+  });
+
+  it("an unanswered store question reads as standalone rather than as a claim about the machine", async () => {
+    // "unknown" is not "unavailable": inferring a security state from a rejection is a
+    // guess, and this panel is not where guesses belong.
+    listAccounts.mockResolvedValue([]);
+    readKeychainStatus.mockRejectedValue(new Error("no answer"));
+    renderPanel();
+    await screen.findByTestId("settings.account-standalone");
+    expect(screen.queryByTestId("settings.account-no-store")).toBeNull();
   });
 
   it("a grouping that cannot be read is an ERROR, never the standalone state", async () => {
@@ -165,7 +197,8 @@ describe("AccountPanel — states that are not 'an account'", () => {
     renderPanel();
     await screen.findByTestId("settings.account-error");
     expect(screen.queryByTestId("settings.account-standalone")).toBeNull();
-    expect(screen.queryByTestId("settings.account-number-row")).toBeNull();
+    // The number survives an unreadable RECORD too: it is not record data.
+    expect(await screen.findByTestId("settings.account-number-row")).toBeTruthy();
   });
 
   it("an unresolved vault id states that rather than guessing", async () => {

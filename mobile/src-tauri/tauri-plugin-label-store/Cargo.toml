@@ -1,0 +1,31 @@
+# In-repo Tauri mobile plugin: the Android Keystore bridge for the two device-local
+# LABEL keys (myne-md/myne#1091, `decisions/clients/0795`): each vault's cached name
+# and the account record. Rust-only surface: it exposes ZERO WebView-facing commands,
+# so it needs no permission file, no capability grant, and no `InlinedPlugin` entry in
+# the app's build.rs (the `tauri-plugin-device-key` precedent). Kotlin lives in
+# `android/` because `src-tauri/gen` is gitignored, so a fresh `tauri android init`
+# cannot clobber this module; the app build wires it in automatically via the
+# `cargo:android_library_path` metadata that `tauri_plugin::Builder` emits.
+#
+# Its OWN crate rather than an arm of the device-key plugin, deliberately: one shared
+# wrapping-key alias would let one family's wipe take another's key, and the two
+# families have different lifetimes (a device key outlives every vault, a label key
+# belongs to one).
+[package]
+name = "tauri-plugin-label-store"
+version = "0.1.0"
+description = "Myne mobile: Android Keystore bridge for the vault label and account-record keys (Rust-only, no WebView commands)"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0-only"
+# Mandatory for tauri-plugin build scripts (build fails without it) and must equal
+# the crate name exactly.
+links = "tauri-plugin-label-store"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link), so no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }

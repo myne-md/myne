@@ -81,7 +81,13 @@
       "confirm_one": "Attach {{count}} file",
       "confirm_other": "Attach {{count}} files",
       "remove": "Remove {{name}}",
-      "noText": "{{name}} has no text the agent can read. Only files whose text could be extracted can be attached."
+      "noText": "{{name}} has no text the agent can read. Only files whose text could be extracted can be attached.",
+      "fromDevice": "Take a photo or pick a file",
+      "readingDevice": "Reading on this device…",
+      "deviceOnly": "Read on this device, never saved",
+      "deviceUnsupported": "{{name}} is not a file the agent can read. Photos, PDFs and plain text work.",
+      "deviceFailed": "That file could not be read. Nothing was sent.",
+      "readingInProgress": "Finish the file reading first, then paste again."
     },
     "progress": {
       "working": "Working",
@@ -3225,6 +3231,7 @@
       "standaloneHelper": "This vault is not grouped under an account on this device, so it stands on its own. Grouping is per device: another device may show it inside one.",
       "unresolvedHelper": "Working out which vault is open…",
       "devicesNote": "Devices, shared-vault members and your identity are managed in Sync.",
+      "noStoreHelper": "This device has no OS key store, so it cannot keep the account grouping. Vaults open on their own here, and another device may show them together.",
       "groupingError": "Could not read the account grouping on this device. Nothing was changed."
     },
     "vault": {
@@ -3863,7 +3870,7 @@
         "copySnippet": "Copy the setup",
         "back": "Back",
         "next": "Next",
-        "scopeLine": "Reaches {{count}} notes in {{folders}} folders, and can change anything in them.",
+        "scopeLine": "Can reach {{count}} notes in {{folders}} folders, and change anything in them.",
         "scopeLine_one": "Reaches {{count}} note in {{folders}} folders, and can change anything in the folders you name. A folder you create later is readable until you leave it out.",
         "scopeLine_other": "Reaches {{count}} notes in {{folders}} folders, and can change anything in the folders you name. A folder you create later is readable until you leave it out.",
         "findFolder": "Find a folder",
@@ -3901,7 +3908,6 @@
         "editExclusions": "Change what it may use",
         "needsReapproval": "Approved by an older version, under the opposite rule. This build reads nothing for it until you approve it again.",
         "approveAgain": "Approve again",
-        "deviceClaim": "Approvals are on this device only: another computer starts with none.",
         "verb": {
           "note_search": "Search notes",
           "note_read": "Read a note",
@@ -3925,13 +3931,12 @@
         "infoBudget": "Reads are budgeted per connection in a moving window, and the count lives in memory: quitting Myne clears it. It is a slowdown, not a lock.",
         "accessLabel": "Folders this connection may use",
         "accessNothing": "None yet",
-        "scopeLineWords": "Reaches the folders you name, and can change anything in them.",
+        "scopeLineWords": "Can reach the folders you name, and change anything in them.",
         "wholeVaultLabel": "Read and write the whole vault",
-        "wholeVaultHelper": "Every folder, including folders you create later. Leave one out below and it is out for reads and writes alike.",
         "excludeLabel": "Leave out",
         "excludeNothing": "None left out",
-        "scopeLineAll": "Reaches every note in the vault, including folders you create later, and can change any of them.",
-        "writeRestore": "A write keeps the same restore point your own edits do, so you can take it back."
+        "scopeLineAll": "Every folder, including ones you create later. Leave one out below to exclude it from reads and writes.",
+        "writeRestore": "A write keeps a restore point you can take back."
       },
       "autoApplyLabel": "Apply suggested tags automatically",
       "autoApplyHelper": "Writes the tags into the note without asking, once per note each session, only after you edit it. On this device only. Undo sits under the note after it writes."
@@ -5890,6 +5895,7 @@
     },
     "form": {
       "title": "New event",
+      "openNote": "Open note",
       "eventTitle": "Event title",
       "starts": "Starts",
       "startDate": "Start date",

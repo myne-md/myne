@@ -67,6 +67,8 @@ pub mod erase_all;
 pub mod error;
 pub mod hide_flag;
 pub mod key;
+#[cfg(target_os = "linux")]
+pub(crate) mod key_secret_service;
 pub mod store;
 pub mod writeback;
 
