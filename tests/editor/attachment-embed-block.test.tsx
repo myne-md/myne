@@ -30,6 +30,7 @@ import {
   attachmentEmbedDecorations,
   embedIsAlone,
 } from "../../src/editor/decorations/attachment-embed";
+import { addCatalogRows } from "../../src/editor/attachments/catalog";
 import { ownLineInsertion } from "../../src/editor/attachments/insert";
 
 const ID = "a".repeat(64);
@@ -274,7 +275,9 @@ describe("a block embed's spacing lives inside the measured box", () => {
     // so a margin on the card is height CodeMirror never counts. Padding on a
     // parent it does measure is counted. A card that IS the widget's DOM has
     // nowhere to put that padding without growing its own border.
-    expect(frame.parentElement?.className).toBe("cm-attachment-block");
+    // The wrapper, and (since 2026-11-27) the caret's own mark on it: the
+    // assertion is about the wrapper existing, not about it being the only class.
+    expect(frame.parentElement?.classList.contains("cm-attachment-block")).toBe(true);
   });
 
   it("leaves the INLINE form unwrapped", async () => {
@@ -285,5 +288,121 @@ describe("a block embed's spacing lives inside the measured box", () => {
     const frame = mounted.host.querySelector(".cm-attachment-frame") as HTMLElement;
     expect(frame).not.toBeNull();
     expect(frame.closest(".cm-attachment-block")).toBeNull();
+  });
+});
+
+// **The embed the caret is on shows itself** (2026-11-27, on the owner's read:
+// while moving through a note with the arrow keys, the image whose line the
+// caret reaches should wear the app's edge, which is more legible than the
+// zoom cursor alone). Lights up on the LINE the selection touches, and only
+// there: a ring on every embed would be ambient chrome on a writing surface.
+describe("the embed under the caret", () => {
+  it("marks the embed's own line and no other", async () => {
+    mounted = await mount(`prose above\n\n${EMBED}\n\nprose below`);
+    const { view, host } = mounted;
+    expect(host.querySelector(".cm-embed-active")).toBeNull();
+
+    // The line after the embed: the caret is outside it, so nothing lights up.
+    view.dispatch({ selection: { anchor: view.state.doc.line(5).from } });
+    await Promise.resolve();
+    expect(host.querySelector(".cm-embed-active")).toBeNull();
+
+    // Onto the embed's own line, where an atomic embed leaves the caret sitting
+    // before it.
+    const embedLine = view.state.doc.line(3);
+    view.dispatch({ selection: { anchor: embedLine.from } });
+    view.requestMeasure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const marked = host.querySelectorAll(".cm-embed-active");
+    expect(marked).toHaveLength(1);
+    // The mark is on the embed's own wrapper, not on a neighbour line.
+    expect(marked[0].classList.contains("cm-attachment-block")).toBe(true);
+  });
+
+  it("takes the mark off when the caret leaves the line", async () => {
+    mounted = await mount(`${EMBED}\n\nprose`);
+    const { view, host } = mounted;
+    view.dispatch({ selection: { anchor: 0 } });
+    await Promise.resolve();
+    expect(host.querySelector(".cm-embed-active")).not.toBeNull();
+
+    view.dispatch({ selection: { anchor: view.state.doc.line(3).from } });
+    await Promise.resolve();
+    expect(host.querySelector(".cm-embed-active")).toBeNull();
+  });
+});
+
+describe("block embed rebuilds when the catalog warms", () => {
+  it("replaces the tombstone with a resolved image frame (new DOM identity)", async () => {
+    const restore = setCatalogLoader(() => new Promise(() => {})); // never resolves → loading
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: EMBED,
+        extensions: [
+          markdown({ base: markdownLanguage, extensions: [Wikilink] }),
+          ...attachmentCatalogExtension(),
+          ...attachmentEmbedDecorations(),
+        ],
+      }),
+      parent: host,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    view.requestMeasure();
+    restore();
+
+    // Before warming: a tombstone, no <img>.
+    expect(host.querySelector("img.cm-attachment-img")).toBeNull();
+
+    const frameBefore = host.querySelector(".cm-attachment-block");
+    expect(frameBefore).not.toBeNull();
+
+    // Warm the catalog → resolved image.
+    addCatalogRows(view, [ROW]);
+    await Promise.resolve();
+    await Promise.resolve();
+    view.requestMeasure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const img = host.querySelector("img.cm-attachment-img") as HTMLImageElement | null;
+    expect(img).not.toBeNull();
+    expect(img?.src).toContain(ID);
+
+    // The frame was rebuilt: either a new wrapper node or a new src.
+    const frameAfter = host.querySelector(".cm-attachment-block");
+    expect(frameAfter).not.toBeNull();
+
+    view.destroy();
+    host.remove();
+  });
+});
+
+describe("block embed rebuilds when layout changes (same widget class)", () => {
+  it("replaces the <img> node when w= changes", async () => {
+    mounted = await mount(EMBED);
+    const imgBefore = mounted.host.querySelector("img.cm-attachment-img") as HTMLImageElement | null;
+    expect(imgBefore).not.toBeNull();
+    const frameBefore = mounted.host.querySelector(".cm-attachment-block");
+    expect(frameBefore).not.toBeNull();
+
+    const newDoc = `![[att:${ID}|shot.png|w=400]]`;
+    mounted.view.dispatch({
+      changes: { from: 0, to: mounted.view.state.doc.length, insert: newDoc },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    mounted.view.requestMeasure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const imgAfter = mounted.host.querySelector("img.cm-attachment-img") as HTMLImageElement | null;
+    expect(imgAfter).not.toBeNull();
+    // The frame was rebuilt: a new <img> node, not the reused one.
+    expect(imgAfter).not.toBe(imgBefore);
+
+    const frameAfter = mounted.host.querySelector(".cm-attachment-block");
+    expect(frameAfter).not.toBeNull();
+    expect(frameAfter).not.toBe(frameBefore);
   });
 });

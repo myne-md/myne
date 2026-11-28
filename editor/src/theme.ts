@@ -1912,6 +1912,18 @@ export const myneThemeSpec = {
     // measures. An inline widget's margin is inside its line's box, so it stays.
     margin: "3px 0 var(--space-3, 10px)",
   },
+  // **The embed the caret is on wears the app's own edge** (2026-11-27, on the
+  // owner's read: while moving through a note with the arrow keys, the embed
+  // whose line the caret reaches should show itself). An `outline`, not a
+  // border: it costs no layout, and it follows the frame's own radius, so the
+  // ring hugs the image rather than re-measuring the block. The class comes from
+  // `buildActiveEmbedLines`, which only marks the SELECTION's lines — a hover
+  // ring would be ambient chrome on a writing surface.
+  ".cm-embed-active .cm-attachment-frame, .cm-embed-active .cm-attachment-file-card, .cm-embed-active .cm-attachment-audio, .cm-embed-active .cm-attachment-tombstone":
+    {
+      outline: "2px solid var(--accent)",
+      outlineOffset: "2px",
+    },
   ".cm-attachment-img": {
     display: "block",
     maxWidth: "100%",

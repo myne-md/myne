@@ -613,10 +613,21 @@ a:focus-visible,
 /* -- Thin scrollbars (MYND-166 behavioral pass) -----------------------------
    The default WebKit scrollbar is ~15px and reads as a heavy bar. Slim it to
    a ~4px thumb (10px track minus a 3px transparent padding-box border) with a
-   transparent track, app-wide. Firefox/standards via `scrollbar-width`. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-2) transparent;
+   transparent track, app-wide.
+
+   **`scrollbar-width` is Firefox's, and only Firefox's** (2026-11-27, reported
+   as "some scrollbars are just the native one"). The rule was unconditional, and
+   WebKit and Chromium both honour it by DISCARDING every `::-webkit-scrollbar`
+   rule below — the bar then paints in the platform's own style, which on a light
+   macOS appearance is the white bar the report showed inside a dark window, and
+   which changes shape per engine version. So the standards properties are gated
+   on the engine that has no `::-webkit-scrollbar` to style, and the engines that
+   do style it get the app's own 4px thumb on every scroll region at once. */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-2) transparent;
+  }
 }
 ::-webkit-scrollbar {
   width: 10px;
