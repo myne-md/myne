@@ -93,7 +93,9 @@ test.describe("voice note recording", () => {
     await page.goto("/");
 
     await fireCapture(page, "text"); // open a fresh editor (no sheet yet)
-    await page.getByLabel("Record voice note").click(); // the FormatBar mic button
+    // The mic is a tile in the format bar's ⋯ sheet since round 2.
+    await page.getByTestId("editor.format-more").click();
+    await page.getByLabel("Record voice note").click();
 
     await expect(page.getByTestId("voice-record-bar")).toBeVisible();
     await page.waitForTimeout(150); // let a few audio frames accumulate

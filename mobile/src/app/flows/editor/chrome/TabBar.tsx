@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
  *  fails at every site that has to answer for it.
  */
 export type WorkspaceTab =
+  | "home"
   | "notes"
   | "tasks"
   | "note-tasks"
@@ -99,8 +100,21 @@ export function TabBar({
       style={{
         flex: "none",
         display: "flex",
-        borderTop: "1px solid var(--line-1)",
-        background: "var(--bg-1)",
+        // A docked surface, not a floating card (owner, 2026-11-27): flush to
+        // the left/right/bottom edges with only the TOP corners rounded, the
+        // shape iOS uses for a persistent bottom bar. The hairline top border
+        // went with the inset card: the rounded edge is the separator now, and
+        // a straight line under a rounded edge is what made the old bar read as
+        // a rectangle pasted onto the screen.
+        // The docked shape keeps its rounded top edge, but it must still READ as
+        // a surface above the content (owner, 2026-11-27 round 2: "ikonlar güzel
+        // olmuş ama ayrım hiç yok şimdi de üst taraf ve bottom bar ile"): a
+        // hairline that follows the rounded corners is what separates a bar from
+        // the page, and `--bg-2` lifts it one step off the content.
+        borderTop: "none",
+        boxShadow: "inset 0 1px 0 var(--line-1)",
+        borderRadius: "var(--m-radius-sheet) var(--m-radius-sheet) 0 0",
+        background: "var(--bg-2)",
         // The bar is TOP-LEVEL NAVIGATION and no destination may cover it. The
         // calendar draws itself as a full-screen surface at `--z-dropdown` (it has to
         // cover the list, the header and the editor), so on a phone opening the
@@ -117,9 +131,13 @@ export function TabBar({
       }}
     >
       <button data-testid="workspace.tab-notes" onClick={onNotes} aria-label={t("notes.list.notesHeading")} style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="5" y="3" width="14" height="18" rx="2.5" stroke={col(active === "notes")} strokeWidth="1.8" />
-          <path d="M9 8h6M9 12h6M9 16h3" stroke={col(active === "notes")} strokeWidth="1.8" strokeLinecap="round" />
+        {/* One stroke idea per glyph, 24-grid, no interior detail smaller than a
+            touch pixel: the owner's note was that the bar's icons read as
+            low-quality because each one carried three or four features
+            ("ikonların kompleks olmasından"). Notes is a sheet with a fold. */}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 3.5h9.5L19 7v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V5a1.5 1.5 0 0 1 1-1.5z" stroke={col(active === "notes")} strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M8.5 11h7M8.5 15h4.5" stroke={col(active === "notes")} strokeWidth="1.7" strokeLinecap="round" />
         </svg>
         <span style={label(active === "notes")}>{t("notes.list.notesHeading")}</span>
       </button>
@@ -128,27 +146,32 @@ export function TabBar({
           alongside notes in the product's mobile identity — and it is hard to
           reverse, because top-level navigation is something users learn. */}
       <button data-testid="workspace.tab-tasks" onClick={onTasks} aria-label={t("common.tasks")} style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="4" y="4" width="6" height="6" rx="1.6" stroke={col(active === "tasks")} strokeWidth="1.8" />
-          <path d="M5.4 7l1.3 1.3L9 5.8" stroke={col(active === "tasks")} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M13 6.5h7M13 12h7M13 17.5h7M5 12h5M5 17.5h5" stroke={col(active === "tasks")} strokeWidth="1.8" strokeLinecap="round" />
+        {/* A single check in a rounded box. The previous glyph was a checkbox
+            PLUS four list lines, which at 24px is a smudge. */}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke={col(active === "tasks")} strokeWidth="1.7" />
+          <path d="M8 12.3l2.7 2.7L16 9.5" stroke={col(active === "tasks")} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span style={label(active === "tasks")}>{t("common.tasks")}</span>
       </button>
       <button data-testid="workspace.tab-graph" onClick={onGraph} aria-label={t("editor.chrome.barItems.graph")} style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="6" cy="17" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
-          <circle cx="18" cy="14" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
-          <circle cx="13" cy="6" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
-          <path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" stroke={col(active === "graph")} strokeWidth="1.6" />
+        {/* Three nodes joined by two edges, balanced around the centre so the
+            glyph reads at a glance. Radii are equal: unequal circles were what
+            made the old one look accidental. */}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="6" cy="7" r="2.6" stroke={col(active === "graph")} strokeWidth="1.7" />
+          <circle cx="18" cy="10" r="2.6" stroke={col(active === "graph")} strokeWidth="1.7" />
+          <circle cx="9" cy="18" r="2.6" stroke={col(active === "graph")} strokeWidth="1.7" />
+          <path d="M8.3 8.4l7.4 1.2M7.2 9.4l1.4 6.2" stroke={col(active === "graph")} strokeWidth="1.7" strokeLinecap="round" />
         </svg>
         <span style={label(active === "graph")}>{t("editor.chrome.barItems.graph")}</span>
       </button>
       <button data-testid="workspace.tab-files" onClick={onAttachments} aria-label={t("attachments.library.title")} style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="18" height="18" rx="2.5" stroke={col(active === "files")} strokeWidth="1.8" />
-          <circle cx="8.5" cy="8.5" r="1.8" fill={col(active === "files")} />
-          <path d="M21 15l-5-5L5 21" stroke={col(active === "files")} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        {/* A folder, not a picture. The old glyph was the image/picture icon,
+            so the column labelled "Files" showed a photo placeholder and read
+            as a photo library. Attachments are files; the folder says so. */}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3.5 7a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.7.9l.9 1.4a2 2 0 0 0 1.7.9H19a2 2 0 0 1 2 2v6.8a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z" stroke={col(active === "files")} strokeWidth="1.7" strokeLinejoin="round" />
         </svg>
         <span style={label(active === "files")}>{t("settings.shell.panels.files")}</span>
       </button>
@@ -158,9 +181,9 @@ export function TabBar({
           users already learned where it was, and reordering top-level navigation is
           the one change a user cannot be told about. */}
       <button data-testid="workspace.tab-calendar" onClick={onCalendar} aria-label={t("calendar.title")} style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke={col(active === "calendar")} strokeWidth="1.8" />
-          <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke={col(active === "calendar")} strokeWidth="1.8" strokeLinecap="round" />
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3.5" y="5" width="17" height="15.5" rx="3" stroke={col(active === "calendar")} strokeWidth="1.7" />
+          <path d="M3.5 9.8h17M8 3.2v3.6M16 3.2v3.6" stroke={col(active === "calendar")} strokeWidth="1.7" strokeLinecap="round" />
         </svg>
         <span style={label(active === "calendar")}>{t("calendar.title")}</span>
       </button>

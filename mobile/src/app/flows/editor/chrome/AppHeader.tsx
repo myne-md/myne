@@ -7,7 +7,20 @@ import { Icon, VaultMark, LIST_TOP } from "../../../../components";
 export function AppHeader({ label, icon, onSwitcher, onPalette, onSettings }: { label: string; icon: string | null; onSwitcher: () => void; onPalette: () => void; onSettings: () => void }) {
   const { t } = useTranslation();
   return (
-    <div data-testid="workspace.app-header" style={{ flex: "none", padding: `${LIST_TOP} 14px 6px 20px`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+    <div
+      data-testid="workspace.app-header"
+      style={{
+        flex: "none",
+        paddingTop: LIST_TOP,
+        paddingRight: 14,
+        paddingBottom: 6,
+        paddingLeft: 20,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+      }}
+    >
       <button
         onClick={onSwitcher}
         style={{ display: "flex", alignItems: "center", gap: 6, border: "none", background: "transparent", padding: 0, cursor: "pointer", minWidth: 0 }}

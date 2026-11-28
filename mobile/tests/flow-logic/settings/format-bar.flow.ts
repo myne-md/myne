@@ -8,10 +8,16 @@
 //   • the live BAR reflects it — the bar reads the same `usePrefs` nonce, so a
 //     write in Settings must reorder the real bar with no remount.
 //
-// Also pinned: the pinned chrome (attach / library / record / raw toggle /
-// hide-keyboard) is NOT in the vocabulary, so it survives hiding every format
-// action. That is the property that keeps the customization surface from removing
-// its own escape hatches.
+// Also pinned: the pinned chrome (attach / ⋯ / hide-keyboard, and library /
+// record / raw inside the sheet) is NOT in the vocabulary, so it survives hiding
+// every format action. That is the property that keeps the customization surface
+// from removing its own escape hatches.
+//
+// **Round 2 (owner, 2026-11-27): the bar itself is THIN.** It renders the five
+// standing actions (undo, redo, bold, italic, checklist) plus attach and ⋯; the
+// rest of the vocabulary is in the ⋯ sheet with its name under each glyph. The
+// specs below therefore read the sheet for the reordering assertions and the bar
+// for the standing set.
 
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
@@ -41,6 +47,23 @@ function barIds(page: Page): Promise<string[]> {
   );
 }
 
+/** Open the bar's ⋯ sheet and read the format ids it offers, in sheet order. */
+async function sheetIds(page: Page): Promise<string[]> {
+  await page.getByTestId("editor.format-more").click();
+  const ids = await page.$$eval('[data-testid="sheet.card"] [data-format-item]', (els) =>
+    els.map((e) => e.getAttribute("data-format-item") ?? ""),
+  );
+  await page.getByRole("button", { name: "Done" }).click();
+  return ids;
+}
+
+/** Bar + sheet, in the order the user's preference list produces. */
+async function allIds(page: Page): Promise<string[]> {
+  const bar = await barIds(page);
+  const sheet = await sheetIds(page);
+  return [...bar, ...sheet];
+}
+
 const orderWrites = (page: Page) =>
   page.evaluate(() => (window as unknown as { __toolbarOrderWrites?: string[][] }).__toolbarOrderWrites ?? []);
 const hiddenWrites = (page: Page) =>
@@ -52,10 +75,10 @@ test.describe("format-bar customization", () => {
     await page.goto("/");
     await openEditor(page);
 
-    expect(await barIds(page)).toEqual([
-      "undo", "redo", "heading1", "heading2", "bold", "italic",
-      "bulletList", "checklist", "quote", "code", "wikilink", "link",
-    ]);
+    // The standing five, in canonical order, then the rest in the sheet.
+    expect(await barIds(page)).toEqual(["undo", "redo", "bold", "italic", "checklist"]);
+    // ^ the canonical order, and the standing set is exactly these five
+    expect(await sheetIds(page)).toEqual(["heading1", "heading2", "bulletList", "quote", "code", "wikilink", "link"]);
   });
 
   test("hiding an action removes it from the live bar and persists sorted", async ({ page }) => {
@@ -75,6 +98,7 @@ test.describe("format-bar customization", () => {
     await closeSheet(page);
     await openEditor(page);
     expect(await barIds(page)).not.toContain("bold");
+    expect(await allIds(page)).not.toContain("bold");
   });
 
   test("moving an action down reorders the live bar", async ({ page }) => {
@@ -93,6 +117,7 @@ test.describe("format-bar customization", () => {
 
     await closeSheet(page);
     await openEditor(page);
+    // Both are standing actions, so the swap is visible without opening the sheet.
     expect((await barIds(page)).slice(0, 2)).toEqual(["redo", "undo"]);
   });
 
@@ -115,10 +140,12 @@ test.describe("format-bar customization", () => {
     await page.goto("/");
     await openEditor(page);
 
-    const ids = await barIds(page);
-    expect(ids.slice(0, 2)).toEqual(["link", "bold"]);
-    expect(ids).not.toContain("undo");
-    expect(ids).not.toContain("redo");
+    // `bold` is standing, so it leads the BAR; `link` leads the sheet once the
+    // bar's own set is taken out. Order is one list, read across both surfaces.
+    expect(await barIds(page)).toEqual(["bold", "italic", "checklist"]);
+    expect((await sheetIds(page))[0]).toBe("link");
+    expect(await allIds(page)).not.toContain("undo");
+    expect(await allIds(page)).not.toContain("redo");
   });
 
   test("a desktop-authored layout degrades instead of leaving holes", async ({ page }) => {
@@ -136,8 +163,10 @@ test.describe("format-bar customization", () => {
     await page.goto("/");
     await openEditor(page);
 
-    const ids = await barIds(page);
-    expect(ids[0]).toBe("quote");
+    // The sheet leads with the id the desktop list put first; the bar keeps the
+    // standing set, which the same list also orders.
+    expect((await sheetIds(page))[0]).toBe("quote");
+    const ids = await allIds(page);
     expect(ids).toHaveLength(12); // nothing hidden — the hidden ids were foreign
     for (const foreign of ["highlight", "strike", "numberedList", "heading"]) {
       expect(ids).not.toContain(foreign);
@@ -163,7 +192,12 @@ test.describe("format-bar customization", () => {
 
     expect(await barIds(page)).toEqual([]);
     await expect(page.getByTestId("editor.format-bar")).toBeVisible();
-    for (const chrome of ["Attach new file", "Insert from library", "Record voice note", "Hide keyboard"]) {
+    for (const chrome of ["Attach new file", "Hide keyboard"]) {
+      await expect(page.getByRole("button", { name: chrome })).toBeVisible();
+    }
+    // The sheet still opens and still offers the pinned insert actions.
+    await page.getByTestId("editor.format-more").click();
+    for (const chrome of ["Insert from library", "Record voice note", "Show raw markdown"]) {
       await expect(page.getByRole("button", { name: chrome })).toBeVisible();
     }
   });

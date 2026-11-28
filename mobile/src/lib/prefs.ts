@@ -169,6 +169,16 @@ export interface SavedView {
   template?: string;
 }
 
+/** One card in the synced home arrangement. Ids, kinds and quarter widths are the
+ *  desktop's vocabulary (`protocol::home_layout`); a kind this client cannot draw
+ *  is skipped rather than shown as a broken box. */
+export interface MobileHomeCard {
+  id: string;
+  kind: string;
+  span: number;
+  options?: Readonly<Record<string, string>>;
+}
+
 export interface PrefsView {
   screen_capture_protection: boolean;
   /** Whether on-device voice-to-text is available (MYND-563/592). Opt-OUT —
@@ -239,6 +249,21 @@ export interface PrefsView {
    * which is why that one became device-local in the same change.
    */
   ai_enabled: boolean;
+  /**
+   * The home board's arrangement (myne-md/myne#1074), **synced**: one layout for
+   * every surface, so the iPad and the phone draw the order the desktop chose
+   * instead of keeping a second, device-local one.
+   *
+   * `null` means the vault has never been arranged, and the client draws its own
+   * default. The phone renders the KINDS it can draw in the stored order and skips
+   * the rest; it never writes this field, because re-arranging belongs to a pointer.
+   */
+  home_cards: readonly MobileHomeCard[] | null;
+  /**
+   * Whether THIS DEVICE opens the home surface on start. Device-local: which phone
+   * starts on home is a fact about that phone, not about the vault.
+   */
+  home_open_on_start: boolean;
   /**
    * The remote AI provider the user named, or `null`.
    * Shared across devices (scalar LWW): naming a provider is a statement about

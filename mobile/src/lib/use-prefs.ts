@@ -21,6 +21,8 @@ export const DEFAULT_PREFS: PrefsView = {
   // path is UNREACHABLE rather than merely disabled, so the pre-read view must
   // not read as anything else even for the frames before the first read lands.
   ai_enabled: false,
+  home_cards: null,
+  home_open_on_start: false,
   ai_provider: null,
   ai_provider_consent: null,
   ai_provider_model: null,

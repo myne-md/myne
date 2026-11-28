@@ -14,10 +14,12 @@
 // drift from the desktop's.
 
 import { useMemo, useState, type ReactNode } from "react";
-import { TaskListPanel } from "@myne/task-panel";
+import { TaskFilterBuilder, TaskListPanel } from "@myne/task-panel";
+import { Sheet } from "./misc";
 import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { todayLocal } from "@myne/task-filters";
 import { setTaskCompleted, setTaskField, useVaultTasks, type VaultTask } from "../lib/tasks";
+import { SCREEN_TOP } from "../components";
 
 export type TaskSurfaceScope =
   /** Every task in the vault - the bottom-bar destination and its sidebar tab. */
@@ -31,6 +33,12 @@ export type TaskSurfaceProps = {
   tagsOf?: (noteId: string) => readonly string[];
   /** Open the task's note at its line. Absent → rows are not openable. */
   onOpen?: (task: VaultTask) => void;
+  /** True when the caller already renders a page header (the AppHeader) above
+   *  this surface, so the surface must not add its own status-bar clearance. */
+  insideHeader?: boolean;
+  /** Drop the source-note column, for a phone-width surface. The vault-wide list
+   *  keeps it on a tablet, where there is room for one more fact per row. */
+  compactWidth?: boolean;
   /** Injected in tests; production reads the local calendar day. */
   today?: string;
   testIdPrefix?: string;
@@ -50,6 +58,8 @@ export function TaskSurface({
   onOpen,
   today,
   testIdPrefix,
+  insideHeader = false,
+  compactWidth = false,
   view: controlledView,
   onViewChange,
 }: TaskSurfaceProps): ReactNode {
@@ -69,7 +79,35 @@ export function TaskSurface({
   );
 
   return (
-    <TaskListPanel
+    // The task DESTINATIONS are full screens, so the host supplies the page
+    // frame the shared panel expects and does not carry itself: status-bar
+    // clearance on top and the canon's 20px gutter on the sides. Without it the
+    // search field rendered UNDER the status bar and every row sat against the
+    // bezel (owner, 2026-11-27: "tasks panellerinin padding ve marginleri çok
+    // yanlış").
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        // The host owns the frame: `SCREEN_TOP` unless an AppHeader already sits
+        // above this surface, and no extra gutter — the panel's own row padding
+        // is the gutter, and adding 20pt to it made every row sit 32pt in from
+        // the bezel (owner, 2026-11-27 round 2: "sol sağ padding şimdi de aşırı
+        // fazla").
+        ...(insideHeader ? { paddingTop: 0 } : { paddingTop: SCREEN_TOP }),
+        // One page gutter, `--space-3` + `--space-2` = 20, matching every other
+        // mobile page. The panel's own toolbar padding is `--space-3`, so the
+        // wrapper contributes the missing `--space-2` and rows/headings take
+        // `--space-3` themselves from the same var: checkbox, section label and
+        // search field all land on 20 and cannot drift apart (owner, 2026-11-27
+        // round 4: "checkmarklar hâlâ search ile eşit değil").
+        paddingInline: "var(--space-2)",
+        ["--task-row-inset" as string]: "var(--space-3)",
+      }}
+    >
+      <TaskListPanel
       tasks={visible}
       view={view}
       today={today ?? todayLocal()}
@@ -78,6 +116,27 @@ export function TaskSurface({
       rowScope={scope.kind === "note" ? "note" : "vault"}
       // Touch-sized checkboxes: the shared dense 14px box is a mouse target.
       roomyBox
+      // One line, because the windowed list owns a FIXED row height and a
+      // two-line row overflowed into its neighbour (owner, 2026-11-27 round 3:
+      // "rowlarda bir crop var"). The narrow screen is answered by dropping the
+      // source-note column instead — see `showNoteTitle`.
+      {...(compactWidth ? { showNoteTitle: false } : {})}
+      // The desktop builder is a two-pane popover anchored to the toolbar. On a
+      // phone that reads as a stray dropdown floating over the list, so the same
+      // content is hosted in a bottom sheet instead.
+      filterSheet={({ view: filterView, onViewChange, onClose, folderOptions, noteOptions, tagOptions, testIdPrefix: prefix }) => (
+        <Sheet onClose={onClose}>
+          <TaskFilterBuilder
+            view={filterView}
+            onViewChange={onViewChange}
+            onClose={onClose}
+            folderOptions={folderOptions}
+            noteOptions={noteOptions}
+            tagOptions={tagOptions}
+            testIdPrefix={prefix}
+          />
+        </Sheet>
+      )}
       {...(tagsOf === undefined ? {} : { tagsOf })}
       onViewChange={handleViewChange}
       // The write goes through the SHARED sequence with mobile IO - including
@@ -90,6 +149,7 @@ export function TaskSurface({
       onWriteField={(task, kind, value) => setTaskField(task, kind, value)}
       {...(onOpen === undefined ? {} : { onOpen })}
       {...(testIdPrefix === undefined ? {} : { testIdPrefix })}
-    />
+      />
+    </div>
   );
 }

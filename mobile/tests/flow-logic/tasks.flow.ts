@@ -127,10 +127,16 @@ test.describe("mobile task surfaces", () => {
     // not be a vault-wide list.
     await expect(page.getByText("buy milk")).toBeVisible();
     await expect(page.getByText("send the invoice")).toBeVisible();
-    // And each row names where it came from, which is the whole reason the row
-    // is two lines on a phone.
-    await expect(page.getByText("Groceries").first()).toBeVisible();
-    await expect(page.getByText("Work").first()).toBeVisible();
+    // The rows come from MORE THAN ONE note, which is what makes this a
+    // vault-wide list — asserted through the vault-scope row shape rather than a
+    // second column: since the 2026-11-27 review the phone drops the source-note
+    // column (the windowed list owns a fixed row height, so a row cannot wrap to
+    // make room, and the task's own words matter more on a narrow screen). The
+    // tablet keeps it, which is where the column is asserted.
+    await expect(page.locator('[data-testid$=".row.note"]')).toHaveCount(0);
+    const texts = await page.locator('[data-testid$=".row"]').allInnerTexts();
+    expect(texts.join(" ")).toContain("buy milk");
+    expect(texts.join(" ")).toContain("send the invoice");
   });
 
   test("a task the index reports with null dates renders, undated", async ({ page }) => {

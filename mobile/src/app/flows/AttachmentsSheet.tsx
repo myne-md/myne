@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sheet, Banner, Spinner, Segmented } from "../../components";
+import { Sheet, Banner, Spinner, Segmented, LIST_TOP } from "../../components";
 import { catalogList, attachmentDelete, attachmentRename, attachmentSetFolders, attachmentUnusedList, attachmentCleanUnused, importFile, ATTACHMENT_ACCEPT, type CatalogEntry } from "../../lib/attachments";
 import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -46,6 +46,7 @@ export function AttachmentsSheet({
   onInsertText,
   onSavedNote,
   variant = "sheet",
+  topInset = false,
 }: {
   onClose: () => void;
   /** When provided, each row shows an "Insert" action that embeds the
@@ -64,6 +65,12 @@ export function AttachmentsSheet({
   /** `"sheet"` = floating modal (in-editor insert picker). `"page"` = full
    *  bottom-tab page (the top-level Files library). */
   variant?: "sheet" | "page";
+  /** The page variant pays for the status bar only when NOTHING renders above it.
+   *  Under the AppHeader that header already carries the clearance, and a second
+   *  inset pushed the Files title a whole header-height down the page (owner,
+   *  2026-11-27 round 3: "files gibi bazı yerlerde ... çözülüyor olsun her
+   *  sayfada"). */
+  topInset?: boolean;
 }) {
   const { t } = useTranslation();
   // Transcription visibility is gated on the pref (MYND-563; the backend
@@ -319,7 +326,13 @@ export function AttachmentsSheet({
             <Spinner />
           </div>
         ) : entries.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
+          // No wash and no stretch: the message holds the middle of the pane the
+          // list will occupy (owner, 2026-11-27 round 4), rather than sitting as
+          // a caption under the header.
+          <div style={{ // `height: 100%` (not `minHeight`) because the scroll container around it is a
+          // block box with a definite height: a percentage resolves there and the
+          // message truly holds the middle of the pane.
+          height: "100%", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
             {t("attachments.emptyState")}
           </div>
         ) : (
@@ -463,7 +476,7 @@ export function AttachmentsSheet({
       <>
         {uploadInput}
         {/* Sits under the shared AppHeader (Files tab), so no safe-area top here. */}
-        <div data-testid="files.page" style={{ flex: "none", padding: "8px 20px 0" }}>
+        <div data-testid="files.page" style={{ flex: "none", paddingTop: topInset ? LIST_TOP : 8, paddingInline: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{title}</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>

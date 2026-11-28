@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sheet, Icon, LIST_TOP } from "../../components";
+import { Sheet, Icon, SCREEN_TOP } from "../../components";
 
 export interface TemplateItem {
   id: string;
@@ -42,7 +42,10 @@ export function TemplatesSheet({
 
   const listInner =
     templates.length === 0 ? (
-      <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
+      <div style={{ // `height: 100%` (not `minHeight`) because the scroll container around it is a
+          // block box with a definite height: a percentage resolves there and the
+          // message truly holds the middle of the pane.
+          height: "100%", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
         {t("templates.emptyBefore")}<span style={{ color: "var(--accent)", fontWeight: 600 }}>{t("templates.newAction")}</span>{t("templates.emptyAfter")}
       </div>
     ) : (
@@ -80,7 +83,7 @@ export function TemplatesSheet({
   if (variant === "page") {
     return (
       <>
-        <div style={{ flex: "none", padding: `${LIST_TOP} 20px 0` }}>
+        <div style={{ flex: "none", paddingTop: SCREEN_TOP, paddingInline: 20 }}>
           {onBack && (
             <button
               onClick={onBack}

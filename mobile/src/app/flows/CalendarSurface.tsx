@@ -131,7 +131,16 @@ function weekdayHeader(date: string, locale: string): string {
 /** Where a create gesture or a tap opened the composer. */
 type ComposeSeed = { date: string; startTime?: string; endTime?: string };
 
-export function CalendarSurface({ onClose }: { onClose: () => void }) {
+export function CalendarSurface({
+  onClose,
+  /** Status-bar clearance for this surface's own header row: 0 when an AppHeader
+   *  renders above it, the page top when this is the page. Same contract as
+   *  `GraphTab`. */
+  pageTop = 8,
+}: {
+  onClose: () => void;
+  pageTop?: string | number;
+}) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<ViewName>("month");
   const [anchor, setAnchor] = useState<CivilDate>(todayCivil);
@@ -493,7 +502,13 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
           display: "flex",
           alignItems: "center",
           gap: "var(--space-2)",
-          padding: "var(--space-7) var(--space-4) var(--space-1)",
+          // Longhands, and the page's own gutter: this row used to pay
+          // `--space-7` (48) at the top and 16 at the sides, so on a phone it was
+          // a 48pt dead band under the AppHeader and did not line up with the
+          // title on any other page (owner, 2026-11-27 round 4).
+          paddingTop: pageTop,
+          paddingInline: 20,
+          paddingBottom: "var(--space-1)",
           borderBottom: "1px solid var(--line-1)",
         }}
       >

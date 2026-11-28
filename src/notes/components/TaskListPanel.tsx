@@ -55,6 +55,22 @@ export type TaskListPanelProps = {
   view: TaskView;
   today: string;
   rowScope: TaskRowScope;
+  /** Show the source-note column on every row. Off for a phone-width surface: the
+   *  windowed list owns a fixed row height, so a row can only be made roomier by
+   *  dropping a column, not by wrapping. */
+  showNoteTitle?: boolean;
+  /** Host the filter builder in the caller's own surface instead of the
+   *  tooltip-style popover. Mobile passes a bottom-sheet renderer: the popover
+   *  is a pointer affordance and reads as a stray dropdown on a phone. */
+  filterSheet?: (args: {
+    view: TaskView;
+    onViewChange: (next: TaskView) => void;
+    onClose: () => void;
+    folderOptions: readonly string[];
+    noteOptions: readonly (readonly [string, string])[];
+    tagOptions: readonly string[];
+    testIdPrefix: string;
+  }) => React.ReactNode;
   tagsOf?: (noteId: string) => readonly string[];
   rebuilding?: boolean;
   onViewChange: (next: TaskView) => void;
@@ -82,10 +98,32 @@ const PRIORITIES = ["highest", "high", "medium", "low", "lowest"] as const;
 /** Menu order, and the roster `present()` is computed over. */
 const FIELD_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priority"];
 
+/** The description as a READER sees it, not as the file spells it.
+ *
+ *  A task line is markdown, so it can carry `[[Writing with Markdown]]`, an
+ *  `![[att:…|diagram.png]]` embed or a `[label](url)` link. The row is a list of
+ *  sentences, not a source view: printing the delimiters is the phone showing
+ *  the note's bytes instead of its meaning, which is what the seeded vault did
+ *  on the Tasks screen (owner, 2026-11-27: "Read [[Writing with Markdown]]").
+ *
+ *  Display-only by construction: the row's field controls write through
+ *  `onWriteField`, which is given the TASK, never this string, so nothing here
+ *  can reach the file. `taskRowKey` keys off the raw line, so a display
+ *  transformation cannot re-key a row either. */
+function displayTaskText(line: string): string {
+  const target = (raw: string): string => raw.split("/").pop() ?? raw;
+  return taskDescription(line)
+    // Embeds first: `![[…]]` would otherwise be matched by the plain rule and
+    // leave its `!` behind.
+    .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t: string, alias?: string) => alias ?? target(t))
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t: string, alias?: string) => alias ?? target(t))
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+}
+
 function toRowData(task: VaultTask, depth: number): TaskRowData {
   return {
     key: taskRowKey(task),
-    text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
+    text: task.lineIndex === null ? (task.noteTitle ?? "") : displayTaskText(task.rawLine),
     completed: task.completed,
     noteTitle: task.noteTitle,
     ...(depth > 0 ? { depth } : {}),
@@ -459,7 +497,8 @@ const HEADER_BASE: CSSProperties = {
   gap: "var(--space-2)",
   boxSizing: "border-box",
   height: TASK_ROW_HEIGHT - 2,
-  padding: "0 8px",
+  // Same inset var as the rows, so headings and rows share one edge.
+  padding: "0 var(--task-row-inset, var(--space-2))",
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-xs)",
   fontWeight: 600,
@@ -632,7 +671,7 @@ function BuilderValueRow({
  * It is an inline non-modal builder (no focus trap): Tab may leave it, and
  * Escape is the keyboard close.
  */
-function TaskFilterBuilder({
+export function TaskFilterBuilder({
   view,
   onViewChange,
   onClose,
@@ -910,6 +949,8 @@ export function TaskListPanel({
   view,
   today,
   rowScope,
+  showNoteTitle = true,
+  filterSheet,
   tagsOf,
   rebuilding = false,
   onViewChange,
@@ -1137,20 +1178,32 @@ export function TaskListPanel({
           )}
         </div>
 
-        {!minimal && builderOpen ? (
-          <>
-            <div style={BUILDER_BACKDROP_STYLE} onClick={() => setBuilderOpen(false)} />
-            <TaskFilterBuilder
-              view={view}
-              onViewChange={onViewChange}
-              onClose={closeBuilder}
-              folderOptions={folderOptions}
-              noteOptions={noteOptions}
-              tagOptions={tagOptions}
-              testIdPrefix={testIdPrefix}
-            />
-          </>
-        ) : null}
+        {!minimal && builderOpen
+          ? filterSheet === undefined
+            ? (
+              <>
+                <div style={BUILDER_BACKDROP_STYLE} onClick={() => setBuilderOpen(false)} />
+                <TaskFilterBuilder
+                  view={view}
+                  onViewChange={onViewChange}
+                  onClose={closeBuilder}
+                  folderOptions={folderOptions}
+                  noteOptions={noteOptions}
+                  tagOptions={tagOptions}
+                  testIdPrefix={testIdPrefix}
+                />
+              </>
+            )
+            : filterSheet({
+                view,
+                onViewChange,
+                onClose: closeBuilder,
+                folderOptions,
+                noteOptions,
+                tagOptions,
+                testIdPrefix,
+              })
+          : null}
 
         {!minimal && chips.length > 0 ? (
           <div style={CHIPS_ROW_STYLE} data-testid={`${testIdPrefix}.appliedFilters`}>
@@ -1198,9 +1251,9 @@ export function TaskListPanel({
                 task={toRowData(item.task, item.depth)}
                 scope={rowScope}
                 today={today}
-                compactX
                 inlineDate
                 roomyBox={roomyBox}
+                {...(showNoteTitle ? {} : { hideNoteTitle: true })}
                 testIdPrefix={`${testIdPrefix}.row`}
                 {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                 {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
@@ -1227,6 +1280,7 @@ export function TaskListPanel({
                     scope={rowScope}
                     today={today}
                     roomyBox={roomyBox}
+                    {...(showNoteTitle ? {} : { hideNoteTitle: true })}
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}

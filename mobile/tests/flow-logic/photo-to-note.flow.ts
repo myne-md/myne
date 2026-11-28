@@ -25,6 +25,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "./mock-ipc";
 
+/** Open the format bar's ⋯ sheet and press one of its tiles by name. */
+async function openBarSheet(page: import("@playwright/test").Page, name: string): Promise<void> {
+  await page.getByTestId("editor.format-more").click();
+  await page.getByRole("button", { name }).click();
+}
+
 /** The id the mock's `attachment_import` always returns. */
 const ID = "a".repeat(64);
 
@@ -96,7 +102,7 @@ test.describe("photo to note", () => {
     // The button, not the hidden input: emptying `onPhotoToNote` used to leave
     // all six cases green, which is a dead feature shipping behind a green tier.
     const chooser = page.waitForEvent("filechooser");
-    await page.getByTestId("editor.photo-to-note").click();
+    await openBarSheet(page, "Photo to note");
     const fileChooser = await chooser;
     await fileChooser.setFiles({
       name: "page.png",
@@ -150,7 +156,11 @@ test.describe("photo to note", () => {
 
   test("the entry opens a draft, and the edited text lands under the image", async ({ page }) => {
     await bootAndOpenNote(page);
-    await expect(page.getByTestId("editor.photo-to-note")).toBeVisible();
+    // The entry lives in the bar's ⋯ sheet (the bar itself is the five standing
+    // format actions since round 2), so it is reachable, not a visible bar button.
+    await page.getByTestId("editor.format-more").click();
+    await expect(page.getByRole("button", { name: "Photo to note" })).toBeVisible();
+    await page.getByRole("button", { name: "Done" }).click();
 
     await pickPhoto(page);
 

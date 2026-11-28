@@ -38,6 +38,32 @@ import { HOME_CARD_BODIES } from "./cardBodies";
 /** The column count the grid is laid out on. A card spans one or two of them. */
 const COLUMNS = 2;
 
+/** Group cards into full-width rows and two-column bands, preserving order.
+ *
+ *  A card whose span is the full width gets its own row. Everything else joins
+ *  the band that follows, alternating between the two columns so a band's two
+ *  stacks stay about the same height without measuring anything. */
+type CardRow = { kind: "wide"; card: HomeCard } | { kind: "band"; columns: [HomeCard[], HomeCard[]] };
+
+function layOutCards(cards: readonly HomeCard[]): CardRow[] {
+  const rows: CardRow[] = [];
+  let band: { kind: "band"; columns: [HomeCard[], HomeCard[]] } | null = null;
+  for (const card of cards) {
+    if (card.span >= COLUMNS) {
+      band = null;
+      rows.push({ kind: "wide", card });
+      continue;
+    }
+    if (band === null) {
+      band = { kind: "band", columns: [[], []] };
+      rows.push(band);
+    }
+    const [left, right] = band.columns;
+    (left.length <= right.length ? left : right).push(card);
+  }
+  return rows;
+}
+
 /**
  * The breakpoint under which the grid is ONE column.
  *
@@ -220,21 +246,33 @@ export function HomeSurface() {
       {cards.length === 0 ? (
         <EmptyState onArrange={() => setEditing(true)} />
       ) : (
-        <div
-          data-testid="home.cards"
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${narrow ? 1 : COLUMNS}, minmax(0, 1fr))`,
-            // Cards size to their content. Without this a grid row stretches every
-            // card to the tallest one, so a one-line card on a sparse vault is a
-            // 280-pixel box with one sentence in it.
-            alignItems: "start",
-            gap: "var(--space-3)",
-          }}
-        >
-          {cards.map((card) => (
-            <CardShell key={card.id} card={card} narrow={narrow} />
-          ))}
+        // Two independent STACKS, not one CSS grid (owner, 2026-11-27 round 2:
+        // the desktop home's "marginleri falan garip"). A grid makes every row as
+        // tall as its tallest card, so a short card beside a long one leaves a
+        // hole under it - which is exactly what the screenshot showed, a column
+        // of dead space. Stacks have no rows to align, so cards sit flush; a card
+        // that asks for the full width starts a row of its own and the stacks
+        // resume underneath it.
+        <div data-testid="home.cards" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {narrow ? (
+            cards.map((card) => <CardShell key={card.id} card={card} narrow />)
+          ) : (
+            layOutCards(cards).map((row, i) =>
+              row.kind === "wide" ? (
+                <CardShell key={`${row.card.id}-${i}`} card={row.card} narrow={false} />
+              ) : (
+                <div key={`row-${i}`} style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
+                  {row.columns.map((column, ci) => (
+                    <div key={ci} style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                      {column.map((card) => (
+                        <CardShell key={card.id} card={card} narrow={false} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ),
+            )
+          )}
         </div>
       )}
     </div>
