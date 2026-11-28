@@ -53,7 +53,13 @@ jobs:
       - name: Build the Arch nightly package
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          DEB="$(find target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          # Absolute, because `find` with a relative root prints a relative path and
+          # Docker reads a bare `target/...` as a named volume, not a host directory.
+          DEB="$(find "$PWD/target/release/bundle/deb" -maxdepth 1 -name '*.deb' -print -quit)"
+          if [ -z "$DEB" ]; then
+            echo "no .deb was produced; nothing to repackage"
+            exit 1
+          fi
           mkdir -p target/release/bundle/arch
           docker run --rm \
             -v "$PWD:/src:ro" \
