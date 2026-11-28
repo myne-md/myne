@@ -571,6 +571,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
    *  this device, so no attachment exists afterwards; only the reading is sent. */
   const readDeviceFiles = useCallback(
     async (files: File[]) => {
+      if (readingDevice) return;
       if (files.length === 0) return;
       setDeviceError(null);
       const room = MAX_RUN_ATTACHMENTS - deviceDocs.length;
@@ -608,7 +609,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         if (deviceInput.current !== null) deviceInput.current.value = "";
       }
     },
-    [t, deviceDocs],
+    [t, deviceDocs, readingDevice],
   );
 
   const send = useCallback(async () => {
@@ -1127,6 +1128,7 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           full={false}
           data-testid="ai.composer-device"
           aria-label={t("agent.attachments.fromDevice")}
+          disabled={readingDevice}
           onClick={() => deviceInput.current?.click()}
           style={{ flex: "none", padding: "0 var(--space-2)", height: 44 }}
         >
