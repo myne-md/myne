@@ -8,10 +8,16 @@
 // lists.
 
 import { describe, expect, it } from "vitest";
+import { indentLess } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { listAwareIndent, listAwareOutdent, nextIndentColumn } from "../../editor/src/list-indent";
+import {
+  floorCaretInsideListItems,
+  listAwareIndent,
+  listAwareOutdent,
+  nextIndentColumn,
+} from "../../editor/src/list-indent";
 import { indentUnit } from "@codemirror/language";
 import { completeState } from "./_parse-budget";
 
@@ -290,5 +296,106 @@ describe("listAwareOutdent", () => {
     );
     listAwareOutdent({ state, dispatch: (tr) => { state = tr.state; } });
     expect(state.doc.toString()).toBe("- [ ] a\n- [ ] b");
+  });
+});
+
+// myne-md/myne#1085: the same report as #1064, arriving through a different door.
+//
+// The command above answers Shift-Tab and floors the caret itself. The owner still
+// saw `text- [ ]`: an outdent that reached `indentLess` (a rebound chord, a
+// different binding, any route that removes the indentation without asking this
+// file) leaves the caret at the LINE START, so the next character lands in front
+// of the bullet and the line stops being a task. The filter is the invariant that
+// no route can dodge.
+describe("floorCaretInsideListItems", () => {
+  const withFilter = (doc: string, anchor: number) =>
+    EditorState.create({
+      doc,
+      selection: { anchor },
+      extensions: [
+        markdown({ base: markdownLanguage }),
+        indentUnit.of("  "),
+        floorCaretInsideListItems,
+      ],
+    });
+
+  const tasksIn = (state: EditorState) => {
+    let count = 0;
+    syntaxTree(state).iterate({
+      enter: (node) => { if (node.name === "Task") count++; },
+    });
+    return count;
+  };
+
+  it("rescues the caret an outdent left at the line start, whichever command it was", () => {
+    const doc = "- [ ] parent\n  - [ ] sub\n    - [ ] ";
+    const emptyItemStart = doc.length - "    - [ ] ".length;
+    const state = withFilter(doc, emptyItemStart);
+
+    // `indentLess`: NOT the command in `keymap.ts`, which is the point. Two
+    // spaces come off, the caret maps to the new line's start, and before the
+    // filter the next character produced `Z  - [ ] ` with no Task node left.
+    const outdented = state.update({ changes: { from: emptyItemStart, to: emptyItemStart + 2 } }).state;
+
+    const line = outdented.doc.lineAt(outdented.selection.main.head);
+    expect(line.text).toBe("  - [ ] ");
+    expect(outdented.selection.main.head).toBe(line.from + "  - [ ] ".length);
+
+    const typed = outdented.update({
+      changes: { from: outdented.selection.main.head, insert: "Z" },
+    }).state;
+    expect(typed.doc.toString()).toBe("- [ ] parent\n  - [ ] sub\n  - [ ] Z");
+    expect(typed.doc.toString()).not.toContain("Z  - [ ]");
+    expect(tasksIn(typed)).toBe(3);
+  });
+
+  it("leaves a selection-only transaction alone, so a click before the marker is the user's choice", () => {
+    const doc = "- [ ] parent\n  - [ ] item";
+    const state = withFilter(doc, doc.length);
+    const line = state.doc.line(2);
+    const moved = state.update({ selection: { anchor: line.from } }).state;
+    expect(moved.selection.main.head).toBe(line.from);
+  });
+
+  it("does not move a caret that is already inside the item", () => {
+    const doc = "- [ ] item";
+    const state = withFilter(doc, doc.length);
+    const typed = state.update({
+      changes: { from: doc.length, insert: "!" },
+      selection: { anchor: doc.length + 1 },
+    }).state;
+    expect(typed.selection.main.head).toBe(typed.doc.length);
+    expect(typed.doc.toString()).toBe("- [ ] item!");
+  });
+
+  it("keeps a plain line's caret where the edit left it", () => {
+    const state = withFilter("prose", 0);
+    const typed = state.update({
+      changes: { from: 0, to: 0, insert: "a " },
+      selection: { anchor: 2 },
+    }).state;
+    expect(typed.selection.main.head).toBe(2);
+  });
+
+  it("keeps a multi-line selection a selection", () => {
+    // A range spanning two list lines outdents as a range; the floor must not
+    // collapse it onto the head's line.
+    const doc = "  - [ ] a\n  - [ ] b";
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0, head: doc.length },
+      extensions: [
+        markdown({ base: markdownLanguage }),
+        indentUnit.of("  "),
+        floorCaretInsideListItems,
+      ],
+    });
+    let outdented = state;
+    indentLess({ state, dispatch: (tr) => { outdented = tr.state; } });
+    const sel = outdented.selection.main;
+    expect(sel.from).toBeLessThan(sel.to);
+    expect(outdented.doc.lineAt(sel.from).number).not.toBe(
+      outdented.doc.lineAt(sel.to).number,
+    );
   });
 });

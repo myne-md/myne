@@ -39,7 +39,12 @@
 // editor's unit and every other language keeps its own indentation service.
 
 import { indentLess, indentMore } from "@codemirror/commands";
-import type { StateCommand } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  type Extension,
+  type StateCommand,
+} from "@codemirror/state";
 
 /** Leading-whitespace width of `text`, counting a tab as the next multiple of 4. */
 function indentWidth(text: string): number {
@@ -293,3 +298,36 @@ function floorSelection(
     head: Math.max(head, floor),
   };
 }
+
+/** Whatever outdented, the caret must not rest in front of the marker
+ *  (myne-md/myne#1085: #1064's report through another door — a rebound chord or any
+ *  route into `indentLess` leaves it at the line start). A filter, because the
+ *  defect is the state any command can leave behind; selection-only transactions
+ *  are left alone, and each endpoint is floored against its OWN line so a
+ *  multi-line selection stays a selection. */
+export const floorCaretInsideListItems: Extension = EditorState.transactionFilter.of(
+  (tr) => {
+    if (!tr.docChanged) return tr;
+    const floored = (pos: number): number => {
+      const line = tr.newDoc.lineAt(pos);
+      const at = line.from + itemContentColumn(line.text);
+      return at === line.from ? pos : Math.max(pos, at);
+    };
+    let moved = false;
+    const ranges = tr.newSelection.ranges.map((range) => {
+      const head = floored(range.head);
+      const anchor = floored(range.anchor);
+      if (head === range.head && anchor === range.anchor) return range;
+      moved = true;
+      return EditorSelection.range(anchor, head);
+    });
+    if (!moved) return tr;
+    return [
+      tr,
+      {
+        selection: EditorSelection.create(ranges, tr.newSelection.mainIndex),
+        sequential: true,
+      },
+    ];
+  },
+);
