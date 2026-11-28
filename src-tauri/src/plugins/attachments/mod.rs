@@ -60,6 +60,7 @@ pub use myne_core::plugins::attachments::{
 
 // Desktop-only modules.
 pub mod blocking_reads;
+pub mod ephemeral;
 pub mod extract;
 pub mod import_desktop;
 pub mod ocr_queue;
@@ -101,6 +102,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             // Desktop import wrapper: core import + eager MYE1 text extraction.
             import_desktop::attachment_import,
+            ephemeral::attachment_extract_ephemeral,
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,

@@ -27,6 +27,7 @@
 description = "Default permission set for the mobile attachments plugin: import + catalog list + delete + rename + export + unused-list + clean-unused + reconcile (apply / remove / referencing) + the MYE1 extracted-text read-back."
 permissions = [
   "allow-attachment-import",
+  "allow-attachment-extract-ephemeral",
   "allow-catalog-list",
   "allow-attachment-delete",
   "allow-attachment-rename",
@@ -39,6 +40,11 @@ permissions = [
   "allow-attachment-refs-referencing",
   "allow-attachment-read-extracted-text",
 ]
+
+[[permission]]
+identifier = "allow-attachment-extract-ephemeral"
+description = "Allow invoking attachments:attachment_extract_ephemeral — the text of a picked or photographed file, returned without an attachment, a catalog row, a text cache row or a sync entry. No vault state and no key, so it is callable while the vault is locked. Images are read by the shared on-device OCR; text-like files as UTF-8; PDF and DOCX have no extractor on this host and answer `unsupported`."
+commands.allow = ["attachment_extract_ephemeral"]
 
 [[permission]]
 identifier = "allow-attachment-import"
