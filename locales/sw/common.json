@@ -3938,9 +3938,7 @@
           "view_list": "Orodhesha mionekano iliyohifadhiwa"
         },
         "wholeVaultLabel": "Soma na uandike kasha zima",
-        "wholeVaultHelper": "Kila folda, ikiwa ni pamoja na unazounda baadaye. Ukiacha folda moja nje hapa chini, inabaki nje kwa usomaji na uandishi.",
         "excludeNothing": "Hakuna kilichoachwa nje",
-        "scopeLineAll": "Inafikia kila noti kwenye kasha, ikiwa ni pamoja na folda unazounda baadaye, na inaweza kubadilisha yoyote.",
         "scopeLine": "Inafikia noti {{count}} katika folda {{folders}}, na inaweza kubadilisha chochote ndani yao.",
         "toolsNote": "Usomaji una kikomo: hadi noti {{count}} kwa kila dakika {{minutes}}.",
         "needsReapproval": "Ilidhinishwa na toleo la zamani chini ya kanuni iliyo kinyume. Toleo hili halisomi chochote kwa ajili yake hadi uidhinishe tena.",
@@ -4172,8 +4170,7 @@
       "strong": "Imara",
       "tooWeak": "Dhaifu mno"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Imehamisha dokezo {{count}} → {{label}}",
       "exported_other": "Imehamisha madokezo {{count}} → {{label}}",

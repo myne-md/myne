@@ -3934,7 +3934,6 @@
         "excludeNothing": "Ingenting holdt utenfor",
         "needsReapproval": "Godkjent av en eldre versjon, under den motsatte regelen. Denne builden leser ingenting for den før du godkjenner på nytt.",
         "scopeLine": "Når {{count}} notater i {{folders}} mapper, og kan endre alt i dem.",
-        "scopeLineAll": "Når hvert notat i hvelvet, også i mapper du lager senere, og kan endre hvilket som helst av dem.",
         "scopeLineWords": "Når mappene du oppgir, og kan endre alt i dem.",
         "toolsNote": "Lesing har et budsjett: opptil {{count}} notater per {{minutes}} minutter.",
         "verb": {
@@ -3943,7 +3942,6 @@
           "calendar_read": "Les kalenderen",
           "view_list": "List lagrede visninger"
         },
-        "wholeVaultHelper": "Hver mappe, også de du lager senere. Holder du en mappe utenfor nedenfor, er den utenfor både for lesing og skriving.",
         "wholeVaultLabel": "Les og skriv hele hvelvet"
       },
       "autoApplyLabel": "Bruk foreslåtte tagger automatisk",
@@ -4172,8 +4170,7 @@
       "strong": "Sterkt",
       "tooWeak": "For svakt"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Eksporterte {{count}} notat → {{label}}",
       "exported_other": "Eksporterte {{count}} notater → {{label}}",

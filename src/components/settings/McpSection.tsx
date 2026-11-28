@@ -22,9 +22,9 @@
 //
 // One line each, at the decision each belongs to, and none behind a disclosure:
 // what a connected tool does with what it reads is outside Myne (the switch); a
-// name is a label, not a password (the name field); what is shared grows with
-// the vault (the scope line); writing
-// is a named list and every write keeps a restore point (the write disclosure).
+// name is a label, not a password (the name field); what is shared grows with the
+// vault (the scope paragraph); writing is a named list and every write keeps a
+// restore point (the same paragraph).
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -408,11 +408,16 @@ export function McpSection({
     const chosen = new Set(flow.access);
     if (flow.wholeVault) {
       // The list is the exclusions, and every folder it does not name is granted.
+      // Write scope comes from the host's readable set (preview.folders), which
+      // already excludes the quiet union (AI/CLI excluded folders); deriving
+      // from view.folders would submit folders the host rejects.
+      const readable = preview?.folders;
       return {
         excluded: flow.access,
-        // The root sentinel (`""`) is not a folder a write scope names; it is what
-        // the picker shows for "the vault root", and the grant derives it.
-        write: known.filter((folder) => folder !== "" && !chosen.has(folder)),
+        write:
+          readable === undefined
+            ? []
+            : readable.filter((folder) => folder !== "" && !chosen.has(folder)),
       };
     }
     return {
@@ -423,6 +428,7 @@ export function McpSection({
 
   useEffect(() => {
     if (flow === null || flow.step !== 3) return;
+    setPreview(null);
     let alive = true;
     readMcpGrantPreview(derived.excluded)
       .then((next) => {
@@ -436,10 +442,15 @@ export function McpSection({
     };
   }, [flow?.step, derived.excluded]);
 
+  useEffect(() => {
+    if (flow === null) setPreview(null);
+  }, [flow]);
+
   const pending = view?.writeRequests ?? [];
   const folderLabels = useFolderLabels();
 
-  const startNew = () =>
+  const startNew = () => {
+    setPreview(null);
     setFlow({
       step: 1,
       presetId: null,
@@ -449,8 +460,10 @@ export function McpSection({
       wholeVault: true,
       disabled: [],
     });
+  };
 
   const startEdit = (row: McpConnectionView) => {
+    setPreview(null);
     // The list is the READABLE set: seeding it from `write_folders` narrowed a whole-vault
     // grant to the root. Write verbs stay on only where it already writes what it reads.
     const readable = row.legacy
@@ -747,7 +760,9 @@ export function McpSection({
                             : {}),
                       }}
                     >
-                      {done ? <Icon name="circle-check" size={14} /> : String(step)}
+                      {/* The disc is already the shape; `circle-check` inside it
+                          drew a second, thinner circle. */}
+                      {done ? <Icon name="check" size={13} /> : String(step)}
                     </span>
                     <span
                       style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
@@ -874,12 +889,18 @@ export function McpSection({
           )}
 
           {flow.step === 3 && (
-            <div data-testid="settings.mcp-step-scope">
+            <div
+              data-testid="settings.mcp-step-scope"
+              // A column with a gap, not a stack of blocks: the row, its one
+              // paragraph and the folder list used to sit edge to edge.
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
+            >
               <SettingRow
                 testId="settings.mcp-whole-vault"
+                helperTestId="settings.mcp-scope-line"
                 stateAttrs={{ "data-whole-vault": String(flow.wholeVault) }}
                 label={t("settings.ai.externalAccess.wholeVaultLabel")}
-                helper={t("settings.ai.externalAccess.wholeVaultHelper")}
+                helper={`${scopeLine} ${t("settings.ai.externalAccess.writeRestore")}`}
                 control={(helperId) => (
                   <Switch
                     checked={flow.wholeVault}
@@ -903,16 +924,6 @@ export function McpSection({
                   />
                 )}
               />
-
-              <p style={HELPER_STYLE} data-testid="settings.mcp-scope-line">
-                {scopeLine}
-              </p>
-              {/* A guarantee rather than a restatement of a control, so it stays:
-                  a write is recoverable, and that is the fact that decides whether
-                  the person switches a write verb on at all. */}
-              <p style={HELPER_STYLE} data-testid="settings.mcp-write-restore">
-                {t("settings.ai.externalAccess.writeRestore")}
-              </p>
 
               <MultiSelectBox
                 collapsible
@@ -999,7 +1010,11 @@ export function McpSection({
                 </Button>
                 <Button
                   variant="primary"
-                  disabled={busy || flow.name.trim().length === 0}
+                  disabled={
+                    busy ||
+                    flow.name.trim().length === 0 ||
+                    (flow.wholeVault && preview === null)
+                  }
                   onClick={() => void approve()}
                   data-testid="settings.mcp-approve"
                 >

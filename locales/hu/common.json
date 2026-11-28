@@ -3938,9 +3938,7 @@
           "view_list": "Mentett nézetek listázása"
         },
         "wholeVaultLabel": "A teljes széf olvasása és írása",
-        "wholeVaultHelper": "Minden mappa, a később létrehozottak is. Ha lent kihagysz egy mappát, az olvasásból és írásból is kimarad.",
         "excludeNothing": "Nincs kihagyva semmi",
-        "scopeLineAll": "Eléri a széf minden jegyzetét, a később létrehozott mappákban is, és bármelyiket módosíthatja.",
         "scopeLine": "Elér {{count}} jegyzetet {{folders}} mappában, és bármit módosíthat bennük.",
         "toolsNote": "Az olvasások keretezettek: legfeljebb {{count}} jegyzet {{minutes}} percenként.",
         "needsReapproval": "Egy régebbi verzió hagyta jóvá, az ellenkező szabály szerint. Ez a build semmit sem olvas neki, amíg újra nem hagyod jóvá.",
@@ -4172,8 +4170,7 @@
       "strong": "Erős",
       "tooWeak": "Túl gyenge"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "{{count}} jegyzet exportálva → {{label}}",
       "exported_other": "{{count}} jegyzet exportálva → {{label}}",

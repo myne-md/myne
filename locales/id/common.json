@@ -3938,9 +3938,7 @@
           "view_list": "Daftar tampilan tersimpan"
         },
         "wholeVaultLabel": "Baca dan tulis seluruh brankas",
-        "wholeVaultHelper": "Setiap folder, termasuk yang Anda buat nanti. Jika satu folder dikecualikan di bawah, folder itu dikecualikan untuk baca dan tulis.",
         "excludeNothing": "Tidak ada yang dikecualikan",
-        "scopeLineAll": "Menjangkau setiap catatan di brankas, termasuk di folder yang Anda buat nanti, dan dapat mengubah salah satunya.",
         "scopeLine": "Menjangkau {{count}} catatan di {{folders}} folder, dan dapat mengubah apa pun di dalamnya.",
         "toolsNote": "Pembacaan dibatasi: hingga {{count}} catatan per {{minutes}} menit.",
         "needsReapproval": "Disetujui versi lama dengan aturan sebaliknya. Build ini tidak membaca apa pun untuknya sampai Anda menyetujui ulang.",
@@ -4172,8 +4170,7 @@
       "strong": "Kuat",
       "tooWeak": "Terlalu lemah"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Mengekspor {{count}} catatan → {{label}}",
       "exported_other": "Mengekspor {{count}} catatan → {{label}}",

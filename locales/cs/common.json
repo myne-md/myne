@@ -4208,9 +4208,7 @@
           "view_list": "Vypsat uložená zobrazení"
         },
         "wholeVaultLabel": "Číst a zapisovat celý trezor",
-        "wholeVaultHelper": "Každá složka, včetně těch, které vytvoříte později. Když některou níže vynecháte, zůstane vynechaná pro čtení i zápis.",
         "excludeNothing": "Nic nevynecháno",
-        "scopeLineAll": "Dosáhne na každou poznámku v trezoru, včetně složek vytvořených později, a může kteroukoli změnit.",
         "scopeLine": "Dosáhne na {{count}} poznámek v {{folders}} složkách a může v nich cokoli změnit.",
         "toolsNote": "Čtení má limit: až {{count}} poznámek za {{minutes}} minut.",
         "needsReapproval": "Schváleno starší verzí podle opačného pravidla. Toto sestavení pro něj nic nečte, dokud ho znovu neschválíte.",

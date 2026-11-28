@@ -4073,9 +4073,7 @@
           "view_list": "Lister les vues enregistrées"
         },
         "wholeVaultLabel": "Lire et écrire tout le coffre",
-        "wholeVaultHelper": "Chaque dossier, y compris ceux que vous créerez plus tard. Laissez-en un de côté ci-dessous et il est exclu des lectures comme des écritures.",
         "excludeNothing": "Rien de mis de côté",
-        "scopeLineAll": "Atteint chaque note du coffre, y compris dans les dossiers que vous créerez plus tard, et peut toutes les modifier.",
         "scopeLine": "Atteint {{count}} notes dans {{folders}} dossiers, et peut tout y modifier.",
         "toolsNote": "Les lectures ont un budget : jusqu'à {{count}} notes par {{minutes}} minutes.",
         "needsReapproval": "Approuvé par une version plus ancienne, sous la règle inverse. Cette version ne lit rien pour lui tant que vous ne l'approuvez pas de nouveau.",

@@ -3938,9 +3938,7 @@
           "view_list": "列出已保存视图"
         },
         "wholeVaultLabel": "读取并写入整个保险库",
-        "wholeVaultHelper": "每个文件夹，包括你以后创建的。如果在下面排除某个文件夹，它在读取和写入时都会被排除。",
         "excludeNothing": "未排除任何项",
-        "scopeLineAll": "可及保险库中的每条笔记，包括你以后创建的文件夹，并能修改其中任何一条。",
         "scopeLine": "可及 {{folders}} 个文件夹中的 {{count}} 条笔记，并能修改其中的任何内容。",
         "toolsNote": "读取有配额：每 {{minutes}} 分钟最多 {{count}} 条笔记。",
         "needsReapproval": "由旧版本按相反规则批准。在你重新批准之前，此版本不会为它读取任何内容。",
@@ -4172,8 +4170,7 @@
       "strong": "强",
       "tooWeak": "太弱"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "已导出 {{count}} 篇笔记 → {{label}}",
       "exported_other": "已导出 {{count}} 篇笔记 → {{label}}",
