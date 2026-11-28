@@ -362,7 +362,12 @@ export function HomeSurface() {
                 />
               );
             })}
-            <AddTile onOpen={() => setPickerOpen(true)} columns={columns} />
+          </div>
+        )}
+
+        {cards.length > 0 && (
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <AddTile onOpen={() => setPickerOpen(true)} />
           </div>
         )}
 
@@ -443,8 +448,8 @@ function CardFrame({
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-2)",
-        padding: "var(--space-3) var(--space-4)",
+        gap: "var(--space-1)",
+        padding: "var(--space-2) var(--space-3)",
         border: "1px solid var(--line-1)",
         borderRadius: "var(--radius-2)",
         background: "var(--bg-1)",
@@ -488,6 +493,9 @@ function CardFrame({
             color: "var(--fg-3)",
             cursor: "grab",
             touchAction: "none",
+            // Present but quiet: a handle at full contrast on every card turns the
+            // board into a form. `:focus-visible` keeps it reachable by keyboard.
+            opacity: 0.45,
           }}
         >
           <Icon name="more-vertical" size={14} />
@@ -566,6 +574,22 @@ function CardMenu({
 }) {
   const { t } = useTranslation();
   const floor = minSpanOf(card.kind);
+  const menuRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent): void => {
+      if (menuRef.current !== null && !menuRef.current.contains(event.target as Node)) onToggle();
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") onToggle();
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onToggle]);
   // A deliberately small menu: two sizes above and below, and remove. Anything
   // else a widget wants to change belongs to the widget, not to the arrangement.
   const item = (label: string, run: () => void, testId: string, disabled = false) => (
@@ -595,7 +619,7 @@ function CardMenu({
   );
 
   return (
-    <span style={{ position: "relative", flexShrink: 0 }}>
+    <span ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
         onClick={onToggle}
@@ -645,7 +669,7 @@ function CardMenu({
 }
 
 /** The trailing tile: the way a widget gets onto the board. */
-function AddTile({ onOpen, columns }: { onOpen: () => void; columns: number }) {
+function AddTile({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
   return (
     <button
@@ -653,8 +677,8 @@ function AddTile({ onOpen, columns }: { onOpen: () => void; columns: number }) {
       onClick={onOpen}
       data-testid="home.add"
       style={{
-        gridColumn: `span ${columns >= 6 ? 2 : columns}`,
-        minHeight: 96,
+        minHeight: 72,
+        width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

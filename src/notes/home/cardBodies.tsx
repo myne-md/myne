@@ -409,10 +409,12 @@ function MarkdownBody({ card }: { card: HomeCard }) {
           background: "none",
           padding: 0,
           cursor: "text",
+          borderInlineStart: stored === "" ? "none" : "2px solid var(--line-2)",
+          paddingInlineStart: stored === "" ? 0 : "var(--space-3)",
           fontFamily: "var(--font-serif, var(--font-sans))",
-          fontSize: "var(--text-md)",
-          lineHeight: 1.6,
-          color: "var(--fg-1)",
+          fontSize: "var(--text-lg)",
+          lineHeight: 1.5,
+          color: stored === "" ? "var(--fg-3)" : "var(--fg-1)",
           whiteSpace: "pre-wrap",
         }}
       >
