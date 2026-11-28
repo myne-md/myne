@@ -26,6 +26,7 @@
 description = "Default permission set for the attachments plugin — import + catalog list + delete + rename + export + reconcile (apply / remove / referencing) + unused-list."
 permissions = [
   "allow-attachment-import",
+  "allow-attachment-extract-ephemeral",
   "allow-catalog-list",
   "allow-attachment-delete",
   "allow-attachment-rename",
@@ -62,6 +63,11 @@ permissions = [
   "allow-attachment-read-structured",
   "allow-attachment-read-extracted-text",
 ]
+
+[[permission]]
+identifier = "allow-attachment-extract-ephemeral"
+description = "Allow invoking attachments:attachment_extract_ephemeral — the text of a picked, pasted or photographed file, run through the same extractor the import path uses and returned without an attachment, a catalog row, a text cache row or a sync entry. No vault state and no key, so it is callable while the vault is locked; the bytes are zeroized when the call returns. Main window only."
+commands.allow = ["attachment_extract_ephemeral"]
 
 [[permission]]
 identifier = "allow-voice-record-start"

@@ -3936,7 +3936,6 @@
           "view_list": "Gespeicherte Ansichten auflisten"
         },
         "wholeVaultLabel": "Den ganzen Tresor lesen und schreiben",
-        "wholeVaultHelper": "Jeder Ordner, auch die, die Sie später anlegen. Lassen Sie unten einen aus, ist er für Lesen und Schreiben gleichermaßen ausgenommen.",
         "excludeNothing": "Nichts ausgelassen",
         "scopeLineAll": "Erreicht jede Notiz im Tresor, auch in Ordnern, die Sie später anlegen, und kann jede davon ändern.",
         "scopeLine": "Erreicht {{count}} Notizen in {{folders}} Ordnern und kann alles darin ändern.",
@@ -4170,8 +4169,7 @@
       "strong": "Stark",
       "tooWeak": "Zu schwach"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "{{count}} Notiz exportiert → {{label}}",
       "exported_other": "{{count}} Notizen exportiert → {{label}}",

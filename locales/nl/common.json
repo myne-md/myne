@@ -3936,7 +3936,6 @@
           "view_list": "Opgeslagen weergaven opvragen"
         },
         "wholeVaultLabel": "De hele kluis lezen en schrijven",
-        "wholeVaultHelper": "Elke map, ook de mappen die je later aanmaakt. Laat je hieronder een map buiten, dan blijft die buiten voor lezen én schrijven.",
         "excludeNothing": "Niets buiten gelaten",
         "scopeLineAll": "Bereikt elke notitie in de kluis, ook in mappen die je later aanmaakt, en kan ze allemaal wijzigen.",
         "scopeLine": "Bereikt {{count}} notities in {{folders}} mappen, en kan alles daarin wijzigen.",
@@ -4170,8 +4169,7 @@
       "strong": "Sterk",
       "tooWeak": "Te zwak"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "{{count}} notitie geëxporteerd → {{label}}",
       "exported_other": "{{count}} notities geëxporteerd → {{label}}",

@@ -3936,7 +3936,6 @@
           "view_list": "Vis gemte visninger"
         },
         "wholeVaultLabel": "Læs og skriv hele boksen",
-        "wholeVaultHelper": "Hver mappe, også dem du opretter senere. Holder du en mappe ude nedenfor, er den ude for både læsning og skrivning.",
         "excludeNothing": "Intet holdt udenfor",
         "scopeLineAll": "Når hver note i boksen, også i mapper du opretter senere, og kan ændre enhver af dem.",
         "scopeLine": "Når {{count}} noter i {{folders}} mapper og kan ændre alt i dem.",
@@ -4170,8 +4169,7 @@
       "strong": "Stærk",
       "tooWeak": "For svag"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Eksporterede {{count}} note → {{label}}",
       "exported_other": "Eksporterede {{count}} noter → {{label}}",

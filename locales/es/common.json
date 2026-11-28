@@ -4070,7 +4070,6 @@
           "view_list": "Listar las vistas guardadas"
         },
         "wholeVaultLabel": "Leer y escribir toda la bóveda",
-        "wholeVaultHelper": "Todas las carpetas, incluidas las que crees después. Si dejas una fuera abajo, queda fuera tanto para lecturas como para escrituras.",
         "excludeNothing": "Ninguna fuera",
         "scopeLineAll": "Llega a cada nota de la bóveda, incluidas las de carpetas que crees después, y puede cambiar cualquiera de ellas.",
         "scopeLine": "Llega a {{count}} notas en {{folders}} carpetas, y puede cambiar cualquier cosa en ellas.",

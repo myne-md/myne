@@ -4070,7 +4070,6 @@
           "view_list": "Listar as vistas guardadas"
         },
         "wholeVaultLabel": "Ler e escrever o cofre inteiro",
-        "wholeVaultHelper": "Todas as pastas, incluindo as que criar mais tarde. Se deixar uma de fora abaixo, fica de fora tanto para leituras como para escritas.",
         "excludeNothing": "Nenhuma de fora",
         "scopeLineAll": "Alcança cada nota do cofre, incluindo as de pastas que criar mais tarde, e pode alterar qualquer uma delas.",
         "scopeLine": "Alcança {{count}} notas em {{folders}} pastas, e pode alterar tudo dentro delas.",

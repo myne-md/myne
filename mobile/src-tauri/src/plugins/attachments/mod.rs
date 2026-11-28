@@ -57,6 +57,7 @@ pub use myne_core::plugins::attachments::{
 
 // Mobile Tauri glue for the `attachment://` URI scheme (delegates to the shared
 // `scheme_core::build_response`). Registered on the Builder in `lib.rs`.
+pub mod extract_ephemeral;
 pub mod import_mobile;
 pub mod read_extracted;
 pub mod scheme;
@@ -76,6 +77,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // contents exactly as on desktop. PDF/DOCX/text extraction stays
             // desktop-only (lopdf/zip/quick-xml are desktop deps).
             import_mobile::attachment_import,
+            // The composer's device lane: text from a picked or shot file,
+            // returned without making an attachment of it.
+            extract_ephemeral::attachment_extract_ephemeral,
             // myne-md/myne#926: read back the MYE1 cache the import just wrote.
             // The phone has held the text of a photographed page since MYND-441
             // and had no way to show it; this is that read, by attachment id.

@@ -291,6 +291,7 @@ export function CalendarEventForm({
   calendars = [],
   mode = "create",
   onSubmit,
+  onOpenNote,
   onClose,
 }: {
   readonly initial: EventFormValues;
@@ -302,6 +303,8 @@ export function CalendarEventForm({
    *  event already carries. The form offers these rather than a free-text box, so a
    *  typo cannot invent a seventh calendar nobody assigned a colour to. */
   readonly calendars?: readonly string[];
+  /** Opens the markdown note the event is. Edit mode only: a create has none. */
+  readonly onOpenNote?: () => void;
   readonly onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -315,29 +318,46 @@ export function CalendarEventForm({
     setRefusal(null);
   }, []);
 
-  const submit = useCallback(async () => {
+  const submit = useCallback(async (): Promise<boolean> => {
     const current = planEventForm(values, REMINDER_HORIZON_DAYS, {
       requireCalendar: mode === "create",
     });
     if (!current.ok) {
       setRefusal(current.refusal);
-      return;
+      return false;
     }
     setBusy(true);
     try {
       if (onSubmit !== undefined) await onSubmit(values);
       else await createEvent(current.input);
       onClose();
+      return true;
     } finally {
       setBusy(false);
     }
   }, [values, onSubmit, onClose]);
 
+  // "Open note" must not silently discard edits typed into the form: submit the
+  // pending edit first (so it lands on the note) and only then navigate. A clean
+  // form has nothing to save, so it just closes and opens the note. A failed
+  // submit (validation or I/O) leaves the form open with the refusal on screen
+  // instead of dropping the user's input.
+  const openNote = useCallback(async () => {
+    const dirty = JSON.stringify(values) !== JSON.stringify(initial);
+    if (dirty) {
+      const ok = await submit();
+      if (!ok) return;
+    } else {
+      onClose();
+    }
+    onOpenNote?.();
+  }, [values, initial, submit, onClose, onOpenNote]);
+
   const allDay = values.startTime === null;
 
   const removeEnd = useCallback(() => patch({ endDate: null, endTime: null }), [patch]);
 
-  // An end equal to the start draws nothing, so the offer seeds an hour later.
+  // An end equal to the start draws nothing; the offer seeds an hour later.
   const addEnd = useCallback(
     () =>
       patch({
@@ -417,8 +437,7 @@ export function CalendarEventForm({
         <div className="myne-event-form__controls myne-event-form__controls--stacked">
           <div className="myne-event-form__line">
             {/* Every control here is the app's own (myne-md/myne#1037): the
-                platform's date and time widgets ignore the tokens, so they were
-                the one surface where a custom palette reached nothing. */}
+                platform's widgets ignore the tokens. */}
             <DateField
               label={t("calendar.form.startDate")}
               value={values.startDate}
@@ -673,6 +692,16 @@ export function CalendarEventForm({
         </div>
 
         <div className="myne-event-form__footer">
+          {mode === "edit" && onOpenNote !== undefined ? (
+            <Button
+              variant="ghost"
+              onClick={() => void openNote()}
+              data-testid="calendar.form.openNote"
+              style={{ marginInlineEnd: "auto" }}
+            >
+              {t("calendar.form.openNote")}
+            </Button>
+          ) : null}
           <Button variant="ghost" onClick={onClose}>
             {t("common.cancel")}
           </Button>

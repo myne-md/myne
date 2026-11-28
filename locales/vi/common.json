@@ -3936,7 +3936,6 @@
           "view_list": "Liệt kê chế độ xem đã lưu"
         },
         "wholeVaultLabel": "Đọc và ghi toàn bộ kho",
-        "wholeVaultHelper": "Mọi thư mục, kể cả thư mục bạn tạo sau này. Nếu để một thư mục ra ngoài bên dưới, nó ra ngoài cho cả đọc và ghi.",
         "excludeNothing": "Không để ra ngoài",
         "scopeLineAll": "Với tới mọi ghi chú trong kho, kể cả trong thư mục bạn tạo sau này, và có thể thay đổi bất kỳ ghi chú nào.",
         "scopeLine": "Với tới {{count}} ghi chú trong {{folders}} thư mục, và có thể thay đổi mọi thứ trong đó.",
@@ -4170,8 +4169,7 @@
       "strong": "Mạnh",
       "tooWeak": "Quá yếu"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Đã xuất {{count}} ghi chú → {{label}}",
       "exported_other": "Đã xuất {{count}} ghi chú → {{label}}",
