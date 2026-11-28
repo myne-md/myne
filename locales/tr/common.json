@@ -3766,7 +3766,6 @@
         },
         "wholeVaultLabel": "Kasanın tamamını oku ve yaz",
         "excludeNothing": "Dışarıda bırakılan yok",
-        "scopeLineAll": "Kasadaki her nota erişir, sonradan oluşturduğunuz klasörler dahil, ve hepsini değiştirebilir.",
         "scopeLine": "{{folders}} klasördeki {{count}} nota erişir ve içlerindeki her şeyi değiştirebilir.",
         "toolsNote": "Okumalar bütçelidir: {{minutes}} dakikada en fazla {{count}} not.",
         "needsReapproval": "Daha eski bir sürüm tarafından, tersi kurala göre onaylandı. Siz yeniden onaylayana kadar bu sürüm onun için hiçbir şey okumaz.",

@@ -3939,7 +3939,6 @@
         },
         "wholeVaultLabel": "Lue ja kirjoita koko holvi",
         "excludeNothing": "Ei mitään pois jätetty",
-        "scopeLineAll": "Tavoittaa jokaisen holvin muistiinpanon, myös myöhemmin luoduissa kansioissa, ja voi muuttaa mitä tahansa niistä.",
         "scopeLine": "Tavoittaa {{count}} muistiinpanoa {{folders}} kansiossa ja voi muuttaa niissä kaikkea.",
         "toolsNote": "Lukemisilla on kiintiö: enintään {{count}} muistiinpanoa {{minutes}} minuutissa.",
         "needsReapproval": "Vanhempi versio hyväksyi sen päinvastaisella säännöllä. Tämä kooste ei lue sille mitään ennen kuin hyväksyt uudelleen.",

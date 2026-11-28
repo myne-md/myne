@@ -4074,7 +4074,6 @@
         },
         "wholeVaultLabel": "Citește și scrie tot seiful",
         "excludeNothing": "Nimic lăsat afară",
-        "scopeLineAll": "Ajunge la fiecare notă din seif, inclusiv în foldere create mai târziu, și poate schimba oricare dintre ele.",
         "scopeLine": "Ajunge la {{count}} note în {{folders}} foldere și poate schimba orice din ele.",
         "toolsNote": "Citirile au un buget: până la {{count}} note la fiecare {{minutes}} minute.",
         "needsReapproval": "Aprobat de o versiune mai veche, după regula opusă. Această versiune nu citește nimic pentru el până nu îl aprobi din nou.",

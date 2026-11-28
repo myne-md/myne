@@ -3939,7 +3939,6 @@
         },
         "wholeVaultLabel": "보관함 전체 읽기 및 쓰기",
         "excludeNothing": "제외된 항목 없음",
-        "scopeLineAll": "보관함의 모든 노트에 닿으며, 나중에 만드는 폴더도 포함하고, 어느 것이든 바꿀 수 있습니다.",
         "scopeLine": "{{folders}}개 폴더의 노트 {{count}}개에 닿고, 그 안의 무엇이든 바꿀 수 있습니다.",
         "toolsNote": "읽기에는 한도가 있습니다: {{minutes}}분마다 최대 노트 {{count}}개.",
         "needsReapproval": "이전 버전이 반대 규칙으로 승인했습니다. 이 빌드는 다시 승인할 때까지 아무것도 읽지 않습니다.",

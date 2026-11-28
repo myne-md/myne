@@ -3939,7 +3939,6 @@
         },
         "wholeVaultLabel": "Baca dan tulis seluruh brankas",
         "excludeNothing": "Tidak ada yang dikecualikan",
-        "scopeLineAll": "Menjangkau setiap catatan di brankas, termasuk di folder yang Anda buat nanti, dan dapat mengubah salah satunya.",
         "scopeLine": "Menjangkau {{count}} catatan di {{folders}} folder, dan dapat mengubah apa pun di dalamnya.",
         "toolsNote": "Pembacaan dibatasi: hingga {{count}} catatan per {{minutes}} menit.",
         "needsReapproval": "Disetujui versi lama dengan aturan sebaliknya. Build ini tidak membaca apa pun untuknya sampai Anda menyetujui ulang.",
