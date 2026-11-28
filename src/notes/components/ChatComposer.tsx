@@ -42,6 +42,7 @@ import {
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { takeComposerSeed } from "../ai/composerSeed";
 
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
@@ -387,7 +388,10 @@ export function ChatComposer({
     setDeviceDocs([]);
     setAttachmentError(null);
   }, [agent.running]);
-  const [message, setMessage] = useState("");
+  // A seed from another surface (the home chat bar, myne-md/myne#1074) lands here
+  // and is consumed: the composer is where the decision to send lives, so the
+  // other surface hands over text and nothing else.
+  const [message, setMessage] = useState(() => takeComposerSeed() ?? "");
   const [attached, setAttached] = useState<string | null>(null);
   const [preview, setPreview] = useState<GrantPreview | "failed" | null>(null);
   const [busy, setBusy] = useState(false);

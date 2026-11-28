@@ -11,19 +11,11 @@
 import { WorkspaceProvider } from "@app/notes/workspaceContext";
 import { SidebarStateProvider } from "@app/notes/sidebarState";
 import { DEFAULT_PREFS } from "@app/hooks/usePrefs";
-import {
-  AgentPromptCard,
-  CalendarAgendaCard,
-  FavoritesCard,
-  GraphCard,
-  QuickCaptureCard,
-  RecentFilesCard,
-  RecentNotesCard,
-  ReferenceSetsCard,
-  SavedViewsCard,
-  TodaysTasksCard,
-  WritingStatsCard,
-} from "@app/notes/home/cardBodies";
+import { HOME_CARD_DEFS } from "@app/notes/home/cardBodies";
+import { HomeLayoutContext } from "@app/notes/home/HomeLayoutContext";
+import * as React from "react";
+import { HOME_CARD_SPECS } from "@app/notes/home/homeCards";
+import type { HomeCard } from "@app/lib/prefs";
 import type { StoryDescriptor } from "../types";
 
 /** The providers a card body needs, and nothing else. */
@@ -64,32 +56,86 @@ const EMPTY = {
   },
 };
 
-/** One entry per card, in the registry's order. */
-const CARDS: readonly { id: string; name: string; body: () => React.ReactElement }[] = [
-  { id: "recent-notes", name: "RecentNotes", body: RecentNotesCard },
-  { id: "favorites", name: "Favorites", body: FavoritesCard },
-  { id: "todays-tasks", name: "TodaysTasks", body: TodaysTasksCard },
-  { id: "calendar-agenda", name: "CalendarAgenda", body: CalendarAgendaCard },
-  { id: "recent-files", name: "RecentFiles", body: RecentFilesCard },
-  { id: "reference-sets", name: "ReferenceSets", body: ReferenceSetsCard },
-  { id: "saved-views", name: "SavedViews", body: SavedViewsCard },
-  { id: "writing-stats", name: "WritingStats", body: WritingStatsCard },
-  { id: "quick-capture", name: "QuickCapture", body: QuickCaptureCard },
-  { id: "agent-prompt", name: "AgentPrompt", body: AgentPromptCard },
-  { id: "graph", name: "Graph", body: GraphCard },
-];
-
-export const HOME_CARD_STORIES: StoryDescriptor[] = CARDS.map((card) => ({
-  id: `home/cards/${card.id}`,
+/**
+ * One story per widget, derived from the registry rather than listed again.
+ *
+ * A hand-kept list here is a second catalogue: it went stale the moment the
+ * registry grew, and a widget with no story is a widget whose empty state nobody
+ * ever looked at.
+ */
+/**
+ * The board's edit surface, mounted on its own.
+ *
+ * Not a widget: `HomeLayoutContext` is what a widget edits THROUGH (the markdown
+ * block writes its own text), so the story draws the provider plus the one control
+ * that reads it, which is the smallest shape that shows the wiring exists.
+ */
+export const HOME_LAYOUT_STORY: StoryDescriptor = {
+  id: "home/layout-context",
   group: "components",
-  surface: "cardBodies",
-  state: card.id,
+  surface: "HomeLayoutContext",
+  state: "default",
   fixture: EMPTY,
-  description: `The ${card.name} card on an empty vault, which is the state its design is really about.`,
-  tags: ["home", "card", card.id, "empty"],
-  render: () => (
-    <Card>
-      <card.body />
-    </Card>
-  ),
-}));
+  description:
+    "The board's layout provider with a widget bound to it: pressing the control asks the surface to store the text, which is the one write path a widget has.",
+  tags: ["home", "layout", "context", "wiring"],
+  render: () => <LayoutContextProbe />,
+};
+
+function LayoutContextProbe(): React.ReactElement {
+  const [written, setWritten] = React.useState<string>("nothing yet");
+  const [cards, setCards] = React.useState<HomeCard[]>([
+    { id: "markdown", kind: "markdown", span: 2, options: { markdown: "Be water." } },
+  ]);
+  const api = {
+    cards,
+    patch: (update: (current: readonly HomeCard[]) => HomeCard[]) => setCards(update(cards)),
+    setOptions: (id: string, options: Readonly<Record<string, string>>) => {
+      setCards((current) =>
+        current.map((card) => (card.id === id ? { ...card, options: { ...card.options, ...options } } : card)),
+      );
+      setWritten(JSON.stringify(options));
+    },
+  };
+  const def = HOME_CARD_DEFS.markdown;
+  return (
+    <SidebarStateProvider>
+      <WorkspaceProvider>
+        <HomeLayoutContext.Provider value={api}>
+          <div style={{ width: 360, padding: "var(--space-3)", border: "1px solid var(--line-1)", borderRadius: "var(--radius-2)" }}>
+            {def === undefined ? null : <def.Body card={cards[0]!} />}
+            <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
+              stored: {written}
+            </div>
+          </div>
+        </HomeLayoutContext.Provider>
+      </WorkspaceProvider>
+    </SidebarStateProvider>
+  );
+}
+
+const WIDGET_STORIES: StoryDescriptor[] = HOME_CARD_SPECS.flatMap((spec) => {
+  const def = HOME_CARD_DEFS[spec.kind];
+  if (def === undefined) return [];
+  const card: HomeCard = { id: spec.kind, kind: spec.kind, span: spec.defaultSpan, options: {} };
+  return [
+    {
+      id: `home/cards/${spec.kind}`,
+      group: "components",
+      surface: "cardBodies",
+      state: spec.kind,
+      fixture: EMPTY,
+      // The registry holds keys, not copy: the story catalogue has no i18n runtime,
+      // so the kind is the honest name it can print.
+      description: `${spec.kind} on an empty vault, which is the state its design is really about.`,
+      tags: ["home", "widget", spec.kind, "empty"],
+      render: () => (
+        <Card>
+          <def.Body card={card} />
+        </Card>
+      ),
+    } satisfies StoryDescriptor,
+  ];
+});
+
+export const HOME_CARD_STORIES: StoryDescriptor[] = [...WIDGET_STORIES, HOME_LAYOUT_STORY];

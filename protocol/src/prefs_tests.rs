@@ -5728,6 +5728,7 @@ fn home_cards_round_trip_and_keep_an_unknown_id() {
                 id: alloc::string::String::from("recent-notes"),
                 kind: alloc::string::String::from("recent-notes"),
                 span: 1,
+                options: alloc::vec::Vec::new(),
             },
             // A card id this build has never heard of: a NEWER client wrote it, and
             // dropping it here would lose a row from the arrangement on every save
@@ -5736,6 +5737,7 @@ fn home_cards_round_trip_and_keep_an_unknown_id() {
                 id: alloc::string::String::from("card-from-the-future"),
                 kind: alloc::string::String::from("future-kind"),
                 span: 2,
+                options: alloc::vec::Vec::new(),
             },
         ]),
         home_open_on_start: true,

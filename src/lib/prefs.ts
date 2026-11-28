@@ -1545,8 +1545,19 @@ export interface HomeCard {
   id: string;
   /** What to draw. A kind this build does not know renders as an inert row. */
   kind: string;
-  /** How many columns the card occupies, 1..=4. */
+  /** How many columns the card occupies, 1..=4. A quarter-step width on the
+   *  12-column desktop grid, and the phone reflows rather than re-arranging. */
   span: number;
+  /**
+   * The widget's own settings, keyed by option name. **The `kind` decides what
+   * these mean** — a `markdown` widget reads `markdown`, a `saved-view` widget
+   * reads `view` — which is what lets a new widget ship without a format change
+   * (`protocol::home_layout` keeps the codec ignorant of the vocabulary).
+   *
+   * Bounded at the codec: 8 keys per card, a 32-byte key, a 1 KiB value, and
+   * 8 KiB across the whole surface.
+   */
+  options?: Readonly<Record<string, string>>;
 }
 
 export async function setRibbonItems(items: string[]): Promise<void> {

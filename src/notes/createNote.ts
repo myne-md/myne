@@ -101,12 +101,23 @@ export async function noteCreate(
  * without an IPC round trip, the shape is the whole point of myne#653, and a
  * test that could only observe it through `invoke` would be asserting the mock.
  */
-export function initialNotePlaintext(folder: string | null): string {
+export function initialNotePlaintext(
+  folder: string | null,
+  /**
+   * The note's starting title, when the caller already has the words.
+   *
+   * The home surface's quick-capture field is that caller: a person types a line
+   * and presses Enter, and a note titled with that line is what they expect to
+   * exist. Defaulted so every other caller keeps the empty-title byte contract
+   * down to the byte (`tests/notes/createNotePlaintext.test.ts`).
+   */
+  title: string = "",
+): string {
   // `buildInitialPlaintext` supplies the `folder:` half (empty string at root,
   // per the state-D symmetry the header explains); the title patch supplies the
   // rest through the same writer every other `title:` write uses.
   const base = buildInitialPlaintext(normalizeFolderPath(folder));
-  return utf8Decoder.decode(patchTitleField(utf8Encoder.encode(base), ""));
+  return utf8Decoder.decode(patchTitleField(utf8Encoder.encode(base), title));
 }
 
 /**
@@ -120,9 +131,12 @@ export function initialNotePlaintext(folder: string | null): string {
  * converged and why the title is patched at this layer. The Rust `note_create`
  * stays dialect-blind: it receives this as opaque plaintext.
  */
-export async function createNote(folder: string | null = null): Promise<string> {
+export async function createNote(
+  folder: string | null = null,
+  title: string = "",
+): Promise<string> {
   // No local normalize: `initialNotePlaintext` normalizes for the frontmatter
   // and `noteCreate` normalizes for the prefs registration, so a third pass here
   // was the same function run three times on one value.
-  return await noteCreate(initialNotePlaintext(folder), folder);
+  return await noteCreate(initialNotePlaintext(folder, title), folder);
 }

@@ -34,6 +34,8 @@ import { Icon } from "../primitives/Icon";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { Switch } from "../primitives/Switch";
+import { usePrefs } from "../../hooks/usePrefs";
+import { setHomeOpenOnStart } from "../../lib/prefs";
 import { Input } from "../primitives/Input";
 import { ERROR_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import { subscribePrefsNonce } from "../../notes/prefsNonce";
@@ -828,8 +830,46 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
       <SettingsSection title={t("settings.appearance.sections.customisation")}>
       <RibbonCustomizeSettings />
       <BarCustomizeSettings />
+      <HomeStartSettings />
       </SettingsSection>
       </SettingsTopicPanel>
     </div>
+  );
+}
+
+/**
+ * The home surface's one setting (myne-md/myne#1074).
+ *
+ * **Here rather than on the surface.** The board used to end with a "when the app
+ * opens" switch under your widgets, which made a device preference part of the
+ * composition: it moved whenever the arrangement changed, it sat below the fold on
+ * a full board, and it was the only control on a surface whose whole point is that
+ * it contains what you put there. Settings owns it now, and the surface contains
+ * no settings at all.
+ *
+ * Device-local by design (`prefs.home_open_on_start` never syncs): which device
+ * opens on home is a fact about this machine, not about the vault.
+ */
+function HomeStartSettings() {
+  const { t } = useTranslation();
+  const { prefs } = usePrefs();
+  return (
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-2)",
+        fontSize: "var(--text-sm)",
+        color: "var(--fg-2)",
+      }}
+    >
+      <Switch
+        checked={prefs.home_open_on_start}
+        onChange={(next) => void setHomeOpenOnStart(next)}
+        ariaLabel={t("notes.home.onStart")}
+        testId="settings.home.open-on-start"
+      />
+      {t("notes.home.onStartHint")}
+    </label>
   );
 }

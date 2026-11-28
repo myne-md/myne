@@ -777,6 +777,13 @@
         "copies": 3,
         "verdict": "justified",
         "reason": "The catalog is a CONSTANT EXPRESSION by design: scripts/check-mcp-tool-surface.mjs refuses format!/concat!/include_str!/env! in this file, because a description a note or the environment could contribute to is the tool-poisoning path the surface exists to close. So the repeated json! envelope cannot be factored into a builder, and what the detector sees is one hand-written literal per verb, which is what makes a verb reviewable in one place. myne-md/myne#1232."
+      },
+      {
+        "id": "src/notes/home/homeCards.ts",
+        "lines": 48,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Two halves of ONE widget registry, matched on shape alone: every entry repeats `kind`/`labelKey`/`descriptionKey`/`icon`/`group`/`defaultSpan`, which is what a data catalogue is. Consolidating them would mean a builder taking six positional arguments per row, and the point of the file is that a widget is readable beside its description (myne-md/myne#1074, same verdict as the settings search index)."
       }
     ],
     "baseline": [

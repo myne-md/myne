@@ -49,6 +49,30 @@ pub const MAX_HOME_CARD_ID_LEN: usize = 64;
 /// The longest card kind. A kind is a small closed vocabulary the client owns.
 pub const MAX_HOME_CARD_KIND_LEN: usize = 32;
 
+/// The most options one card may carry.
+///
+/// A bound rather than a preference, for the same reason `MAX_HOME_CARDS` is one:
+/// options are free-form widget settings (`markdown` text, a view id, a folder),
+/// so the blob is where a compromised WebView would park storage. Eight is what
+/// the widest widget in the catalogue needs; the 64 KiB envelope stays the
+/// backstop rather than the validation.
+pub const MAX_HOME_CARD_OPTIONS: usize = 8;
+
+/// The longest option key. Keys are the client's own tokens (`markdown`, `view`).
+pub const MAX_HOME_CARD_OPTION_KEY_LEN: usize = 32;
+
+/// The longest option value. A markdown/quote widget is the long one, and this is
+/// roughly two screens of text: enough for a quote block, short of a note.
+pub const MAX_HOME_CARD_OPTION_VALUE_LEN: usize = 1024;
+
+/// The total option budget across every card on one home surface.
+///
+/// Per-card bounds do not bound the SUM: sixty-four cards times eight options
+/// times a 1 KiB value is half a megabyte inside a 64 KiB envelope. This is the
+/// number that makes the envelope the real backstop, and it is generous enough
+/// that no honest arrangement is anywhere near it.
+pub const MAX_HOME_OPTIONS_BYTES: usize = 8192;
+
 /// The widest a card may span, in columns. Two is what the design proposes; four
 /// is the ceiling this codec accepts so a later two-to-four-column layout does
 /// not need a format change.
@@ -70,6 +94,24 @@ pub struct HomeCard {
     pub kind: String,
     /// How many columns the card occupies, 1..=[`MAX_HOME_CARD_SPAN`].
     pub span: u8,
+    /// The widget's own settings, sorted by key. Empty for a card that has none,
+    /// which is why the writer omits the member entirely.
+    ///
+    /// **`kind` decides what these mean, and the codec does not interpret them.**
+    /// A `markdown` widget reads `markdown`; a `saved-view` widget reads `view`.
+    /// Keeping the codec ignorant is what lets a new widget ship without a format
+    /// change, and it is the same discipline `kind` itself follows: the client
+    /// owns the vocabulary, the format owns only the shape.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<HomeCardOption>,
+}
+
+/// One per-card option: a key the renderer understands and its value.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HomeCardOption {
+    pub key: String,
+    pub value: String,
 }
 
 /// Why a card array could not be read.
@@ -123,7 +165,49 @@ fn card_from_json(value: &JsonValue) -> Option<HomeCard> {
     if id.len() > MAX_HOME_CARD_ID_LEN || kind.len() > MAX_HOME_CARD_KIND_LEN {
         return None;
     }
-    Some(HomeCard { id, kind, span })
+    let options = match member(members, "options") {
+        None => Vec::new(),
+        // A malformed options object costs the OPTIONS, never the card: the card
+        // is still a card, and refusing it would turn a settings bug into a
+        // missing row the user cannot get back.
+        Some(JsonValue::Object(pairs)) => options_from_json(pairs),
+        Some(_) => Vec::new(),
+    };
+    Some(HomeCard {
+        id,
+        kind,
+        span,
+        options,
+    })
+}
+
+/// The accepted options of one card's `options` object.
+///
+/// Sorted by key so the parsed value equals the written one, and bounded per pair
+/// and per card. An entry that breaks a bound is skipped rather than truncating
+/// the value: a half-quote is worse than no quote.
+fn options_from_json(pairs: &[(String, JsonValue)]) -> Vec<HomeCardOption> {
+    let mut kept: Vec<HomeCardOption> = Vec::new();
+    for (key, value) in pairs {
+        if kept.len() == MAX_HOME_CARD_OPTIONS {
+            break;
+        }
+        let JsonValue::Str(text) = value else {
+            continue;
+        };
+        if key.is_empty()
+            || key.len() > MAX_HOME_CARD_OPTION_KEY_LEN
+            || text.len() > MAX_HOME_CARD_OPTION_VALUE_LEN
+        {
+            continue;
+        }
+        kept.push(HomeCardOption {
+            key: key.clone(),
+            value: text.clone(),
+        });
+    }
+    kept.sort_by(|a, b| a.key.cmp(&b.key));
+    kept
 }
 
 fn member<'a>(members: &'a [(String, JsonValue)], key: &str) -> Option<&'a JsonValue> {
@@ -156,6 +240,25 @@ pub fn push_home_cards(out: &mut Vec<u8>, cards: &[HomeCard]) {
         push_json_string(out, &card.id);
         out.extend_from_slice(b",\"kind\":");
         push_json_string(out, &card.kind);
+        // `options` sorts between `kind` and `span` (id < kind < options < span),
+        // which is the same byte order every other object in the codec follows.
+        if !card.options.is_empty() {
+            // Sorted HERE rather than required of the caller: canonical output is
+            // the writer's promise, and a caller that builds options from an
+            // object has no meaningful order to offer.
+            let mut ordered: Vec<&HomeCardOption> = card.options.iter().collect();
+            ordered.sort_by(|a, b| a.key.cmp(&b.key));
+            out.extend_from_slice(b",\"options\":{");
+            for (i, option) in ordered.iter().enumerate() {
+                if i > 0 {
+                    out.push(b',');
+                }
+                push_json_string(out, &option.key);
+                out.push(b':');
+                push_json_string(out, &option.value);
+            }
+            out.push(b'}');
+        }
         if card.span > 1 {
             out.extend_from_slice(b",\"span\":");
             push_json_uint(out, u32::from(card.span));
@@ -179,7 +282,24 @@ pub fn home_cards_are_writable(cards: &[HomeCard]) -> bool {
                 && !c.kind.is_empty()
                 && c.kind.len() <= MAX_HOME_CARD_KIND_LEN
                 && (1..=MAX_HOME_CARD_SPAN).contains(&c.span)
+                && c.options.len() <= MAX_HOME_CARD_OPTIONS
+                && c.options.iter().all(|o| {
+                    !o.key.is_empty()
+                        && o.key.len() <= MAX_HOME_CARD_OPTION_KEY_LEN
+                        && o.value.len() <= MAX_HOME_CARD_OPTION_VALUE_LEN
+                })
         })
+        && home_options_bytes(cards) <= MAX_HOME_OPTIONS_BYTES
+}
+
+/// The bytes the surface's options occupy, the number [`MAX_HOME_OPTIONS_BYTES`]
+/// bounds. Counted as key + value, which is what the envelope carries.
+pub fn home_options_bytes(cards: &[HomeCard]) -> usize {
+    cards
+        .iter()
+        .flat_map(|c| c.options.iter())
+        .map(|o| o.key.len() + o.value.len())
+        .sum()
 }
 
 #[cfg(test)]
@@ -191,6 +311,7 @@ mod tests {
             id: id.to_string(),
             kind: kind.to_string(),
             span,
+            options: Vec::new(),
         }
     }
 
@@ -209,6 +330,96 @@ mod tests {
         let (parsed, consumed) = parse_home_cards_array(&out).unwrap();
         assert_eq!(parsed, cards);
         assert_eq!(consumed, out.len());
+    }
+
+    fn with_options(id: &str, kind: &str, pairs: &[(&str, &str)]) -> HomeCard {
+        HomeCard {
+            id: id.to_string(),
+            kind: kind.to_string(),
+            span: 1,
+            options: pairs
+                .iter()
+                .map(|(k, v)| HomeCardOption {
+                    key: k.to_string(),
+                    value: v.to_string(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn writes_options_between_kind_and_span_in_key_order() {
+        let cards = alloc::vec![with_options(
+            "quote",
+            "markdown",
+            &[("markdown", "Be water."), ("align", "center")]
+        )];
+        let mut out = Vec::new();
+        push_home_cards(&mut out, &cards);
+        // id < kind < options < span, and the option keys sort by byte.
+        assert_eq!(
+            core::str::from_utf8(&out).unwrap(),
+            r#"[{"id":"quote","kind":"markdown","options":{"align":"center","markdown":"Be water."}}]"#
+        );
+    }
+
+    #[test]
+    fn round_trips_options_and_sorts_them_on_read() {
+        // The writer sorts, and the reader sorts, so a blob written by an older
+        // client in another order still parses to the value a save would produce.
+        let bytes = br#"[{"id":"q","kind":"markdown","options":{"z":"1","a":"2"}}]"#;
+        let (parsed, _) = parse_home_cards_array(bytes).unwrap();
+        assert_eq!(
+            parsed,
+            alloc::vec![with_options("q", "markdown", &[("a", "2"), ("z", "1")])]
+        );
+        let mut out = Vec::new();
+        push_home_cards(&mut out, &parsed);
+        let (again, _) = parse_home_cards_array(&out).unwrap();
+        assert_eq!(again, parsed);
+    }
+
+    #[test]
+    fn a_malformed_options_member_costs_the_options_not_the_card() {
+        // The card is still a card. Refusing it would turn a settings bug into a
+        // row the user cannot get back.
+        let bytes = br#"[{"id":"q","kind":"markdown","options":"not-an-object"}]"#;
+        let (parsed, _) = parse_home_cards_array(bytes).unwrap();
+        assert_eq!(parsed, alloc::vec![card("q", "markdown", 1)]);
+    }
+
+    #[test]
+    fn skips_over_long_option_values_instead_of_truncating_them() {
+        let long = "x".repeat(MAX_HOME_CARD_OPTION_VALUE_LEN + 1);
+        let bytes = alloc::format!(
+            r#"[{{"id":"q","kind":"markdown","options":{{"markdown":"{long}","align":"left"}}}}]"#
+        );
+        let (parsed, _) = parse_home_cards_array(bytes.as_bytes()).unwrap();
+        // The half-quote is gone; the rest of the widget's settings survive.
+        assert_eq!(
+            parsed,
+            alloc::vec![with_options("q", "markdown", &[("align", "left")])]
+        );
+    }
+
+    #[test]
+    fn refuses_to_write_more_option_bytes_than_the_surface_budget() {
+        let big = "x".repeat(MAX_HOME_CARD_OPTION_VALUE_LEN);
+        let cards: alloc::vec::Vec<HomeCard> = (0..MAX_HOME_CARDS)
+            .map(|i| {
+                with_options(
+                    &alloc::format!("c{i}"),
+                    "markdown",
+                    &[("markdown", big.as_str()), ("b", big.as_str())],
+                )
+            })
+            .collect();
+        assert!(!home_cards_are_writable(&cards));
+        // And the sum is what caught it: every single card is within its own bound.
+        assert!(cards
+            .iter()
+            .all(|c| c.options.len() <= MAX_HOME_CARD_OPTIONS));
+        assert!(home_options_bytes(&cards) > MAX_HOME_OPTIONS_BYTES);
     }
 
     #[test]
