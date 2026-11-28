@@ -1,12 +1,14 @@
 // One device-local "layout" store: an ordered list of ids, a set of hidden ones,
 // persisted in `localStorage` and published to React.
 //
-// Two surfaces need exactly this — the expanded-size-class rail
-// (`lib/nav-ribbon.ts`) and the home screen's cards (`lib/home-layout.ts`) — and
-// they had been written as two copies of the same read/repair/write/subscribe
-// shape. The shape is the thing that must not drift: a repair rule that exists in
-// one copy and not the other silently hides a destination on one surface only
-// (`check-duplication` flagged the pair, and it was right).
+// One surface needs exactly this now — the expanded-size-class rail
+// (`lib/nav-ribbon.ts`). It was written twice (the rail and the home screen's
+// cards) and both copies were the same read/repair/write/subscribe shape, which is
+// what `check-duplication` flagged. The home board has since moved to the SYNCED
+// arrangement (`prefs.home_cards`, myne-md/myne#1074), so the store has one caller
+// again — kept, because the shape is still the right one for a per-device layout
+// and the rule it encodes (repair rather than trust) is not obvious enough to
+// re-derive a third time.
 //
 // It is a STORE rather than React context on purpose: both consumers render in
 // the editor shell, where a preference change must reach a mounted surface with

@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../../components";
-import { HOME_CARD_ORDER, homeLayout, type HomeCardId } from "../../../lib/home-layout";
-import { LayoutCustomizeSheet, type CustomizeRow } from "./chrome/LayoutCustomizeSheet";
+import { usePrefs } from "../../../lib/use-prefs";
+import type { MobileHomeCard } from "../../../lib/prefs";
 import type { VaultTask } from "../../../lib/tasks";
 import { taskDescription } from "@myne/dialect/taskFieldWriter";
 import type { SavedView } from "../../../lib/prefs";
@@ -11,10 +11,12 @@ import type { NoteEntry } from "./types";
 /** The phone/tablet home surface (owner, 2026-11-27 round 2).
  *
  *  The desktop's Home is a grid of cards you arrange in a separate editing mode.
- *  On one column that editing mode is a second screen for something you do twice
- *  a year, so the phone's version is the SAME idea in the shape a hand can hold:
- *  a vertical stack of cards, each one a door, and one "Customize" sheet that
- *  reorders and hides them in place (`lib/home-layout.ts`, device-local).
+ *  On one column that editing mode is a second screen for something you do twice a
+ *  year, so the phone's version is the SAME idea in the shape a hand can hold: a
+ *  vertical stack of cards, each one a door, in the order the SYNCED arrangement
+ *  names (`prefs.home_cards`, myne-md/myne#1074). There is no customize sheet and
+ *  no device-local copy: the board you arranged on a computer is the board you
+ *  get here, and re-arranging needs a pointer.
  *
  *  **Why every card carries real data.** The owner's reading of the desktop
  *  surface was "customize edilemez, çok restricted" — a screen of empty
@@ -22,6 +24,24 @@ import type { NoteEntry } from "./types";
  *  already has: the note list, the vault task index, starred notes, saved views.
  *  A card with nothing to say says so in one line and offers the action that
  *  fixes it, rather than pretending the feature is missing. */
+
+/**
+ * What an unarranged vault gets on a phone.
+ *
+ * The same kinds the desktop's default board leads with, minus the ones that need
+ * a pointer (drag-to-resize) or a surface this client does not have. It is a
+ * FALLBACK, not a second layout: the moment `prefs.home_cards` is written, this
+ * list stops being consulted.
+ */
+const MOBILE_DEFAULT_ORDER: readonly string[] = [
+  "quick-capture",
+  "recent-notes",
+  "todays-tasks",
+  "calendar-agenda",
+  "favorites",
+  "saved-views",
+  "writing-stats",
+];
 
 export interface HomeSurfaceProps {
   notes: readonly NoteEntry[];
@@ -97,14 +117,13 @@ export function HomeSurfaceMobile({
   onOpenAllNotes,
 }: HomeSurfaceProps) {
   const { t } = useTranslation();
-  const layout = homeLayout.useLayout();
-  const [customize, setCustomize] = useState(false);
+  const { prefs } = usePrefs();
 
   const recent = notes.slice(0, 4);
   const openTasks = tasks.filter((task) => !task.completed);
   const dueSoon = openTasks.filter((task) => task.due != null).slice(0, 4);
 
-  const cards: Record<HomeCardId, { title: string; icon: ReactNode; body: ReactNode }> = {
+  const cards: Record<string, { title: string; icon: ReactNode; body: ReactNode }> = {
     "quick-capture": {
       title: t("notes.home.cards.quickCapture"),
       icon: (
@@ -137,7 +156,7 @@ export function HomeSurfaceMobile({
         </div>
       ),
     },
-    recent: {
+    "recent-notes": {
       title: t("notes.home.cards.recentNotes"),
       icon: <Icon name="file-text" size={17} color="var(--fg-3)" strokeWidth={1.7} />,
       body:
@@ -156,7 +175,7 @@ export function HomeSurfaceMobile({
           </div>
         ),
     },
-    tasks: {
+    "todays-tasks": {
       title: t("notes.home.cards.todaysTasks"),
       icon: <Icon name="check" size={17} color="var(--fg-3)" strokeWidth={2} />,
       body: openTasks.length === 0 ? (
@@ -180,7 +199,7 @@ export function HomeSurfaceMobile({
         </div>
       ),
     },
-    "coming-up": {
+    "calendar-agenda": {
       title: t("notes.home.cards.comingUp"),
       icon: <Icon name="clock" size={17} color="var(--fg-3)" strokeWidth={1.7} />,
       body:
@@ -197,7 +216,7 @@ export function HomeSurfaceMobile({
           </div>
         ),
     },
-    favourites: {
+    favorites: {
       title: t("notes.home.cards.favourites"),
       icon: <Icon name="star" size={17} color="var(--fg-3)" strokeWidth={1.7} />,
       body:
@@ -215,7 +234,7 @@ export function HomeSurfaceMobile({
           </div>
         ),
     },
-    views: {
+    "saved-views": {
       title: t("notes.home.cards.savedViews"),
       icon: <Icon name="columns-2" size={17} color="var(--fg-3)" strokeWidth={1.7} />,
       body:
@@ -234,7 +253,7 @@ export function HomeSurfaceMobile({
           </div>
         ),
     },
-    writing: {
+    "writing-stats": {
       title: t("notes.home.cards.writing"),
       icon: <Icon name="edit" size={17} color="var(--fg-3)" strokeWidth={1.7} />,
       body: (
@@ -256,26 +275,27 @@ export function HomeSurfaceMobile({
     },
   };
 
-  const visibleCards = layout.order.filter((id) => !layout.hidden.includes(id));
+  /**
+   * The synced arrangement, narrowed to what this client can draw.
+   *
+   * **One layout, every surface** (owner, 2026-11-27): the board the user arranged
+   * on a computer is the board they get on the iPad and the phone, in the same
+   * order. The phone renders the kinds it has bodies for and SKIPS the rest rather
+   * than drawing a box it cannot fill, so a widget added on desktop does not turn
+   * into an empty card here. It never writes the field: re-arranging needs a
+   * pointer, and the desktop owns that.
+   */
+  const stored = prefs.home_cards;
+  const ordered = (stored ?? MOBILE_DEFAULT_ORDER.map((kind) => ({ id: kind, kind, span: 1 })))
+    .filter((card: MobileHomeCard) => cards[card.kind] !== undefined)
+    .map((card: MobileHomeCard) => card.kind);
 
   return (
     // The column caps its width on a tablet: a card 900pt wide with one sentence
     // in it reads as a layout that lost its content, and the desktop's own home
     // has the same measure discipline.
     <div data-testid="home.surface-mobile" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", width: "100%", maxWidth: 720, margin: "0 auto" }}>
-      <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "0 20px 10px" }}>
-        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>
-          {t("notes.home.title")}
-        </h1>
-        <button
-          type="button"
-          onClick={() => setCustomize(true)}
-          data-testid="home.customize"
-          style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, flex: "none" }}
-        >
-          {t("notes.home.arrange")}
-        </button>
-      </div>
+
       <div
         style={{
           flex: 1,
@@ -290,9 +310,9 @@ export function HomeSurfaceMobile({
           gap: 12,
         }}
       >
-        {visibleCards.map((id) => (
-          <HomeCardShell key={id} title={cards[id].title} icon={cards[id].icon}>
-            {cards[id].body}
+        {ordered.map((kind, index) => (
+          <HomeCardShell key={`${kind}-${index}`} title={cards[kind]!.title} icon={cards[kind]!.icon}>
+            {cards[kind]!.body}
           </HomeCardShell>
         ))}
         {notes.length === 0 && (
@@ -302,24 +322,6 @@ export function HomeSurfaceMobile({
         )}
       </div>
 
-      {customize && (
-        <LayoutCustomizeSheet
-          title={t("notes.home.arrange")}
-          rows={HOME_CARD_ORDER.map(
-            (id): CustomizeRow => ({
-              id,
-              label: cards[id].title,
-              icon: cards[id].icon,
-              supported: true,
-              shown: !layout.hidden.includes(id),
-            }),
-          )}
-          onToggle={(id, shown) => homeLayout.setHidden(id as HomeCardId, shown)}
-          onMove={(id, delta) => homeLayout.move(id as HomeCardId, delta)}
-          onReset={() => homeLayout.reset()}
-          onClose={() => setCustomize(false)}
-        />
-      )}
     </div>
   );
 }
