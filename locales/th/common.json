@@ -1,41 +1,14 @@
 {
-  "accountBootstrap": {
-    "accountMismatch": "เบราว์เซอร์นี้มีห้องนิรภัยของบัญชีอื่นอยู่แล้ว เปิดบัญชีนั้น หรือออกจากระบบแล้วลบสำเนาในเบราว์เซอร์นี้ก่อน",
-    "changeAccount": "ใช้หมายเลขบัญชีอื่น",
-    "continue": "ดำเนินการต่อ",
-    "hint": "ป้อนรหัสผ่านหลักของบัญชีนี้ Myne จะดึงห้องนิรภัยของคุณมาและตั้งค่าเบราว์เซอร์นี้เป็นอุปกรณ์หนึ่งในบัญชี",
-    "noEndpoint": "Myne ชุดนี้ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์ซิงค์ จึงเข้าถึงห้องนิรภัยของคุณไม่ได้ ติดต่อผู้ที่ดูแลระบบนี้",
-    "passwordLabel": "รหัสผ่านหลัก",
-    "approversIntro": "อุปกรณ์เหล่านี้อนุมัติเครื่องนี้ได้:",
-    "noApprovers": "ตอนนี้ไม่มีอุปกรณ์อื่นในบัญชีนี้ที่อนุมัติได้ เปิด Myne บนอุปกรณ์ที่เข้าถึงบัญชีได้อยู่แล้ว แล้วกลับมาที่นี่",
-    "pendingStartOver": "เริ่มใหม่ด้วยบัญชีอื่น",
-    "pendingTitle": "กำลังรอการอนุมัติ",
-    "sasMatch": "ตรงกัน ดำเนินการต่อ",
-    "sasMismatch": "ไม่ตรงกัน",
-    "verifyBody": "ตรวจสอบว่ารหัสนี้ตรงกันทั้งสองอุปกรณ์ก่อนดำเนินการต่อ ถ้าไม่ตรงกันให้หยุด: ปัญหาอยู่ที่การเชื่อมต่อ ไม่ใช่ที่รหัสผ่านของคุณ",
-    "verifyChanged": "รหัสเปลี่ยนไประหว่างที่คุณกำลังดูอยู่ เปรียบเทียบทั้งสองหน้าจออีกครั้ง ถ้ายังเปลี่ยนอยู่เรื่อย ๆ ให้หยุดและอย่าดำเนินการต่อ",
-    "verifyTitle": "เปรียบเทียบรหัสนี้",
-    "title": "ลงชื่อเข้าใช้ห้องนิรภัยของคุณ",
-    "working": "กำลังตั้งค่า…"
-  },
-  "accountEntry": {
-    "createAccount": "ฉันยังไม่มีบัญชี สร้างบัญชีใหม่",
-    "checkFailed": "ตรวจสอบหมายเลขบัญชีนั้นไม่ได้ ลองอีกครั้ง",
-    "checking": "กำลังตรวจสอบ…",
-    "continue": "ดำเนินการต่อ",
-    "hint": "รูปแบบจะเป็น MY-XXXX-XXXX-XXXX-XXXX-XXXX ระบบตรวจสอบให้ที่นี่บนอุปกรณ์ของคุณ ยังไม่มีการส่งข้อมูลออกไป",
-    "invalid": "หมายเลขบัญชีนั้นไม่ถูกต้อง ตรวจสอบแล้วลองอีกครั้ง",
-    "title": "ป้อนหมายเลขบัญชีของคุณ"
-  },
   "agent": {
     "composer": {
       "placeholder": "ถาม AI…",
       "scopeLabel": "ทำงานกับ",
-      "scopeOpenNote": "โน้ตนี้",
       "scopeCount_one": "โน้ต {{count}} รายการ",
       "scopeCount_other": "โน้ต {{count}} รายการ",
       "scopeCountUnavailable": "ตอนนี้ตรวจสอบไม่ได้ว่าโฟลเดอร์นั้นมีโน้ตกี่รายการ",
       "startFailed": "เริ่มเอเจนต์ AI ไม่ได้",
+      "modelCannotEdit": "โมเดลนี้ทำการเปลี่ยนแปลงที่โหมดเอเจนต์ต้องการไม่ได้ เลือกโมเดลที่ทำได้ในการตั้งค่า → AI",
+      "stillWorking": "เอเจนต์ยังทำงานในขั้นตอนล่าสุดอยู่ รอให้เสร็จก่อน แล้วส่งอีกครั้ง",
       "autoApplyFailed": "ปรับใช้การเปลี่ยนแปลงโดยอัตโนมัติไม่ได้ ยังไม่มีการเขียนอะไรลงไป เปิดหน้าการตรวจสอบเพื่อปรับใช้ด้วยตัวคุณเอง",
       "permissionLabel": "เมื่อรอบการทำงานเสร็จสิ้น",
       "permissionAsk": "ตรวจสอบก่อน",
@@ -49,7 +22,6 @@
       "checking": "กำลังตรวจสอบ",
       "unsupportedProvisional": "เกณฑ์ผ่านนี้ยังไม่ได้วัดกับโมเดลต่าง ๆ จึงอาจเข้มงวดหรือหย่อนเกินกว่าที่ควรเป็น",
       "scopeNone": "ไม่มีบันทึกที่เปิดอยู่ จึงยังไม่มีสิ่งใดให้ทำงานด้วย",
-      "scopeAllVault": "โน้ตทั้งหมด",
       "scopeQuestion": "เอเจนต์อ่านอะไรได้",
       "scopeFolders": "โฟลเดอร์",
       "scopeApplies": "มีผลกับข้อความถัดไปของคุณ โน้ตที่ถังขยะ เก็บถาวร และเทมเพลตถูกทิ้งไว้เสมอ",
@@ -70,7 +42,13 @@
       "confirm_one": "แนบ {{count}} ไฟล์",
       "confirm_other": "แนบ {{count}} ไฟล์",
       "remove": "เอา {{name}} ออก",
-      "noText": "{{name}} ไม่มีข้อความที่เอเจนต์อ่านได้ เฉพาะไฟล์ที่ดึงข้อความได้เท่านั้นที่แนบได้"
+      "noText": "{{name}} ไม่มีข้อความที่เอเจนต์อ่านได้ เฉพาะไฟล์ที่ดึงข้อความได้เท่านั้นที่แนบได้",
+      "fromDevice": "ถ่ายภาพหรือเลือกไฟล์",
+      "readingDevice": "กำลังอ่านบนอุปกรณ์นี้…",
+      "deviceOnly": "อ่านบนอุปกรณ์นี้ ไม่ถูกบันทึกเลย",
+      "deviceUnsupported": "{{name}} ไม่ใช่ไฟล์ที่เอเจนต์อ่านได้ รองรับรูปภาพ PDF และข้อความล้วน",
+      "deviceFailed": "อ่านไฟล์นั้นไม่ได้ ไม่มีอะไรถูกส่ง",
+      "readingInProgress": "อ่านไฟล์ให้เสร็จก่อน แล้วจึงวางอีกครั้ง"
     },
     "progress": {
       "working": "กำลังทำงาน",
@@ -108,7 +86,6 @@
     "review": {
       "title": "ตรวจสอบการเปลี่ยนแปลง",
       "statusWaiting": "รอการอนุมัติของคุณ",
-      "close": "ปิด",
       "scopeTotal_one": "โน้ต {{count}} รายการอยู่ในขอบเขต",
       "scopeTotal_other": "โน้ต {{count}} รายการอยู่ในขอบเขต",
       "noChanges": "เอเจนต์ AI ไม่ได้เสนอการเปลี่ยนแปลงใดเลย",
@@ -178,8 +155,6 @@
       "undoFailed": "เลิกทำรอบการทำงานนี้ไม่ได้",
       "undoReport": "กู้คืนโน้ตแล้ว {{reverted}} รายการ โน้ต {{kept}} รายการที่รอบการทำงานสร้างขึ้นถูกคงไว้",
       "alreadyApplied": "ปรับใช้แล้ว",
-      "untitledNote": "โน้ตไม่มีชื่อ",
-      "vaultRoot": "รากของห้องนิรภัย",
       "newNotesHeading_one": "โน้ตใหม่ {{count}} รายการ",
       "newNotesHeading_other": "โน้ตใหม่ {{count}} รายการ",
       "createdCount_one": "สร้างโน้ตแล้ว {{count}} รายการ",
@@ -245,7 +220,6 @@
       "loading": "กำลังโหลดบทสนทนา…",
       "modeLabel": "บทสนทนาใด",
       "modeVault": "ทั้งหมด",
-      "modeNote": "โน้ตนี้",
       "renamedAnnouncement": "เปลี่ยนชื่อเป็น {{name}} แล้ว",
       "deletedAnnouncement": "ลบบทสนทนาแล้ว",
       "loadFailed": "ตอนนี้โหลดบทสนทนาของคุณไม่ได้",
@@ -261,7 +235,6 @@
       "titleSaveFailed": "บันทึกชื่อเรื่องไม่ได้",
       "searchLabel": "ค้นหาบทสนทนา",
       "searchPlaceholder": "ค้นหาบทสนทนา…",
-      "noMatchTitle": "ไม่พบรายการที่ตรงกัน",
       "noMatchBody": "ไม่มีบทสนทนาที่ตรงกับ “{{query}}” ล้างการค้นหาเพื่อดูทั้งหมด",
       "emptyBody": "บทสนทนาที่คุณเริ่มจะปรากฏที่นี่",
       "menu": "การดำเนินการกับบทสนทนา",
@@ -293,9 +266,7 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "ยกเลิก",
       "cleaning": "กำลังล้าง…",
-      "close": "ปิด",
       "completeTitle": "ล้างเสร็จแล้ว",
       "deleteCta": "ลบ {{count}} รายการที่ไม่ได้ใช้",
       "deleteCta_one": "ลบ {{count}} รายการที่ไม่ได้ใช้",
@@ -315,16 +286,13 @@
       "willBeReclaimed": "จะได้พื้นที่คืน {{size}}"
     },
     "coverPicker": {
-      "close": "ปิด",
       "dropHint": "วางรูปภาพเพื่อใช้เป็นภาพหน้าปก",
       "empty": "ยังไม่มีรูปภาพในห้องนิรภัยนี้ อัปโหลดหรือลากรูปภาพมาวางที่นี่",
-      "loading": "กำลังโหลด…",
       "removeCover": "เอาภาพหน้าปกออก",
       "title": "เลือกภาพหน้าปก",
       "upload": "อัปโหลด"
     },
     "deleteDialog": {
-      "cancel": "ยกเลิก",
       "confirmPrompt": "ลบไฟล์แนบนี้อย่างถาวรหรือไม่ การกระทำนี้ย้อนกลับไม่ได้",
       "delete": "ลบ",
       "deleting": "กำลังลบ…",
@@ -332,8 +300,7 @@
       "notUsed": "ไม่ได้ถูกใช้ในโน้ตใดเลย",
       "stillUsed_one": "ยังถูกใช้อยู่ในโน้ต {{count}} รายการ การลบจะทิ้งร่องรอยไว้ตรงจุดที่ฝังไฟล์ไว้:",
       "stillUsed_other": "ยังถูกใช้อยู่ในโน้ต {{count}} รายการ การลบจะทิ้งร่องรอยไว้ตรงจุดที่ฝังไฟล์ไว้:",
-      "title": "ลบไฟล์แนบ",
-      "untitled": "ไม่มีชื่อ"
+      "title": "ลบไฟล์แนบ"
     },
     "library": {
       "actionsAriaLabel": "การดำเนินการกับไฟล์แนบ",
@@ -351,7 +318,6 @@
       "colUsedIn": "ใช้ใน",
       "decrypting": "กำลังถอดรหัสไฟล์แนบ…",
       "clearSearchAriaLabel": "ล้างการค้นหา",
-      "emptyClearSearch": "ล้างการค้นหา",
       "emptyImportHint": "ไฟล์ที่คุณเพิ่มลงในโน้ตจะถูกเก็บไว้ในห้องนิรภัยของคุณ โดยเข้ารหัสบนอุปกรณ์นี้ก่อนที่จะออกไปที่ใด นำเข้าไฟล์เพื่อเริ่มต้น",
       "emptyLoadError": "อ่านแคตตาล็อกไฟล์แนบไม่ได้",
       "emptyNoAttachments": "ยังไม่มีไฟล์แนบ",
@@ -364,9 +330,7 @@
       "importing": "กำลังนำเข้า…",
       "listView": "มุมมองรายการ",
       "menuDelete": "ลบ",
-      "menuExport": "ส่งออก",
       "menuPreview": "ดูตัวอย่าง",
-      "menuRename": "เปลี่ยนชื่อ",
       "menuTranscribe": "ถอดเสียง",
       "menuViewTranscription": "ดูข้อความถอดเสียง",
       "noUnusedNotice": "ไม่มีไฟล์แนบที่ไม่ได้ใช้ให้ล้าง",
@@ -402,8 +366,6 @@
       "emptyFilteredBody": "ไม่มีอะไรตรงกับตัวกรองประเภทปัจจุบัน ล้างตัวกรองเพื่อดูคลังทั้งหมดอีกครั้ง",
       "emptyFilteredBodyQuery": "ไม่มีอะไรในคลังที่ตรงกัน",
       "emptyLoadErrorBody": "แคตตาล็อกถูกเข้ารหัสด้วยห้องนิรภัยของคุณ ปกติแล้วนี่คือการอ่านที่ถูกขัดจังหวะ มากกว่าข้อมูลที่สูญหาย ลองอีกครั้ง หากยังล้มเหลว โน้ตและไฟล์ของคุณไม่ได้รับผลกระทบ",
-      "emptyRetry": "ลองอีกครั้ง",
-      "transcriptCopy": "คัดลอก",
       "transcriptCopied": "คัดลอกข้อความถอดเสียงแล้ว",
       "transcriptCopyFailed": "คัดลอกข้อความถอดเสียงไม่ได้",
       "transcriptEmpty": "ไม่พบเสียงพูดในการบันทึกนี้",
@@ -435,8 +397,7 @@
       "play": "เล่น"
     },
     "usedInNotesPopover": {
-      "empty": "ไม่ได้ถูกใช้ในโน้ตใดเลย",
-      "untitled": "ไม่มีชื่อ"
+      "empty": "ไม่ได้ถูกใช้ในโน้ตใดเลย"
     },
     "needsApp": "การล้างไฟล์แนบต้องใช้แอป",
     "noUnused": "ไม่มีไฟล์แนบที่ไม่ได้ใช้ ทุกไฟล์ถูกอ้างอิงอยู่",
@@ -468,7 +429,6 @@
   "backup": {
     "errors": {
       "export": {
-        "authOperationInProgress": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ รอให้เสร็จก่อนแล้วลองอีกครั้ง",
         "cancelled": "ยกเลิกการสำรองข้อมูลแล้ว ไม่มีไฟล์ตกค้าง",
         "invalidDestination": "โฟลเดอร์ปลายทางนั้นใช้งานไม่ได้",
         "ioGeneric": "เขียนไฟล์สำรองข้อมูลไม่ได้",
@@ -481,7 +441,6 @@
         "unknown": "การสำรองข้อมูลล้มเหลวจากสาเหตุที่ Myne ระบุไม่ได้ อย่าเชื่อไฟล์ในปลายทาง; ลองอีกครั้ง"
       },
       "restore": {
-        "authOperationInProgress": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ รอให้เสร็จก่อนแล้วลองอีกครั้ง",
         "cancelled": "ยกเลิกการกู้คืนแล้ว ไม่มีอะไรเปลี่ยนแปลง",
         "damagedBackup": "ไฟล์สำรองข้อมูลเสียหาย",
         "futureVersionBackup": "ไฟล์สำรองข้อมูลนี้สร้างจาก Myne รุ่นที่ใหม่กว่า อัปเดต Myne ก่อน แล้วจึงกู้คืน",
@@ -496,20 +455,17 @@
       }
     },
     "export": {
-      "cancel": "ยกเลิก",
-      "close": "ปิด",
       "copying": "กำลังคัดลอก {{done}} จาก {{total}}…",
       "preparing": "กำลังเตรียม…",
       "successToast": "ตรวจสอบและบันทึกไฟล์สำรองข้อมูลแล้ว",
       "title": "สำรองข้อมูลห้องนิรภัย",
       "verifying": "กำลังตรวจสอบ {{done}} จาก {{total}}…",
-      "phraseNotSubstitute": "ไฟล์สำรองเพียงอย่างเดียวจะพาคุณกลับเข้าไปไม่ได้ หากคุณทำรหัสผ่านหาย"
+      "phraseNotSubstitute": "ไฟล์สำรองเพียงอย่างเดียวจะพาคุณกลับเข้าไปไม่ได้หากคุณทำรหัสผ่านหาย: ไฟล์นั้นเก็บโน้ตของคุณ ไม่ใช่รหัสผ่านหรือวลีตัวตนของคุณ"
     }
   },
   "clipper": {
     "pairing": {
       "accept": "ยอมรับ",
-      "close": "ปิด",
       "codeAriaLabel": "รหัสจับคู่",
       "intro": "ยืนยันว่ารหัสนี้ตรงกับรหัสที่แสดงในส่วนขยาย แล้วกด ยอมรับ เพื่อจับคู่",
       "reject": "ปฏิเสธ",
@@ -525,7 +481,6 @@
     "matchedInAttachment": "ในไฟล์แนบ",
     "matchedInAttachmentTitle": "คำค้นตรงกับข้อความในไฟล์ที่ฝังอยู่ในโน้ตนี้",
     "matchedInBody": "↳ ตรงกับเนื้อหา",
-    "noMatches": "ไม่พบรายการที่ตรงกัน",
     "operatorHint": "กด Tab เพื่อเติมให้ครบ",
     "operators": {
       "tag": "โน้ตที่มีแท็ก",
@@ -538,7 +493,6 @@
     "searchPlaceholder": "ค้นหาโน้ตหรือเรียกใช้คำสั่ง ลอง tag: · path: · task:",
     "sectionCommands": "คำสั่ง",
     "sectionNotes": "โน้ต",
-    "untitledNote": "ไม่มีชื่อ",
     "resultsLabel": "คำสั่งและโน้ต",
     "pin": "ปักหมุดที่ริบบอนซ้าย",
     "unpin": "เลิกปักหมุดจากริบบอนซ้าย",
@@ -654,9 +608,6 @@
       "togglePreview": {
         "label": "สลับการแสดงตัวอย่างเคียงข้าง"
       },
-      "findInNote": {
-        "label": "ค้นหาในโน้ต"
-      },
       "findReplace": {
         "label": "ค้นหาและแทนที่ในโน้ต"
       },
@@ -744,6 +695,7 @@
       "exportVaultMarkdown": {
         "label": "ส่งออกห้องนิรภัยเป็น Markdown…"
       },
+      "findInNote": {},
       "foldAll": {
         "label": "ยุบทั้งหมด"
       },
@@ -828,6 +780,9 @@
       "unfoldAll": {
         "label": "ขยายทั้งหมด"
       },
+      "showCalendar": {
+        "label": "เปิดปฏิทิน"
+      },
       "openThisWeekNote": {
         "label": "เปิดบันทึกของสัปดาห์นี้"
       },
@@ -877,11 +832,9 @@
     "hotkeys": {
       "command": {
         "bold": "ตัวหนา",
-        "closeTab": "ปิดแท็บ",
         "cycleHeadingLevel": "วนระดับหัวข้อ",
         "cycleTabs": "วนแท็บ",
         "deleteWorkspace": "ลบพื้นที่ทำงาน",
-        "findInNote": "ค้นหาในโน้ต",
         "focusNextPane": "โฟกัสบานหน้าต่างถัดไป",
         "focusPrevPane": "โฟกัสบานหน้าต่างก่อนหน้า",
         "foldAll": "ยุบทั้งหมด",
@@ -891,12 +844,10 @@
         "italic": "ตัวเอียง",
         "navigateBack": "ย้อนกลับ",
         "navigateForward": "ไปข้างหน้า",
-        "newNote": "โน้ตใหม่",
         "openSettings": "เปิดการตั้งค่า",
         "outdent": "ลดระยะย่อหน้า",
         "paletteToggle": "เปิดแผงคำสั่ง",
         "redo": "ทำซ้ำ",
-        "renameWorkspace": "เปลี่ยนชื่อพื้นที่ทำงาน",
         "saveWorkspaceAs": "บันทึกพื้นที่ทำงานเป็น",
         "selectAllScoped": "เลือกทั้งหมด (ในขอบเขต)",
         "selectNextOccurrence": "เลือกรายการถัดไปที่ตรงกัน",
@@ -913,6 +864,7 @@
         "toggleTaskList": "สลับรายการงาน",
         "undo": "เลิกทำ",
         "unfoldAll": "ขยายทั้งหมด",
+        "showCalendar": "เปิดปฏิทิน",
         "cycleRegion": "สลับโฟกระหว่างพื้นที่",
         "focusEditorRegion": "โฟกัสที่ตัวแก้ไข",
         "focusRightPanelRegion": "โฟกัสที่แผงขวา",
@@ -923,7 +875,6 @@
       "invalidChordReason": "ต้องมีปุ่มปรับร่วมด้วย (⌘, Ctrl หรือ Alt) ปุ่มเดี่ยว ๆ ใช้เป็นคีย์ลัดไม่ได้"
     },
     "picker": {
-      "vaultRoot": "รากของห้องนิรภัย",
       "moveNoteTitle": "ย้ายโน้ตไปโฟลเดอร์",
       "moveNotePlaceholder": "เลือกโฟลเดอร์…",
       "noFolders": "ยังไม่มีโฟลเดอร์",
@@ -945,6 +896,68 @@
     },
     "back": "ย้อนกลับ",
     "continue": "ดำเนินการต่อ",
+    "phraseWordsProgress": "{{filled}} จาก {{total}} คำ",
+    "clear": "ล้าง",
+    "untitled": "ไม่มีชื่อ",
+    "done": "เสร็จสิ้น",
+    "rename": "เปลี่ยนชื่อ",
+    "remove": "นำออก",
+    "edit": "แก้ไข",
+    "export": "ส่งออก",
+    "copy": "คัดลอก",
+    "loading": "กำลังโหลด…",
+    "tasks": "งาน",
+    "priority": "ลำดับความสำคัญ",
+    "today": "วันนี้",
+    "thisnote": "โน้ตนี้",
+    "nomatches": "ไม่พบรายการที่ตรงกัน",
+    "allnotes": "โน้ตทั้งหมด",
+    "untitlednote": "โน้ตที่ไม่มีชื่อ",
+    "vaultroot": "รากห้องนิรภัย",
+    "clearsearch": "ล้างการค้นหา",
+    "tryagain": "ลองอีกครั้ง",
+    "anothervaultoperationisinprogresswaitforittofinishthentryagain": "มีการดำเนินการกับห้องนิรภัยอื่นอยู่ รอให้เสร็จก่อน แล้วลองอีกครั้ง",
+    "closetab": "ปิดแท็บ",
+    "emptytrash": "ล้างถังขยะ",
+    "findinnote": "ค้นหาในโน้ต",
+    "newfolder": "โฟลเดอร์ใหม่",
+    "newnote": "โน้ตใหม่",
+    "renameworkspace": "เปลี่ยนชื่อพื้นที่ทำงาน",
+    "notnow": "ไม่ใช่ตอนนี้",
+    "versionhistory": "ประวัติเวอร์ชัน",
+    "duedate": "วันที่ครบกำหนด",
+    "nodate": "ไม่มีวันที่",
+    "movetotrash": "ย้ายไปถังขยะ",
+    "thevaultislockedunlockitthentryagain": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกก่อน แล้วลองอีกครั้ง",
+    "showinfolder": "แสดงในโฟลเดอร์",
+    "untitledview": "มุมมองที่ไม่มีชื่อ",
+    "choosefolder": "เลือกโฟลเดอร์…",
+    "untitledtemplate": "เทมเพลตที่ไม่มีชื่อ",
+    "justnow": "เมื่อสักครู่",
+    "nonotesmatchthisview": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
+    "novalue": "ไม่มีค่า",
+    "masterpassword": "รหัสผ่านหลัก",
+    "recoveryphrase": "วลีกู้คืน",
+    "unexpectederrorpleasetryagain": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
+    "vaultfilenotfoundpleaserestarttheapp": "ไม่พบไฟล์ห้องนิรภัย โปรดรีสตาร์ตแอป",
+    "vaultfileisunreadablerestorefromabackup": "ไฟล์ห้องนิรภัยอ่านไม่ได้ กู้คืนจากไฟล์สำรอง",
+    "restorefrombackup": "กู้คืนจากไฟล์สำรอง",
+    "deviceonly": "เฉพาะอุปกรณ์นี้",
+    "accountnumber": "หมายเลขบัญชี",
+    "changepassword": "เปลี่ยนรหัสผ่าน",
+    "couldnotsavethissetting": "บันทึกการตั้งค่านี้ไม่ได้",
+    "periodicnotes": "โน้ตตามช่วงเวลา",
+    "thisdevice": "อุปกรณ์นี้",
+    "thecodechangedwhileyouwerelookingcomparebothscreensagainifitkeepschangingstopanddonotcontinue": "รหัสเปลี่ยนไประหว่างที่คุณกำลังดูอยู่ เปรียบเทียบทั้งสองหน้าจออีกครั้ง ถ้ามันยังเปลี่ยนอยู่ ให้หยุดและอย่าดำเนินการต่อ",
+    "waitingforapproval": "กำลังรอการอนุมัติ",
+    "youridentitycode": "รหัสตัวตนของคุณ",
+    "keepit": "เก็บไว้",
+    "youridentity": "ตัวตนของคุณ",
+    "forgetthisidentityonthisdevice": "ลืมตัวตนนี้บนอุปกรณ์นี้",
+    "noinvitationsyet": "ยังไม่มีคำเชิญ",
+    "createanidentity": "สร้างตัวตน",
+    "confirmyourphrase": "ยืนยันวลีของคุณ",
+    "registerthisidentity": "ลงทะเบียนตัวตนนี้",
     "skipToContent": "ข้ามไปยังเนื้อหา"
   },
   "deviceRevoked": {
@@ -967,7 +980,6 @@
         "noticeContainerChanged": "บีบอัดเป็น {{format}}: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "ยกเลิก",
         "confirm": "แปลง",
         "skipped": "ข้าม: {{note}}",
         "subtitle_one": "จะมีการเขียนการอ้างอิงใหม่ 1 รายการ ตรวจสอบก่อนยืนยัน",
@@ -1041,7 +1053,6 @@
       },
       "lightbox": {
         "close": "ปิดตัวอย่าง",
-        "export": "ส่งออก",
         "exportAria": "ส่งออกไฟล์แนบ",
         "imagePreview": "ตัวอย่างรูปภาพ",
         "pdfFallback": "PDF",
@@ -1053,27 +1064,21 @@
       "menu": {
         "actionsAria": "การดำเนินการกับไฟล์แนบ"
       },
-      "pdf": {
-        "loading": "กำลังโหลด…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "เปิดตัวเลือกไฟล์ไม่ได้"
       },
       "progress": {
         "encrypting": "กำลังเข้ารหัส…",
-        "importing": "กำลังนำเข้า…",
-        "loading": "กำลังโหลด…"
+        "importing": "กำลังนำเข้า…"
       },
       "recording": {
         "barAria": "กำลังบันทึกโน้ตเสียง",
-        "cancel": "ยกเลิก",
         "noAudio": "ตรวจไม่พบเสียง ตรวจสอบไมโครโฟนของคุณ",
         "saving": "กำลังบันทึก…",
         "stop": "หยุด"
       },
       "rename": {
-        "cancel": "ยกเลิก",
-        "confirm": "เปลี่ยนชื่อ",
         "title": "เปลี่ยนชื่อไฟล์แนบ"
       },
       "summary": {
@@ -1114,9 +1119,6 @@
           "seek": "เลื่อนตำแหน่ง"
         },
         "menu": {
-          "export": "ส่งออก",
-          "remove": "เอาออก",
-          "rename": "เปลี่ยนชื่อ",
           "reveal": "แสดงในคลังไฟล์แนบ",
           "transcribe": "ถอดเสียง",
           "customSize": "ขนาดที่กำหนดเอง…",
@@ -1177,7 +1179,6 @@
         "bug": "บั๊ก",
         "caution": "ข้อควรระวัง",
         "danger": "อันตราย",
-        "done": "เสร็จแล้ว",
         "error": "ข้อผิดพลาด",
         "example": "ตัวอย่าง",
         "failure": "ล้มเหลว",
@@ -1205,8 +1206,7 @@
         "linksTo": "ลิงก์ไปยัง {{count}}",
         "linksTo_one": "ลิงก์ไปยัง {{count}}",
         "linksTo_other": "ลิงก์ไปยัง {{count}}",
-        "outgoingEmpty": "โน้ตนี้ยังไม่ได้ลิงก์ไปที่ใด",
-        "untitled": "ไม่มีชื่อ"
+        "outgoingEmpty": "โน้ตนี้ยังไม่ได้ลิงก์ไปที่ใด"
       },
       "barItems": {
         "graph": "กราฟ",
@@ -1320,38 +1320,23 @@
           "truncated": "สรุปจาก {{count}} อักขระแรก",
           "you": "คุณ",
           "history": "ประวัติ",
-          "historyCancel": "ยกเลิก",
           "historyDelete": "ลบ",
           "historyDeleteBody": "จะลบสนทนานี้จากทุกอุปกรณ์ในการเชื่อมต่อครั้งถัดไป ไม่สามารถยกเลิกได้",
           "historyError": "โหลดสนทนาไม่ได้ ลองอีกครั้ง",
-          "historyProposalNewNote": "โน้ตใหม่",
-          "historyRename": "เปลี่ยนชื่อ",
           "historyTitle": "ประวัติแชต",
           "historyDeleteTitle": "ลบสนทนา",
           "persistWarning": "บันทึกลงที่เก็บข้อมูลไม่ได้ ข้อความของคุณอยู่ที่นี่ กำลังลองใหม่",
           "memory": "ความจำ",
-          "memoryPopoverTitle": "ผู้ช่วยจำอะไรได้บ้าง",
-          "memoryPopoverEmpty": "ยังไม่จำอะไรเลย",
-          "memoryPopoverDelete": "ลบ",
-          "memoryPopoverDeleted": "ลบรายการแล้วทุกที่",
-          "memoryPopoverDeleteFailed": "ลบรายการไม่ได้",
-          "memoryPopoverEntryFailed": "อ่านรายการไม่ได้ ยังถูกบันทึกอยู่ ลบจากที่นี่หรือแก้ไขในการตั้งค่า",
-          "memoryPopoverLoadFailed": "โหลดความจำไม่ได้ ไม่มีอะไรเปลี่ยนแปลง",
-          "memoryPopoverRetry": "ลองอีกครั้ง",
-          "memoryPopoverSettings": "จัดการในการตั้งค่า",
-          "memoryPopoverClose": "ปิด",
           "seedCard": {
             "title": "ให้ Myne รู้จักห้องนิรภัยของคุณไหม",
             "body": "มันอ่านรูปร่างของโน้ตคุณครั้งเดียวแล้วสร้างบันทึกความจำไม่กี่รายการ คุณตรวจสอบทุกบรรทัดก่อนบันทึก",
-            "action": "สอน Myne เกี่ยวกับห้องนิรภัยของคุณ",
-            "dismiss": "ไม่ใช่ตอนนี้"
+            "action": "สอน Myne เกี่ยวกับห้องนิรภัยของคุณ"
           },
           "copied": "คัดลอกแล้ว",
           "copyAnswer": "คัดลอกคำตอบ",
           "copyFailed": "คัดลอกไม่ได้",
           "copyYourMessage": "คัดลอกข้อความของคุณ",
           "emptyTitle": "ถามเกี่ยวกับโน้ตของคุณ",
-          "noticeSettingsCta": "เปิดการตั้งค่า AI",
           "viewDiff": "ดูการเปลี่ยนแปลง",
           "revertRun": "ย้อนกลับรอบการทำงานนี้",
           "diffTitle": "การเปลี่ยนแปลงที่เสนอ",
@@ -1365,8 +1350,7 @@
           "statusKeyRejected": "คีย์ถูกปฏิเสธ",
           "statusOutOfCredit": "เครดิตหมด",
           "statusRefused": "ถูกปฏิเสธ",
-          "statusNotWorking": "ใช้งานไม่ได้",
-          "historyRetry": "ลองอีกครั้ง"
+          "statusNotWorking": "ใช้งานไม่ได้"
         },
         "allHidden": "แท็บทั้งหมดถูกซ่อนอยู่ คลิกขวาเพื่อเรียกคืน",
         "outline": {
@@ -1401,15 +1385,12 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "ชื่อพื้นที่ทำงาน",
-        "renameConfirm": "เปลี่ยนชื่อ",
-        "renameTitle": "เปลี่ยนชื่อพื้นที่ทำงาน",
         "saveAsTitle": "บันทึกพื้นที่ทำงานเป็น",
         "saveConfirm": "บันทึก"
       },
       "workspaceSwitcher": {
         "defaultName": "พื้นที่ทำงาน",
         "renameItemLabel": "เปลี่ยนชื่อพื้นที่ทำงาน {{name}}",
-        "renameTitle": "เปลี่ยนชื่อพื้นที่ทำงาน",
         "saveCurrentAs": "บันทึกพื้นที่ปัจจุบันเป็น…",
         "switchLabel": "สลับพื้นที่ทำงาน",
         "toggleTitle": "พื้นที่ทำงาน: {{name}}"
@@ -1433,14 +1414,12 @@
     "noteActions": {
       "buttonLabel": "การดำเนินการกับโน้ต",
       "convertFailed": "เปลี่ยนประเภทของโน้ตนี้ไม่ได้ จึงไม่เปลี่ยนแปลง",
-      "rename": "เปลี่ยนชื่อ",
       "move": "ย้ายไปโฟลเดอร์…",
       "duplicate": "ทำสำเนา",
       "convertToTemplate": "เปลี่ยนเป็นเทมเพลต",
       "convertToNote": "แปลงเป็นโน้ต",
       "turnedIntoTemplate": "เปลี่ยนเป็นเทมเพลตแล้ว",
       "convertedToNote": "แปลงเป็นโน้ตแล้ว",
-      "versionHistory": "ประวัติเวอร์ชัน",
       "trash": "ย้ายไปถังขยะ",
       "openInNewWindow": "เปิดในหน้าต่างใหม่"
     },
@@ -1449,9 +1428,7 @@
       "defaultBadge": "โค้ด"
     },
     "drawingEmbed": {
-      "done": "เสร็จสิ้น",
       "edit": "แก้ไขภาพวาด {{name}}",
-      "editAction": "แก้ไข",
       "empty": "ภาพวาดว่างเปล่า: คลิกเพื่อวาด",
       "open": "เปิด",
       "rename": "เปลี่ยนชื่อภาพวาด"
@@ -1466,8 +1443,6 @@
       "matchCase": "ตรงตามตัวพิมพ์เล็ก-ใหญ่",
       "matchCount": "{{current}} จาก {{total}}",
       "nextMatch": "รายการถัดไปที่ตรงกัน",
-      "noMatches": "ไม่พบรายการที่ตรงกัน",
-      "placeholder": "ค้นหาในโน้ต",
       "previousMatch": "รายการก่อนหน้าที่ตรงกัน",
       "replaceAll": "แทนที่ทั้งหมด",
       "replaceAllCount": "แทนที่ทั้งหมด ({{total}})",
@@ -1498,7 +1473,6 @@
       "propertiesLabel": "คุณสมบัติ",
       "removeListItemAriaLabel": "เอา {{item}} ออก",
       "titleAriaLabel": "ชื่อโน้ต",
-      "titlePlaceholder": "ไม่มีชื่อ",
       "managedField": "Myne เป็นผู้เขียนฟิลด์นี้"
     },
     "mermaid": {
@@ -1513,11 +1487,9 @@
       "panLeft": "เลื่อนซ้าย",
       "panRight": "เลื่อนขวา",
       "edit": "แก้ไขซอร์สโค้ดไดอะแกรม",
-      "editText": "แก้ไข",
       "expand": "ขยายไดอะแกรม",
       "expandText": "ขยาย",
-      "expandClose": "ปิดไดอะแกรมที่ขยาย",
-      "expandCloseText": "ปิด"
+      "expandClose": "ปิดไดอะแกรมที่ขยาย"
     },
     "slash": {
       "aiContinue": "เขียนต่อ (AI)",
@@ -1531,7 +1503,6 @@
       "day": "วัน",
       "divider": "เส้นคั่น",
       "drawing": "ภาพวาด",
-      "due": "วันครบกำหนด",
       "heading1": "หัวข้อ 1",
       "heading2": "หัวข้อ 2",
       "heading3": "หัวข้อ 3",
@@ -1541,7 +1512,6 @@
       "link": "ลิงก์",
       "now": "ตอนนี้",
       "numberedList": "รายการลำดับเลข",
-      "priority": "ความสำคัญ",
       "quote": "คำพูดอ้างอิง",
       "repeat": "การทำซ้ำ",
       "table": "ตาราง",
@@ -1592,19 +1562,15 @@
       "title": {
         "due": "วันครบกำหนด",
         "repeat": "การทำซ้ำ",
-        "priority": "ความสำคัญ",
         "remind": "การเตือน"
       },
       "invalidRemind": "Myne อ่านวันที่นี้ไม่ได้ จึงจะไม่เตือนคุณ",
       "addTime": "เพิ่มเวลา",
-      "clear": "ล้าง",
       "dateGrid": "เลือกวันที่",
       "dateNext": "เดือนถัดไป",
       "datePrev": "เดือนก่อน",
-      "today": "วันนี้",
       "tomorrow": "พรุ่งนี้",
       "selectField": "เลือกฟิลด์เพื่อเพิ่ม",
-      "noDate": "ไม่มีวันที่",
       "removeTime": "ลบเวลา",
       "timeHour": "ชั่วโมง",
       "timeMeridiem": "AM หรือ PM",
@@ -1613,6 +1579,7 @@
     "toolbar": {
       "apply": "ใช้",
       "exportImageTitle": "ส่งออกข้อความที่เลือกเป็นรูปภาพ",
+      "label": "การจัดรูปแบบ",
       "customize": {
         "bold": "ตัวหนา",
         "bulletList": "รายการหัวข้อย่อย",
@@ -1650,7 +1617,8 @@
         "brown": "น้ำตาล",
         "grey": "เทา",
         "indigo": "คราม",
-        "remove": "เอาไฮไลต์ออก"
+        "remove": "เอาไฮไลต์ออก",
+        "colours": "สีไฮไลต์"
       },
       "urlPlaceholder": "วาง URL ของลิงก์"
     },
@@ -1699,7 +1667,6 @@
         "embed": "ฝัง: {{label}}"
       },
       "convert": {
-        "cancel": "ยกเลิก",
         "choiceClause_one": " · {{count}} รายการต้องเลือกเป้าหมาย",
         "choiceClause_other": " · {{count}} รายการต้องเลือกเป้าหมาย",
         "chooseTarget": "เลือกเป้าหมาย…",
@@ -1746,15 +1713,12 @@
     },
     "nav": {
       "dailyNote": "โน้ตประจำวัน",
-      "openToday": "เปิดของวันนี้",
-      "allNotes": "โน้ตทั้งหมด"
+      "openToday": "เปิดของวันนี้"
     },
     "list": {
       "searchPlaceholder": "ค้นหาโน้ต",
-      "clearSearch": "ล้างการค้นหา",
       "viewNoteCount_one": "โน้ต {{count}} รายการใน “{{name}}”",
       "viewNoteCount_other": "โน้ต {{count}} รายการใน “{{name}}”",
-      "edit": "แก้ไข",
       "trashEmpty": "ถังขยะว่างเปล่า",
       "archiveEmpty": "ไม่มีโน้ตที่เก็บถาวรไว้",
       "noMatchingNotes": "ไม่มีโน้ตที่ตรงกัน",
@@ -1771,10 +1735,8 @@
       "wordCount_one": "{{count}} คำ · อ่าน {{minutes}} นาที",
       "wordCount_other": "{{count}} คำ · อ่าน {{minutes}} นาที",
       "moveToFolder": "ย้ายไปโฟลเดอร์…",
-      "moveToTrash": "ย้ายไปถังขยะ",
       "copied": "คัดลอกแล้ว ✓",
-      "copyToClipboard": "คัดลอกไปยังคลิปบอร์ด",
-      "versionHistory": "ประวัติเวอร์ชัน"
+      "copyToClipboard": "คัดลอกไปยังคลิปบอร์ด"
     },
     "purge": {
       "body": "การกระทำนี้จะลบโน้ตออกจากอุปกรณ์นี้อย่างถาวร และย้อนกลับไม่ได้"
@@ -1793,8 +1755,7 @@
       "body": "เลือกโน้ตจากรายการ หรือเริ่มโน้ตใหม่"
     },
     "readingBar": {
-      "editNote": "แก้ไขโน้ต",
-      "edit": "แก้ไข"
+      "editNote": "แก้ไขโน้ต"
     },
     "graphTab": {
       "linkedNotes_one": "โน้ตที่เชื่อมโยง {{count}} รายการ",
@@ -1828,9 +1789,7 @@
       "emptyState": "ยังไม่มีมุมมองที่บันทึกไว้ สร้างมุมมองเพื่อกรองโน้ตตามแท็ก โฟลเดอร์ หรือข้อความ",
       "editView": "แก้ไขมุมมอง"
     },
-    "sheet": {
-      "done": "เสร็จสิ้น"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "ห้องนิรภัย"
     },
@@ -1839,7 +1798,6 @@
       "notesCount_one": "โน้ต · {{count}}",
       "notesCount_other": "โน้ต · {{count}}"
     },
-    "untitledNote": "โน้ตไม่มีชื่อ",
     "commandPalette": {
       "searchPlaceholder": "ค้นหาโน้ตหรือเรียกใช้คำสั่ง…",
       "noMatches": "ไม่มีคำสั่งหรือโน้ตที่ตรงกัน"
@@ -1876,7 +1834,6 @@
     "meeting": {
       "ai": {
         "cancelled": "หยุดแล้ว ไม่มีอะไรถูกเพิ่มลงในโน้ต",
-        "close": "ปิด",
         "discard": "ทิ้ง",
         "failed": "การประมวลผลด้วย AI ล้มเหลว บันทึกการถอดเสียงไม่เปลี่ยนแปลง",
         "generate": "สร้าง",
@@ -1901,7 +1858,6 @@
         "title": "AI การประชุม"
       },
       "barAria": "เซสชันการประชุม",
-      "cancel": "ยกเลิก",
       "chunksMissing": "ข้อมูลการประชุมบางส่วนไม่ถูกส่งมา โน้ตจึงมีช่องว่าง เสียงที่มาถึงยังอยู่ครบ",
       "clipFailed": "บันทึกการประชุมบางส่วนไม่ได้ ส่วนที่เหลือยังอยู่ในโน้ต",
       "machineNotice": "นี่คือบันทึกการถอดเสียงการประชุมโดยเครื่อง และอาจมีข้อผิดพลาด",
@@ -1940,8 +1896,7 @@
         "pdfPayloadMissing": "การส่งออกถูกขัดจังหวะ ถ้าห้องนิรภัยล็อกไป ให้ปลดล็อกแล้วลองอีกครั้ง",
         "pdfRenderTimeout": "โน้ตใช้เวลาเรนเดอร์นานเกินไป จึงไม่มีอะไรถูกส่งออก",
         "pdfWindowCreateFailed": "เปิดหน้าต่างส่งออกไม่ได้ จึงไม่มีอะไรถูกส่งออก",
-        "targetExists": "มีไฟล์ชื่อนั้นอยู่ที่ปลายทางแล้ว",
-        "vaultLocked": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกแล้วลองอีกครั้ง"
+        "targetExists": "มีไฟล์ชื่อนั้นอยู่ที่ปลายทางแล้ว"
       },
       "flow": {
         "couldNotRead": "อ่านโน้ตนี้ไม่ได้",
@@ -1953,11 +1908,9 @@
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
-        "filterPlainText": "ข้อความล้วน",
-        "showInFolder": "แสดงในโฟลเดอร์"
+        "filterPlainText": "ข้อความล้วน"
       },
       "modal": {
-        "cancel": "ยกเลิก",
         "export": "ส่งออก…",
         "includeAttachments_one": "รวมไฟล์แนบ {{count}} รายการ",
         "includeAttachments_other": "รวมไฟล์แนบ {{count}} รายการ",
@@ -1968,12 +1921,10 @@
       }
     },
     "egress": {
-      "cancel": "ยกเลิก",
       "confirm": "ดาวน์โหลด",
       "title": "ดาวน์โหลดไฟล์นี้"
     },
     "pdf": {
-      "cancel": "ยกเลิก",
       "continue": "ดำเนินการต่อ…",
       "title": "ส่งออกเป็น PDF"
     },
@@ -1982,7 +1933,6 @@
       "errors": {
         "attachmentCorrupt": "ไฟล์แนบที่โน้ตหนึ่งอ้างอิงอ่านไม่ได้ จึงไม่มีอะไรถูกส่งออก",
         "attachmentMissing": "ไฟล์แนบที่โน้ตหนึ่งอ้างอิงหายไป จึงไม่มีอะไรถูกส่งออก",
-        "authOperationInProgress": "มีการทำงานกับห้องนิรภัยอื่นค้างอยู่ รอให้เสร็จก่อนแล้วลองอีกครั้ง",
         "cancelled": "ยกเลิกการส่งออกแล้ว ไม่มีไฟล์ตกค้างที่ปลายทาง",
         "cannotDecrypt": "มีโน้ตที่อ่านไม่ได้ จึงไม่มีอะไรถูกส่งออก",
         "destinationAlreadyExists": "มีบางอย่างอยู่ที่ตำแหน่งนั้นแล้ว เลือกตำแหน่งใหม่สำหรับการส่งออก",
@@ -1991,7 +1941,6 @@
         "invalidVaultMeta": "อ่านข้อมูลกำกับห้องนิรภัยไม่ได้ จึงไม่มีอะไรถูกส่งออก",
         "ioWriteDefault": "เขียนไฟล์ที่ส่งออกไม่ได้",
         "joinFailure": "การส่งออกล้มเหลวโดยไม่คาดคิด ไม่มีไฟล์ตกค้างที่ปลายทาง",
-        "vaultLocked": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกแล้วลองอีกครั้ง",
         "vaultNotFound": "ไม่พบห้องนิรภัยที่จะส่งออก"
       },
       "flow": {
@@ -2012,12 +1961,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "ยกเลิก",
         "cancelling": "กำลังยกเลิก…",
         "title": "กำลังส่งออก…"
       },
       "setup": {
-        "cancel": "ยกเลิก",
         "choose": "เลือก…",
         "chooseFolder": "เลือกโฟลเดอร์…",
         "destinationLabel": "ปลายทาง",
@@ -2031,8 +1978,6 @@
         "title": "ส่งออกห้องนิรภัยเป็น Markdown"
       },
       "summary": {
-        "done": "เสร็จสิ้น",
-        "showInFolder": "แสดงในโฟลเดอร์",
         "title": "ส่งออกเสร็จสมบูรณ์"
       }
     }
@@ -2068,8 +2013,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "ยกเลิก",
-      "close": "ปิด",
       "count_one": "โน้ต {{count}} รายการ",
       "count_other": "โน้ต {{count}} รายการ",
       "delete": "ลบ",
@@ -2080,14 +2023,12 @@
       "folderDeleteBody_other": "“{{name}}” และโน้ต {{count}} รายการในนั้น",
       "folderDeleteConfirm_one": "ย้ายโน้ต {{count}} รายการไปถังขยะหรือไม่",
       "folderDeleteConfirm_other": "ย้ายโน้ต {{count}} รายการไปถังขยะหรือไม่",
-      "folderDeleteConfirmCta": "ย้ายไปถังขยะ",
       "folderDeleteError": "ย้ายโน้ตในโฟลเดอร์นั้นไปถังขยะไม่ได้ ลองอีกครั้ง",
       "folderDeleteTitle": "ย้ายโฟลเดอร์นี้ไปถังขยะหรือไม่",
       "folderDeleteWarning": "รายการจะถูกย้ายไปถังขยะ กู้คืนได้ทุกเมื่อ การลบถาวรเป็นอีกขั้นตอนหนึ่งต่างหาก",
       "restore": "กู้คืน",
       "restoreError": "กู้คืนโน้ตนั้นไม่ได้ ลองอีกครั้ง",
-      "title": "ที่เก็บถาวร",
-      "untitled": "ไม่มีชื่อ"
+      "title": "ที่เก็บถาวร"
     },
     "cardMenu": {
       "copyLink": "คัดลอกลิงก์",
@@ -2115,10 +2056,8 @@
       "none": "ไม่มี"
     },
     "deleteConfirm": {
-      "cancel": "ยกเลิก",
       "delete": "ลบ",
       "title": "ลบโน้ตนี้หรือไม่",
-      "untitled": "ไม่มีชื่อ",
       "warning": "การกระทำนี้ย้อนกลับไม่ได้"
     },
     "example": {
@@ -2147,7 +2086,6 @@
     "filterBuilder": {
       "addCondition": "เพิ่มเงื่อนไข",
       "addFilterGroup": "เพิ่มกลุ่มตัวกรอง",
-      "cancel": "ยกเลิก",
       "combinator": {
         "all": "ทั้งหมด",
         "any": "ข้อใดข้อหนึ่ง"
@@ -2193,6 +2131,7 @@
       "unsettledSave": "โน้ตที่เปิดอยู่ยังบันทึกไม่เสร็จ จึงปล่อยโฟลเดอร์ไว้ ลองอีกครั้งเมื่อบันทึกเสร็จ",
       "renameFailed": "เปลี่ยนชื่อโฟลเดอร์ไม่ได้ จึงไม่เปลี่ยนแปลง",
       "deliberateWriteFailed": "เปลี่ยนชื่อโฟลเดอร์แล้ว แต่บันทึกการตั้งค่าอย่างหนึ่งของโฟลเดอร์ไม่ได้ จะมีโฟลเดอร์ว่างปรากฏขึ้นในชื่อเดิมทุกครั้งที่คุณปลดล็อก ลบโฟลเดอร์นั้นได้อย่างปลอดภัย และจะไม่เปลี่ยนแปลงสิ่งอื่นใด การเปลี่ยนชื่อโฟลเดอร์อีกครั้งจะไม่ทำให้โฟลเดอร์นั้นหายไป",
+      "mcpScopeRewriteFailed": "เปลี่ยนชื่อโฟลเดอร์แล้ว แต่โฟลเดอร์ที่กันการเชื่อมต่อ AI ภายนอกไว้อัปเดตไม่ได้ ถ้าคุณเคยกันโฟลเดอร์นี้ออกจากการอนุมัติของการเชื่อมต่อใด ตอนนี้การเชื่อมต่อนั้นอาจอ่านโฟลเดอร์นี้ได้ เปิด การตั้งค่า → AI → การเข้าถึงภายนอก แล้วตรวจสอบโฟลเดอร์ที่กันออกของการเชื่อมต่อแต่ละรายการ",
       "folderListFull": "Myne จดจำโฟลเดอร์ได้เพียงจำนวนจำกัด และรายการนั้นเต็มแล้ว โฟลเดอร์นี้ยังใช้งานได้ แต่จะหายไปเมื่อโน้ตสุดท้ายออกจากโฟลเดอร์ การลบโฟลเดอร์ที่คุณไม่ต้องการแล้วจะทำให้มีที่ว่างเพิ่ม",
       "folderNotRemembered": "สร้างโฟลเดอร์แล้ว แต่ Myne บันทึกโฟลเดอร์นั้นไว้ไม่ได้ โฟลเดอร์จะหายไปเมื่อโน้ตสุดท้ายออกจากโฟลเดอร์ และจะหายไปตั้งแต่การปลดล็อกครั้งถัดไปถ้ายังว่างอยู่ สร้างใหม่อีกครั้งได้อย่างปลอดภัย",
       "attachmentFolderRewriteFailed": "เปลี่ยนชื่อโฟลเดอร์แล้ว แต่ไฟล์ที่เก็บอยู่ในนั้นไม่ได้ย้ายตามไป ไฟล์ยังระบุโฟลเดอร์เดิม จึงหายไปจากโครงสร้างคลังและจากเอเจนต์ที่ได้รับโฟลเดอร์นี้ ย้ายไฟล์เหล่านั้นด้วยมืออีกครั้งจากไฟล์แนบ หรือเปลี่ยนชื่อโฟลเดอร์กลับแล้วเปลี่ยนอีกครั้ง"
@@ -2224,7 +2163,6 @@
         "heading": "กลุ่มสี",
         "namePlaceholder": "กฎที่ไม่มีชื่อ",
         "rowLabel": "{{name}} กลุ่ม {{index}} จาก {{total}} Alt กับลูกศรขึ้นหรือลงเปลี่ยนลำดับ",
-        "editRuleButton": "แก้ไข",
         "derivedMakeEditable": "ทำให้แก้ไขได้",
         "derivedMakeEditableFailed": "บันทึกกลุ่มเหล่านี้ไม่ได้ ลองอีกครั้ง",
         "derivedNote_one": "ระบายสีกราฟตามแท็ก {{count}} กลุ่มที่ได้จากแท็กของคุณ จะไม่บันทึกจนกว่าคุณจะทำให้แก้ไขได้",
@@ -2245,7 +2183,6 @@
       "refreshTitle": "ห้องนิรภัยมีการเปลี่ยนแปลง: สร้างกราฟใหม่",
       "settings": {
         "appearanceHeading": "รูปลักษณ์",
-        "closeTitle": "ปิด",
         "forceCenter": "แรงดึงเข้าศูนย์กลาง",
         "forceLinkDistance": "ระยะห่างของเส้นเชื่อม",
         "forceLinkStrength": "ความแรงของเส้นเชื่อม",
@@ -2269,27 +2206,19 @@
       "relayoutTitle": "จัดกราฟใหม่จากศูนย์",
       "showingCount_one": "แสดง {{count}} โน้ต",
       "showingCount_other": "แสดง {{count}} โน้ต",
-      "untitledNote": "โน้ตไม่มีชื่อ",
       "viewGraph": "กราฟ",
       "viewList": "รายการ",
       "viewToggleAriaLabel": "เลือกภาพกราฟหรือรายการโน้ตของมัน"
     },
     "import": {
-      "base": {
-        "untitledView": "มุมมองที่ไม่มีชื่อ"
-      },
+      "base": {},
       "modal": {
-        "cancel": "ยกเลิก",
         "cancelledNotImported": "ไม่ได้นำเข้า {{count}} รายการ",
         "cancelledNotImported_one": "ไม่ได้นำเข้า {{count}} รายการ",
         "cancelledNotImported_other": "ไม่ได้นำเข้า {{count}} รายการ",
         "cancelling": "กำลังยกเลิก…",
-        "chooseFolder": "เลือกโฟลเดอร์…",
-        "close": "ปิด",
         "closeAriaLabel": "ปิด",
         "copied": "คัดลอกแล้ว",
-        "copy": "คัดลอก",
-        "done": "เสร็จสิ้น",
         "errorBody": "การนำเข้าทำไม่สำเร็จ โน้ตที่นำเข้าไปแล้วยังอยู่ครบ จะเก็บไว้หรือลบทิ้งก็ได้",
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}",
         "flagKindFolder": "โฟลเดอร์",
@@ -2362,10 +2291,8 @@
         "statFoldersNotKept": "โฟลเดอร์ที่ไม่ได้เก็บไว้"
       },
       "offer": {
-        "body": "นำโน้ตที่คุณมีอยู่เข้ามาใน Myne แต่ละรายการจะถูกเข้ารหัสตอนนำเข้า ไม่มีข้อมูลใดออกจากอุปกรณ์นี้ และไฟล์ต้นฉบับของคุณยังอยู่ที่เดิมทุกประการ",
-        "chooseFolder": "เลือกโฟลเดอร์…",
+        "body": "นำโน้ตที่คุณมีอยู่เข้ามาใน Myne แต่ละรายการจะถูกเข้ารหัสตอนนำเข้า และไฟล์ต้นฉบับของคุณยังอยู่ที่เดิมทุกประการ",
         "laterHint": "คุณนำเข้าภายหลังได้เสมอที่ การตั้งค่า → ที่เก็บข้อมูล",
-        "notNow": "ยังไม่ตอนนี้",
         "title": "นำเข้าโน้ตของคุณหรือไม่"
       },
       "picker": {
@@ -2492,12 +2419,8 @@
       "mergeAnyway": "รวมต่อไป",
       "newDrawingHere": "ภาพวาดใหม่ที่นี่",
       "newDrawingMenu": "ภาพวาดใหม่",
-      "newFolder": "โฟลเดอร์ใหม่",
       "newFolderInPlaceholder": "โฟลเดอร์ใหม่ใน {{path}}",
-      "newFolderPlaceholder": "โฟลเดอร์ใหม่",
-      "newNote": "โน้ตใหม่",
       "newNoteHere": "โน้ตใหม่ที่นี่",
-      "newNoteMenu": "โน้ตใหม่",
       "newSubfolder": "โฟลเดอร์ย่อยใหม่",
       "newViewTitle": "มุมมองใหม่",
       "noteMovedToTrash": "ย้ายโน้ตไปถังขยะแล้ว",
@@ -2509,19 +2432,16 @@
       "openToSide": "เปิดด้านข้าง",
       "removeFolderNote": "เอาโน้ตประจำโฟลเดอร์ออก",
       "removeFromFavorites": "เอาออกจากรายการโปรด",
-      "rename": "เปลี่ยนชื่อ",
       "setAsFolderNote": "ตั้งเป็นโน้ตประจำโฟลเดอร์",
       "trash": "ถังขยะ",
       "trashBulkError": "ย้ายโน้ตไปถังขยะไม่ได้",
       "trashConfirmBulkBody_one": "โน้ต {{count}} รายการจะถูกย้ายไปถังขยะ",
       "trashConfirmBulkBody_other": "โน้ต {{count}} รายการจะถูกย้ายไปถังขยะ",
       "trashConfirmBulkWarning": "คุณกู้คืนจากถังขยะได้ภายหลัง",
-      "trashConfirmConfirm": "ย้ายไปถังขยะ",
       "trashConfirmTitle": "ย้ายไปถังขยะหรือไม่",
       "trashConfirmWarning": "คุณกู้คืนจากถังขยะได้ภายหลัง",
       "trashSingleError": "ย้ายโน้ตไปถังขยะไม่ได้",
       "undo": "เลิกทำ",
-      "vaultRoot": "รากของห้องนิรภัย",
       "viewSettingsTitle": "การตั้งค่ามุมมอง",
       "imported_one": "นำเข้าโน้ต 1 รายการมาไว้ในโฟลเดอร์นี้",
       "imported_other": "นำเข้าโน้ต {{count}} รายการมาไว้ในโฟลเดอร์นี้",
@@ -2532,32 +2452,25 @@
       "moveFolderTo": "ย้ายโฟลเดอร์ไป…",
       "treeLabel": "โน้ตและโฟลเดอร์",
       "selectionAnnouncement": "เลือกแล้ว: {{title}}",
-      "untitled": "ไม่มีชื่อ",
       "search": "ค้นหา"
     },
     "newFromTemplate": {
-      "back": "ย้อนกลับ",
       "blankNote": "โน้ตเปล่า",
       "createNote": "สร้างโน้ต",
       "createFirstTemplate": "สร้างเทมเพลต",
       "manageTemplates": "จัดการเทมเพลต",
       "emptyState": "คุณยังไม่ได้สร้างเทมเพลตใดเลย",
       "listLabel": "เทมเพลต",
-      "loading": "กำลังโหลด…",
       "nameLabel": "ชื่อของโน้ต (จาก “{{templateName}}”)",
-      "namePlaceholder": "ไม่มีชื่อ",
       "nameStepTitle": "ตั้งชื่อโน้ตนี้",
-      "pickStepTitle": "โน้ตใหม่จากเทมเพลต",
-      "untitledTemplate": "เทมเพลตที่ไม่มีชื่อ"
+      "pickStepTitle": "โน้ตใหม่จากเทมเพลต"
     },
     "newTab": {
-      "createNote": "โน้ตใหม่",
       "createDrawing": "ภาพวาดใหม่",
       "noNotesYet": "ยังไม่มีโน้ต",
       "recent": "กลับไปทำต่อ",
       "searchAriaLabel": "ค้นหาโน้ตและคำสั่ง",
       "searchPlaceholder": "ค้นหาโน้ตและคำสั่ง…",
-      "untitled": "ไม่มีชื่อ",
       "createFromTemplate": "จากเทมเพลต",
       "kindCommand": "คำสั่ง",
       "kindNote": "โน้ต",
@@ -2568,6 +2481,7 @@
         "graph": "กราฟ",
         "tasks": "งาน",
         "today": "วันนี้",
+        "calendar": "ปฏิทิน",
         "home": "หน้าแรก"
       },
       "placesLabel": "ไปที่",
@@ -2576,15 +2490,13 @@
     "pane": {
       "graphTab": "กราฟ",
       "tasksTab": "งาน",
-      "loading": "กำลังโหลด…",
-      "untitledView": "มุมมองที่ไม่มีชื่อ",
       "agentTab": "เอเจนต์",
+      "calendarTab": "ปฏิทิน",
       "homeTab": "หน้าแรก"
     },
     "relativeTime": {
       "daysAgo": "{{d}} วันที่แล้ว",
       "hoursAgo": "{{h}} ชม. ที่แล้ว",
-      "justNow": "เมื่อสักครู่",
       "minutesAgo": "{{m}} นาทีที่แล้ว",
       "oneWeekAgo": "1 สัปดาห์ที่แล้ว",
       "weeksAgo": "{{w}} สัปดาห์ที่แล้ว",
@@ -2603,7 +2515,6 @@
       "taskBadgeTitle": "โน้ตงาน",
       "unsyncedLabel": "ยังไม่อยู่บนเซิร์ฟเวอร์",
       "unsyncedTitle": "การเปลี่ยนแปลงล่าสุดของโน้ตนี้อยู่บนอุปกรณ์นี้เท่านั้น",
-      "untitled": "ไม่มีชื่อ",
       "untitledDrawing": "ภาพวาดไม่มีชื่อ"
     },
     "savedView": {
@@ -2615,7 +2526,6 @@
       "editing": "กำลังแก้ไข",
       "editingEllipsis": "กำลังแก้ไข…",
       "editingTitle": "กำลังแก้ไข: การบันทึกอัตโนมัติพร้อมทำงาน",
-      "justNow": "เมื่อสักครู่",
       "retry": "ลองใหม่",
       "saved": "บันทึกแล้ว",
       "savedRelative": "บันทึกแล้ว {{rel}}",
@@ -2627,39 +2537,33 @@
       "savingEllipsis": "กำลังบันทึก…"
     },
     "snapshotFailed": {
-      "dismiss": "ปิด",
       "message": "บันทึกสแนปช็อตไม่ได้ โน้ตของคุณถูกบันทึกแล้ว แต่ประวัติเวอร์ชันอาจไม่ครบ (ดิสก์อาจเต็ม)"
     },
     "snapshots": {
-      "cancel": "ยกเลิก",
       "changeCount_one": "เปลี่ยนแปลง {{count}} ครั้งนับจากสแนปช็อตนี้",
       "changeCount_other": "เปลี่ยนแปลง {{count}} ครั้งนับจากสแนปช็อตนี้",
       "changeCountPrev_one": "เปลี่ยนแปลง {{count}} ครั้งจากสแนปช็อตก่อนหน้า",
       "changeCountPrev_other": "เปลี่ยนแปลง {{count}} ครั้งจากสแนปช็อตก่อนหน้า",
-      "close": "ปิด",
       "compareAgainstLabel": "เปรียบเทียบกับ",
       "compareCurrent": "โน้ตปัจจุบัน",
       "comparePrevious": "สแนปช็อตก่อนหน้า",
       "confirmBody": "โน้ตปัจจุบันของคุณจะถูกบันทึกเป็นสแนปช็อตไว้ก่อน คุณจึงย้อนกลับได้",
       "confirmTitle": "กู้คืนสแนปช็อตนี้หรือไม่",
       "decrypting": "กำลังถอดรหัส…",
-      "emptyState": "",
+      "emptyState": "ยังไม่มีสแนปช็อต สแนปช็อตจะถูกบันทึกอัตโนมัติขณะที่คุณแก้ไข เก็บไว้ประมาณ 7 วัน และหายไปอย่างถาวรเมื่อโน้ตถูกลบอย่างถาวร",
       "errorCannotDecrypt": "ถอดรหัสสแนปช็อตนี้ไม่ได้",
       "errorGeneric": "เกิดข้อผิดพลาด ลองอีกครั้ง",
       "errorIo": "เกิดข้อผิดพลาดกับดิสก์ ดิสก์อาจเต็มหรือเขียนไม่ได้",
       "errorNotFound": "ไม่มีสแนปช็อตนั้นแล้ว",
       "errorStorageAccess": "เข้าถึงที่เก็บสแนปช็อตของห้องนิรภัยไม่ได้",
       "errorVaultLocked": "ห้องนิรภัยถูกล็อกอยู่ ปลดล็อกเพื่อดูสแนปช็อต",
-      "justNow": "เมื่อสักครู่",
       "listLabel": "รายการสแนปช็อต",
-      "loading": "กำลังโหลด…",
       "noPrevious": "นี่คือสแนปช็อตแรกสุด ไม่มีรายการก่อนหน้าให้เปรียบเทียบ",
       "restore": "กู้คืน",
       "restoreCta": "กู้คืนสแนปช็อตนี้",
       "restoredStatus": "กู้คืนแล้ว เวอร์ชันที่คุณมีอยู่ถูกบันทึกเป็นสแนปช็อตไว้",
       "selectPlaceholder": "เลือกสแนปช็อตเพื่อดูว่ามีอะไรเปลี่ยนไปนับจากตอนนั้น",
       "title": "สแนปช็อต",
-      "untitled": "ไม่มีชื่อ",
       "deviceFallback": "อุปกรณ์ {{code}}",
       "unknownAuthor": "อุปกรณ์ที่ไม่รู้จัก"
     },
@@ -2672,14 +2576,10 @@
       "pinned": "ปักหมุดแล้ว",
       "pinnedTitle": "ปักหมุดอยู่: เอาหมุดออกก่อนจึงจะปิดได้",
       "unpin": "เอาหมุดออก",
-      "untitled": "ไม่มีชื่อ",
-      "closeTabMenuItem": "ปิดแท็บ",
       "moveLeft": "เลื่อนซ้าย",
       "moveRight": "เลื่อนขวา"
     },
     "tagBrowser": {
-      "cancel": "ยกเลิก",
-      "clear": "ล้าง",
       "combineTagsWith": "รวมแท็กด้วย",
       "filtering": "กำลังกรอง…",
       "modeAll": "ทั้งหมด",
@@ -2695,19 +2595,15 @@
       "saveAsView": "บันทึกเป็นมุมมอง",
       "searchPlaceholder": "ค้นหาแท็ก…",
       "title": "แท็ก",
-      "untitled": "ไม่มีชื่อ",
       "viewNamePlaceholder": "ชื่อมุมมอง"
     },
     "trash": {
-      "close": "ปิด",
       "count_one": "โน้ต {{count}} รายการ",
       "count_other": "โน้ต {{count}} รายการ",
       "delete": "ลบ",
       "deleteError": "ลบโน้ตนั้นไม่ได้ ลองอีกครั้ง",
-      "empty": "ล้างถังขยะ",
       "emptyConfirmBody_one": "โน้ต {{count}} รายการจะถูกลบอย่างถาวร",
       "emptyConfirmBody_other": "โน้ต {{count}} รายการจะถูกลบอย่างถาวร",
-      "emptyConfirmCta": "ล้างถังขยะ",
       "emptyConfirmTitle": "ล้างถังขยะหรือไม่",
       "emptyPartialFailure_one": "โน้ต {{count}} รายการลบไม่ได้และยังอยู่ในถังขยะ",
       "emptyPartialFailure_other": "โน้ต {{count}} รายการลบไม่ได้และยังอยู่ในถังขยะ",
@@ -2717,8 +2613,7 @@
       "purgeConfirmTitle": "ลบอย่างถาวรหรือไม่",
       "restore": "กู้คืน",
       "restoreError": "กู้คืนโน้ตนั้นไม่ได้ ลองอีกครั้ง",
-      "title": "ถังขยะ",
-      "untitled": "ไม่มีชื่อ"
+      "title": "ถังขยะ"
     },
     "unlinkedMentions": {
       "empty": "ไม่มีการกล่าวถึงที่ยังไม่ได้ลิงก์",
@@ -2727,8 +2622,7 @@
       "linkTooltip": "ลิงก์การกล่าวถึงนี้ไปยัง {{title}}",
       "refresh": "การกล่าวถึงอาจเปลี่ยนไป: รีเฟรช",
       "searching": "กำลังค้นหา…",
-      "thisNote": "โน้ตนี้",
-      "untitled": "ไม่มีชื่อ"
+      "thisNote": "โน้ตนี้"
     },
     "unsettledSave": "โน้ตที่เปิดอยู่ยังบันทึกไม่เสร็จ จึงไม่มีการเปลี่ยนแปลง ลองอีกครั้งเมื่อบันทึกเสร็จ",
     "views": {
@@ -2775,11 +2669,9 @@
         "renameLane": "เปลี่ยนชื่อเลน {{lane}}",
         "newLaneName": "ชื่อเลนใหม่",
         "saveLaneName": "บันทึกชื่อเลน",
-        "cancelLaneRename": "ยกเลิก",
         "lanesNotSaved": "การ์ดย้ายแล้ว แต่บันทึกลำดับเลนไม่ได้",
         "laneOrderRestored": "ลำดับเลนกลับมาแล้ว",
         "laneOrderRestoreFailed": "คืนลำดับเลนไม่ได้",
-        "cancel": "ยกเลิก",
         "archiveFailed": "เก็บโน้ตถาวรไม่ได้",
         "trashFailed": "ย้ายโน้ตไปถังขยะไม่ได้",
         "noGroupBy": "กระดานนี้ไม่มีคุณสมบัติเลน เลือกคุณสมบัติที่จะจัดกลุ่มในตั้งค่ามุมมอง"
@@ -2787,17 +2679,11 @@
       "cards": {
         "changeCover": "เปลี่ยนภาพหน้าปก",
         "changeCoverImage": "เปลี่ยนภาพหน้าปก",
-        "empty": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
-        "noValue": "ไม่มีค่า",
         "setCover": "ตั้งภาพหน้าปก",
-        "setCoverImage": "ตั้งภาพหน้าปก",
-        "untitled": "ไม่มีชื่อ"
+        "setCoverImage": "ตั้งภาพหน้าปก"
       },
       "empty": "ยังไม่มีมุมมอง บันทึกรายการโน้ตปัจจุบันเป็นมุมมองได้",
-      "list": {
-        "empty": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
-        "noValue": "ไม่มีค่า"
-      },
+      "list": {},
       "import": {
         "approveAction": "อนุมัติ v{{version}}",
         "approveFailed": "บันทึกการอนุมัตินั้นไม่ได้",
@@ -2809,7 +2695,6 @@
         "armRefusedHeading": "{{name}} ไม่ได้ถูกนำเข้า",
         "armSameVersionDifferent": "ไฟล์บอก v{{version}} เท่ากับที่ห้องนิรภัยนี้มี แต่เนื้อหาต่างกัน นั่นคือผู้เขียนอื่นใช้รหัสซ้ำ หรือไฟล์ถูกเปลี่ยนหลังลงนาม จึงปฏิเสธ",
         "armUpdate": "นี่แทนที่ {{name}}: ห้องนิรภัยนี้เป็น v{{stored}} ไฟล์เป็น v{{incoming}}",
-        "close": "ปิด",
         "filterName": "ไฟล์แสดงมุมมอง",
         "idleBody": "ไฟล์มุมมองคือมุมมองที่บันทึกแล้วที่ใครบางคนส่งออก Myne ตรวจสอบก่อนแล้วแสดงว่ามันเลือกและอ่านอะไรก่อนจัดเก็บ",
         "importAction": "นำเข้ามุมมอง",
@@ -2835,7 +2720,6 @@
       "manager": {
         "approve": "อนุมัติ",
         "approvedState": "อนุมัติบนอุปกรณ์นี้แล้ว",
-        "close": "ปิด",
         "deleteFailed": "ลบมุมมองนั้นไม่ได้",
         "deleteLabel": "ลบ {{name}}",
         "emptyBody": "มุมมองที่คุณบันทึกจากรายการโน้ต หรือที่ใครบางคนส่งมา จะปรากฏที่นี่",
@@ -2852,18 +2736,14 @@
         "editFilter": "แก้ไขตัวกรอง…",
         "moveDown": "ย้ายลง",
         "moveUp": "ย้ายขึ้น",
-        "rename": "เปลี่ยนชื่อ",
         "viewSettings": "การตั้งค่ามุมมอง…"
       },
       "newView": "มุมมองใหม่",
       "noMatch": "ไม่มีมุมมองที่ตรงกับการค้นหาของคุณ",
       "searchPlaceholder": "ค้นหามุมมอง…",
       "table": {
-        "empty": "ไม่มีโน้ตที่ตรงกับมุมมองนี้",
-        "name": "ชื่อ",
-        "noValue": "ไม่มีค่า"
-      },
-      "untitledView": "มุมมองที่ไม่มีชื่อ"
+        "name": "ชื่อ"
+      }
     },
     "viewSettings": {
       "aspect": {
@@ -2873,7 +2753,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (กว้าง)"
       },
-      "cancel": "ยกเลิก",
       "cardSize": "ขนาดการ์ด",
       "cardSizeValue": "{{size}} px",
       "columns": "คอลัมน์",
@@ -3033,7 +2912,6 @@
       "confirmLabel": "ยืนยันรหัสผ่านหลัก",
       "defaultEmptyCaption": "เลือกรหัสผ่านที่คุณจำได้ เพราะรีเซ็ตไม่ได้",
       "mismatch": "รหัสผ่านไม่ตรงกัน",
-      "passwordLabel": "รหัสผ่านหลัก",
       "suggestPassword": "แนะนำรหัสผ่าน",
       "tooShort": "ใช้อย่างน้อย {{n}} ตัวอักษร"
     },
@@ -3051,8 +2929,6 @@
   },
   "migrate": {
     "intro": "อัปเกรดห้องนิรภัยนี้เป็นรูปแบบใหม่ โน้ตของคุณจะผสานข้ามอุปกรณ์ได้เองโดยอัตโนมัติ การอัปเกรดนี้จะสร้างกุญแจใหม่ให้ทั้งห้องนิรภัย สำเนาเดิมจะยังถูกเก็บไว้บนอุปกรณ์นี้จนกว่าคุณจะยืนยัน",
-    "passwordLabel": "รหัสผ่านหลัก",
-    "phraseLabel": "วลีกู้คืน",
     "phraseHelp": "จำเป็นต้องกรอก: กุญแจใหม่ของคุณจะถูกห่อไว้ด้วยวลีนี้ การกู้คืนจึงยังใช้งานได้ต่อไป ป้อนคำกู้คืนของคุณให้ครบทุกคำ",
     "submit": "อัปเกรด",
     "migrating": "กำลังอัปเกรด…",
@@ -3079,11 +2955,8 @@
     "errors": {
       "cancelledVaultLocked": "ยกเลิกการกู้คืน: ห้องนิรภัยถูกล็อก",
       "operationInProgress": "มีการทำงานค้างอยู่ โปรดรอสักครู่",
-      "unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
-      "vaultNotFound": "ไม่พบไฟล์ห้องนิรภัย โปรดเริ่มแอปใหม่",
       "openAsImportSource": "ขณะนี้มีการนำเข้ากำลังอ่านห้องนิรภัยนี้อยู่ ทำการนำเข้านั้นให้เสร็จหรือยกเลิก แล้วจึงกู้คืนห้องนิรภัยนี้"
     },
-    "vaultUnreadable": "ไฟล์ห้องนิรภัยอ่านไม่ได้ กู้คืนจากไฟล์สำรองข้อมูล",
     "genericError": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง",
     "weakPassword": "รหัสผ่านต้องมีอย่างน้อย {{min}} ตัวอักษร",
     "setPasswordError": "ตั้งรหัสผ่านใหม่ของคุณไม่ได้ โปรดลองอีกครั้ง",
@@ -3092,7 +2965,7 @@
     "restoreVaultHeader": "กู้คืนห้องนิรภัย",
     "accountTitle": "ป้อนหมายเลขบัญชีของคุณ",
     "accountLead": "ดูได้จากที่ที่คุณเก็บวลีกู้คืนไว้ หมายเลขนี้ระบุว่าจะกู้คืนห้องนิรภัยใด",
-    "accountInvalid": "หมายเลขบัญชีไม่ถูกต้อง — ตรวจสอบแล้วป้อนอีกครั้ง",
+    "accountInvalid": "หมายเลขบัญชีไม่ถูกต้อง ตรวจสอบแล้วป้อนอีกครั้ง",
     "accountOptionalHint": "ไม่มีหมายเลขใช่ไหม เว้นว่างไว้แล้วดำเนินการต่อได้ วลีกู้คืน 24 คำก็เพียงพอแล้ว",
     "paste": "วาง",
     "phraseGridHint": "พิมพ์ทีละคำ หรือวางทั้ง 24 คำพร้อมกันเพื่อเติมลงในตาราง",
@@ -3177,8 +3050,6 @@
     }
   },
   "restore": {
-    "backLabel": "ย้อนกลับ",
-    "cancelLabel": "ย้อนกลับ",
     "collision": {
       "body": "มีห้องนิรภัยจากไฟล์สำรองนี้อยู่บนอุปกรณ์นี้แล้ว คุณจะเก็บไว้ทั้งสองก็ได้: สำเนาที่กู้คืนจะปรากฏเป็นห้องนิรภัยแยกต่างหากในรายการห้องนิรภัยของคุณ หรือจะกู้คืนตอนนี้แล้วค่อยเอาห้องนิรภัยเดิมออกจากรายการด้วยตัวเองก็ได้ การเอาออกจะให้คุณพิมพ์ DELETE และควรทำหลังจากที่คุณยืนยันแล้วว่าห้องนิรภัยที่กู้คืนเปิดได้เท่านั้น",
       "keepBoth": "เก็บไว้ทั้งสอง",
@@ -3186,14 +3057,13 @@
     },
     "damaged": {
       "body": "ไฟล์สำรองข้อมูลเสียหาย จึงยังไม่มีอะไรถูกกู้คืน ถ้านี่เป็นสำเนาเดียวที่คุณมี การกู้ซากจะกู้โน้ตที่ยังสมบูรณ์กลับมาได้ และแจกแจงว่าอะไรบ้างที่อ่านไม่ได้ ผลลัพธ์จะถูกระบุว่าเป็นการกู้คืนบางส่วนเสมอ",
-      "close": "ปิด",
       "salvage": "กู้ซากโน้ตที่ยังสมบูรณ์…"
     },
     "error": {
       "tryAnotherFile": "ลองไฟล์อื่น"
     },
     "pick": {
-      "body": "เลือกไฟล์ <code>.myne-backup</code> ระบบจะตรวจสอบไฟล์สำรองก่อนกู้คืนสิ่งใด ห้องนิรภัยที่กู้คืนจะปลดล็อกด้วยรหัสผ่านหรือวลีกู้คืนของห้องนิรภัยนั้น เหมือนการปลดล็อกตามปกติทุกประการ",
+      "body": "เลือกไฟล์ <code>.myne-backup</code> ระบบจะตรวจสอบไฟล์สำรองก่อนกู้คืนสิ่งใด ห้องนิรภัยที่กู้คืนจะปลดล็อกด้วยรหัสผ่านของห้องนิรภัยนั้น เหมือนการปลดล็อกตามปกติทุกประการ",
       "chooseFile": "เลือกไฟล์สำรองข้อมูล…",
       "corruptedSuffix": "ห้องนิรภัยปัจจุบันของคุณจะไม่ถูกแตะต้อง: ไฟล์สำรองจะถูกกู้คืนเป็นห้องนิรภัยแยกต่างหากก่อน"
     },
@@ -3207,9 +3077,7 @@
       "restored": "กู้คืนห้องนิรภัยแล้ว",
       "versionHistory": "รายการประวัติเวอร์ชัน: {{n}}"
     },
-    "title": "กู้คืนจากไฟล์สำรองข้อมูล",
     "working": {
-      "cancel": "ยกเลิก",
       "restoringProgress": "กำลังกู้คืน… {{done}} จาก {{total}}",
       "verifying": "กำลังตรวจสอบไฟล์สำรอง…",
       "verifyingProgress": "กำลังตรวจสอบไฟล์สำรอง… {{done}} จาก {{total}}"
@@ -3220,8 +3088,7 @@
       "buildChannelDevelopment": "รุ่นสำหรับพัฒนา",
       "buildLabel": "บิลด์",
       "buildChannelLabel": "ช่องทางบิลด์",
-      "buildChannelStable": "เสถียร",
-      "developerModeHelper": "แสดงการตั้งค่าขั้นสูงที่ Myne ซ่อนไว้ตามค่าเริ่มต้น: ส่วนที่คุณออกจากเส้นทางที่ Myne รับรอง และเครื่องมือสำหรับผู้ใช้ขั้นสูงที่คนส่วนใหญ่ไม่ต้องใช้ การปิดโหมดนี้เพียงซ่อนมันอีกครั้ง สิ่งที่คุณเปิดไว้ยังคงเปิดอยู่ และต้องไปปิดที่ตัวควบคุมของมันเอง",
+      "developerModeHelper": "ตัวเลือกที่คุณออกจากเส้นทางที่ Myne รับรอง และเครื่องมือสำหรับผู้ใช้ขั้นสูงที่คนส่วนใหญ่ไม่ต้องใช้ การปิดโหมดนี้เพียงซ่อนมันอีกครั้ง สิ่งใดที่คุณเปิดไว้ยังคงเปิดอยู่ และตัวควบคุมของมันเองคือที่ที่คุณปิด",
       "developerModeLabel": "โหมดนักพัฒนา",
       "legalLabel": "ข้อกฎหมาย",
       "legalHelper": "เปิดที่ myne.md ในเบราว์เซอร์ของคุณ เป็นภาษาเยอรมันเมื่ออินเทอร์เฟซเป็นภาษาเยอรมัน",
@@ -3229,11 +3096,10 @@
       "licenseBody": "เอกสาร CC-BY-4.0 · โค้ดแอปพลิเคชัน AGPL-3.0",
       "licenseLabel": "สัญญาอนุญาต",
       "tagline": "ก่อนอัลฟา",
-      "threatModelHelper": "เปิดเอกสารแบบจำลองภัยคุกคามฉบับสาธารณะในเบราว์เซอร์ของคุณ",
+      "threatModelHelper": "เปิดในเบราว์เซอร์ของคุณ",
       "threatModelLabel": "แบบจำลองภัยคุกคาม",
-      "version": "เวอร์ชัน",
       "dev": "เดฟ",
-      "updateAutoCheckHelper": "Myne ดาวน์โหลดไฟล์ลงนามขนาดเล็กจาก myne.md เพื่อดูว่ามีรุ่นใหม่กว่าหรือไม่ แล้วบอกคุณ มันส่งเฉพาะรุ่นปัจจุบันและแพลตฟอร์มของคุณ ไม่ส่งอย่างอื่น คุณยังตรวจสอบด้วยตัวเองได้ด้วยปุ่มด้านบน",
+      "updateAutoCheckHelper": "Myne ดาวน์โหลดไฟล์ลงนามขนาดเล็กจาก myne.md เพื่อดูว่ามีรุ่นใหม่กว่าหรือไม่ แล้วบอกคุณ มันส่งเฉพาะรุ่นปัจจุบันและแพลตฟอร์มของคุณ ไม่ส่งอย่างอื่น",
       "updateAutoCheckLabel": "ตรวจหาการอัปเดตอัตโนมัติ",
       "updateAvailable": "มีรุ่น {{version}} ให้ใช้งาน",
       "updateChannelBeta": "เบต้า",
@@ -3243,8 +3109,9 @@
       "updateChecking": "กำลังตรวจสอบ…",
       "updateFailed": "ตรวจหาการอัปเดตไม่ได้ จะลองอีกครั้งภายหลัง",
       "updateHelper": "Myne ตรวจสอบทุกการอัปเดตกับคีย์ปล่อยรุ่นแบบออฟไลน์ก่อนติดตั้ง การตรวจสอบจะถาม downloads.myne.md ถึงรุ่นล่าสุด ส่งเฉพาะรุ่นและแพลตฟอร์มของคุณ (และ IP ของคุณ ซึ่งต้นทางนั้นไม่บันทึก) ไม่เคยส่งโน้ตหรือบัญชีของคุณ",
-      "updateIdle": "การอัปเดตที่ลงนามแล้ว ดึงจาก downloads.myne.md เมื่อคุณตรวจสอบ",
+      "updateIdle": "ยังไม่ได้ตรวจสอบ",
       "updateInstallButton": "รีสตาร์ทเพื่ออัปเดต",
+      "updateFlushFailed": "บันทึกโน้ตที่เปิดอยู่ได้ไม่ครบทุกฉบับ Myne จึงไม่รีสตาร์ตเพื่ออัปเดต ลองอีกครั้งในอีกสักครู่",
       "updateLabel": "การอัปเดต",
       "updateUpToDate": "คุณใช้รุ่นล่าสุดอยู่",
       "developerModeInline": "แสดงการตั้งค่าที่ Myne ซ่อนไว้ตามค่าเริ่มต้น",
@@ -3253,6 +3120,10 @@
       "diagnosticLogError": "Myne เปลี่ยนการตั้งค่านั้นไม่ได้",
       "diagnosticLogReadError": "Myne อ่านการตั้งค่าการบันทึกข้อมูลวินิจฉัยไม่ได้ จึงแสดงเป็นปิดอยู่",
       "diagnosticBlockLabel": "รายละเอียดรายงาน",
+      "diagnosticsIntro": "สิ่งที่ Myne รู้เกี่ยวกับอุปกรณ์นี้ในตอนนี้ ไม่มีอะไรถูกส่งไปที่ใดทั้งสิ้น คุณเป็นผู้ตัดสินใจว่าจะแบ่งปันอะไร",
+      "diagnosticsReading": "กำลังอ่าน…",
+      "diagnosticCopied": "คัดลอกแล้ว",
+      "diagnosticsLogNote": "บนอุปกรณ์นี้ไม่มีไฟล์บันทึกให้บล็อกนี้ส่งต่อ: บันทึกการวินิจฉัยที่จัดเก็บไว้เป็นฟีเจอร์ของเดสก์ท็อป",
       "diagnosticCopy": "คัดลอกข้อมูลวินิจฉัย",
       "diagnosticCopyDone": "คัดลอกข้อมูลวินิจฉัยแล้ว",
       "diagnosticCopyFailed": "คัดลอกไม่ได้ เลือกข้อความด้านบนแล้วคัดลอกด้วยตัวเอง",
@@ -3281,7 +3152,6 @@
       "updateBlocked": "Myne เริ่มการอัปเดตจากที่นี่ไม่ได้ จึงไม่มีอะไรถูกติดตั้ง ลองอีกครั้งในอีกสักครู่"
     },
     "vault": {
-      "changePasswordButton": "เปลี่ยนรหัสผ่าน",
       "changePasswordError": {
         "invalidCredentialOrVault": "รหัสผ่านปัจจุบันผิด หรือไฟล์ห้องนิรภัยเสียหาย",
         "ioError": "ข้อผิดพลาดดิสก์ ลองอีกครั้ง",
@@ -3293,13 +3163,9 @@
         "vaultNotUnlocked": "ปลดล็อกห้องนิรภัยนี้ก่อนเปลี่ยนรหัสผ่าน"
       },
       "changePasswordHeading": "เปลี่ยนรหัสผ่าน",
-      "changePasswordHelper": "หมุนรหัสผ่านหลักโดยคงห้องนิรภัยเดิม วลีกู้คืนยังเหมือนเดิม",
+      "changePasswordHelper": "หมุนรหัสผ่านหลักของคุณโดยคงห้องนิรภัยเดิมไว้ ไม่มีสิ่งอื่นเกี่ยวกับห้องนิรภัยเปลี่ยน",
       "dangerZoneHeading": "โซนอันตราย",
-      "dangerZoneHelper": "ลบห้องนิรภัยนี้และโน้ตทั้งหมดอย่างถาวร ย้อนกลับไม่ได้ วลีกู้คืนจะไม่กู้ห้องนิรภัยคืน",
       "localEraseHeading": "เบราว์เซอร์นี้",
-      "localEraseHelper": "ล้างสำเนาห้องนิรภัยของ Myne จากเบราว์เซอร์นี้ บัญชีและทุกอย่างที่ซิงค์แล้วอยู่บนเซิร์ฟเวอร์",
-      "localEraseButton": "ออกจากระบบและล้างสำเนาเบราว์เซอร์นี้…",
-      "deleteVaultButton": "ลบห้องนิรภัย…",
       "vaultLabelEyebrow": "ป้ายห้องนิรภัย",
       "vaultLabelHelper": "ชื่อสำหรับห้องนิรภัยนี้ แสดงในตัวสลับในแอปและบนตัวเลือกห้องนิรภัยตอนเริ่มก่อนปลดล็อก เก็บแบบเข้ารหัสในห้องนิรภัย ไม่ออกจากอุปกรณ์เป็นข้อความธรรมดา",
       "vaultLabelPlaceholder": "เพิ่มป้าย…",
@@ -3307,17 +3173,15 @@
       "vaultLabelSave": "บันทึก",
       "vaultIconLabel": "ไอคอน",
       "vaultIconDefault": "ค่าเริ่มต้น (wordmark)",
-      "renamedToast": "เปลี่ยนชื่อห้องนิรภัยแล้ว",
       "renameError": "เปลี่ยนชื่อห้องนิรภัยไม่ได้",
       "newPasswordMismatch": "รหัสผ่านใหม่ไม่ตรงกัน",
       "samePassword": "รหัสผ่านใหม่เหมือนปัจจุบัน",
       "passwordChangedToast": "เปลี่ยนรหัสผ่านแล้ว",
-      "vaultUnreadable": "อ่านไฟล์ห้องนิรภัยไม่ได้ กู้คืนจากสำรองข้อมูล",
       "genericChangeError": "มีบางอย่างผิดพลาด ลองอีกครั้ง",
       "renameHelper": "แสดงในตัวสลับห้องนิรภัย เก็บแบบเข้ารหัสในห้องนิรภัยนี้ ปล่อยว่างเพื่อล้าง",
       "newPasswordPlaceholder": "อย่างน้อย 12 อักขระ",
       "reenterNewPassword": "ป้อนรหัสผ่านใหม่อีกครั้ง",
-      "changePasswordFootnote": "นี่ทำให้ปลดล็อกด่วนใช้ไม่ได้ วลีกู้คืนไม่เปลี่ยน",
+      "changePasswordFootnote": "นี่ทำให้ปลดล็อกด่วนใช้ไม่ได้ วลีตัวตนของคุณไม่ได้รับผลกระทบ",
       "changing": "กำลังเปลี่ยน…",
       "memberVaultNotice": "นี่คือห้องนิรภัยที่แชร์ ไม่มีรหัสผ่านห้องนิรภัย ใช้การปลดล็อกห้องนิรภัยที่แชร์ในความเป็นส่วนตัวเพื่อเพิ่มรหัสผ่านหรือ PIN",
       "topics": {
@@ -3329,14 +3193,14 @@
       },
       "format": {
         "heading": "รูปแบบห้องนิรภัย",
-        "intro": "ห้องนิรภัยนี้ยังใช้วลีกู้คืนของตัวเอง การอัปเกรดย้ายไปใช้วลีตัวตนของคุณ จึงหนึ่งวลีกู้ห้องนิรภัยทุกห้องที่คุณเป็นเจ้าของ",
-        "cta": "อัปเกรดเป็นการกู้คืนหนึ่งวลี",
+        "intro": "ห้องนิรภัยนี้ยังมีวลีกู้คืนของตัวเอง การอัปเกรดจะปลดระวางมัน ห้องนิรภัยนี้จึงเปิดด้วยรหัสผ่านของมันเท่านั้น วลีตัวตนของคุณยังกู้คืนว่าคุณเป็นใครบนอุปกรณ์ใหม่ได้ และมันไม่ได้เปิดห้องนิรภัยใด",
+        "cta": "ปลดระวางวลีห้องนิรภัยของฉัน",
         "confirm": "ปลดระวางวลีห้องนิรภัยของฉันและอัปเกรด",
-        "cancel": "คงวลีห้องนิรภัยของฉันไว้ก่อน",
+        "cancel": "เก็บวลีห้องนิรภัยของฉันไว้",
         "running": "กำลังอัปเกรด…",
-        "warningPhrase": "วลีกู้คืนห้องนิรภัยที่คุณบันทึกจะหยุดเปิดห้องนิรภัยนี้ รหัสผ่านห้องนิรภัยยังทำงาน และวลีตัวตนเป็นทางกลับเข้า",
+        "warningPhrase": "วลีกู้คืนห้องนิรภัยที่คุณบันทึกไว้จะหยุดเปิดห้องนิรภัยนี้ และไม่มีสิ่งใดมาแทนที่: จากนั้นเป็นต้นไปห้องนิรภัยจะเปิดด้วยรหัสผ่านของมันเท่านั้น รหัสผ่านที่ลืมจึงหมายถึงห้องนิรภัยที่หายไป",
         "warningDevices": "ทุกอุปกรณ์ที่คุณใช้ต้องอัปเดตก่อน เมื่อการอัปเกรดซิงค์แล้ว รุ่นเก่าเปิดห้องนิรภัยนี้ไม่ได้",
-        "done": "ห้องนิรภัยนี้ใช้วลีตัวตนของคุณแล้ว (อัปเกรดจาก {{from}})",
+        "done": "ตอนนี้ห้องนิรภัยนี้เปิดด้วยรหัสผ่านของมันเท่านั้น (อัปเกรดจาก {{from}}) วลีห้องนิรภัยที่คุณบันทึกไว้ใช้ไม่ได้อีกแล้ว",
         "error": {
           "migrationRequired": "ห้องนิรภัยนี้ยังอยู่ในรูปแบบ v0.1 เก่า เสร็จสิ้นการอัปเกรดห้องนิรภัยในการตั้งค่า Sync ก่อน",
           "personRequired": "อุปกรณ์นี้ยังไม่มีตัวตน สร้างตัวตนของคุณก่อน แล้วกลับมา",
@@ -3345,7 +3209,7 @@
           "notOwner": "นี่คือห้องนิรภัยที่แชร์ เฉพาะเจ้าของเท่านั้นที่เปลี่ยนรูปแบบได้",
           "notUnlocked": "เปิดห้องนิรภัยก่อนอัปเกรดรูปแบบ",
           "inProgress": "การดำเนินการด้านความปลอดภัยอื่นกำลังทำงาน ลองอีกครั้งในอีกสักครู่",
-          "alreadyUpgraded": "ห้องนิรภัยนี้ใช้วลีตัวตนของคุณอยู่แล้ว",
+          "alreadyUpgraded": "ห้องนิรภัยนี้เปิดด้วยรหัสผ่านของมันเท่านั้นอยู่แล้ว",
           "generic": "การอัปเกรดไม่เสร็จ ไม่มีอะไรเปลี่ยน",
           "sharedVault": "ห้องนิรภัยนี้แชร์กับคนอื่น การกู้คืนหนึ่งวลีสำหรับห้องนิรภัยที่คุณเป็นเจ้าของเท่านั้น เพราะการจัดการสมาชิกที่แชร์ยังไม่รองรับ"
         }
@@ -3370,6 +3234,7 @@
         "light": "สว่าง",
         "system": "ตามระบบ"
       },
+      "themeCustomOverride": "{{name}} ใช้งานอยู่และแทนที่ตัวเลือกเหล่านี้",
       "themeHelper": "สลับระหว่างธีมสว่างและมืด หรือใช้ตามค่าของระบบ",
       "themeLabel": "ธีม",
       "themeOptionAria": "ธีม{{label}}",
@@ -3397,7 +3262,10 @@
         "theme": "ธีมและสีเน้น",
         "sidebar": "ในแถบข้าง",
         "customisation": "การปรับแต่ง"
-      }
+      },
+      "homeZoneLabel": "เขตเวลาของคุณ",
+      "homeZoneHelper": "แสดงข้างเวลาของกิจกรรม เป็นนาฬิกาเรือนที่สอง อุปกรณ์นี้อยู่ใน {zone} ไม่มีสิ่งใดที่นี่ถูกเขียนลงในโน้ตของคุณ",
+      "homeZoneUnknown": "นั่นไม่ใช่เขตเวลาที่อุปกรณ์นี้รู้จัก จึงไม่แสดงนาฬิกาเรือนที่สอง"
     },
     "archive": {
       "helper": "อนุญาตให้ย้ายโน้ตไปยังที่เก็บถาวร เพื่อเก็บไว้นอกรายการหลัก การปิดตัวเลือกนี้จะคืนโน้ตที่เก็บถาวรทุกรายการกลับไปยังโฟลเดอร์เดิม เอาโฟลเดอร์ที่เก็บถาวรทุกโฟลเดอร์ออกจากที่เก็บถาวร และซ่อนตัวควบคุมการเก็บถาวร ค่านี้มีผลกับทั้งห้องนิรภัยบนทุกอุปกรณ์",
@@ -3409,8 +3277,7 @@
       "label": "บีบอัดรูปภาพเมื่อนำเข้า",
       "helper": "ย่อขนาดรูปภาพที่วางหรือลากเข้ามา ก่อนเข้ารหัสและจัดเก็บ เพื่อให้ห้องนิรภัย ไฟล์สำรองข้อมูล และการซิงค์ของคุณเล็กลง การทำเช่นนี้ย้อนกลับไม่ได้: ไฟล์ต้นฉบับจะไม่ถูกเก็บไว้",
       "helperScopeEveryDevice": "มีผลกับทั้งห้องนิรภัย บนทุกอุปกรณ์",
-      "helperScopeNotHere": "มีผลกับทั้งห้องนิรภัย แต่ไม่มีผลในเบราว์เซอร์นี้: รูปภาพที่เพิ่มที่นี่จะถูกเก็บตามต้นฉบับ",
-      "errorSaveSetting": "บันทึกการตั้งค่านี้ไม่ได้"
+      "helperScopeNotHere": "มีผลกับทั้งห้องนิรภัย แต่ไม่มีผลในเบราว์เซอร์นี้: รูปภาพที่เพิ่มที่นี่จะถูกเก็บตามต้นฉบับ"
     },
     "transcription": {
       "label": "การแปลงเสียงเป็นข้อความ",
@@ -3420,15 +3287,11 @@
     "attachmentOcr": {
       "label": "ค้นหาข้อความในรูปภาพและเอกสารสแกน",
       "helper": "อ่านข้อความจากไฟล์แนบที่เป็นรูปภาพและ PDF ที่สแกนมา บนอุปกรณ์นี้ เพื่อให้ค้นหาจากเนื้อหาได้ ไม่มีการอัปโหลดอะไร การปิดตัวเลือกนี้จะหยุดการอ่านที่ทำอยู่เบื้องหลัง ข้อความที่อ่านไว้แล้วจะยังคงอยู่",
-      "errorSaveSetting": "บันทึกการตั้งค่านี้ไม่ได้",
       "processing_one": "กำลังอ่านไฟล์แนบ 1 รายการ…",
-      "processing_other": "กำลังอ่านไฟล์แนบ {{count}} รายการ…",
-      "draftUse": "ข้อความที่มันอ่านยังถูกเสนอเป็นร่างให้เพิ่มในโน้ตได้ โน้ตซิงค์แบบเข้ารหัสเหมือนปกติ",
-      "mobileDeviceLocal": "ตัวเลือกนี้เป็นรายอุปกรณ์: มันกำหนดว่าโทรศัพท์เครื่องนี้จะทำดัชนีอะไร อุปกรณ์เครื่องอื่นของคุณจึงมีค่าของตัวเอง"
+      "processing_other": "กำลังอ่านไฟล์แนบ {{count}} รายการ…"
     },
     "autoBackup": {
       "backupFolder": "โฟลเดอร์สำรองข้อมูล",
-      "chooseFolder": "เลือกโฟลเดอร์…",
       "chooseFolderDialogTitle": "เลือกโฟลเดอร์สำหรับการสำรองข้อมูลอัตโนมัติ",
       "frequency": "ความถี่",
       "frequencyAriaLabel": "ความถี่การสำรองข้อมูล",
@@ -3447,14 +3310,12 @@
       "title": "การสำรองข้อมูลอัตโนมัติ"
     },
     "changePassword": {
-      "cancel": "ยกเลิก",
       "checkingStrength": "กำลังตรวจสอบความแข็งแรง…",
       "strengthUnavailable": "การตรวจสอบความแข็งแรงโหลดไม่ได้ จึงตรวจสอบเฉพาะความยาวขั้นต่ำ",
       "confirmLabel": "ยืนยันรหัสผ่านใหม่",
       "currentLabel": "รหัสผ่านปัจจุบัน",
       "mismatch": "รหัสผ่านไม่ตรงกัน",
       "newLabel": "รหัสผ่านใหม่",
-      "submit": "เปลี่ยนรหัสผ่าน",
       "submitting": "กำลังเปลี่ยนรหัสผ่าน…",
       "title": "เปลี่ยนรหัสผ่าน",
       "tooShort": "ใช้อย่างน้อย {{n}} ตัวอักษร"
@@ -3482,7 +3343,7 @@
     "cliAccess": {
       "label": "การเข้าถึงจากเทอร์มินัล",
       "helperOff": "ปิดอยู่ คำสั่ง `myne` อ่านหรือเปลี่ยนแปลงอะไรในห้องนิรภัยนี้ไม่ได้",
-      "helperOn": "เปิดอยู่ขณะที่ห้องนิรภัยนี้ปลดล็อก โปรแกรมใดก็ตามที่ทำงานภายใต้บัญชีผู้ใช้ของคุณสามารถอ่าน ค้นหา และสร้างโน้ตผ่านช่องทางนี้ได้ Myne แยกไม่ออกว่าเป็นเทอร์มินัลของคุณหรือสคริปต์ และไม่ตรวจสอบอะไรนอกจากว่าประตูเปิดอยู่ ช่องทางนี้ไม่เคยถามรหัสผ่านของคุณ ปิดทันทีที่ห้องนิรภัยล็อก และลบโน้ตไม่ได้",
+      "helperOn": "เปิดอยู่ขณะที่ห้องนิรภัยนี้ปลดล็อก Myne แยกเทอร์มินัลของคุณจากสคริปต์ไม่ได้ และไม่ตรวจสอบอะไรนอกเหนือจากว่าประตูเปิดอยู่ ช่องทางนี้ไม่เคยถามรหัสผ่านของคุณ ปิดทันทีที่ห้องนิรภัยล็อก และลบโน้ตไม่ได้",
       "lastUsedNever": "ยังไม่ได้ใช้นับตั้งแต่ปลดล็อกห้องนิรภัยนี้",
       "lastUsedJustNow": "ใช้ล่าสุดเมื่อสักครู่",
       "lastUsedMinutesAgo": "ใช้ล่าสุดเมื่อ {{count}} นาทีก่อน",
@@ -3505,7 +3366,7 @@
     },
     "clipperInstall": {
       "error": "อัปเดตการตั้งค่าตัวคลิปหน้าเว็บไม่ได้",
-      "helper": "ลงทะเบียนโฮสต์ native-messaging เพื่อให้ส่วนขยายเบราว์เซอร์ของ Myne ส่งคลิปมายังแอปนี้ได้ เปิดอยู่ตามค่าเริ่มต้น ปิดเพื่อเอาออก",
+      "helper": "ให้ส่วนขยายเบราว์เซอร์ของ Myne ส่งคลิปมายังแอปนี้ได้",
       "label": "ตัวคลิปหน้าเว็บ"
     },
     "customThemes": {
@@ -3547,7 +3408,6 @@
       "folderSearchPlaceholder": "ค้นหาโฟลเดอร์…",
       "searchEmpty": "ไม่มีเทมเพลตที่ตรงกัน",
       "searchPlaceholder": "ค้นหาเทมเพลต…",
-      "untitledTemplate": "เทมเพลตไม่มีชื่อ",
       "sectionDaily": "บันทึกรายวัน",
       "sectionWeekly": "บันทึกรายสัปดาห์",
       "sectionMonthly": "บันทึกรายเดือน",
@@ -3572,16 +3432,13 @@
       "periodTemplateAriaLabel": "เทมเพลตบันทึก{{period}}",
       "sectionPeriodic": "บันทึกตามรอบ",
       "periodSwitcherAriaLabel": "ประเภทบันทึกตามรอบ",
-      "blockLabel": "บันทึกตามรอบ",
       "mobilePeriodAriaLabel": "รอบของบันทึก",
       "mobileSaveGlyph": "✓",
       "mobileSaveLabel": "บันทึก",
       "mobileSharedNotice": "การตั้งค่าเหล่านี้ถูกแชร์: การแก้ไขที่นี่จะไปถึงอุปกรณ์เครื่องอื่นของคุณ และค่าที่ตั้งบนคอมพิวเตอร์จะมาถึงที่นี่"
     },
     "deleteVault": {
-      "cancel": "ยกเลิก",
       "caseSensitiveHint": "ตัวพิมพ์เล็กใหญ่มีผล พิมพ์คำให้ตรงเป๊ะเพื่อเปิดใช้การลบ",
-      "continue": "ดำเนินการต่อ",
       "copyPrimary": "การกระทำนี้ลบห้องนิรภัยนี้และโน้ตทุกรายการในนั้นอย่างถาวร ย้อนกลับไม่ได้ และวลีกู้คืนของคุณจะไม่สามารถกู้ข้อมูลคืนมาได้",
       "copySecondary": "กุญแจของห้องนิรภัยจะถูกล้างออกจากหน่วยความจำก่อนที่ไฟล์จะถูกลบ ไซเฟอร์เท็กซ์ที่ตกค้างอยู่บนดิสก์จะเป็นข้อมูลขยะที่ห่อด้วย Argon2id ซึ่งกู้คืนไม่ได้",
       "keychainNote": "เมื่อการลบเสร็จ Myne ยังขอให้คีย์เชนของระบบลบคีย์ปลดล็อกไบโอเมตริกที่เก็บไว้สำหรับห้องนิรภัยนี้ บนแพลตฟอร์มที่เก็บไว้",
@@ -3606,7 +3463,8 @@
       "vaultPath": "เส้นทางห้องนิรภัย: {{path}}",
       "deleteError": "ลบห้องนิรภัยจนหมดไม่ได้ โปรดลองอีกครั้ง",
       "warning": "การกระทำนี้ลบห้องนิรภัยนี้และโน้ตทั้งหมดออกจากอุปกรณ์นี้อย่างถาวร ย้อนกลับไม่ได้",
-      "deleteButton": "ลบห้องนิรภัยนี้"
+      "deleteButton": "ลบห้องนิรภัยนี้",
+      "detailsLabel": "ข้อมูลเพิ่มเติมเกี่ยวกับการลบห้องนิรภัยนี้"
     },
     "files": {
       "newNote": {
@@ -3626,13 +3484,11 @@
         "label": "ไฟล์ที่จะเปิดเป็นค่าเริ่มต้น",
         "noteLabel": "โน้ตที่จะเปิดตอนเริ่มแอป",
         "notePlaceholder": "เลือกโน้ต…",
-        "optionEmpty": "โน้ตใหม่",
         "optionLast": "ที่เปิดล่าสุด",
         "optionSpecific": "โน้ตที่ระบุ",
         "saveError": "บันทึกการตั้งค่าตอนเริ่มแอปไม่ได้",
         "searchEmpty": "ไม่พบโน้ต",
-        "searchPlaceholder": "ค้นหาโน้ต…",
-        "untitledNote": "ไม่มีชื่อ"
+        "searchPlaceholder": "ค้นหาโน้ต…"
       },
       "sections": {
         "notes": "โน้ตและโฟลเดอร์",
@@ -3648,11 +3504,11 @@
       "saveError": "บันทึกการตั้งค่าโหมดโฟกัสไม่ได้",
       "typewriterAria": "การเลื่อนแบบพิมพ์ดีด",
       "typewriterHelper": "ในโหมดโฟกัส (⇧⌘F) จะให้บรรทัดที่กำลังพิมพ์อยู่กึ่งกลางแนวตั้งเสมอ",
-      "typewriterLabel": "โหมดโฟกัส · การเลื่อนแบบพิมพ์ดีด"
+      "typewriterLabel": "โหมดโฟกัส · การเลื่อนแบบพิมพ์ดีด",
+      "typewriterHelperMobile": "ทำให้เคอร์เซอร์อยู่กึ่งกลางแนวตั้ง"
     },
     "hotkeys": {
       "addBindingAria": "เพิ่มคีย์ลัดสำหรับ {{command}}",
-      "cancel": "ยกเลิก",
       "capturePrompt": "กดปุ่ม…",
       "conflictIndicator": "⚠ ขัดแย้ง",
       "conflictTitle": "ใช้โดย {{commands}} ด้วย",
@@ -3726,20 +3582,21 @@
       "on": "เปิด"
     },
     "toolbarCustomize": {
+      "errorLoad": "อ่านการจัดวางแถบเครื่องมือปัจจุบันของคุณไม่ได้ แถวเหล่านี้จึงแก้ไขไม่ได้จนกว่าคุณจะเปิดแผงนี้ใหม่",
       "errorSave": "บันทึกการจัดวางแถบเครื่องมือไม่ได้",
       "helper": "เลือกว่าจะให้ปุ่มจัดรูปแบบใดปรากฏบนแถบเครื่องมือของข้อความที่เลือก และเรียงลำดับอย่างไร",
       "label": "ปุ่มบนแถบเครื่องมือ",
+      "lastShownHint": "เก็บไว้อย่างน้อยหนึ่งรายการ",
+      "lastHiddenHint": "เก็บไว้ซ่อนอย่างน้อยหนึ่งรายการ",
       "moveDown": "เลื่อนลง",
-      "moveUp": "เลื่อนขึ้น",
-      "pendingHint": "เร็ว ๆ นี้"
+      "moveUp": "เลื่อนขึ้น"
     },
     "ai": {
       "autoTagHelper": "เมื่อคุณหยุดพิมพ์ โมเดลเล็กบนอุปกรณ์ของคุณอ่านโน้ตแล้วแนะนำแท็กที่ด้านบน ไม่มีอะไรถูกเพิ่มจนกว่าคุณจะยอมรับคำแนะนำ ยกเว้นว่าคุณเปิดแถวข้างล่าง",
       "autoTagLabel": "เสนอแท็กอัตโนมัติ",
-      "autoTagUnavailable": "ยังไม่ได้ติดตั้งโมเดลแท็ก ดาวน์โหลดสักครั้งจาก การตั้งค่า → AI แล้วสวิตช์จะเปิดเองเมื่อติดตั้งเสร็จ",
+      "autoTagUnavailable": "ยังไม่ได้ติดตั้งโมเดลแท็ก เปิดสวิตช์นั้นในการตั้งค่า → AI เมื่อติดตั้งแล้ว",
       "consent": {
         "accept": "ส่งโน้ตของฉันไปยัง {{provider}}",
-        "cancel": "ยกเลิก",
         "cannotVerifyLabel": "สิ่งที่ Myne ตรวจสอบไม่ได้",
         "revokeLabel": "วิธียกเลิกสิ่งนี้",
         "scopeLabel": "ครอบคลุมอุปกรณ์ใดบ้าง",
@@ -3794,7 +3651,7 @@
       "modelNone": "ยังไม่ได้เลือกไฟล์",
       "modelSaveFailed": "บันทึกเส้นทางโมเดลไม่ได้ (ต้องอยู่นอกห้องนิรภัยของคุณ)",
       "modelTranscriptionLabel": "โมเดลแปลงเสียงเป็นข้อความ (การถอดเสียง)",
-      "modelsHelper": "กำหนดไฟล์ที่แต่ละบทบาทใช้เมื่อไฟล์นั้นมาจากที่อื่นนอกเหนือจากรายการที่ผ่านการตรวจสอบด้านบน: เปิดลิงก์เพื่อรับไฟล์ในเบราว์เซอร์ของคุณ แล้วเลือกที่นี่ โมเดลจะทำงานบนอุปกรณ์ของคุณ แต่ถ้าคุณระบุผู้ให้บริการไว้แทน ผู้ให้บริการนั้นจะเป็นผู้ตอบ",
+      "modelsHelper": "กำหนดไฟล์ที่แต่ละบทบาทใช้เมื่อไฟล์นั้นมาจากที่อื่นนอกเหนือจากรายการที่ผ่านการตรวจสอบด้านบน โมเดลทำงานบนอุปกรณ์ของคุณ แต่ถ้าคุณระบุผู้ให้บริการไว้แทน ผู้ให้บริการนั้นจะเป็นผู้ตอบ",
       "providerHelper": "แทนที่จะรันโมเดลที่นี่ Myne ส่งคำขอไปยังบริการที่คุณระบุได้ และเมื่อทำเช่นนั้น โน้ตของคุณจะออกจากอุปกรณ์นี้ ค่าเริ่มต้นคือ “ไม่มี” ซึ่งหมายความว่าจะไม่มีการติดต่อบริการใดเลย",
       "providerKeyAdd": "วางคีย์ API ของคุณ",
       "providerKeyLabel": "คีย์ API",
@@ -3830,7 +3687,7 @@
       "mobileRevokeHelper": "ลบผู้ให้บริการ คีย์ และการอนุมัติของโทรศัพท์เครื่องนี้พร้อมกัน เหลือสถานะเหมือนไม่เคยตั้งค่ามาก่อน อุปกรณ์อื่นยังทำงานต่อไปจนกว่าคุณจะลบที่นั่นด้วย",
       "mobileApproveLabel": "อนุมัติการส่งจากโทรศัพท์เครื่องนี้",
       "mobileApproveHelper": "ผู้ให้บริการและคีย์มาจากอุปกรณ์อื่น จะไม่มีการส่งสิ่งใดจากโทรศัพท์เครื่องนี้จนกว่าคุณจะอ่านว่าจะส่งอะไรและอนุมัติที่นี่",
-      "historyBudgetHelper": "แต่ละคำขอจะพาบทสนทนาล่าสุดไปมากเท่าใด นับเป็นตัวอักษร เว้นว่างไว้เพื่อใช้ค่าเริ่มต้น ตัวเลขที่มากขึ้นทำให้ AI ติดตามบทสนทนาที่ยาวขึ้นได้และส่งไปมากขึ้น หากผู้ให้บริการไม่ได้อยู่บนอุปกรณ์นี้ นั่นหมายถึงข้อความของคุณออกจากอุปกรณ์มากขึ้นในทุกขั้นตอนของการทำงาน",
+      "historyBudgetHelper": "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้น ตัวเลขที่มากขึ้นทำให้ AI ติดตามบทสนทนาที่ยาวขึ้นได้และส่งบทสนทนาเหล่านั้นไปมากขึ้น หากใช้ผู้ให้บริการที่ไม่ได้อยู่บนอุปกรณ์นี้ นั่นหมายถึงข้อความของคุณออกจากอุปกรณ์มากขึ้นในทุกขั้นตอนของการทำงาน",
       "historyBudgetLabel": "บทสนทนาที่ส่งไปกับทุกคำขอ",
       "meetingPromptHelper": "คำสั่งที่การประมวลผลด้วย AI สำหรับการประชุมใช้เปลี่ยนบันทึกการถอดเสียงเป็นส่วนต่าง ๆ เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นที่มีมาให้ มันแทนที่รูปแบบผลลัพธ์เริ่มต้น ดังนั้นหากคุณตั้งค่าไว้ ให้ระบุส่วนที่คุณต้องการเอง",
       "meetingPromptLabel": "พรอมป์ต์สรุปการประชุม",
@@ -3838,7 +3695,6 @@
       "groupAdvanced": "ขั้นสูง",
       "excludedPickLabel": "เพิ่มโฟลเดอร์ที่จะยกเว้น",
       "excludedPickPlaceholder": "เลือกโฟลเดอร์…",
-      "modelShowInFolder": "แสดงในโฟลเดอร์",
       "modelShowLocation": "แสดงตำแหน่งของ {{name}}",
       "downloadsLabel": "ดาวน์โหลดโมเดล",
       "downloadsHelper": "ดึงโมเดลจากต้นทางของ Myne เอง มันจะถูกตรวจสอบกับลายนิ้วมือที่ฝังอยู่ในแอปก่อนใช้งาน การดาวน์โหลดที่ถูกดัดแปลงจึงถูกปฏิเสธ ไม่มีการดึงสิ่งใดเว้นแต่คุณคลิก",
@@ -3848,10 +3704,8 @@
       "downloadNotInstalled": "ยังไม่ได้ติดตั้ง",
       "downloadReinstall": "ดาวน์โหลด",
       "downloadInstall": "ดาวน์โหลด",
-      "modelRemove": "ลบออก",
       "downloading": "กำลังดาวน์โหลด…",
       "downloadingPercent": "กำลังดาวน์โหลด… {{percent}}%",
-      "downloadCancel": "ยกเลิก",
       "downloadFailed": "การดาวน์โหลดไม่สำเร็จ",
       "downloadFailedChecksum": "การดาวน์โหลดไม่ตรงกับลายนิ้วมือและถูกปฏิเสธ ลองอีกครั้ง",
       "sideloadDisclosure": "โหมดนักพัฒนายังให้คุณชี้ Myne ไปยังไฟล์โมเดลที่คุณหาเองได้ ไฟล์ที่คุณดาวน์โหลดจากที่อื่นจะไม่ถูกตรวจสอบโดย Myne จึงใช้เฉพาะไฟล์ที่คุณเชื่อถือ",
@@ -3868,14 +3722,13 @@
       "excludedFoldersEmpty": "ยังไม่ได้ยกเว้นอะไรเลย AI จึงอ่านได้ทุกโฟลเดอร์ในห้องนิรภัยนี้",
       "excludedFoldersAdd": "เพิ่ม",
       "excludedFoldersAddLabel": "โฟลเดอร์ที่จะยกเว้นจาก AI",
-      "excludedFoldersRemove": "เอาออก",
       "excludedFoldersRemoveLabel": "หยุดยกเว้น {{folder}} จาก AI",
       "excludedFoldersMonotoneNotice": "การยกเว้นที่เพิ่มบนอุปกรณ์ใดก็ตามของคุณจะอยู่ต่อไปจนกว่าคุณจะเอามันออกทุกที่: การเอาออกที่นี่ไม่เดินทางไปที่อื่น โฟลเดอร์ที่อุปกรณ์เครื่องอื่นยังยกเว้นอยู่จึงจะกลับมาอีกครั้งในการซิงค์ครั้งถัดไป",
       "catalogueOpen": "ดาวน์โหลดโมเดล",
       "catalogueColModel": "โมเดล",
       "catalogueColState": "สถานะ",
       "providerInline": "โน้ตของคุณจะออกจากอุปกรณ์เครื่องนี้เมื่อคุณระบุบริการใดบริการหนึ่ง",
-      "providerChooseHelper": "โมเดลสามารถทำงานบนอุปกรณ์นี้ หรือ Myne จะส่งคำขอไปยังบริการที่คุณระบุก็ได้ เมื่อทำเช่นนั้นโน้ตของคุณจะออกจากอุปกรณ์นี้ “บนอุปกรณ์นี้” เป็นค่าเริ่มต้นและหมายความว่าจะไม่มีการติดต่อบริการใดเลย",
+      "providerChooseHelper": "โมเดลสามารถทำงานบนอุปกรณ์นี้ หรือ Myne จะส่งคำขอไปยังบริการที่คุณระบุก็ได้ “บนอุปกรณ์นี้” เป็นค่าเริ่มต้นและหมายความว่าจะไม่มีการติดต่อบริการใดเลย",
       "providerChooseLabel": "เลือกผู้ให้บริการ",
       "providerKeySave": "บันทึกคีย์นี้",
       "providerOnDevice": "บนอุปกรณ์นี้",
@@ -3890,56 +3743,90 @@
       "externalAccess": {
         "label": "การเข้าถึงภายนอก",
         "helperOff": "ปิด ไม่มีเครื่องมือ AI ที่เข้าถึงห้องนิรภัยนี้ผ่าน `myne-mcp` ได้",
-        "explanationShared": "นี่คือสวิตช์เดียวกับการตั้งค่า CLI การเข้าถึงเทอร์มินัล ประตูเดียว สองวิธีเข้า: `myne` ขับโดยคุณ และ `myne-mcp` ขับโดยเครื่องมือ AI ใดก็ตามที่คุณตั้งค่า",
-        "explanationLabel": "ชื่อการเชื่อมต่อเป็นป้าย ไม่ใช่รหัสผ่าน Myne แยกโปรแกรมหนึ่งจากอีกโปรแกรมที่ทำงานภายใต้บัญชีของคุณไม่ได้ และไม่ตรวจสอบอะไร ngoài door ที่เปิดอยู่",
-        "explanationDevice": "การอนุมัติเก็บบนอุปกรณ์นี้ คอมพิวเตอร์หรือโทรศัพท์เครื่องที่สองเริ่มจากไม่มีอะไรและต้องถูกถามอีก",
-        "outsideMyne": "สิ่งที่เครื่องมือที่เชื่อมต่อทำกับสิ่งที่อ่านอยู่นอก Myne มันทำงานบนเครื่องนี้ มีการเข้าถึงเครือข่ายของตัวเอง และ Myne ไม่เห็นว่ามันส่งอะไรไปที่ไหน",
+        "helperOn": "เปิดอยู่ขณะที่ห้องนิรภัยนี้ปลดล็อก Myne ไม่เห็นว่าเครื่องมือที่เชื่อมต่อทำอะไรกับสิ่งที่มันอ่าน",
+        "empty": "ยังไม่มีการเชื่อมต่อ",
+        "outsideMyne": "โปรแกรมนั้นแยกจาก Myne มันมีการเข้าถึงเครือข่ายของตัวเอง และ Myne ไม่เห็นว่ามันส่งสิ่งที่อ่านไปที่ไหน",
+        "infoOneDoor": "ประตูเดียว สองทางเข้า: สวิตช์เดียวกันเปิดไคลเอนต์เทอร์มินัล `myne` ซึ่งคุณขับเอง และ `myne-mcp` ซึ่งเครื่องมือที่คุณตั้งค่าเป็นตัวขับ",
+        "infoNotACredential": "ชื่อการเชื่อมต่อกำหนดว่าอะไรถูกแชร์ให้ใคร ไม่ได้กำหนดว่าใครเป็นผู้ถาม: โปรแกรมใดที่ทำงานในสิทธิ์ของคุณก็ใช้ชื่ออะไรก็ได้",
+        "infoBudget": "การอ่านถูกจำกัดโควตาต่อการเชื่อมต่อในช่วงเวลาที่เลื่อนไป และตัวนับอยู่ในหน่วยความจำ: ออกจาก Myne แล้วตัวนับหายไป นี่เป็นการชะลอ ไม่ใช่การล็อก",
+        "accessLabel": "โฟลเดอร์ที่การเชื่อมต่อนี้ใช้ได้",
+        "accessNothing": "ยังไม่มี",
         "readFailed": "อ่านรายการการเชื่อมต่อไม่ได้ในตอนนี้ Myne ไม่ได้บอกคุณว่าไม่มีอะไรถูกอนุมัติ",
         "retry": "ลองอีกครั้ง",
         "readSummary": "อ่านโน้ต {{count}} รายการใน {{folders}} โฟลเดอร์ได้",
         "readSummary_one": "อ่านโน้ต {{count}} รายการใน {{folders}} โฟลเดอร์ได้",
         "readSummary_other": "อ่านโน้ต {{count}} รายการใน {{folders}} โฟลเดอร์ได้",
-        "writeNone": "เขียนอะไรไม่ได้ รุ่นนี้ให้เฉพาะการอ่าน",
+        "readNothing": "ไม่อ่านอะไรเลย: ทุกโฟลเดอร์ถูกกันออก",
+        "wholeVault": "อ่านทั้งห้องนิรภัย: ไม่มีโฟลเดอร์ใดถูกกันออก",
+        "writeNone": "ไม่เขียนที่ใดเลย",
+        "writeSummary": "เขียนใน {{folders}}",
+        "toolsAll": "ใช้เครื่องมือได้ทุกตัว",
+        "toolsOff": "ปิดเครื่องมือ {{count}} ตัว: {{verbs}}",
+        "toolsOff_one": "ปิดเครื่องมือ {{count}} ตัว: {{verbs}}",
+        "toolsOff_other": "ปิดเครื่องมือ {{count}} ตัว: {{verbs}}",
         "whenLine": "อนุมัติ {{approved}} ใช้ล่าสุด {{used}}",
         "whenLineNever": "อนุมัติ {{approved}} ไม่ได้ใช้ตั้งแต่นั้น",
         "revoke": "ถอน",
         "revokeFailed": "ถอนการเชื่อมต่อนั้นไม่ได้ มันอาจยังอ่านสิ่งที่ได้รับได้",
-        "snippetToggle": "ตัวอย่างการตั้งค่า",
-        "snippetHelper": "วางสิ่งนี้ในตั้งค่า MCP ของเครื่องมือ AI ชื่อต้องตรงกับการเชื่อมต่อข้างบน เพราะนั่นคือสิ่งที่การอนุมัติถูก keyed",
+        "editExclusions": "เปลี่ยนสิ่งที่มันใช้ได้",
         "rootFolder": "รากห้องนิรภัย",
-        "addConnection": "อนุมัติการเชื่อมต่อ",
-        "dialogTitleNew": "อนุมัติการเชื่อมต่อ",
-        "dialogTitle": "อนุมัติ {{name}} อีกครั้ง",
+        "requestsTitle": "รอคุณอยู่",
+        "requestLineWrite": "{{connection}} ต้องการเขียนใน {{folder}}",
+        "requestLineWriteTyped": "{{connection}} ต้องการเขียนใน {{folder}}: “{{summary}}”",
+        "requestLineRead": "{{connection}} ต้องการอ่าน {{folder}}",
+        "requestAccept": "อนุญาต",
+        "requestDismiss": "ปิด",
+        "requestAccepted": "ตอนนี้ {{connection}} ใช้ {{folder}} ได้แล้ว",
+        "requestStale": "คำขอนั้นใช้ไม่ได้อีกแล้ว ไม่มีอะไรเปลี่ยนแปลง",
+        "requestFailed": "ตัดสินใจคำขอนั้นไม่ได้ ไม่มีอะไรเปลี่ยนแปลง",
+        "addConnection": "เพิ่มการเชื่อมต่อ",
+        "step1Title": "เครื่องมือ",
+        "step2Title": "การตั้งค่า",
+        "step3Title": "การเข้าถึง",
+        "step1Question": "เครื่องมือใดกำลังเชื่อมต่อ",
+        "otherClientsDetail": "คำสั่งแบบดิบ",
+        "otherClientsHelper": "ไคลเอนต์ MCP ใดก็ใช้คำสั่งนี้ได้ ให้ชื่อการเชื่อมต่อที่คุณตั้งไว้ด้านล่างกับมัน",
+        "configPath": "เพิ่มสิ่งนี้ใน {{path}} แล้วรีสตาร์ตเครื่องมือ",
         "nameLabel": "ชื่อการเชื่อมต่อ",
-        "namePlaceholder": "claude-desktop",
-        "nameHelper": "ชื่อที่ไคลเอนต์ของคุณส่ง มันเป็นป้าย ไม่ใช่รหัสผ่าน โปรแกรมใดก็ได้บนเครื่องนี้ใช้ชื่อใดก็ได้ จึงตัดสินว่าแชร์อะไรกับใคร ไม่ใช่ผู้ที่ถาม",
-        "nameReserved": "ชื่อนั้นถูกสงวน: ไคลเอนต์ที่ตั้งค่าโดยไม่มีชื่อมาเป็น `unnamed-client` การอนุมัติมันจึงอนุมัติไคลเอนต์ที่ไม่ได้ตั้งค่าทุกตัว",
-        "nameEmpty": "การเชื่อมต่อต้องมีชื่อ เพราะนั่นคือสิ่งที่การให้สิทธิ์ถูก keyed",
-        "countsPending": "กำลังพิจารณาว่าครอบคลุมอะไร…",
-        "countsNotes": "แชร์โน้ต {{count}} รายการใน {{folders}} โฟลเดอร์",
-        "countsNotes_one": "แชร์โน้ต {{count}} รายการใน {{folders}} โฟลเดอร์",
-        "countsNotes_other": "แชร์โน้ต {{count}} รายการใน {{folders}} โฟลเดอร์",
-        "countsExcluded_one": "ยกเว้น {{count}} โฟลเดอร์",
-        "countsExcluded_other": "ยกเว้น {{count}} โฟลเดอร์",
+        "nameClaim": "เป็นเพียงป้ายชื่อ ไม่ใช่รหัสผ่าน: โปรแกรมใดบนเครื่องนี้ก็ใช้ชื่ออะไรก็ได้",
+        "clientToolsNote": "{{name}} กรองได้ด้วยว่าใช้เครื่องมือใด นั่นเป็นเพียงความสะดวก: สิ่งที่หน้าจอนี้อนุญาตคือสิ่งที่ Myne บังคับใช้",
+        "copySnippet": "คัดลอกการตั้งค่า",
+        "back": "ย้อนกลับ",
+        "next": "ถัดไป",
         "excludeLabel": "ละเว้น",
-        "excludePlaceholder": "ไม่มีการละเว้น",
-        "excludeSearch": "ค้นหาโฟลเดอร์",
-        "excludeEmpty": "ไม่มีโฟลเดอร์ที่ตรง",
-        "excludeHelper": "โฟลเดอร์ที่คุณละเว้นไม่ถูกแชร์ และทุกอย่างในนั้นด้วย คุณกำลังเลือกจากทุกโฟลเดอร์ในห้องนิรภัยนี้ จึงเป็นที่เดียวที่ห้องนิรภัยทั้งหมดอยู่บนโต๊ะ",
         "approve": "อนุมัติ",
-        "grantRefused": "การให้สิทธิ์นี้ไม่พอดีกับงบการตั้งค่าของห้องนิรภัย ไม่มีอะไรเปลี่ยน ถอนการเชื่อมต่อที่คุณไม่ใช้แล้ว แล้วลองอีกครั้ง",
         "grantFailed": "บันทึกการอนุมัติไม่ได้ ไม่มีอะไรเปลี่ยน",
         "verb": {
+          "note_search": "ค้นหาโน้ต",
+          "note_read": "อ่านโน้ต",
+          "vault_list": "แสดงรายการโฟลเดอร์",
+          "vault_state": "สรุปห้องนิรภัย",
+          "note_create": "สร้างโน้ต",
+          "note_append": "ต่อท้ายโน้ต",
+          "note_set_field": "ตั้งค่าฟิลด์ของโน้ต",
+          "note_move": "ย้ายโน้ต",
+          "note_edit": "แก้ไขโน้ต",
           "attachment_list": "แสดงรายการไฟล์",
           "attachment_read": "อ่านข้อความในไฟล์",
           "calendar_read": "อ่านปฏิทิน",
           "view_list": "แสดงมุมมองที่บันทึกไว้"
         },
+        "emptyBody": "การอนุมัติสักรายการคือสิ่งที่ทำให้เครื่องมือที่คุณติดตั้งอ่านห้องนิรภัยนี้ได้ เว้นโฟลเดอร์ที่คุณกันออก",
+        "trademarks": "Myne ไม่มีความเกี่ยวข้อง ไม่ได้รับการรับรองและไม่ได้รับการสนับสนุนจากเครื่องมือเหล่านี้ ชื่อและโลโก้เป็นของเจ้าของแต่ละราย",
         "wholeVaultLabel": "อ่านและเขียนทั้งห้องนิรภัย",
         "excludeNothing": "ไม่ได้ยกเว้นอะไร",
+        "scopeLineAll": "ทุกโฟลเดอร์ที่มีอยู่ตอนนี้อ่านและเขียนได้ เว้นแต่คุณจะกันออกด้านล่าง โฟลเดอร์ที่คุณสร้างภายหลังจะอ่านได้ แต่เขียนไม่ได้จนกว่าคุณจะระบุชื่อ",
+        "writeRestore": "การเขียนหนึ่งครั้งเก็บจุดกู้คืนที่คุณย้อนกลับได้",
         "scopeLine": "เข้าถึง {{count}} โน้ตใน {{folders}} โฟลเดอร์ และแก้ไขทุกอย่างในนั้นได้",
+        "scopeLine_one": "เข้าถึงโน้ต {{count}} รายการใน {{folders}} โฟลเดอร์ และแก้ไขทุกอย่างในโฟลเดอร์ที่คุณระบุได้",
+        "scopeLine_other": "เข้าถึงโน้ต {{count}} รายการใน {{folders}} โฟลเดอร์ และแก้ไขทุกอย่างในโฟลเดอร์ที่คุณระบุได้",
+        "findFolder": "ค้นหาโฟลเดอร์",
+        "noFolderMatches": "ไม่มีโฟลเดอร์ที่ตรง",
+        "toolsLabel": "เครื่องมือ",
+        "toolUnavailable": "ไม่มีในบิลด์นี้",
         "toolsNote": "การอ่านมีโควตา: สูงสุด {{count}} โน้ตต่อ {{minutes}} นาที",
         "needsReapproval": "อนุมัติโดยเวอร์ชันเก่าภายใต้กฎตรงกันข้าม บิลด์นี้จะไม่อ่านสิ่งใดให้จนกว่าคุณจะอนุมัติใหม่",
+        "approveAgain": "อนุมัติอีกครั้ง",
         "scopeLineWords": "เข้าถึงโฟลเดอร์ที่คุณระบุ และแก้ไขทุกอย่างในนั้นได้"
       },
       "autoApplyLabel": "ปรับใช้แท็กที่แนะนำโดยอัตโนมัติ",
@@ -3964,7 +3851,7 @@
       "residualPayment": "ถ้าคุณจ่ายค่าบริการซิงค์แบบโฮสต์ การชำระเงินและบัญชีของคุณยังเชื่อมโยงถึงตัวคุณได้ Tor เปลี่ยนแค่ว่าการเชื่อมต่อมาจากที่ใด ไม่ได้เปลี่ยนร่องรอยการเรียกเก็บเงิน",
       "residualScope": "บนเดสก์ท็อป สิ่งนี้ครอบคลุมการรับส่งข้อมูลซิงค์และคำขอไปยังผู้ให้บริการ AI ระยะไกลของคุณ บนมือถือยังไม่มีการกำหนดเส้นทางผ่าน Tor คำขอไปยังผู้ให้บริการจึงออกโดยตรง ไม่มีอย่างอื่นบนอุปกรณ์นี้ที่ผ่าน Tor",
       "residualsToggle": "สิ่งที่วิธีนี้ไม่ได้ปกปิด",
-      "torHelper": "ซ่อนที่อยู่ IP และตำแหน่งของคุณจากเซิร์ฟเวอร์ซิงค์ และซ่อนว่าคุณซิงค์กับเซิร์ฟเวอร์ใด (และบนเดสก์ท็อป ซ่อนว่าคุณเข้าถึงผู้ให้บริการ AI รายใด) จากเครือข่ายและผู้ให้บริการอินเทอร์เน็ตของคุณ พวกเขายังเห็นได้ว่าอุปกรณ์นี้เชื่อมต่อกับ Tor วิธีนี้ไม่ได้ทำให้คุณนิรนามต่อ Myne และไม่ได้ซ่อนจากเซิร์ฟเวอร์ว่าคุณซิงค์อะไรหรือเมื่อใด",
+      "torHelper": "บนเดสก์ท็อป สิ่งนี้ยังซ่อนว่าคุณเข้าถึงผู้ให้บริการ AI รายใด ใครก็ตามที่ดักดูเครือข่ายยังเห็นได้ว่าอุปกรณ์นี้เชื่อมต่อกับ Tor วิธีนี้ไม่ได้ทำให้คุณนิรนามต่อ Myne และไม่ได้ซ่อนจากเซิร์ฟเวอร์ว่าคุณซิงค์อะไรหรือเมื่อใด",
       "torLabel": "ส่งการซิงค์และ AI บนเดสก์ท็อปผ่าน Tor",
       "torInline": "ซ่อนที่อยู่ IP และตำแหน่งของคุณจากเซิร์ฟเวอร์ซิงค์ และซ่อนว่าคุณซิงค์กับเซิร์ฟเวอร์ใดจากเครือข่ายและผู้ให้บริการอินเทอร์เน็ตของคุณ"
     },
@@ -3993,8 +3880,6 @@
       "autoLockSearchPlaceholder": "ค้นหาช่วงเวลา…",
       "hideVaultNamesLabel": "ซ่อนชื่อห้องนิรภัยบนหน้าจอล็อก",
       "hideVaultNamesHelper": "บนอุปกรณ์ที่มีพวงกุญแจของระบบใช้งานได้ หน้าจอเลือกห้องนิรภัยจะแสดงชื่อของห้องนิรภัยเมื่ออุปกรณ์นี้ปลดล็อกห้องนั้นแล้ว เมื่อเปิดตัวเลือกนี้ ทุกห้องนิรภัยจะแสดงชื่อแทน เช่น ห้องนิรภัย 2 และหมายเลขนั้นจะติดอยู่กับห้องนิรภัยเดิมไม่ว่ารายการจะเรียงใหม่อย่างไร",
-      "hideVaultNamesErases": "การเปิดตัวเลือกนี้จะทำลายกุญแจที่ทำให้ชื่อซึ่งเก็บไว้ที่นี่อ่านได้ ชื่อเหล่านั้นจึงกู้คืนบนอุปกรณ์นี้ไม่ได้ และจะไม่มีการเขียนชื่อใดเพิ่มอีกตราบใดที่ตัวเลือกนี้ยังเปิดอยู่",
-      "hideVaultNamesResidue": "แต่มันเอื้อมไปถึงสำเนาที่ถูกทำไว้ก่อนหน้านี้ไม่ได้: ข้อมูลสำรองทั้งระบบ ดิสก์อิมเมจ หรือสำเนาระดับระบบอื่นใดของดิสก์นี้ที่ทำขึ้นตอนที่ยังแสดงชื่ออยู่ จะมีทั้งชื่อที่เก็บไว้และกุญแจของชื่อเหล่านั้นติดไปด้วย",
       "hideVaultNamesUnavailable": "Myne เก็บชื่อห้องนิรภัยในแอปชุดนี้ไม่ได้ จึงไม่ได้เก็บชื่อใดไว้ที่นี่เลย และเปิดตัวเลือกนี้ไม่ได้ หน้าจอเลือกห้องนิรภัยแสดงชื่อแทนสำหรับทุกห้องนิรภัยอยู่แล้ว",
       "hideVaultNamesErrorRead": "อ่านค่าที่ตั้งไว้ปัจจุบันไม่ได้ สลับสวิตช์เพื่อตั้งค่าอีกครั้ง",
       "hideVaultNamesErrorSave": "บันทึกการตั้งค่านี้ไม่ได้ ค่าจึงไม่เปลี่ยน ถ้าคุณกำลังเปิดใช้งานอยู่ ชื่อบางส่วนที่เก็บไว้อาจถูกทำลายไปแล้ว เปิดอีกครั้งเพื่อทำให้เสร็จ",
@@ -4049,27 +3934,12 @@
       "setPin": "ตั้ง PIN",
       "setupHelper": "Touch ID ใช้ได้เฉพาะบน macOS และยังอยู่ในขั้นทดลอง (รอการยืนยันกับฮาร์ดแวร์) ส่วน PIN ใช้ได้ทุกที่",
       "title": "การปลดล็อกด่วน",
-      "useTouchId": "ใช้ Touch ID",
-      "pinTooShort": "PIN ต้องมีอย่างน้อย 6 หลัก",
-      "pinMismatch": "PIN ไม่ตรงกัน",
-      "pinOnToast": "การปลดล็อกด่วนด้วย PIN เปิดอยู่",
       "setupError": "ตั้งค่าการปลดล็อกด่วนไม่ได้",
-      "turnedOffToast": "ปิดการปลดล็อกด่วนแล้ว",
       "turnOffError": "ปิดการปลดล็อกด่วนไม่ได้",
-      "biometricOnToast": "การปลดล็อกด่วนด้วย {{method}} เปิดอยู่",
       "biometricUnavailable": "{{method}} ใช้บนอุปกรณ์นี้ไม่ได้",
-      "warningBanner": "เป็นเพียงประตูเพื่อความสะดวก หากใช้ PIN จะต้องใช้รหัสผ่านของคุณอีกครั้งหลังเริ่มแอปใหม่ ส่วนการตรวจลายนิ้วมือหรือใบหน้าจะยังใช้ได้แม้หลังเริ่มแอปใหม่",
-      "biometricToggleSubtitle": "ปลดล็อกด้วย {{method}} หลังล็อกอัตโนมัติ",
-      "pinOnLead": "การปลดล็อกด่วนด้วย PIN ",
-      "pinOnEmphasis": "เปิดอยู่",
-      "pinOnRest": " หลังจากห้องนิรภัยล็อกอัตโนมัติ คุณเข้าใหม่ด้วย PIN แทนรหัสผ่านเต็มได้ (เฉพาะเซสชันนี้ของแอปเท่านั้น) การเปิดแอปขึ้นมาใหม่ต้องใช้รหัสผ่านเต็มเสมอ",
-      "turnOffPin": "ปิด PIN",
       "pinSetupHelper": "ตั้ง PIN 6 หลักขึ้นไปเพื่อปลดล็อกใหม่ได้เร็วหลังล็อกอัตโนมัติ PIN จะห่อกุญแจที่อยู่เฉพาะบนอุปกรณ์นี้: ไม่เคยออกจากอุปกรณ์นี้ และไม่แตะต้องวลีกู้คืนของคุณ",
       "pinReplacesBiometric": " การตั้ง PIN จะแทนที่การปลดล็อกด้วย {{method}}",
-      "pinPlaceholder6": "อย่างน้อย 6 หลัก",
-      "confirmPin": "ยืนยัน PIN",
-      "reenterPin": "ป้อน PIN อีกครั้ง",
-      "setupButton": "ตั้งค่าการปลดล็อกด่วน",
+      "useBiometric": "ใช้ {{method}}",
       "errorBiometricAuthFailed": "ตั้งค่า Touch ID ไม่ได้ ตรวจสอบว่าลงทะเบียนลายนิ้วมือไว้ในการตั้งค่าระบบแล้ว หรือใช้ PIN แทน",
       "biometricAuthFailed": "ตั้งค่า {{method}} ไม่ได้ ตรวจสอบว่าเปิดใช้งานไว้ในการตั้งค่าอุปกรณ์แล้ว หรือใช้ PIN แทน"
     },
@@ -4118,7 +3988,7 @@
       "mobileUnavailable": "การตรวจการสะกดยังใช้ไม่ได้บนโทรศัพท์เครื่องนี้: อุปกรณ์นี้ไม่มีพจนานุกรม ตัวแก้ไขที่นี่จึงขีดเส้นใต้ไม่ได้ เปิดจากคอมพิวเตอร์ของคุณแทน"
     },
     "storage": {
-      "backupHelper": "ไฟล์สำรองข้อมูลถูกเข้ารหัสในระดับเดียวกับห้องนิรภัยของคุณ รวมอยู่ในไฟล์ .myne-backup ไฟล์เดียวที่ผ่านการตรวจสอบ การกู้คืนใช้รหัสผ่านหรือวลีกู้คืนของห้องนิรภัยนั้น เหมือนตอนปลดล็อกทุกประการ",
+      "backupHelper": "ไฟล์สำรองข้อมูลถูกเข้ารหัสในระดับเดียวกับห้องนิรภัยของคุณ รวมอยู่ในไฟล์ .myne-backup ไฟล์เดียวที่ผ่านการตรวจสอบ การกู้คืนใช้รหัสผ่านของห้องนิรภัยนั้น เหมือนตอนปลดล็อกทุกประการ",
       "backupLabel": "การสำรองข้อมูล",
       "backUpVault": "สำรองข้อมูลห้องนิรภัย…",
       "exportAction": "ส่งออก…",
@@ -4128,14 +3998,10 @@
       "importHelper": "นำโน้ตเข้ามาจาก Obsidian, Notion, Evernote, ไฟล์ HTML หรือ CSV ทุกอย่างถูกนำเข้าและเข้ารหัสทันที ไฟล์ต้นฉบับของคุณไม่ถูกแตะต้อง",
       "importLabel": "การนำเข้า",
       "importObsidian": "นำเข้าโน้ต…",
-      "locationHelper": "แต่ละห้องนิรภัยคือโฟลเดอร์ของไฟล์เข้ารหัสภายใต้เส้นทางนี้ ชอบปุ่มสำรองข้อมูลด้านล่างมากกว่าการคัดลอกด้วยมือ: มันตรวจสอบไฟล์ที่เขียน",
-      "openInFiles": "เปิดในตัวจัดการไฟล์",
       "webLocationHelper": "โน้ตของคุณอยู่ในพื้นที่เก็บของเบราว์เซอร์นี้สำหรับไซต์นี้ จัดการโดยเบราว์เซอร์ ไม่มีโฟลเดอร์ให้เปิด การล้างข้อมูลไซต์นี้เอาสำเนาในเครื่องออก เนื่องจากไคลเอนต์นี้ซิงค์ การลงชื่อเข้าใช้อีกครั้งจะดาวน์โหลดกลับมา",
       "webLocationLabel": "ที่ที่เก็บโน้ตของคุณ",
-      "pathUnavailable": "ไม่มีเส้นทาง",
       "restoreBackup": "กู้คืนจากไฟล์สำรองข้อมูล…",
       "sections": {
-        "location": "ที่ที่ห้องนิรภัยอยู่",
         "backup": "การสำรองข้อมูลและการกู้คืน",
         "transfer": "การนำเข้าและการส่งออก"
       }
@@ -4172,6 +4038,8 @@
     "data": {
       "exported_one": "ส่งออกโน้ต {{count}} รายการ → {{label}}",
       "exported_other": "ส่งออกโน้ต {{count}} รายการ → {{label}}",
+      "exportedChoose_one": "ส่งออกโน้ต {{count}} รายการแล้ว เลือกที่บันทึกสำเนา",
+      "exportedChoose_other": "ส่งออกโน้ต {{count}} รายการแล้ว เลือกที่บันทึกสำเนา",
       "exportNeedsApp": "การส่งออกต้องใช้แอป (ไม่ใช่การแสดงตัวอย่างในเบราว์เซอร์)",
       "exportFailed": "ส่งออกห้องนิรภัยไม่ได้",
       "exportToMarkdown": "ส่งออกเป็น Markdown",
@@ -4184,7 +4052,6 @@
       "vaultName": "ชื่อห้องนิรภัย",
       "approveDevice": "อนุมัติอุปกรณ์"
     },
-    "done": "เสร็จสิ้น",
     "sectionOptions": "ตัวเลือก",
     "footerTagline": "myne · เข้ารหัสบนอุปกรณ์นี้ · โอเพนซอร์ส",
     "editor": {
@@ -4199,18 +4066,11 @@
         "heading": "เป็นมนุษย์สุดประเสริฐเลิศคุณค่า",
         "bullet1": "กว่าบรรดาฝูงสัตว์เดรัจฉาน",
         "bullet2": "จงฝ่าฟันพัฒนาวิชาการ",
-        "spellCaption": "การตรวจการสะกด",
-        "spellSample": "สะกดผืด",
         "dateTime": "วันที่และเวลา",
         "toolbar": "แถบเครื่องมือ",
-        "task": "งาน",
         "taskSampleOpen": "ส่งรายงานประจำไตรมาส",
         "taskSampleDone": "จองสถานที่"
       },
-      "defaultView": "มุมมองเริ่มต้น",
-      "typewriter": "การเลื่อนแบบพิมพ์ดีด",
-      "typewriterSubtitle": "ให้เคอร์เซอร์อยู่กึ่งกลางแนวตั้ง",
-      "enableArchiving": "เปิดใช้การเก็บถาวร",
       "taskChipColor": {
         "accent": "สีเน้น",
         "danger": "แดง",
@@ -4225,7 +4085,8 @@
         "label": "ลำดับความสำคัญเฉพาะไอคอน"
       },
       "topics": {
-        "periodic": "บันทึกตามรอบ"
+        "periodic": "บันทึกตามรอบ",
+        "calendar": "ปฏิทิน"
       }
     },
     "search": {
@@ -4311,8 +4172,8 @@
         "plainFile": "ไฟล์ธรรมดา ตัวแก้ไข markdown ในเครื่อง ดิสก์ นอกห้องนิรภัย ข้อความธรรมดา เปิดในที่เดิม",
         "memberPassword": "ห้องนิรภัยที่แชร์ รหัสผ่าน สมาชิก ปลดล็อก เข้าร่วม วลี",
         "bar": "แถบล่าง แถบสถานะ ตัวบ่งชี้ ปรับแต่ง จัดลำดับ ซ่อน แสดง แถบเครื่องมือ",
-        "vaultFormat": "รูปแบบห้องนิรภัย อัปเกรด วลีกู้คืนหนึ่งวลี ปลดระวาง วลีกู้คืนห้องนิรภัย ย้าย ตัวตน",
-        "externalAccess": "การเข้าถึงภายนอก MCP myne-mcp Claude Desktop ไคลเอนต์ การเชื่อมต่อ อนุมัติ scope ถอน",
+        "vaultFormat": "รูปแบบห้องนิรภัย อัปเกรด ปลดระวาง วลีกู้คืนห้องนิรภัย รหัสผ่านเท่านั้น ย้าย ตัวตน",
+        "externalAccess": "การเข้าถึงภายนอก MCP myne-mcp Claude Desktop Cursor VS Code Hermes ไคลเอนต์ การเชื่อมต่อ อนุมัติ ขอบเขต ถอน เพิกถอน เครื่องมือ งบประมาณ",
         "diagnosticLog": "ไฟล์บันทึกข้อมูลวินิจฉัย การบันทึก การดีบัก การแก้ปัญหา รายงานการหยุดทำงาน รายงานข้อผิดพลาด การสนับสนุน"
       },
       "emptyBody": "ลองใช้คำที่สั้นลง หรือชื่อของแผง"
@@ -4327,16 +4188,26 @@
       "time24": "24 ชั่วโมง",
       "time12": "12 ชั่วโมง",
       "zoneLabel": "เขตเวลา",
-      "zoneHelper": "เขตเวลาใดเป็นตัวกำหนดว่าอะไรนับเป็นวันนี้ และจึงกำหนดว่าโน้ตรายวัน รายสัปดาห์ และรายเดือนของคุณจะเปิดโน้ตใด เว้นว่างไว้เพื่อใช้ตามอุปกรณ์นี้ ค่านี้ตั้งแยกกันในแต่ละอุปกรณ์ ไม่มีอุปกรณ์อื่นเขียนทับ การตั้งค่าเฉพาะเครื่องจึงอาจทำให้อุปกรณ์นี้อยู่คนละวันกับอุปกรณ์อื่นของคุณ เวลาที่คุณเขียนไว้ในโน้ตจะไม่ถูกเปลี่ยนเลย 09:00 ยังคงเป็น 09:00 ทุกที่",
+      "zoneHelper": "เว้นว่างไว้เพื่อใช้ตามอุปกรณ์นี้ ค่านี้ตัดสินแยกกันในแต่ละอุปกรณ์ ไม่มีอุปกรณ์อื่นเขียนทับ การตั้งค่าเฉพาะเครื่องจึงทำให้อุปกรณ์นี้อยู่คนละวันกับอุปกรณ์อื่นของคุณได้ เวลาที่คุณเขียนไว้ในโน้ตจะไม่ถูกเปลี่ยนเลย 09:00 ยังคงเป็น 09:00 ทุกที่",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne ไม่รู้จักเขตเวลานั้น ใช้ชื่ออย่างเช่น Europe/Berlin",
       "errorSave": "บันทึกการตั้งค่านั้นไม่ได้",
       "zoneInline": "เขตเวลาใดเป็นตัวกำหนดว่าอะไรนับเป็นวันนี้ และด้วยเหตุนั้น บันทึกรายวัน รายสัปดาห์ และรายเดือนของคุณจะเปิดโน้ตใด"
     },
+    "calendar": {
+      "anchorLabel": "เวลาการเตือนกิจกรรมตลอดวัน",
+      "anchorHelper": "การเตือนกิจกรรมตลอดวันจะดังขึ้นเมื่อถึงเวลาใดของวัน ส่วนกิจกรรมที่มีเวลาเจาะจงนับถอยหลังจากเวลาเริ่มของตัวเองแทน",
+      "coloursLabel": "สีของปฏิทิน",
+      "coloursHelper": "ปฏิทินแต่ละอันวาดด้วยสีที่คุณเลือก สีมาจากธีม การเปลี่ยนธีมจึงวาดปฏิทินใหม่ด้วย",
+      "coloursEmpty": "ยังไม่มีปฏิทินใดมีสี เพิ่มด้านล่าง หรือใส่ชื่อปฏิทินให้กิจกรรมแล้วมันจะปรากฏที่นี่",
+      "newNameLabel": "ชื่อปฏิทินใหม่",
+      "newNamePlaceholder": "งาน",
+      "addColour": "เพิ่ม",
+      "saveFailed": "บันทึกการตั้งค่านั้นไม่ได้ ห้องนิรภัยของคุณไม่เปลี่ยน"
+    },
     "folderNotes": {
       "label": "โน้ตโฟลเดอร์",
-      "helper": "ให้โน้ตทำหน้าที่เป็นดัชนีของโฟลเดอร์ เปิดเมื่อดับคลิกโฟลเดอร์ และลิงก์เช่น [[Projects/]] จะชี้มาที่มัน ปิดอยู่ตามค่าเริ่มต้น การปิดจะซ่อนปุ่มสร้างโน้ตแบบนี้และแสดงที่มีอยู่เป็นโน้ตปกติ บนดิสก์ไม่มีอะไรเปลี่ยน จึงเปิดอีกครั้งแล้วได้เหมือนเดิม",
-      "errorSaveSetting": "บันทึกการตั้งค่านี้ไม่ได้",
+      "helper": "ปิดอยู่ตามค่าเริ่มต้น การปิดจะซ่อนปุ่มที่สร้างโน้ตประจำโฟลเดอร์และแสดงโน้ตที่คุณมีอยู่แล้วเป็นโน้ตปกติ บนดิสก์ไม่มีอะไรเปลี่ยน จึงเปิดกลับแล้วได้คืนเหมือนเดิม",
       "inline": "ให้โน้ตทำหน้าที่เป็นดัชนีของโฟลเดอร์: มันจะเปิดขึ้นเมื่อคุณดับเบิลคลิกที่โฟลเดอร์ และลิงก์โฟลเดอร์อย่าง [[Projects/]] จะชี้มาที่มัน"
     },
     "ribbonCustomize": {
@@ -4350,7 +4221,7 @@
       "searchEmpty": "ไม่มีคำสั่งที่ตรง",
       "searchPlaceholder": "ค้นหาคำสั่ง…",
       "searchResultsLabel": "คำสั่งที่ตรง",
-      "showHelper": "แสดงริบบอนซ้ายบนอุปกรณ์นี้",
+      "showHelper": "เฉพาะอุปกรณ์นี้เท่านั้น",
       "showLabel": "แสดงริบบอนซ้าย",
       "emptyTitle": "ยังไม่มีอะไรถูกปักหมุด"
     },
@@ -4358,11 +4229,8 @@
       "heading": "ผู้ช่วยจำอะไรได้บ้าง",
       "helper": "ข้อเท็จจริงที่ AI เรียนรู้ขณะทำงานกับคุณ มันบันทึกเองอย่างน้อยหนึ่งรายการต่อการรัน คุณเห็นทุกรายการและแก้ไขได้ รายการซิงก์กับอุปกรณ์อื่นและยังเข้ารหัสอยู่",
       "empty": "รายการจะปรากฏที่นี่เมื่อผู้ช่วยเรียนรู้บางอย่างระหว่างการทำงาน",
-      "editLabel": "แก้ไข",
       "deleteLabel": "ลบ",
       "save": "บันทึก",
-      "cancel": "ยกเลิก",
-      "cancelLabel": "ยกเลิก",
       "saveFailed": "บันทึกรายการไม่ได้",
       "deleteFailed": "ลบรายการไม่ได้",
       "entryUnreadable": "อ่านรายการไม่ได้ ยังถูกบันทึกอยู่ ลบจากที่นี่หรือแก้ไขในการตั้งค่า",
@@ -4380,21 +4248,19 @@
       "personalitySavedToast": "อัปเดตการตั้งค่าเสียงแล้ว",
       "personalitySaveFailed": "บันทึกการตั้งค่าเสียงไม่ได้",
       "loadFailed": "โหลดความจำหรือการตั้งค่าเสียงไม่ได้ ไม่มีอะไรเปลี่ยนแปลง",
-      "retryLabel": "ลองอีกครั้ง",
       "seed": {
-        "rowTitle": "สอน Myne เกี่ยวกับห้องนิรภัยของคุณ",
         "rowHelper": "สร้างความจำจากโน้ตของคุณครั้งเดียว พร้อมตรวจสอบทุกบรรทัดก่อนบันทึก",
         "rowSeeded": "สร้าง {{date}} · {{count}} รายการ",
-        "start": "สอน Myne เกี่ยวกับห้องนิรภัยของคุณ",
         "rebuild": "สร้างใหม่",
         "rebuildConfirm": "แทนที่ seed จาก {{date}} ({{count}} รายการ)?",
         "title": "สอน Myne เกี่ยวกับห้องนิรภัยของคุณ",
         "candidatesTitle": "ตรวจสอบสิ่งที่ Myne เรียนรู้",
-        "close": "ปิด",
         "loading": "กำลังอ่านห้องนิรภัยของคุณ…",
         "scopeIntro": "Myne อ่านรูปร่างห้องนิรภัยของคุณก่อน: ชื่อเรื่องโน้ต โฟลเดอร์ และแท็ก มันขอข้อความโน้ตเฉพาะเมื่อจำเป็น และไม่ขอไฟล์แนบเลย",
         "provider": "ผู้ให้บริการ: {{provider}}",
         "estimatedChars": "ประมาณ {{chars}} อักขระ",
+        "excluded_one": "ไม่รวมโน้ต {{count}} รายการเพราะโฟลเดอร์ของมันถูกกันออกจาก AI",
+        "excluded_other": "ไม่รวมโน้ต {{count}} รายการเพราะโฟลเดอร์ของมันถูกกันออกจาก AI",
         "showPayload": "แสดงสิ่งที่จะส่งทั้งหมด",
         "hidePayload": "ซ่อน payload",
         "consentLabel": "ส่งเค้าโครงนี้ไปยัง {{provider}} (ประมาณ {{chars}} อักขระ) ฉันเข้าใจว่าผู้ให้บริการได้รับ",
@@ -4432,7 +4298,7 @@
         },
         "phases": {
           "projecting": "กำลังอ่านรูปร่างห้องนิรภัยของคุณ…",
-          "asking": "กำลังถามโมเดลเรื่องธีม…",
+          "asking": "กำลังถามโมเดลสำหรับรายการความจำ…",
           "reading": "กำลังอ่านโน้ตที่โมเดลขอ…",
           "finalizing": "กำลังเขียนรายการ…",
           "working": "กำลังทำงาน…"
@@ -4443,10 +4309,13 @@
         "removeConfirm": "เอารายการทั้งหมดจาก seed นี้ออก?",
         "removedToast": "เอารายการจากห้องนิรภัยของคุณออกแล้ว",
         "rowStale": "ห้องนิรภัยเปลี่ยนตั้งแต่ seed นี้",
-        "providerLocalName": "Provider: on this device",
-        "countNotes_other": "{{count}} notes",
-        "countFolders_other": "{{count}} folders",
-        "countTags_other": "{{count}} tags"
+        "providerLocalName": "ผู้ให้บริการ: บนอุปกรณ์นี้",
+        "countNotes_one": "โน้ต {{count}} รายการ",
+        "countNotes_other": "โน้ต {{count}} รายการ",
+        "countFolders_one": "โฟลเดอร์ {{count}} รายการ",
+        "countFolders_other": "โฟลเดอร์ {{count}} รายการ",
+        "countTags_one": "แท็ก {{count}} รายการ",
+        "countTags_other": "แท็ก {{count}} รายการ"
       },
       "emptyTitle": "ยังไม่มีอะไรถูกจดจำ",
       "count": "{{used}} จาก {{cap}}",
@@ -4454,26 +4323,25 @@
     },
     "account": {
       "vaultsLabel": "ห้องนิรภัยในบัญชีนี้",
-      "vaultsHelper": "ห้องนิรภัยที่อุปกรณ์นี้จัดกลุ่มไว้ด้วยกัน การจัดกลุ่มเป็นตัวเลือกองค์กรต่ออุปกรณ์ จึงไม่เป็นส่วนหนึ่งของเนื้อหาห้องนิรภัยและไม่เดินทางไปกับมัน",
+      "vaultsHelper": "ห้องนิรภัยที่อุปกรณ์นี้จัดกลุ่มไว้ด้วยกัน การจัดกลุ่มไม่เป็นส่วนหนึ่งของเนื้อหาห้องนิรภัยใด",
       "vaultsHelperShort": "การจัดกลุ่มอยู่บนอุปกรณ์นี้และไม่เดินทางไปกับห้องนิรภัย",
       "vaultsCount_one": "ห้องนิรภัย {{count}} แห่ง",
       "vaultsCount_other": "ห้องนิรภัย {{count}} แห่ง",
       "vaultCorrupted": "อ่านข้อมูลกำกับของห้องนิรภัยนี้ไม่ได้",
       "vaultUnreadable": "อ่านไม่ได้บนอุปกรณ์นี้",
-      "vaultDeviceOnly": "เฉพาะอุปกรณ์",
       "currentVault": "ห้องนิรภัยนี้",
       "unknownVault": "ห้องนิรภัยอื่นบนอุปกรณ์นี้",
       "numberLabel": "หมายเลขบัญชี",
       "numberHelper": "หมายเลขของตัวตนคุณ ไม่ใช่ของห้องนิรภัย คำนวณจากวลีตัวตน จึงหายไม่ได้และไม่ต้องบันทึก ไม่ใช่ความลับ ใช้สำหรับการสนับสนุนหรือส่งต่อให้ผู้ดูแลระบบ",
       "numberUnavailable": "อ่านหมายเลขบัญชีบนอุปกรณ์นี้ไม่ได้ เปิดการตั้งค่าอีกครั้งเพื่อลอง",
       "numberEmpty": "ไม่มีตัวตนบนอุปกรณ์นี้ เพิ่มหรือกู้คืนใน Sync เพื่อรับหมายเลขบัญชี",
-      "numberCopy": "คัดลอก",
       "numberCopied": "คัดลอกหมายเลขบัญชีแล้ว",
       "numberCopyFailed": "คัดลอกหมายเลขบัญชีไม่ได้",
       "copyAccountNumber": "คัดลอกหมายเลขบัญชี",
       "standaloneHelper": "ห้องนิรภัยนี้ไม่ได้จัดกลุ่มภายใต้บัญชีบนอุปกรณ์นี้ จึงยืนอยู่คนเดียว การจัดกลุ่มเป็นต่ออุปกรณ์ อุปกรณ์อื่นอาจแสดงอยู่ในกลุ่ม",
       "unresolvedHelper": "กำลังพิจารณาว่าห้องนิรภัยใดเปิดอยู่…",
       "devicesNote": "อุปกรณ์ สมาชิกห้องนิรภัยที่แชร์ และตัวตนของคุณจัดการใน Sync",
+      "noStoreHelper": "อุปกรณ์นี้ไม่มีที่เก็บคีย์ของระบบ จึงเก็บการจัดกลุ่มบัญชีไว้ไม่ได้ บนอุปกรณ์นี้ห้องนิรภัยจะเปิดแยกกัน และอุปกรณ์อื่นอาจแสดงรวมกัน",
       "groupingError": "อ่านการจัดกลุ่มบัญชีบนอุปกรณ์นี้ไม่ได้ ไม่มีอะไรเปลี่ยน",
       "sections": {
         "grouping": "บัญชีนี้"
@@ -4486,14 +4354,12 @@
       "openFilesRemain": "ยังมีไฟล์ที่มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึกเปิดอยู่ จัดการให้เรียบร้อย แล้วปิดตัวเลือกนี้อีกครั้ง"
     },
     "memberPassword": {
-      "reminder": "คุณยังไม่มีการปลดล็อกด่วนบนอุปกรณ์นี้ ห้องนิรภัยนี้จึงขอวลีกู้คืนของคุณทุกครั้ง",
-      "reminderDismiss": "ไม่ใช่ตอนนี้",
+      "reminder": "ตั้งสักอันเพื่อให้อุปกรณ์นี้เปิดห้องนิรภัยได้อีกครั้ง",
       "title": "การปลดล็อกห้องนิรภัยที่แชร์",
       "helperConfigured": "ห้องนิรภัยที่แชร์นี้เปิดด้วย {{method}} ที่เก็บไว้บนอุปกรณ์นี้",
-      "helperNotConfigured": "ตั้งรหัสผ่านหรือ PIN เพื่อไม่ต้องพิมพ์วลีกู้คืนใหม่ทุกครั้ง",
+      "helperNotConfigured": "ตั้งรหัสผ่านหรือ PIN เพื่อให้อุปกรณ์นี้เปิดห้องนิรภัยได้อีกครั้ง ถ้าไม่มี การเปิดที่นี่ใหม่ต้องใช้คำเชิญใหม่จากเจ้าของ",
       "set": "ตั้งค่า",
       "change": "เปลี่ยน",
-      "remove": "ลบออก",
       "label": "รหัสผ่านห้องนิรภัย",
       "methodPassword": "รหัสผ่าน",
       "methodPin": "PIN",
@@ -4502,8 +4368,8 @@
       "useBiometric": "ใช้ Touch ID",
       "pinLabel": "PIN ห้องนิรภัย",
       "pinPlaceholder": "PIN อย่างน้อย {{count}} หลัก",
-      "setupHelper": "อย่างน้อย {{count}} ตัวอักษร เก็บไว้บนอุปกรณ์นี้เท่านั้น วลีกู้คืนของคุณยังเปิดห้องนิรภัยได้ทุกที่",
-      "pinSetupHelper": "อย่างน้อย {{count}} หลัก เก็บไว้บนอุปกรณ์นี้เท่านั้น วลีกู้คืนของคุณยังเปิดห้องนิรภัยได้ทุกที่",
+      "setupHelper": "อย่างน้อย {{count}} ตัวอักษร เก็บไว้บนอุปกรณ์นี้เท่านั้น ถ้าคุณลืมมัน อุปกรณ์นี้ต้องใช้คำเชิญใหม่จากเจ้าของห้องนิรภัย",
+      "pinSetupHelper": "อย่างน้อย {{count}} หลัก เก็บไว้บนอุปกรณ์นี้เท่านั้น ถ้าคุณลืมมัน อุปกรณ์นี้ต้องใช้คำเชิญใหม่จากเจ้าของห้องนิรภัย",
       "errorTooShort": "ใช้อย่างน้อย {{count}} ตัวอักษร/หลัก",
       "errorGeneric": "ตั้งค่าข้อมูลรับรองไม่ได้ กรุณาลองอีกครั้ง"
     },
@@ -4585,21 +4451,19 @@
       "emptyTitle": "ไม่มีความขัดแย้ง"
     },
     "deviceJoinQr": {
-      "accountLabel": "หมายเลขบัญชี",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "สร้าง QR ไม่ได้ โปรดลองอีกครั้ง",
       "generate": "สร้าง QR",
       "hint": "วางหมายเลขบัญชีของคุณเพื่อสร้าง QR ให้โทรศัพท์สแกน ระบบจะเติมเซิร์ฟเวอร์และหมายเลขบัญชีให้คุณเอง",
       "invalidAccount": "นั่นดูไม่เหมือนหมายเลขบัญชีที่ถูกต้อง",
       "notConfigured": "ตั้งค่าเซิร์ฟเวอร์ซิงค์ก่อน แล้วจึงสร้าง QR",
-      "scanWithApp": "สแกนด้วยแอป iOS",
+      "scanWithApp": "สแกนด้วยแอปบนมือถือ",
       "title": "ลงชื่อเข้าใช้อุปกรณ์อื่น"
     },
     "devices": {
       "approve": "อนุมัติ",
       "awaitingApproval_one": "อุปกรณ์ {{count}} เครื่องรอการอนุมัติ",
       "awaitingApproval_other": "อุปกรณ์ {{count}} เครื่องรอการอนุมัติ",
-      "loading": "กำลังโหลด…",
       "noDevices": "ยังไม่มีอุปกรณ์อื่น",
       "notEnrolled": "อุปกรณ์นี้ยังไม่ได้ลงชื่อเข้าใช้ ถ้าคุณเพิ่งเพิ่ม มันรอการอนุมัติจากอุปกรณ์ที่อยู่ในบัญชีแล้ว ไม่เช่นนั้นลงชื่อเข้าใช้ด้วย “ลงชื่อเข้าใช้อุปกรณ์นี้”",
       "platform": {
@@ -4613,15 +4477,12 @@
         "web": "เบราว์เซอร์",
         "windows": "พีซี Windows"
       },
-      "remove": "นำออก",
       "removedElsewhere": "อุปกรณ์นี้ถูกนำออกจากบัญชีของคุณบนอุปกรณ์อื่น",
-      "rename": "เปลี่ยนชื่อ",
       "renameFailed": "บันทึกชื่อนั้นไม่ได้ ลองอีกครั้ง",
       "renameLabel": "ชื่ออุปกรณ์",
       "resetAndReAdd": "รีเซ็ตแล้วเพิ่มอุปกรณ์นี้ใหม่",
       "resetSyncOnThisDevice": "รีเซ็ตการซิงค์บนอุปกรณ์นี้",
       "shortName": "อุปกรณ์ {{hex}}",
-      "thisDevice": "อุปกรณ์นี้",
       "reasonUnreachable": "เซิร์ฟเวอร์ไม่ตอบ",
       "reasonUnexpected": "ข้อผิดพลาดที่ไม่คาดคิด",
       "reasonRejected": "เซิร์ฟเวอร์ปฏิเสธการลงชื่อเข้าใช้ของอุปกรณ์นี้",
@@ -4635,7 +4496,6 @@
       "verifyMatch": "ตรงกัน",
       "verifyMismatch": "ไม่ตรงกัน",
       "verifyPending": "รหัสนี้จะปรากฏเมื่ออุปกรณ์ใหม่ซิงค์ครั้งแรกเสร็จ",
-      "verifyChanged": "รหัสเปลี่ยนไประหว่างที่คุณกำลังดูอยู่ เปรียบเทียบทั้งสองหน้าจออีกครั้ง ถ้ายังเปลี่ยนอยู่เรื่อย ๆ ให้หยุดและอย่าดำเนินการต่อ",
       "verifySyncing": "กำลังซิงค์…",
       "verifyTitle": "ยืนยันอุปกรณ์ใหม่",
       "verifyAction": "เปรียบเทียบรหัส",
@@ -4662,7 +4522,6 @@
       "invitePlaceholder": "รหัสที่ผู้ดูแลเซิร์ฟเวอร์ให้คุณ"
     },
     "enroll": {
-      "accountNumberLabel": "หมายเลขบัญชี",
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "กำลังเชื่อมต่อ…",
       "credentialTypeAria": "ประเภทข้อมูลรับรอง",
@@ -4680,64 +4539,21 @@
         "inviteCodeRequired": "เซิร์ฟเวอร์นี้รับบัญชีใหม่เฉพาะเมื่อมีรหัสเชิญ ป้อนรหัสที่ผู้ดูแลให้คุณ"
       },
       "mode": {
-        "password": "รหัสผ่าน",
-        "recovery": "วลีกู้คืน"
+        "password": "รหัสผ่าน"
       },
       "passwordLabel": "รหัสผ่าน",
       "recoveryPhraseHint": "ป้อนวลีกู้คืน 24 คำของคุณ",
-      "recoveryPhraseLabel": "วลีกู้คืน",
       "signInWith": "ลงชื่อเข้าใช้ด้วย",
       "submit": "เพิ่มอุปกรณ์นี้",
       "wordAria": "คำที่ {{number}}"
     },
     "join": {
-      "accountLabel": "หมายเลขบัญชี",
       "cancel": "ยกเลิก",
-      "error": "เพิ่มอุปกรณ์นี้ไม่ได้ ตรวจสอบ URL ของเซิร์ฟเวอร์ หมายเลขบัญชี และรหัสผ่าน และว่าเซิร์ฟเวอร์เข้าถึงได้",
-      "help": "ลงชื่อเข้าใช้ด้วยหมายเลขบัญชีและรหัสผ่านของคุณ อุปกรณ์นี้จะซิงค์โน้ตของคุณเมื่ออุปกรณ์เดิมอนุมัติแล้ว ไม่ต้องใช้วลีกู้คืน",
-      "passwordLabel": "รหัสผ่าน",
       "serverLabel": "เซิร์ฟเวอร์ซิงค์",
-      "serverPlaceholder": "https://your-server.example",
       "sasMatch": "ตรงกัน ดำเนินการต่อ",
-      "sasMismatch": "ไม่ตรงกัน นำอุปกรณ์นี้ออก",
-      "submit": "เพิ่มอุปกรณ์",
       "submitting": "กำลังเพิ่ม…",
-      "title": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
-      "verifyBody": "ตรวจสอบว่ารหัสนี้ตรงกับรหัสบนอุปกรณ์ที่คุณใช้อนุมัติ",
-      "verifyChanged": "รหัสเปลี่ยนไปขณะที่คุณกำลังดูอยู่ เทียบทั้งสองหน้าจออีกครั้ง ถ้ามันยังเปลี่ยนอยู่เรื่อย ๆ ให้หยุดและอย่าดำเนินการต่อ",
       "verifyTitle": "ยืนยันอุปกรณ์นี้",
-      "waitingHint": "เปิดหน้าต่างนี้ทิ้งไว้ เมื่อได้รับอนุมัติแล้ว รหัสยืนยันจะปรากฏที่นี่ให้เทียบกับอุปกรณ์อีกเครื่องของคุณ",
-      "waitingTitle": "กำลังรอการอนุมัติ",
-      "personListFailed": "คุณอยู่ในบัญชีนี้แล้ว แต่แสดงรายการห้องนิรภัยไม่เสร็จ จึงยังไม่แสดง ลองอีกครั้ง หรือเปิดหน้านี้ใหม่ภายหลัง",
-      "personListRetry": "แสดงรายการห้องนิรภัยอีกครั้ง",
-      "sasAbortFailed": "ตัดการเชื่อมต่ออุปกรณ์นี้ไม่ได้ อุปกรณ์นี้ยังลงทะเบียนอยู่กับเซิร์ฟเวอร์นั้น ให้ถือว่าอุปกรณ์นี้ไม่น่าเชื่อถือ: เปิด การตั้งค่า → ซิงค์ แล้วนำออกจากที่นั่น โน้ตของคุณไม่ได้ถูกลบ",
-      "backToWaiting": "กลับไปที่การรอ",
-      "codeBody": "วางรหัสที่อุปกรณ์อื่นแสดง รหัสจากตัวตนเพิ่มอุปกรณ์นี้เข้าบัญชีทั้งหมด",
-      "codeContinue": "ดำเนินการต่อ",
-      "codeExpired": "รหัสนั้นหมดอายุแล้ว ขอให้อุปกรณ์อื่นแสดงรหัสใหม่",
-      "codeInvalid": "นั่นไม่ใช่รหัสเข้าร่วม Myne",
-      "codeLabel": "รหัสเข้าร่วม",
-      "codeMemberUnsupported": "รหัสนั้นสำหรับห้องนิรภัยที่แชร์ เพิ่มอุปกรณ์นี้จากหน้าจอตัวตนแทน ที่นั่นห้องนิรภัยจะปรากฏภายใต้คำเชิญของคุณ",
-      "codeOpen": "ฉันมีรหัสเข้าร่วม",
-      "codeTitle": "เพิ่มอุปกรณ์นี้ด้วยรหัส",
-      "personMismatch": "รหัสนั้นสำหรับตัวตนอื่น ไม่ใช่วลีที่คุณป้อน ตรวจสอบทั้งสองแล้วลองอีกครั้ง",
-      "personPendingBody": "อุปกรณ์อื่นของคุณต้องอนุมัติเครื่องนี้ จนกว่าจะทำ นี้อุปกรณ์เปิดห้องนิรภัยของบัญชีไม่ได้",
-      "personPendingHint": "กำลังรอการอนุมัติ นี้เสร็จเองเมื่ออุปกรณ์อื่นอนุมัติ",
-      "personPendingPhraseAgain": "อุปกรณ์นี้รีสตาร์ทก่อนการอนุมัติมาถึง จึงต้องการวลีอีกครั้ง",
-      "personPendingPhraseCta": "ป้อนวลีอีกครั้ง",
-      "personPendingTitle": "กำลังรอการอนุมัติ",
-      "personPhraseBody": "รหัสตั้งชื่อตัวตน 24 คำพิสูจน์ มันไม่ออกจากอุปกรณ์นั้น อุปกรณ์นี้จะขอรหัสผ่านของห้องนิรภัยแต่ละห้องเมื่อคุณเปิด",
-      "personPhraseSubmit": "เพิ่มอุปกรณ์นี้",
-      "personPhraseTitle": "ป้อนวลีตัวตนของคุณ",
-      "errorPhrase": "เพิ่มอุปกรณ์นี้ไม่ได้ ตรวจสอบ URL เซิร์ฟเวอร์ หมายเลขบัญชี และวลีกู้คืน และตรวจสอบว่าเข้าถึงเซิร์ฟเวอร์ได้",
-      "modePassword": "รหัสผ่านของฉัน",
-      "modePhrase": "วลีกู้คืนของฉัน",
-      "noDeviceBody": "ไม่มีอุปกรณ์อื่นที่จะอนุมัติเครื่องนี้ใช่ไหม คุณยืนยันด้วยวลีกู้คืนแทนได้",
-      "phraseEscapeBody": "วลีกู้คืนของคุณคือกุญแจเต็มของบัญชีนี้ จึงยืนยันอุปกรณ์นี้ได้โดยไม่ต้องมีอุปกรณ์อื่นอนุมัติ คุณยังใช้รหัสผ่านที่เพิ่งใช้ไป",
-      "phraseTitle": "ยืนยันด้วยวลีกู้คืนของคุณ",
-      "phraseWarning": "วลีกู้คืนของคุณคือกุญแจเต็มของบัญชีนี้ อุปกรณ์นี้จึงถูกเพิ่มโดยไม่ต้องมีอุปกรณ์อื่นอนุมัติ ใช้เฉพาะเมื่อคุณไม่มีอุปกรณ์อื่นให้อนุมัติ ต่อไปคุณจะตั้งรหัสผ่านใหม่",
-      "usePhrase": "ใช้วลีกู้คืนของฉัน",
-      "back": "ย้อนกลับ"
+      "sasAbortFailed": "ตัดการเชื่อมต่ออุปกรณ์นี้ไม่ได้ อุปกรณ์นี้ยังลงทะเบียนอยู่กับเซิร์ฟเวอร์นั้น ให้ถือว่าอุปกรณ์นี้ไม่น่าเชื่อถือ: เปิด การตั้งค่า → ซิงค์ แล้วนำออกจากที่นั่น โน้ตของคุณไม่ได้ถูกลบ"
     },
     "panel": {
       "addDevice": {
@@ -4756,7 +4572,6 @@
         "helper": "การอนุมัติหนึ่งครั้งลงชื่อเข้าใช้อุปกรณ์เข้าบัญชีของคุณ มันเห็นทุกห้องนิรภัยที่คุณเป็นเจ้าของ และแต่ละห้องยังเปิดด้วยรหัสผ่านของตัวเอง"
       },
       "recovered": {
-        "close": "ปิด",
         "decrypting": "กำลังถอดรหัส…",
         "deleteConfirmTitle": "ลบโน้ตที่กู้คืนมานี้หรือไม่",
         "deleteConfirmWarning": "การกระทำนี้จะลบสำเนาเดียวที่เก็บไว้บนอุปกรณ์นี้อย่างถาวร และย้อนกลับไม่ได้",
@@ -4774,7 +4589,16 @@
       },
       "status": {
         "helper": "Myne ซิงค์โน้ตที่เข้ารหัสของคุณระหว่างอุปกรณ์ต่าง ๆ เซิร์ฟเวอร์เก็บไว้เพียงข้อความเข้ารหัสที่มันอ่านไม่ได้",
-        "label": "สถานะการซิงค์"
+        "label": "สถานะการซิงค์",
+        "authorityIdentityClosed": "การซิงค์จะกลับมาเมื่อคุณเปิดตัวตนของคุณบนอุปกรณ์นี้",
+        "authorityKeyMissing": "การซิงค์จะกลับมาเมื่อคุณเปิดตัวตนของคุณและอุปกรณ์นี้ถูกซ่อมแซม",
+        "authorityNoHeadContext": "อุปกรณ์นี้อ่านห้องนิรภัยได้ไม่พอที่จะลงนามให้มัน ข้อมูลรับรองของคุณไม่ใช่ปัญหา",
+        "authorityNoDeviceId": "อุปกรณ์นี้ยังไม่มีตัวตนของตัวเอง ห้องนิรภัยจึงระบุชื่อมันไม่ได้",
+        "authorityNoKeyAtRest": "อุปกรณ์นี้ไม่มีคีย์ลงนาม เปิดตัวตนของคุณบนอุปกรณ์นี้เพื่อตั้งคีย์ขึ้นมา",
+        "authorityKeyUnreadable": "คีย์ลงนามของอุปกรณ์นี้มีอยู่ แต่ที่เก็บคีย์ของระบบไม่ยอมอ่านมัน การรีสตาร์ตมักแก้ได้ และการเปิดตัวตนของคุณจะใช้ได้จนกว่าจะถึงตอนนั้น",
+        "authorityNoBindingRow": "คีย์ลงนามของอุปกรณ์นี้ยังไม่ถูกเผยแพร่ในห้องนิรภัย เปิดตัวตนของคุณบนอุปกรณ์นี้เพื่อเผยแพร่มัน",
+        "authorityRowNamesDifferentKey": "บันทึกของห้องนิรภัยสำหรับอุปกรณ์นี้ระบุคีย์คนละอันกับที่เก็บไว้ที่นี่ เปิดตัวตนของคุณบนอุปกรณ์นี้เพื่อซ่อมแซม",
+        "authorityRowUnverified": "บันทึกของห้องนิรภัยสำหรับอุปกรณ์นี้ตรวจสอบไม่ผ่าน เปิดตัวตนของคุณบนอุปกรณ์นี้เพื่อลงนามอีกครั้ง"
       },
       "usage": {
         "helper": "บัญชีนี้เก็บข้อมูลที่เข้ารหัสไว้บนเซิร์ฟเวอร์มากแค่ไหน และมีอุปกรณ์กี่เครื่องที่ลงชื่อเข้าใช้อยู่",
@@ -4786,7 +4610,6 @@
         "label": "ตัวตน",
         "helper": "ตัวตนทำให้คนอื่นเชิญคุณเข้าห้องนิรภัยได้ และทำให้ตัวตนหนึ่งเป็นเจ้าของหลายห้องนิรภัยได้",
         "cta": "เพิ่มตัวตน",
-        "codeLabel": "รหัสตัวตนของคุณ",
         "lockedHelper": "อุปกรณ์นี้มีตัวตนอยู่ มันถูกล็อกสำหรับเซสชันนี้ ปลดล็อกด้วยวลีกู้คืนของคุณเพื่อลงนามการซิงค์และคำเชิญ",
         "unregisteredHelper": "ตัวตนนี้มีบนอุปกรณ์นี้เท่านั้น การลงทะเบียนเขียนมันไปยังเซิร์ฟเวอร์ซิงค์ ซึ่งทำให้คำเชิญมาถึงคุณได้",
         "unlockedHelper": "อุปกรณ์นี้มีตัวตนอยู่ และปลดล็อกแล้วสำหรับเซสชันนี้"
@@ -4809,8 +4632,7 @@
       "restoredToast": "กู้คืนเป็นโน้ตใหม่แล้ว"
     },
     "stale": {
-      "body": "Myne เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้มาหลายวันแล้ว โน้ตของคุณกำลังถูกบันทึกบนอุปกรณ์นี้ แต่ไม่มีอะไรออกไปจากเครื่องเลย นี่จึงเป็นสำเนาเดียวที่มีอยู่ เปิด การตั้งค่า → ซิงค์ เพื่อดูสาเหตุ",
-      "dismiss": "ปิด"
+      "body": "Myne เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้มาหลายวันแล้ว โน้ตของคุณกำลังถูกบันทึกบนอุปกรณ์นี้ แต่ไม่มีอะไรออกไปจากเครื่องเลย นี่จึงเป็นสำเนาเดียวที่มีอยู่ เปิด การตั้งค่า → ซิงค์ เพื่อดูสาเหตุ"
     },
     "status": {
       "awaitingApproval": "รอการอนุมัติ",
@@ -4832,8 +4654,11 @@
       "syncing": "กำลังซิงค์…",
       "syncNow": "ซิงค์เดี๋ยวนี้",
       "errorIdentityLocked": "ปลดล็อกตัวตนของคุณเพื่อซิงค์",
+      "uploadsBlocked": "หยุดการอัปโหลดชั่วคราว: อุปกรณ์นี้ลงนามหัวห้องนิรภัยไม่ได้",
       "errorTls": "ตรวจสอบการเชื่อมต่อ HTTPS ของเซิร์ฟเวอร์ซิงค์ไม่ได้",
-      "unlockIdentityCta": "ปลดล็อกตัวตน"
+      "unlockIdentityCta": "ปลดล็อกตัวตน",
+      "errorDeviceKeyMissing": "คีย์ลงนามที่อุปกรณ์นี้เผยแพร่ไว้ไม่อยู่ที่นี่ การซิงค์จึงทำงานไม่ได้",
+      "repairDeviceCta": "ซ่อมแซมอุปกรณ์นี้"
     },
     "usage": {
       "devices": "อุปกรณ์",
@@ -4848,6 +4673,7 @@
       "serverSection": "เซิร์ฟเวอร์",
       "serverNotSet": "ยังไม่ได้ตั้งค่า",
       "statusLabel": "สถานะ",
+      "approvalCode": "รหัสอนุมัติของอุปกรณ์นี้",
       "hubHelp": "การซิงค์ทำให้โน้ตของคุณอัปเดตตรงกันทุกอุปกรณ์ ทุกอย่างถูกเข้ารหัสบนอุปกรณ์นี้ก่อนถูกส่งออกไป เซิร์ฟเวอร์ไม่เคยเห็นโน้ตของคุณ",
       "connectedTls": "เชื่อมต่อผ่าน TLS แล้ว",
       "connectedLocal": "เชื่อมต่อในเครือข่ายท้องถิ่นของคุณแล้ว",
@@ -4862,7 +4688,6 @@
       "verifyBody": "ตรวจสอบว่ารหัสเดียวกันนี้ปรากฏบนอุปกรณ์ที่คุณเพิ่งอนุมัติ ถ้าตรงกัน แสดงว่าอยู่ในบัญชีของคุณ ถ้าไม่ตรงกัน ให้นำอุปกรณ์นั้นออก",
       "sasMismatch": "ไม่ตรงกัน",
       "removeDeviceButton": "นำอุปกรณ์ออก",
-      "keepDevice": "เก็บไว้",
       "notEnrolledHelp": "อุปกรณ์นี้ยังไม่ได้ซิงค์ เพิ่มจากหน้าจอก่อนหน้าเพื่อดูอุปกรณ์ของคุณ",
       "unauthenticated": "สิทธิ์เข้าถึงของอุปกรณ์นี้ถูกเพิกถอน น่าจะถูกนำออกจากอุปกรณ์อื่น",
       "transportError": "เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้ ตรวจสอบที่อยู่เซิร์ฟเวอร์และใบรับรอง HTTPS ของมัน",
@@ -4891,7 +4716,7 @@
     "memberRoster": {
       "loading": "กำลังโหลดสมาชิก…",
       "error": "อ่านรายชื่อสมาชิกคลังไม่ได้",
-      "hint": "สมาชิกของคลังนี้ แต่ละคนเข้าร่วมด้วยตัวตนและข้อมูลรับรองของตนเอง",
+      "hint": "สมาชิกของห้องนิรภัยนี้ แต่ละคนเข้าร่วมด้วยตัวตนและข้อมูลรับรองของตนเอง จำนวนอุปกรณ์คือคำกล่าวอ้างที่สมาชิกนั้นลงนามไว้ ไม่ใช่หลักฐานว่าเขาเป็นเจ้าของเครื่อง",
       "empty": "เชิญใครสักคนเพื่อแชร์ห้องนิรภัยนี้ พวกเขาจะเข้าร่วมด้วยตัวตนของตัวเอง",
       "rotated": "หมุนคีย์แล้ว",
       "keyChanged": "คีย์เปลี่ยนแล้ว ตรวจสอบกับเจ้าของ",
@@ -4899,7 +4724,6 @@
       "ownerBadge": "เจ้าของ",
       "memberBadge": "สมาชิก",
       "invite": "เชิญสมาชิก",
-      "remove": "ลบ",
       "removeConfirm": "ลบ {{name}} หรือ หลังหมุนคีย์พวกเขาจะสูญเสียการเข้าถึงการเปลี่ยนแปลงในอนาคต สิ่งนี้ไม่ลบสิ่งที่คัดลอกแล้วและไม่เพิกถอนเนื้อหาจากอุปกรณ์หรือผู้ให้บริการ AI ของพวกเขา",
       "removalLimits": "การลบสมาชิกหยุดเฉพาะการเข้าถึงการเปลี่ยนแปลงในอนาคต สิ่งนี้ไม่ลบสิ่งที่คัดลอกแล้วและไม่เพิกถอนเนื้อหาจากอุปกรณ์หรือผู้ให้บริการ AI ของพวกเขา",
       "inviteReady": "คำเชิญพร้อมสำหรับ {{fingerprint}} แล้ว",
@@ -4914,18 +4738,18 @@
       "personLock": "ล็อกตัวตน",
       "personError": "วลีนี้ไม่ได้ปลดล็อกตัวตนสมาชิก",
       "inviteHint": "วางรหัสตัวตนสมาชิกที่เชิญ (จากหน้าตัวตนของเขา)",
-      "inviteCodeLabel": "รหัสตัวตนของคุณ",
       "untitledVault": "คลังไม่มีชื่อ",
       "inviteFailed": "สร้างคำเชิญไม่ได้",
       "inviteNotOnServer": "ห้องนิรภัยนี้ยังไม่อยู่บนเซิร์ฟเวอร์ซิงค์ของคุณ เผยแพร่มัน และลงทะเบียนตัวตนของคุณ แล้วเชิญอีกครั้ง",
       "removeFailed": "ลบสมาชิกไม่ได้",
       "youBadge": "คุณ",
+      "deviceCount_one": "คำกล่าวอ้างอุปกรณ์ {{count}} รายการ",
+      "deviceCount_other": "คำกล่าวอ้างอุปกรณ์ {{count}} รายการ",
+      "deviceClaimsUnverified_one": "ตรวจสอบคำกล่าวอ้างอุปกรณ์หนึ่งรายการไม่ได้: สมาชิกที่มันระบุไม่ได้ลงนามในมัน",
+      "deviceClaimsUnverified_other": "ตรวจสอบคำกล่าวอ้างอุปกรณ์ {{count}} รายการไม่ได้: สมาชิกที่แต่ละรายการระบุไม่ได้ลงนามในมัน",
       "nameUnverified": "ชื่อไม่ได้รับการยืนยัน",
       "nameLabel": "ชื่อที่แสดงของคุณ",
-      "nameEdit": "เปลี่ยนชื่อ",
       "nameSave": "บันทึก",
-      "nameClear": "ล้าง",
-      "nameCancel": "ยกเลิก",
       "nameErrorEmpty": "ป้อนชื่อ หรือใช้ล้างเพื่อลบชื่อของคุณ",
       "nameErrorTooLong": "ชื่อนั้นยาวเกินไป",
       "nameErrorUnreadable": "อ่านที่เก็บชื่อบนอุปกรณ์นี้ไม่ได้ ไม่มีอะไรถูกบันทึก",
@@ -4934,7 +4758,6 @@
       "nameErrorGeneric": "บันทึกชื่อของคุณไม่ได้ ลองอีกครั้ง",
       "nameInviteCta": "ตั้งชื่อ",
       "noInvitations": "ยังไม่ได้ส่งคำเชิญ",
-      "identityHeading": "ตัวตนของคุณ",
       "membersHeading": "สมาชิก",
       "emptyTitle": "ยังไม่มีสมาชิก",
       "personUnlockOpen": "ปลดล็อก",
@@ -4944,16 +4767,12 @@
       "shareConfirmBody": "การเชิญใครสักคนจะเปลี่ยนห้องนิรภัยนี้เป็นห้องนิรภัยที่แชร์: มันจะได้คีย์กลุ่ม และคนที่คุณเชิญจะเปิดเนื้อหาของมันด้วยคีย์นั้น การเปลี่ยนแปลงนี้เป็นการถาวรและไม่มีทางกลับไปเป็นห้องนิรภัยผู้ใช้คนเดียว ดำเนินการต่อเพื่อเลือกว่าจะเชิญใคร",
       "shareConfirmCta": "แชร์และเชิญ",
       "shareFailed": "เริ่มแชร์ห้องนิรภัยนี้ไม่ได้",
-      "identityForgetCta": "ลืมตัวตนนี้บนอุปกรณ์นี้",
       "identityForgetCheckbox": "ฉันเข้าใจว่าตัวตนนี้จะถูกลบออกจากอุปกรณ์นี้",
       "identityForgetConfirm": "ลืมตัวตน",
-      "identityForgetCancel": "เก็บไว้",
-      "identityForgetWarning": "การทำเช่นนี้ลบตัวตนออกจากอุปกรณ์นี้เท่านั้น บัญชีบนเซิร์ฟเวอร์และห้องนิรภัยใดที่มันเป็นเจ้าของหรือเข้าร่วมไม่ได้รับผลกระทบ และคุณกู้คืนตัวตนได้ด้วยวลี 24 คำของมันบนอุปกรณ์อื่น คำเชิญและการดำเนินการกับรายชื่อบนอุปกรณ์นี้จะต้องปลดล็อกมันอีกครั้ง",
       "identityForgetError": "ลืมตัวตนไม่ได้ ลองอีกครั้ง",
       "invitationDeclined": "ปฏิเสธแล้ว"
     },
     "deviceBindings": {
-      "title": "อุปกรณ์และสมาชิก",
       "errorLocked": "ปลดล็อกห้องนิรภัยเพื่ออ่านอุปกรณ์ของมัน",
       "errorUnshared": "ห้องนิรภัยนี้ไม่ได้แชร์ จึงไม่มีการผูกอุปกรณ์ใด",
       "errorNoDeviceId": "อุปกรณ์นี้ยังไม่ได้ถูกเพิ่มเข้าในบัญชีของคุณ จึงไม่มีตัวตนอุปกรณ์ให้อ้างสิทธิ์ตัวเองภายใต้",
@@ -4965,8 +4784,7 @@
       "title": "เลือกชื่อที่แสดง",
       "body": "นี่คือวิธีที่สมาชิกคนอื่นของห้องนิรภัยนี้จะเห็นคุณในรายชื่อสมาชิก ลายนิ้วมือของคุณจะอยู่ข้าง ๆ ชื่อ และคุณเปลี่ยนชื่อภายหลังได้",
       "label": "ชื่อที่แสดงของคุณ",
-      "checking": "กำลังตรวจสอบชื่อของคุณ…",
-      "save": "ดำเนินการต่อ"
+      "checking": "กำลังตรวจสอบชื่อของคุณ…"
     },
     "memberJoinQr": {
       "error": "สร้างรหัสไม่ได้",
@@ -4999,11 +4817,8 @@
       "folder": "โฟลเดอร์",
       "insert": "แทรก",
       "noDueDate": "ไม่มีกำหนดส่ง",
-      "priority": "ความสำคัญ",
       "sort": "เรียงตาม",
-      "sortDue": "วันที่กำหนดส่ง",
       "sortPath": "โน้ต",
-      "sortPriority": "ความสำคัญ",
       "status": "สถานะ",
       "statusDone": "เสร็จแล้ว",
       "statusTodo": "ยังไม่เสร็จ",
@@ -5018,7 +4833,6 @@
     },
     "filter": {
       "overdue": "เลยกำหนด",
-      "today": "วันนี้",
       "upcoming": "ที่จะถึง"
     },
     "noteTitle": "งานในโน้ตนี้",
@@ -5041,12 +4855,10 @@
       "untitled": "งานไม่มีชื่อ",
       "editFields": "แก้ไขฟิลด์ของงาน"
     },
-    "title": "งาน",
     "axis": {
       "due": "กำหนดส่ง",
       "folder": "โฟลเดอร์",
       "note": "โน้ต",
-      "priority": "ลำดับความสำคัญ",
       "sort": "เรียงลำดับ",
       "status": "สถานะ",
       "tag": "แท็ก"
@@ -5054,9 +4866,7 @@
     "due": {
       "any": "วันที่ใดก็ได้",
       "later": "ภายหลัง",
-      "none": "ไม่มีวันที่",
       "overdue": "เกินกำหนด",
-      "today": "วันนี้",
       "upcoming": "ที่จะมาถึง"
     },
     "filters": {
@@ -5073,30 +4883,22 @@
       "medium": "ปานกลาง"
     },
     "section": {
-      "done": "เสร็จแล้ว",
       "later": "ภายหลัง",
-      "none": "ไม่มีวันที่",
       "overdue": "เกินกำหนด",
-      "today": "วันนี้",
       "upcoming": "ที่จะมาถึง"
     },
     "sort": {
-      "due": "กำหนดส่ง",
       "dueDesc": "กำหนดส่ง ใหม่ก่อน",
-      "note": "โน้ต",
-      "priority": "ลำดับความสำคัญ"
+      "note": "โน้ต"
     },
     "status": {
       "all": "ทั้งหมด",
-      "done": "เสร็จแล้ว",
       "undone": "เปิดอยู่"
     },
     "view": {
       "allFolders": "ทุกโฟลเดอร์",
-      "allNotes": "ทุกโน้ต",
       "anyPriority": "ลำดับความสำคัญใดก็ได้",
-      "anyTag": "แท็กใดก็ได้",
-      "untitled": "ไม่มีชื่อ"
+      "anyTag": "แท็กใดก็ได้"
     },
     "search": {
       "label": "ค้นางาน",
@@ -5110,9 +4912,7 @@
       "emptyBody": "สร้างเทมเพลตเพื่อใช้โครงโน้ตซ้ำ: บันทึกการประชุม บันทึกประจำวัน บันทึกการอ่าน เลือกใช้อันหนึ่งตอนสร้างโน้ตใหม่",
       "emptyTitle": "ยังไม่มีเทมเพลต",
       "listLabel": "เทมเพลต",
-      "loading": "กำลังโหลด…",
       "newTemplate": "เทมเพลตใหม่",
-      "newTemplateName": "เทมเพลตไม่มีชื่อ",
       "removeFromTemplates": "เอาออกจากเทมเพลต",
       "removeRowLabel": "เอา {{name}} ออกจากเทมเพลต (ยังเก็บโน้ตไว้)",
       "title": "เทมเพลตโน้ต",
@@ -5124,7 +4924,6 @@
     "newAction": "ใหม่",
     "emptyAfter": " เพื่อสร้างเทมเพลตโน้ตที่ใช้ซ้ำได้ แล้วเริ่มโน้ตจากมัน (และเลือกอันหนึ่งเป็นเทมเพลตโน้ตประจำวันใน การตั้งค่า)",
     "use": "ใช้",
-    "edit": "แก้ไข",
     "deleteConfirm": "ลบเทมเพลตนี้หรือไม่",
     "convertToNote": "แปลงเป็นโน้ต"
   },
@@ -5132,8 +4931,6 @@
     "apply": "ใช้ธีมนี้",
     "applying": "กำลังใช้…",
     "byAuthor": "ลิงก์นี้ระบุว่าสร้างโดย {{author}}",
-    "cancel": "ยกเลิก",
-    "close": "ปิด",
     "collision": {
       "keepBoth": "เก็บทั้งคู่ และติดตั้งเป็น “{{name}}”",
       "question": "คุณมีธีมชื่อ “{{name}}” อยู่แล้ว",
@@ -5156,7 +4953,6 @@
   },
   "unlock": {
     "backToPicker": "เลือกห้องนิรภัยอื่น",
-    "continue": "ดำเนินการต่อ",
     "decrypting": "กำลังถอดรหัส…",
     "deleteLink": "ลืมทั้งรหัสผ่านและวลีกู้คืนใช่ไหม ลบห้องนิรภัยแล้วเริ่มใหม่",
     "memberRemoveLink": "เอาห้องนิรภัยนี้ออกจากอุปกรณ์นี้",
@@ -5164,8 +4960,6 @@
       "alreadyUnlocked": "ห้องนิรภัยถูกปลดล็อกอยู่แล้ว",
       "inProgress": "มีการทำงานค้างอยู่",
       "kdfMemoryExceedsHost": "ห้องนิรภัยนี้ต้องการหน่วยความจำ {{required}} MiB เพื่อเปิด มากกว่าที่เบราว์เซอร์นี้ให้ได้ ({{available}} MiB) ห้องนิรภัยไม่เป็นไร เปิดในแอป Myne บนเดสก์ท็อป",
-      "unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
-      "vaultNotFound": "ไม่พบไฟล์ห้องนิรภัย โปรดเริ่มแอปใหม่",
       "vaultUpgraded": "ห้องนิรภัยนี้ถูกอัปเกรดเป็นรูปแบบที่ใหม่กว่าที่ Myne เวอร์ชันนี้ยังไม่รองรับ ข้อมูลของคุณไม่ได้เสียหาย อัปเดต Myne เป็นเวอร์ชันล่าสุดเพื่อเปิดใช้งาน",
       "openAsImportSource": "ขณะนี้มีการนำเข้ากำลังอ่านห้องนิรภัยนี้อยู่ ทำการนำเข้านั้นให้เสร็จหรือยกเลิก แล้วจึงปลดล็อกห้องนิรภัยนี้"
     },
@@ -5180,8 +4974,8 @@
       "wrongCredential": "ไม่ถูกต้อง เหลืออีก {{remaining}} ครั้ง",
       "showPin": "แสดง PIN",
       "hidePin": "ซ่อน PIN",
-      "waitingForTouchId": "Waiting for Touch ID…",
-      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
+      "waitingForTouchId": "กำลังรอ Touch ID…",
+      "waitingForTouchIdHint": "ตอบคำขอของระบบเพื่อปลดล็อก ถ้าไม่มีคำขอปรากฏ ให้ใช้รหัสผ่านของคุณแทน"
     },
     "recoveryInterruptedBanner": "ขั้นตอนการกู้คืนถูกขัดจังหวะ ตั้งรหัสผ่านใหม่ก่อน",
     "recoveryInterruptedBody": "ตั้งรหัสผ่านใหม่ก่อน แล้วจึงผนึกห้องนิรภัยของคุณอีกครั้ง",
@@ -5196,7 +4990,6 @@
       "metaChangedExternally": "ห้องนิรภัยถูกแก้ไขในเซสชันอื่น โปรดปลดล็อกอีกครั้ง"
     },
     "title": "ปลดล็อกห้องนิรภัยของคุณ",
-    "vaultUnreadable": "ไฟล์ห้องนิรภัยอ่านไม่ได้ กู้คืนจากไฟล์สำรองข้อมูล",
     "unlockFailedGeneric": "ปลดล็อกไม่ได้ โปรดลองอีกครั้ง",
     "biometricTooManyAttempts": "ลอง {{biometric}} หลายครั้งเกินไป ใช้รหัสผ่านของคุณ",
     "pinIncorrect_one": "PIN ไม่ถูกต้อง เหลืออีก {{count}} ครั้ง",
@@ -5223,16 +5016,12 @@
     "deletePartialError": "ลบไฟล์บางไฟล์ไม่ได้ ห้องนิรภัยนี้ใช้งานไม่ได้อีกแล้ว ดำเนินการต่อเพื่อเริ่มใหม่",
     "failClosedEyebrow": "เปิดห้องนิรภัยไม่ได้",
     "restoreHint": "การกู้คืนจากไฟล์สำรองข้อมูลยังใช้ไม่ได้บนมือถือ",
-    "memberHint": "คลังนี้ถูกแชร์กับคุณ ปลดล็อกด้วยวลีกู้คืนของคุณ",
     "memberSubtitle": "เปิดห้องนิรภัยที่แชร์นี้",
-    "memberPhraseLabel": "วลีกู้คืน",
+    "memberNoCredential": "ห้องนิรภัยที่แชร์นี้ถูกตั้งค่าบนอุปกรณ์อื่น การจะเปิดมันที่นี่ ให้ยอมรับคำเชิญใหม่จากเจ้าของห้องนิรภัย: อุปกรณ์นี้ไม่มีรหัสผ่านสำหรับมัน และวลีกู้คืนไม่ปลดล็อกห้องนิรภัยที่แชร์แล้วอีกต่อไป",
     "memberSubmit": "ปลดล็อก",
-    "memberError": "วลีนี้ไม่ได้ปลดล็อกคลังที่แชร์",
     "memberPasswordHint": "ห้องนิรภัยนี้ถูกแชร์ให้คุณ ปลดล็อกด้วยรหัสผ่านที่คุณตั้งบนอุปกรณ์นี้",
     "memberPasswordLabel": "รหัสผ่านห้องนิรภัย",
     "memberPasswordError": "รหัสผ่านนั้นเปิดห้องนิรภัยที่แชร์นี้ไม่ได้",
-    "memberUsePhrase": "ใช้วลีกู้คืนแทน",
-    "memberUseFast": "ใช้การปลดล็อกด่วนแทน",
     "memberPinHint": "ห้องนิรภัยนี้ถูกแชร์ให้คุณ ปลดล็อกด้วย PIN ที่คุณตั้งบนอุปกรณ์นี้",
     "memberPinLabel": "PIN ห้องนิรภัย",
     "memberPinPlaceholder": "PIN ห้องนิรภัย (อย่างน้อย {{count}} หลัก)",
@@ -5242,6 +5031,7 @@
     "restoreCta": "กู้คืนจากไฟล์สำรองข้อมูล",
     "ioErrorHint": "ลองอีกครั้ง หรือเปิด Myne ใหม่",
     "identityPhraseLink": "ใช้วลีตัวตนของคุณ",
+    "passwordOnlyNote": "ห้องนิรภัยนี้เปิดด้วยรหัสผ่านของมันเท่านั้น ไม่มีวลีกู้คืนสำหรับมัน",
     "identityPhrase": {
       "title": "ปลดล็อกด้วยวลีตัวตนของคุณ",
       "body": "ห้องนิรภัยนี้เปิดด้วยรหัสผ่านหรือวลีตัวตน หากคุณบันทึกวลีห้องนิรภัยแยกไว้ มันถูกปลดระวางแล้วและไม่เปิดอีก การเปิดด้วย 24 คำที่คุณเขียนไว้สำหรับตัวตนยังปลดล็อกตัวตนสำหรับเซสชันนี้ ทำให้ซิงค์ทำงานโดยไม่ต้องถามอีก",
@@ -5258,13 +5048,11 @@
   "vault": {
     "ioBanner": {
       "cannotRead": "อ่านไฟล์ห้องนิรภัยไม่ได้",
-      "notFound": "ไม่พบไฟล์ห้องนิรภัย โปรดเริ่มแอปใหม่",
       "permissionDenied": "ไม่มีสิทธิ์เข้าถึงไฟล์ห้องนิรภัย ตรวจสอบสิทธิ์ของไฟล์"
     }
   },
   "vaultCreation": {
     "briefing": {
-      "back": "ย้อนกลับ",
       "continue": "ไปต่อที่การสร้างห้องนิรภัย",
       "eyebrow": "ห้องนิรภัยใหม่",
       "heading": "ก่อนสร้างห้องนิรภัยของคุณ",
@@ -5281,15 +5069,14 @@
           "why": "รหัสผ่านของคุณคือข้อมูลนำเข้าของกุญแจที่ถอดรหัสโน้ตของคุณ มันไม่เคยออกจากอุปกรณ์นี้ และไม่มีอะไรบนเซิร์ฟเวอร์ของเราที่สร้างมันขึ้นมาใหม่ได้ นั่นคือสิ่งที่ทำให้โน้ตของคุณเป็นส่วนตัว และเป็นเหตุผลที่เรารีเซ็ตให้คุณไม่ได้"
         },
         "phrase-backup": {
-          "ackLabel": "ฉันเข้าใจว่าวลีกู้คืนคือข้อมูลสำรองเพียงอย่างเดียวของฉัน",
-          "statement": "วลีกู้คืนคือข้อมูลสำรองเพียงอย่างเดียวของคุณ",
-          "why": "ถ้าคุณลืมรหัสผ่าน วลีกู้คืน 24 คำคือทางเดียวที่จะกลับเข้าไปได้ {{lostBothSecrets}} จดวลีนั้นไว้และเก็บในที่ปลอดภัย"
+          "ackLabel": "ฉันเข้าใจว่าไม่มีสิ่งอื่นใดพาฉันกลับเข้าห้องนิรภัยนี้ได้",
+          "statement": "เก็บสิ่งที่ Myne แสดงให้คุณไว้ ไม่มีสิ่งอื่นใดพาคุณกลับเข้าไปได้",
+          "why": "ห้องนิรภัยที่สร้างขณะตัวตนของคุณปลดล็อกอยู่จะเปิดด้วยรหัสผ่านของมันเท่านั้น: วลีตัวตนของคุณพิสูจน์ว่าคุณเป็นใครบนอุปกรณ์ใหม่ และมันไม่ได้เปิดห้องนิรภัย ส่วนห้องนิรภัยที่สร้างบนอุปกรณ์ที่ไม่มีตัวตนจะมีวลีกู้คืน 24 คำแทน และวลีนั้นคือทางเดียวกลับเข้าไป {{lostBothSecrets}} จดสิ่งที่ขั้นตอนนี้แสดงให้คุณเห็นและเก็บไว้ในที่ปลอดภัย"
         }
       },
       "why": "ทำไม"
     },
     "confirm": {
-      "back": "ย้อนกลับ",
       "heading": "ยืนยันวลีกู้คืนของคุณ",
       "intro": "พิมพ์คำที่ตำแหน่งทั้งสี่นี้ เพื่อตรวจสอบว่าคุณบันทึกไว้แล้ว",
       "mismatch": "ไม่ตรงกับคำที่ {{pos}}",
@@ -5311,31 +5098,24 @@
     },
     "errors": {
       "accountNumberInvalid": {
-        "body": "ลองอีกครั้ง",
         "title": "หมายเลขบัญชีไม่ถูกต้อง"
       },
       "aeadFailure": {
-        "body": "ลองอีกครั้ง",
         "title": "การเข้ารหัสล้มเหลว"
       },
       "csprng": {
-        "body": "ลองอีกครั้ง",
         "title": "สร้างข้อมูลสุ่มที่ปลอดภัยไม่ได้"
       },
       "invalidPassword": {
-        "body": "ลองอีกครั้ง",
         "title": "รหัสผ่านไม่ถูกต้อง"
       },
       "invalidVaultMeta": {
-        "body": "ลองอีกครั้ง",
         "title": "รูปแบบห้องนิรภัยผิดพลาด"
       },
       "ioOther": {
-        "body": "ลองอีกครั้ง",
         "title": "บันทึกห้องนิรภัยไม่ได้"
       },
       "joinFailure": {
-        "body": "ลองอีกครั้ง",
         "title": "เกิดข้อผิดพลาดบางอย่าง"
       },
       "kdfFailure": {
@@ -5347,7 +5127,6 @@
         "title": "พื้นที่ดิสก์ไม่พอ"
       },
       "notFound": {
-        "body": "ลองอีกครั้ง",
         "title": "ไม่พบโฟลเดอร์ห้องนิรภัย"
       },
       "passwordTooShort": {
@@ -5395,7 +5174,6 @@
         "title": "ทิ้งการสร้างห้องนิรภัยหรือไม่"
       },
       "genericError": {
-        "body": "ลองอีกครั้ง",
         "title": "เกิดข้อผิดพลาดบางอย่าง"
       },
       "provisionFailed": {
@@ -5404,17 +5182,14 @@
       }
     },
     "password": {
-      "back": "ย้อนกลับ",
       "heading": "เลือกรหัสผ่านหลัก",
       "helperLead": "Myne ไม่ได้เก็บรหัสผ่านหรือวลีกู้คืนของคุณ",
-      "submit": "สร้างวลีกู้คืน",
-      "eyebrowLabel": "รหัสผ่านหลัก"
+      "submit": "สร้างวลีกู้คืน"
     },
     "phrase": {
       "clipboardNotCleared": "เบราว์เซอร์ของคุณไม่ยอมให้ Myne ล้างคลิปบอร์ดหลังจากนี้ 24 คำนั้นจึงค้างอยู่จนกว่าคุณจะคัดลอกสิ่งอื่น วางลงในตัวจัดการรหัสผ่านของคุณ แล้วคัดลอกอะไรก็ได้ทับ",
       "copied": "คัดลอกแล้ว Myne จะล้างคลิปบอร์ดให้ใน 30 วินาที แม้คุณจะไปทำอย่างอื่นแล้ว ตราบใดที่แอปยังทำงานอยู่",
       "copiedNoAutoClear": "คัดลอกแล้ว Myne ล้างคลิปบอร์ดที่นี่ไม่ได้ คำเหล่านั้นจึงค้างอยู่จนกว่าคุณจะคัดลอกสิ่งอื่น",
-      "copy": "คัดลอก",
       "extensionNotice": "ส่วนขยายเบราว์เซอร์ที่เข้าถึงเว็บไซต์นี้ได้สามารถอ่านสิ่งที่อยู่บนหน้านี้ได้ ถ้าคุณไม่มั่นใจในส่วนขยายทุกตัวในโปรไฟล์นี้ ให้ใช้แอปบนเดสก์ท็อปหรือโปรไฟล์เบราว์เซอร์ที่สะอาดสำหรับขั้นตอนนี้",
       "copyFailed": "คัดลอกไม่ได้ ใช้ “บันทึกเป็นไฟล์” แทน",
       "downloadStarted": "ส่งไปยังการดาวน์โหลดของเบราว์เซอร์แล้ว ตรวจสอบว่ามาถึง: เบราว์เซอร์ตัดสินว่าไฟล์ไปไหน และ Myne ไม่เห็นว่ามาถึงหรือไม่",
@@ -5425,42 +5200,31 @@
       "sessionOnlyNotice": "เบราว์เซอร์นี้ไม่เก็บวลีของคุณหลังรีโหลด คุณจึงถูกขอ 24 คำอีกครั้ง เก็บไว้ในที่ปลอดภัย"
     },
     "ready": {
-      "backedUp": "สำรองข้อมูลแล้ว",
-      "backingUp": "กำลังสำรองข้อมูล…",
-      "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "การสำรองข้อมูลไม่เสร็จสมบูรณ์ ไม่มีไฟล์ตกค้าง คุณสำรองข้อมูลเมื่อไรก็ได้จาก การตั้งค่า → ที่เก็บข้อมูล",
-      "backupFilterName": "ไฟล์สำรองข้อมูล Myne",
-      "backUpNow": "สำรองข้อมูลเดี๋ยวนี้",
       "body": "โน้ตของคุณถูกเข้ารหัสและเก็บไว้บนอุปกรณ์นี้ เก็บรหัสผ่านและชุดกู้คืนของคุณไว้ในที่ปลอดภัย เพราะมันเป็นทางเดียวที่จะกลับเข้าไปได้",
       "decrypting": "กำลังถอดรหัส…",
       "done": "เปิดห้องนิรภัย",
-      "heading": "ห้องนิรภัยของคุณพร้อมแล้ว",
-      "showFolder": "แสดงโฟลเดอร์ห้องนิรภัย"
+      "heading": "ห้องนิรภัยของคุณพร้อมแล้ว"
     },
     "sessionLost": {
       "startOver": "เริ่มใหม่"
     },
     "kit": {
-      "accountFor": "หมายเลขบัญชี — เมื่อคุณเพิ่มอุปกรณ์อื่น",
-      "back": "ย้อนกลับ",
+      "accountFor": "หมายเลขบัญชี เมื่อคุณเพิ่มอุปกรณ์อื่น",
       "continue": "ฉันบันทึกสิ่งนี้แล้ว ยืนยันวลี",
       "copied": "ชุดกู้คืนอยู่บนคลิปบอร์ดของคุณ Myne จะล้างมันใน 30 วินาที แม้คุณจะไปทำอย่างอื่นต่อ ตราบใดที่แอปยังทำงานอยู่",
       "copiedNoAutoClear": "คัดลอกแล้ว Myne ล้างคลิปบอร์ดของคุณที่นี่ไม่ได้ ชุดกู้คืนจึงอยู่บนนั้นจนกว่าคุณจะคัดลอกอย่างอื่น",
-      "copy": "คัดลอก",
       "copyFailed": "คัดลอกไม่ได้ ใช้ “บันทึกชุดกู้คืน” แทน",
       "documentTitle": "ชุดกู้คืน Myne",
       "downloadStarted": "ส่งไปยังรายการดาวน์โหลดของเบราว์เซอร์คุณแล้ว ตรวจสอบว่าชุดกู้คืนมาถึง: เบราว์เซอร์ของคุณเป็นผู้กำหนดว่าไฟล์ไปอยู่ที่ใด และ Myne มองไม่เห็นว่ามันไปถึงหรือไม่",
       "eyebrowLabel": "ชุดกู้คืน",
       "heading": "บันทึกชุดกู้คืนของคุณ",
       "intro": "ไฟล์ที่คุณกำลังจะบันทึกคือสิ่งนี้ทุกประการ มันถูกแสดงครั้งเดียว",
-      "phraseFor": "วลีกู้คืน — หากคุณลืมรหัสผ่าน",
+      "phraseFor": "วลีกู้คืน หากคุณลืมรหัสผ่าน",
       "save": "บันทึกชุดกู้คืน",
       "saveFailed": "บันทึกไฟล์ไม่ได้ คัดลอกชุดกู้คืนแทน หรือจดทั้งสองส่วนลงไป",
       "savedToFile": "บันทึกแล้ว มันเป็นไฟล์ข้อความธรรมดาที่เก็บความลับทั้งสองส่วน จึงเก็บไว้ในที่ที่มีเพียงคุณอ่านได้"
     },
     "name": {
-      "back": "ย้อนกลับ",
-      "continue": "ดำเนินการต่อ",
       "eyebrowLabel": "ตั้งชื่อห้องนิรภัยของคุณ",
       "heading": "จะเรียกห้องนิรภัยนี้ว่าอะไร",
       "helper": "ชื่อถูกเก็บแบบเข้ารหัสไปกับห้องนิรภัย บนอุปกรณ์นี้ มันจะแสดงบนตัวเลือกห้องนิรภัยตอนเริ่มต้นก่อนคุณปลดล็อก ใครที่เห็นหน้าจอนั้นก็อ่านได้ ซ่อนชื่อห้องนิรภัยในการตั้งค่าเพื่อปิดสิ่งนั้น คุณเปลี่ยนภายหลังได้",
@@ -5471,13 +5235,10 @@
   },
   "vaultPicker": {
     "createAnother": "สร้างห้องนิรภัยอีกแห่ง",
-    "deviceOnly": "เฉพาะอุปกรณ์",
     "heading": "เลือกห้องนิรภัย",
-    "joinDevice": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
     "loading": "กำลังโหลดห้องนิรภัยของคุณ…",
     "noneLoaded": "ตอนนี้โหลดห้องนิรภัยไม่ได้เลย",
     "openedRelative": "เปิดเมื่อ {{rel}}",
-    "restoreFromBackup": "กู้คืนจากไฟล์สำรองข้อมูล",
     "subline": "คุณมีห้องนิรภัยมากกว่าหนึ่งแห่งบนอุปกรณ์นี้ เลือกหนึ่งแห่งเพื่อปลดล็อก",
     "vaultFallback": "ห้องนิรภัย {{n}}",
     "accountError": "อ่านการจัดกลุ่มบัญชีบนอุปกรณ์นี้ไม่ได้",
@@ -5497,7 +5258,6 @@
       "errors": {
         "cancelledVaultLocked": "ยกเลิกการกู้คืน: ห้องนิรภัยถูกล็อก",
         "operationInProgress": "มีการทำงานค้างอยู่ โปรดรอ",
-        "unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง",
         "weakPassword": "รหัสผ่านใหม่ต้องมีอย่างน้อย 12 อักขระ"
       },
       "eyebrow": "การกู้คืน · รหัสผ่านใหม่",
@@ -5519,8 +5279,7 @@
       "accountInvalid": "หมายเลขบัญชีไม่ถูกต้อง โปรดตรวจสอบแล้วลองอีกครั้ง",
       "accountLabel": "หมายเลขบัญชี (ไม่บังคับ)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (ไม่บังคับ)",
-      "body": "เลือกห้องนิรภัยที่คุณต้องการกู้คืนด้วยวลีกู้คืน 24 คำ หรือพิมพ์หมายเลขบัญชีเพื่อข้ามไปที่มันโดยตรง",
-      "cancel": "ยกเลิก",
+      "body": "เลือกห้องนิรภัยที่คุณต้องการกู้คืน ห้องนิรภัยที่ยังมีวลีกู้คืนของตัวเองอยู่กู้คืนได้ด้วย 24 คำนั้น ส่วนห้องที่ไม่มีจะบอกคุณตอนที่คุณเลือก คุณยังพิมพ์หมายเลขบัญชีเพื่อข้ามไปที่มันได้ด้วย",
       "checking": "กำลังตรวจสอบ…",
       "loadFailed": "ตอนนี้โหลดห้องนิรภัยไม่ได้เลย",
       "loading": "กำลังโหลดห้องนิรภัยของคุณ…",
@@ -5542,8 +5301,6 @@
   "vaultSwitcher": {
     "chipFallback": "ห้องนิรภัย",
     "createAnother": "สร้างห้องนิรภัยอีกแห่ง",
-    "deviceOnly": "เฉพาะอุปกรณ์",
-    "joinDevice": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
     "switching": "กำลังสลับ…",
     "switchVaultLabel": "สลับห้องนิรภัย",
     "vaultFallback": "ห้องนิรภัย {{n}}"
@@ -5599,15 +5356,16 @@
     "heroLine2": "เป็นของ",
     "heroLine3": "คุณคนเดียว",
     "lede": "Markdown ที่เข้ารหัสบนอุปกรณ์นี้ก่อนออกจากเครื่อง ไม่มีอีเมลบัญชี ไม่มีเซิร์ฟเวอร์ที่อ่านได้แม้แต่คำเดียว",
-    "residueBanner": "มีไฟล์ตกค้างจากการลบที่ถูกขัดจังหวะ ({{n}}) ล้างออกก่อนสร้างห้องนิรภัย",
+    "residueBanner": "มีไฟล์ตกค้างจากการลบที่ถูกขัดจังหวะ ({{n}}) มันอ่านไม่ได้อยู่แล้ว การล้างออกจึงเพียงเอามันออกจากอุปกรณ์นี้",
+    "residueGated": "ยังมีไดเรกทอรีห้องนิรภัยที่อุปกรณ์นี้เปิดไม่ได้อยู่ ({{n}}) ถ้าคุณลบมันไปแล้ว นี่คือส่วนที่การลบทำไม่เสร็จ",
+    "residueGatedDelete": "ลบมันอย่างถาวร",
+    "residueGatedHint": "พิมพ์ DELETE เพื่อยืนยัน",
     "cleanUpFiles": "ล้างไฟล์ตกค้าง",
     "connect": "เชื่อมต่อกับบัญชีของฉัน",
     "tagline": "โน้ต markdown ที่เข้ารหัส ไม่ต้องใช้อีเมลตอนสมัคร",
     "startAction": "สร้างตัวตนและห้องนิรภัยของคุณ",
     "startBody": "เริ่มใหม่บนอุปกรณ์นี้: ตัวตนใหม่ แล้วห้องนิรภัยที่เป็นของมัน",
-    "restoreTitle": "กู้คืนจากไฟล์สำรอง",
     "restoreBody": "เปิดไฟล์ .myne-backup ที่คุณบันทึกไว้ก่อนหน้านี้",
-    "joinTitle": "เพิ่มอุปกรณ์นี้เข้าบัญชี",
     "joinBody": "ใช้ห้องนิรภัยที่คุณมีอยู่แล้วบนอุปกรณ์อื่น",
     "invitedTitle": "ฉันได้รับคำเชิญเข้าห้องนิรภัย",
     "invitedBody": "ตั้งค่าตัวตนที่คำเชิญส่งถึง คุณไม่ต้องมีห้องนิรภัยของตัวเอง",
@@ -5686,28 +5444,15 @@
     "accountError": "อ่านการจัดกลุ่มบัญชีบนอุปกรณ์นี้ไม่ได้"
   },
   "join": {
-    "transportError": "เข้าถึงเซิร์ฟเวอร์ซิงค์นั้นไม่ได้ ตรวจสอบที่อยู่และการเชื่อมต่อของคุณ แล้วลองอีกครั้ง",
-    "passwordPlaceholder": "รหัสผ่านห้องนิรภัยของคุณ",
     "waitingHint": "เปิดหน้าจอนี้ทิ้งไว้ เมื่อได้รับอนุมัติแล้ว รหัสยืนยันจะปรากฏที่นี่ให้เทียบกับอุปกรณ์อีกเครื่องของคุณ",
     "verifyBody": "ตรวจสอบว่ารหัสนี้เป็นรหัสเดียวกับที่แสดงบนอุปกรณ์ที่คุณใช้อนุมัติ",
-    "verifyChanged": "รหัสเปลี่ยนไปขณะที่คุณกำลังดูอยู่ เทียบทั้งสองหน้าจออีกครั้ง ถ้ามันยังเปลี่ยนอยู่เรื่อย ๆ ให้หยุดและอย่าดำเนินการต่อ",
     "removing": "กำลังนำออก…",
     "sasMismatch": "ไม่ตรงกัน นำอุปกรณ์นี้ออก",
-    "title": "เชื่อมต่อกับบัญชีของคุณ",
-    "lead": "ป้อนรายละเอียดบัญชีของคุณเพื่อนำโน้ตมายังอุปกรณ์นี้ ทุกอย่างยังคงเข้ารหัสแบบต้นทางถึงปลายทาง",
-    "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "ตรวจสอบหมายเลขนี้อีกครั้ง ดูแล้วไม่ถูกต้อง",
-    "approvalHint": "โน้ตของคุณจะปรากฏเมื่อคุณอนุมัติอุปกรณ์นี้จากอุปกรณ์ที่มีบัญชีของคุณอยู่แล้ว",
-    "connectingSubtitle": "กำลังดึงบัญชีของคุณและปลดล็อกห้องนิรภัยบนอุปกรณ์นี้",
     "qr": {
-      "confirmAccount": "บัญชี",
-      "confirmServer": "เซิร์ฟเวอร์",
-      "confirmTitle": "เพิ่มอุปกรณ์นี้หรือไม่",
-      "continue": "ดำเนินการต่อ",
       "expired": "QR นี้หมดอายุแล้ว แสดง QR ใหม่บนอุปกรณ์อีกเครื่องแล้วสแกนอีกครั้ง",
       "invalid": "นั่นไม่ใช่ QR สำหรับเพิ่มอุปกรณ์ของ Myne",
+      "legacyAccount": "รหัสนี้สำหรับบัญชีชนิดเก่า ขอคำเชิญจากเจ้าของห้องนิรภัย",
       "newerVersion": "QR นี้มาจาก Myne รุ่นที่ใหม่กว่า อัปเดตแอปแล้วลองอีกครั้ง",
-      "scan": "สแกน QR",
       "scanFailed": "สแกนไม่ได้ ลองอีกครั้ง หรือป้อนรายละเอียดของคุณเอง",
       "scanUnavailable": "อุปกรณ์นี้สแกนไม่ได้ ป้อนรายละเอียดของคุณด้านล่าง"
     }
@@ -5720,7 +5465,7 @@
     "phraseCopied": "คัดลอกแล้ว วลีจะอยู่บนอุปกรณ์นี้เท่านั้น และระบบจะทิ้งไปหลัง 30 วินาที",
     "phraseCopyFailed": "คัดลอกไม่ได้ ใช้ “บันทึกลงไฟล์” แทน",
     "savedToFile": "บันทึกไปยัง {{label}} แล้ว",
-    "savedToShareSheet": "บันทึกไว้ภายใน Myne ซึ่งตัวจัดการไฟล์ของระบบเข้าถึงไม่ได้ ไฟล์นี้เป็นข้อความล้วน ถ้าคุณใช้เมนูแชร์เพื่อเก็บสำเนาไว้ในที่ที่คุณเข้าถึงได้ ให้เลือกที่ที่มีเพียงคุณเท่านั้นที่อ่านได้ ไม่ใช่ไดรฟ์บนคลาวด์ แตะ “บันทึก” อีกครั้งถ้าคุณปิดเมนูไปแล้ว",
+    "savedToShareSheet": "บันทึกไว้ภายใน Myne ซึ่งตัวจัดการไฟล์ของระบบเข้าถึงไม่ได้ ไฟล์นี้เป็นข้อความล้วน ถ้าระบบถามคุณว่าจะเก็บสำเนาไว้ที่ไหนและคุณเลือกที่ไว้แล้ว ให้เลือกที่ที่มีเพียงคุณเท่านั้นที่อ่านได้ ไม่ใช่ไดรฟ์บนคลาวด์ แตะ บันทึก อีกครั้งเพื่อให้ตัวเลือกกลับมา",
     "savedFileWritten": "บันทึกไว้ภายใน Myne ไฟล์นี้เป็นข้อความล้วน ถ้าคุณทำสำเนาไว้ ให้เก็บไว้ในที่ที่มีเพียงคุณเท่านั้นที่อ่านได้ อุปกรณ์นี้ไม่ได้แจ้งว่าเข้าถึงไฟล์ได้จากที่ใด ให้ถือว่าไฟล์เข้าถึงได้จากในแอปเท่านั้นจนกว่าคุณจะตรวจสอบแล้ว",
     "saveFileError": "บันทึกไฟล์ไม่ได้",
     "stepLabel": "สร้างห้องนิรภัย · {{current}} จาก {{total}}",
@@ -5733,7 +5478,6 @@
     "showSecondHalf": "แสดงคำที่ 13-24",
     "saveToFile": "บันทึกลงไฟล์",
     "writtenThemDown": "ฉันจดไว้แล้ว",
-    "typebackTitle": "ยืนยันวลีของคุณ",
     "typebackLead": "ป้อนสี่คำนี้จากวลีกู้คืนที่คุณเพิ่งบันทึกไว้",
     "wordMismatch": "ไม่ตรงกับคำที่ #{{pos}}",
     "backToPhrase": "กลับไปที่วลี",
@@ -5744,8 +5488,7 @@
     "unlockingSubtitle": "กำลังเปิดห้องนิรภัยของคุณ",
     "readyTitle": "ห้องนิรภัยของคุณพร้อมแล้ว",
     "readyBody": "ทุกอย่างที่คุณเขียนจากนี้ไปจะถูกเข้ารหัสบนอุปกรณ์นี้ก่อนถูกจัดเก็บหรือซิงค์",
-    "openVault": "เปิดห้องนิรภัย",
-    "backUpNow": "สำรองข้อมูลเดี๋ยวนี้"
+    "openVault": "เปิดห้องนิรภัย"
   },
   "web": {
     "openElsewhere": {
@@ -5793,6 +5536,15 @@
       }
     }
   },
+  "approvalWait": {
+    "approversIntro": "อุปกรณ์เหล่านี้อนุมัติอุปกรณ์นี้ได้:",
+    "noApprovers": "ตอนนี้ไม่มีอุปกรณ์อื่นในบัญชีนี้ที่อนุมัติมันได้ เปิด Myne บนอุปกรณ์ที่มีสิทธิ์เข้าถึงอยู่แล้ว แล้วกลับมาที่นี่",
+    "pendingStartOver": "เริ่มใหม่ด้วยบัญชีอื่น",
+    "sasMatch": "ตรงกัน ดำเนินการต่อ",
+    "sasMismatch": "ไม่ตรงกัน",
+    "verifyBody": "ตรวจสอบว่ารหัสนี้เหมือนกันบนทั้งสองอุปกรณ์ก่อนดำเนินการต่อ ถ้าไม่เหมือนกัน ให้หยุด: มีบางอย่างผิดปกติกับการเชื่อมต่อ ไม่ใช่กับรหัสผ่านของคุณ",
+    "verifyTitle": "เปรียบเทียบรหัสนี้"
+  },
   "screenCaptureEscape": {
     "disableBody": "การป้องกันการจับภาพหน้าจอจะขอให้ระบบปฏิบัติการกันหน้าต่างนี้ออกจากภาพหน้าจอและการบันทึกหน้าจอ ใช้งานได้บน Windows 10 (May 2020 Update) ขึ้นไป ส่วน macOS และ Linux ไม่มี API ของระบบสำหรับสิ่งนี้ จึงไม่สามารถบล็อกการจับภาพหน้าจอได้ ในระบบที่ใช้งานได้ สิ่งที่หน้าต่างนี้ถูกซ่อนไม่ให้เห็นนั้นรวมถึงซอฟต์แวร์รีโมตเดสก์ท็อปและแว่นขยายหน้าจอด้วย จึงเป็นเหตุผลที่มีทางออกนี้ไว้",
     "disableConfirm": "ปิดการป้องกัน",
@@ -5808,7 +5560,6 @@
     "savedForNextLaunch": "บันทึกแล้ว เซสชันนี้ยังคงปิดการป้องกันอยู่เพราะถูกเริ่มด้วย --disable-screen-capture-protection การป้องกันจะกลับมาในครั้งถัดไปที่คุณเปิด Myne โดยไม่ใช้ตัวเลือกนั้น"
   },
   "identitySetup": {
-    "doneCta": "เสร็จแล้ว",
     "error": "ตั้งค่าตัวตนไม่ได้ ลองอีกครั้ง",
     "intro": "ตัวตนทำให้ใครก็ตามส่งคำเชิญถึงคุณได้ก่อนที่คุณจะมีคลัง ไม่ได้สร้างคลังและไม่เก็บโน้ต",
     "pending": "อุปกรณ์นี้รอการยืนยันจากอุปกรณ์อื่นของบัญชี",
@@ -5816,9 +5567,7 @@
     "recoverCta": "กู้คืนตัวตน",
     "recoverIntro": "วลีกู้คืนตัวตน",
     "recovered": "กู้คืนตัวตนแล้ว",
-    "title": "สร้างตัวตน",
     "errorAlreadyHeld": "อุปกรณ์นี้มีตัวตนอยู่แล้ว กู้คืนมันด้วยวลีกู้คืนของมัน หรือลืมมันแล้วสร้างใหม่",
-    "forgetCancel": "เก็บไว้",
     "forgetConfirm": "ลืมและสร้างใหม่",
     "forgetCta": "ลืมตัวตนนี้และสร้างใหม่",
     "forgetWarning": "การทำเช่นนี้ลบตัวตนที่เก็บอยู่บนอุปกรณ์นี้ หากคุณยังไม่ได้จดวลีกู้คืน 24 คำของมัน มันจะหายไป: อุปกรณ์นี้จะสูญเสียการเข้าถึงห้องนิรภัยใดที่มันเป็นเจ้าของหรือเข้าร่วม จนกว่าคุณจะกู้คืนมันด้วยวลีนั้น ดำเนินการต่อเฉพาะเมื่อคุณแน่ใจ",
@@ -5831,10 +5580,7 @@
     "recoverTitle": "ฉันมีอยู่แล้ว",
     "recoverHint": "กู้คืนมันบนอุปกรณ์นี้ด้วยวลีกู้คืน 24 คำของมัน",
     "recoverAction": "กู้คืน",
-    "back": "ย้อนกลับ",
-    "phraseTitle": "บันทึกวลีตัวตนของคุณ",
-    "phraseContinue": "ดำเนินการต่อ",
-    "confirmTitle": "ยืนยันวลีของคุณ"
+    "phraseTitle": "บันทึกวลีตัวตนของคุณ"
   },
   "personIdentityCode": {
     "copy": "คัดลอกรหัสตัวตน",
@@ -5849,8 +5595,6 @@
     "invitesLoading": "กำลังตรวจสอบคำเชิญ…",
     "invitesPending": "อุปกรณ์นี้กำลังรอการอนุมัติ คำเชิญจะปรากฏที่นี่เมื่ออุปกรณ์อื่นของคุณอนุมัติ",
     "invitesUnregistered": "ตัวตนนี้ยังไม่ได้ลงทะเบียนกับเซิร์ฟเวอร์ซิงค์ จึงไม่มีคำเชิญมาถึงได้",
-    "noInvites": "ยังไม่มีคำเชิญ",
-    "subtitle": "คุณมีตัวตนบนอุปกรณ์ จึงถูกเชิญเข้าคลังได้ ไม่จำเป็นต้องสร้างเพื่อการเชิญ",
     "accept": "ยอมรับ",
     "acceptHint": "ป้อนรหัสตัวตนของเจ้าของ (พวกเขาแบ่งปันเมื่อเชิญ)",
     "acceptOwnerCodeLabel": "รหัสตัวตนเจ้าของ",
@@ -5859,7 +5603,6 @@
     "acceptError": "ยอมรับคำเชิญไม่ได้",
     "shareCodeHeading": "รหัสคำเชิญของคุณ",
     "shareCodeHint": "แบ่งปันรหัสนี้กับคนที่เชิญคุณ มีเฉพาะข้อมูลสาธารณะ (id ตัวตนและคีย์สาธารณะ) ไม่มีวลี",
-    "title": "ตัวตนของคุณ",
     "acceptPasswordNote": "เลือกรหัสผ่านสำหรับอุปกรณ์นี้ มันแยกจากรหัสผ่านของเจ้าของห้องนิรภัยและจากวลีกู้คืนของคุณ: มันปลดล็อกห้องนิรภัยนี้บนอุปกรณ์นี้ และวลีของคุณยังคงเป็นวิธีกลับเข้าไปที่พกพาได้",
     "acceptErrorNotFound": "คำเชิญนี้ใช้ไม่ได้อีกแล้ว อาจถูกใช้ไปแล้วหรือถูกถอนไป ขอให้เจ้าของส่งคำเชิญใหม่",
     "acceptErrorNotEnrolled": "อุปกรณ์นี้ไม่ใช่ตัวตนที่คำเชิญนี้ส่งถึง เปิดตัวตนที่คำเชิญถูกส่งไป แล้วจึงตอบรับ",
@@ -5870,7 +5613,7 @@
     "join": "เพิ่มเข้าอุปกรณ์นี้",
     "joinHint": "ห้องนิรภัยนี้ถูกแชร์กับตัวตนของคุณแล้ว ป้อนวลีกู้คืนของคุณเพื่อติดตั้งมันบนอุปกรณ์นี้",
     "joinPhraseLabel": "วลีกู้คืนของคุณ",
-    "joinPasswordNote": "เลือกรหัสผ่านสำหรับอุปกรณ์นี้ มันแยกจากรหัสผ่านของเจ้าของห้องนิรภัย: มันปลดล็อกห้องนิรภัยนี้ที่นี่ และวลีกู้คืนของคุณยังคงเป็นวิธีกลับเข้าไปที่พกพาได้",
+    "joinPasswordNote": "เลือกรหัสผ่านสำหรับอุปกรณ์นี้ มันแยกจากรหัสผ่านของเจ้าของห้องนิรภัย และเป็นทางเดียวเข้าห้องนิรภัยนี้บนอุปกรณ์นี้: ถ้าคุณทำมันหาย ให้ขอคำเชิญใหม่จากเจ้าของ",
     "joinSubmit": "เพิ่มและปลดล็อก",
     "joinError": "เพิ่มห้องนิรภัยเข้าอุปกรณ์นี้ไม่ได้",
     "joinErrorAlreadyHeld": "อุปกรณ์นี้มีห้องนิรภัยนี้อยู่แล้ว จึงไม่มีอะไรให้เพิ่ม เปิดห้องนิรภัยที่คุณมีอยู่ที่นี่",
@@ -5879,14 +5622,9 @@
     "joinErrorNotConfigured": "ยังไม่ได้ตั้งค่าการซิงค์บนอุปกรณ์นี้ ตั้งค่าเซิร์ฟเวอร์ซิงค์ของคุณ แล้วลองอีกครั้ง",
     "joinErrorUnauthenticated": "ตัวตนของคุณยังไม่ได้ลงชื่อเข้าใช้บนอุปกรณ์นี้ ปลดล็อกตัวตนของคุณแล้วลองอีกครั้ง",
     "joinErrorTransport": "เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้ หรือห้องนิรภัยนี้ยังไม่ถูกเผยแพร่ที่นั่น ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
-    "forgetCancel": "เก็บไว้",
     "forgetCheckbox": "ฉันเข้าใจว่าตัวตนนี้จะถูกลบออกจากอุปกรณ์นี้",
     "forgetConfirm": "ลืมตัวตน",
-    "forgetCta": "ลืมตัวตนนี้บนอุปกรณ์นี้",
     "forgetError": "ลืมตัวตนไม่ได้ ลองอีกครั้ง",
-    "forgetWarning": "การทำเช่นนี้ลบตัวตนออกจากอุปกรณ์นี้เท่านั้น บัญชีบนเซิร์ฟเวอร์และห้องนิรภัยใดที่มันเป็นเจ้าของหรือเข้าร่วมไม่ได้รับผลกระทบ และคุณกู้คืนตัวตนได้ด้วยวลี 24 คำของมันบนอุปกรณ์อื่น หากคุณยังไม่ได้บันทึกวลีนั้น อุปกรณ์นี้จะกู้คืนมันไม่ได้",
-    "registerCta": "ลงทะเบียนตัวตนนี้",
-    "registerContinue": "ดำเนินการต่อ",
     "registerSubmit": "ลงทะเบียน",
     "registerError": "ลงทะเบียนไม่ได้ ตรวจสอบวลีและที่อยู่เซิร์ฟเวอร์แล้วลองอีกครั้ง",
     "registerServerLabel": "ที่อยู่เซิร์ฟเวอร์ซิงค์",
@@ -5895,7 +5633,6 @@
     "registerInviteCodeLabel": "รหัสเชิญเซิร์ฟเวอร์",
     "registerInviteCodeHint": "เฉพาะถ้าเซิร์ฟเวอร์ของคุณขอ",
     "registerServerError": "เซิร์ฟเวอร์นั้นเข้าถึงไม่ได้ ตรวจสอบที่อยู่แล้วลองอีกครั้ง คำของคุณยังอยู่ที่นี่",
-    "accountNumberHeading": "หมายเลขบัญชี",
     "accountNumberHint": "คำนวณจากวลีตัวตนของคุณ จึงหายไม่ได้ และไม่ใช่ความลับ ใช้สำหรับการสนับสนุนหรือส่งต่อให้ผู้ดูแลระบบ",
     "copyAccountNumber": "คัดลอกหมายเลขบัญชี",
     "registerPhraseLabel": "วลีตัวตนของคุณ 24 คำ",
@@ -5924,7 +5661,6 @@
     },
     "download": "ดาวน์โหลด",
     "downloading": "กำลังดาวน์โหลด…",
-    "cancel": "ยกเลิก",
     "complete": "พร้อม",
     "retry": "ลองอีกครั้ง",
     "skip": "ข้าม",
@@ -5947,7 +5683,6 @@
     },
     "deeplink": {
       "body": "มันอยู่นอกห้องนิรภัยทุกแห่ง Myne จึงจะไม่เข้ารหัสมัน",
-      "cancel": "ยกเลิก",
       "confirm": "เปิด",
       "failed": "เปิดไฟล์ไม่ได้ อาจถูกย้ายหรือเปลี่ยนไปแล้ว",
       "title": "เปิดไฟล์ในเครื่องนี้หรือไม่"
@@ -5968,7 +5703,6 @@
     "unsaved": "การเปลี่ยนแปลงที่ยังไม่ได้บันทึก"
   },
   "update": {
-    "banner": {},
     "notice": {
       "available": "มี Myne {{version}} ให้ใช้งาน",
       "consequence": "การอัปเดตจะล็อกห้องนิรภัยของคุณและรีสตาร์ท Myne โน้ตที่เปิดอยู่ของคุณจะถูกบันทึกไว้ก่อน",
@@ -5980,41 +5714,39 @@
       "confirmTitle": "อัปเดตและรีสตาร์ท Myne หรือไม่",
       "confirmBody": "ห้องนิรภัยของคุณจะถูกล็อกและ Myne จะรีสตาร์ท การดาวน์โหลดและติดตั้งอาจใช้เวลาสองสามนาทีถ้าการเชื่อมต่อช้า",
       "confirmPrimary": "ล็อกห้องนิรภัยและอัปเดต",
-      "cancel": "ยกเลิก",
       "pill": "มีการอัปเดต"
     },
     "updating": {
       "eyebrow": "กำลังอัปเดต",
-      "heading": "กำลังอัปเดต Myne",
       "version": "เวอร์ชัน {{version}}",
-      "caption": "กำลังดาวน์โหลดและติดตั้งเวอร์ชันใหม่",
-      "hint": "Myne จะรีสตาร์ทเองเมื่อเสร็จ เปิดหน้าต่างนี้ไว้"
+      "progressLabel": "ความคืบหน้าการอัปเดต",
+      "bytes": "ดาวน์โหลดแล้ว {{done}}",
+      "bytesOfTotal": "{{done}} จาก {{total}}"
+    },
+    "phase": {
+      "starting": "กำลังเตรียมการ",
+      "downloading": "กำลังดาวน์โหลด",
+      "verifying": "กำลังตรวจสอบ",
+      "installing": "กำลังติดตั้ง"
     },
     "failed": {
-      "eyebrow": "การอัปเดตไม่เสร็จสิ้น",
       "heading": "การอัปเดตไม่เสร็จสิ้น",
       "caption": "Myne {{version}} ยังทำงานอยู่และโน้ตของคุณไม่ถูกแตะต้อง",
-      "hint": "การลองอีกครั้งจะเริ่มดาวน์โหลดใหม่ตั้งแต่ต้น",
-      "retry": "ลองอีกครั้ง",
       "back": "กลับไปที่หน้าปลดล็อก",
       "manual": "ถ้ายังเกิดซ้ำ ให้ดาวน์โหลดเวอร์ชันใหม่จาก myne.md แล้วติดตั้งด้วยมือ แอปที่คุณมีอยู่จะไม่ถูกแตะต้อง"
     }
   },
   "identityFlow": {
-    "title": "สร้างตัวตน",
-    "lead": "ตัวตนทำให้คนอื่นเชิญคุณเข้าห้องนิรภัยได้ และทำให้ตัวตนหนึ่งเป็นเจ้าของหลายห้องนิรภัยได้ มันต้องมีเซิร์ฟเวอร์ซิงค์เพื่อเก็บโน้ตที่เข้ารหัสของคุณและติดต่อคุณ",
-    "start": "สร้างตัวตน",
-    "skip": "ไม่ใช่ตอนนี้ ใช้เฉพาะอุปกรณ์นี้",
-    "back": "ย้อนกลับ",
-    "serverUnreachable": "เข้าถึงเซิร์ฟเวอร์นั้นไม่ได้ ตรวจสอบที่อยู่แล้วลองอีกครั้ง",
-    "createFailed": "สร้างตัวตนไม่ได้ ตรวจสอบเซิร์ฟเวอร์ซิงค์แล้วลองอีกครั้ง",
-    "server": {
-      "title": "เลือกเซิร์ฟเวอร์ซิงค์",
-      "lead": "โน้ตของคุณจะถูกเข้ารหัสบนอุปกรณ์นี้ก่อนออกไป เซิร์ฟเวอร์เก็บเฉพาะข้อความที่เข้ารหัสเท่านั้น",
-      "urlLabel": "ที่อยู่เซิร์ฟเวอร์",
-      "connect": "เชื่อมต่อ",
-      "connecting": "กำลังเชื่อมต่อ…"
+    "fork": {
+      "lead": "นำตัวตนที่คุณมีอยู่แล้วมาที่อุปกรณ์นี้ หรือเริ่มตัวตนใหม่",
+      "words": "ป้อน 24 คำของฉัน",
+      "wordsBody": "วลีตัวตนที่คุณบันทึกไว้ตอนสร้างมัน มันไม่ใช่วลีห้องนิรภัย",
+      "code": "สแกนรหัสจากอุปกรณ์อื่นของฉัน",
+      "codeBody": "อุปกรณ์ที่มีตัวตนของคุณอยู่แล้วจะแสดงรหัส อุปกรณ์นี้จะเข้าร่วมบัญชีและรอการอนุมัติของมัน"
     },
+    "forget": {},
+    "lead": "ตัวตนทำให้คนอื่นเชิญคุณเข้าห้องนิรภัยได้ และทำให้ตัวตนหนึ่งเป็นเจ้าของหลายห้องนิรภัยได้ มันต้องมีเซิร์ฟเวอร์ซิงค์เพื่อเก็บโน้ตที่เข้ารหัสของคุณและติดต่อคุณ",
+    "createFailed": "สร้างตัวตนไม่ได้ ตรวจสอบเซิร์ฟเวอร์ซิงค์แล้วลองอีกครั้ง",
     "held": {
       "title": "มีตัวตนอยู่บนอุปกรณ์นี้แล้ว",
       "lead": "อุปกรณ์นี้มีตัวตนอยู่แล้ว การลืมมันทำให้อุปกรณ์นี้สูญเสียการเข้าถึงห้องนิรภัยใดที่มันเป็นเจ้าของหรือเข้าร่วม จนกว่าคุณจะกู้คืนมันด้วยวลี 24 คำของมัน หากคุณยังไม่ได้บันทึกวลีนั้น มันจะกู้คืนไม่ได้",
@@ -6033,17 +5765,15 @@
       "typebackLead": "ป้อนสี่คำนี้จากวลีตัวตนที่คุณเพิ่งบันทึก",
       "wordNumber": "คำที่ {{position}}",
       "wordMismatch": "ไม่ตรงกับคำที่ {{pos}}",
-      "continue": "ดำเนินการต่อ"
+      "registerCta": "บันทึกและลงทะเบียน",
+      "registerLater": "ไว้ทีหลัง",
+      "registerHint": "การลงทะเบียนจะเพิ่มตัวตนนี้ใน {{server}} ซึ่งเป็นเซิร์ฟเวอร์ซิงค์ที่อุปกรณ์นี้ใช้อยู่แล้ว เพื่อให้คนอื่นเชิญคุณได้และห้องนิรภัยของคุณซิงค์ได้ ส่วน ไว้ทีหลัง จะเก็บมันไว้บนอุปกรณ์นี้เท่านั้น และหน้าตัวตนจะลงทะเบียนในภายหลังได้"
     },
+    "typeback": {},
     "home": {
-      "title": "ตัวตนของคุณ",
       "lead": "คนอื่นเชิญคุณเข้าห้องนิรภัยได้ คุณไม่จำเป็นต้องเป็นเจ้าของห้องนิรภัยเพื่อถูกเชิญ",
-      "codeLabel": "รหัสตัวตนของคุณ",
       "invitesHeading": "คำเชิญ",
-      "noInvites": "ยังไม่มีคำเชิญ",
       "inviteHint": "เปิดคำเชิญนี้จากตัวเลือกห้องนิรภัยเพื่อเข้าร่วมด้วยวลีตัวตนของคุณ",
-      "forgetHeading": "อุปกรณ์นี้",
-      "forget": "ลืมตัวตนนี้บนอุปกรณ์นี้",
       "forgetCheckbox": "ฉันเข้าใจว่าตัวตนนี้จะถูกลบออกจากอุปกรณ์นี้ บัญชีบนเซิร์ฟเวอร์ยังคงอยู่และวลีกู้คืนมันได้",
       "vaultHeading": "ห้องนิรภัยของคุณ",
       "vaultHint": "ตัวตนของคุณเป็นเจ้าของห้องนิรภัยได้ไม่จำกัด แต่ละห้องมีรหัสผ่านของตัวเอง",
@@ -6051,21 +5781,31 @@
       "registerHint": "ตัวตนนี้ยังไม่ได้ลงทะเบียน จึงไม่มีใครเชิญคุณได้และไม่มีอะไรซิงค์"
     },
     "register": {
-      "title": "ลงทะเบียนตัวตนนี้",
-      "open": "ลงทะเบียนตัวตนนี้",
       "cta": "ลงทะเบียน",
       "working": "กำลังลงทะเบียน…",
       "failed": "ลงทะเบียนตัวตนนี้ไม่ได้ มันยังอยู่บนอุปกรณ์นี้ ลองอีกครั้งได้"
     },
     "personJoin": {
+      "inviteLabel": "รหัสเชิญ",
+      "inviteHint": "เฉพาะเมื่อเซิร์ฟเวอร์ของคุณขอ เซิร์ฟเวอร์ส่วนใหญ่ยอมให้อุปกรณ์ที่มีบัญชีอยู่แล้วเข้ามา",
       "title": "เพิ่มโทรศัพท์เครื่องนี้เข้าบัญชี",
       "lead": "พิมพ์ 24 คำของบัญชีที่รหัสนี้มาจาก อุปกรณ์ที่มีอยู่แล้วจะอนุมัติโทรศัพท์เครื่องนี้ วลีเพียงอย่างเดียวจึงเพิ่มไม่ได้",
       "phraseLabel": "วลีตัวตน",
       "cta": "เพิ่มโทรศัพท์เครื่องนี้",
       "working": "กำลังเพิ่มโทรศัพท์เครื่องนี้…",
       "mismatch": "คำเหล่านั้นเป็นของตัวตนอื่น ไม่ใช่ของรหัสนี้",
+      "error": {
+        "held": "อุปกรณ์นี้มีตัวตนอื่นอยู่แล้ว จึงผนึกตัวตนนี้ไม่ได้ ลืมมันบนอุปกรณ์นี้ก่อน แล้วเพิ่มอีกครั้ง",
+        "inviteRequired": "เซิร์ฟเวอร์ของคุณรับบัญชีใหม่เฉพาะเมื่อมีรหัสเชิญ พิมพ์รหัสที่มันให้มาแล้วลองอีกครั้ง",
+        "inviteInvalid": "รหัสเชิญนั้นไม่ตรงกับรหัสที่เซิร์ฟเวอร์ของคุณต้องการ",
+        "deviceLimit": "บัญชีของคุณถึงขีดจำกัดจำนวนอุปกรณ์แล้ว เอาอุปกรณ์ออกจากอุปกรณ์ที่มีบัญชีอยู่แล้ว แล้วลองอีกครั้ง",
+        "alreadyInstalled": "อุปกรณ์นี้ได้รับอนุญาตเข้าบัญชีนั้นแล้ว เปิดมันแทนการเพิ่มอีกครั้ง",
+        "awaitingApproval": "อุปกรณ์นี้ถูกเพิ่มแล้วและกำลังรอการอนุมัติบนอุปกรณ์ที่มีบัญชีของคุณอยู่แล้ว",
+        "accountFrozen": "เซิร์ฟเวอร์ของคุณระงับบัญชีนี้แล้ว สิ่งที่คุณพิมพ์ที่นี่เปลี่ยนเรื่องนั้นไม่ได้ ติดต่อผู้ที่ดูแลเซิร์ฟเวอร์",
+        "notConfigured": "ตั้งที่อยู่เซิร์ฟเวอร์ก่อน แล้วจึงเพิ่มอุปกรณ์นี้",
+        "transport": "ติดต่อเซิร์ฟเวอร์ของคุณไม่ได้ ตัวตนของคุณไม่เปลี่ยน ลองอีกครั้งเมื่อการเชื่อมต่อกลับมา"
+      },
       "failed": "เพิ่มโทรศัพท์เครื่องนี้ไม่สำเร็จ ตรวจสอบคำและลองอีกครั้ง",
-      "pendingTitle": "กำลังรอการอนุมัติ",
       "pendingLead": "โทรศัพท์เครื่องนี้ถูกเพิ่มแล้วและกำลังรอ อุปกรณ์ที่มีบัญชีอยู่แล้วอนุมัติโทรศัพท์เครื่องนี้ แล้วหน้านี้จะเสร็จเอง",
       "pendingHint": "ไม่มีอะไรต้องทำที่นี่จนกว่าอุปกรณ์อื่นจะอนุมัติ",
       "sessionEnded": "การรอสิ้นสุดเมื่อแอปปิด ป้อน 24 คำของคุณอีกครั้งเพื่อทำต่อ",
@@ -6073,7 +5813,11 @@
       "finishingTitle": "กำลังเสร็จสิ้นอุปกรณ์นี้",
       "finishingLead": "โทรศัพท์เครื่องนี้ถูกเพิ่มเข้าบัญชีแล้ว ห้องนิรภัยของคุณกำลังถูกดึงมา แต่ละห้องยังถามรหัสผ่านของตัวเอง",
       "listFailed": "โทรศัพท์เครื่องนี้ถูกเพิ่มแล้ว แต่ห้องนิรภัยของบัญชีไม่มาถึง ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
-      "listRetry": "ดึงห้องนิรภัยอีกครั้ง"
+      "listRetry": "ดึงห้องนิรภัยอีกครั้ง",
+      "noVaults": "โทรศัพท์เครื่องนี้ถูกเพิ่มแล้ว แต่ไม่มีห้องนิรภัยใดของคุณที่นำมาที่นี่ได้ เปิดบัญชีนี้บนอุปกรณ์ที่มีห้องนิรภัยอยู่แล้ว แล้วลองอีกครั้ง",
+      "vaultsNoneOnServer": "บัญชีของคุณยังไม่มีห้องนิรภัยบนเซิร์ฟเวอร์ ห้องนิรภัยจะปรากฏที่นี่เมื่ออุปกรณ์ที่เป็นเจ้าของมันเผยแพร่มันแล้ว",
+      "vaultsNotHere_one": "ห้องนิรภัย {{count}} ห้องของบัญชีนี้นำมาที่โทรศัพท์เครื่องนี้ไม่ได้ เปิดบัญชีนี้อีกครั้งเพื่อลองใหม่",
+      "vaultsNotHere_other": "ห้องนิรภัย {{count}} ห้องของบัญชีนี้นำมาที่โทรศัพท์เครื่องนี้ไม่ได้ เปิดบัญชีนี้อีกครั้งเพื่อลองใหม่"
     },
     "unlock": {
       "title": "ปลดล็อกตัวตนของคุณ",
@@ -6091,18 +5835,190 @@
       "working": "กำลังกู้คืน…",
       "failed": "กู้คืนตัวตนบนอุปกรณ์นี้ไม่ได้ ตรวจสอบ 24 คำแล้วลองอีกครั้ง"
     },
-    "typeback": {
-      "title": "ยืนยันวลีของคุณ"
-    },
     "joinFromQr": {
       "notFound": "รหัสนี้ระบุห้องนิรภัยที่ไม่ได้อยู่ในคำเชิญของคุณบนอุปกรณ์นี้ ขอให้เจ้าของห้องนิรภัยส่งคำเชิญมาที่ตัวตนนี้อีกครั้ง"
     }
   },
   "calendar": {
+    "view": {
+      "label": "มุมมองปฏิทิน",
+      "month": "เดือน",
+      "week": "สัปดาห์",
+      "day": "วัน",
+      "agenda": "กำหนดการ"
+    },
+    "allDay": "ทั้งวัน",
+    "untitled": "กิจกรรมที่ไม่มีชื่อ",
+    "locked": "ปลดล็อกห้องนิรภัยเพื่อดูปฏิทิน",
+    "loadFailed": "อ่านปฏิทินไม่ได้ ห้องนิรภัยของคุณไม่เปลี่ยน",
+    "capture": {
+      "on": "เพิ่มกิจกรรมใน {{date}}"
+    },
+    "unreadable": {
+      "heading_one": "อ่านกิจกรรม {{count}} รายการไม่ได้",
+      "heading_other": "อ่านกิจกรรม {{count}} รายการไม่ได้",
+      "start-missing": "ไม่มีเวลาเริ่ม",
+      "start-unreadable": "เวลาเริ่มไม่ใช่วันที่ที่แอปนี้อ่านได้",
+      "end-unreadable": "เวลาสิ้นสุดไม่ใช่วันที่ที่แอปนี้อ่านได้",
+      "end-before-start": "สิ้นสุดก่อนเริ่ม",
+      "end-time-without-start-time": "มีเวลาสิ้นสุดแต่ไม่มีเวลาเริ่ม",
+      "calendar-unreadable": "ชื่อปฏิทินใช้งานไม่ได้"
+    },
+    "agendaRange": "{{days}} วันข้างหน้า",
+    "prev": "ก่อนหน้า",
+    "next": "ถัดไป",
+    "today": "วันนี้",
+    "more": "อีก {{count}} รายการ",
+    "weekday": {
+      "monday": "จ.",
+      "tuesday": "อ.",
+      "wednesday": "พ.",
+      "thursday": "พฤ.",
+      "friday": "ศ.",
+      "saturday": "ส.",
+      "sunday": "อา."
+    },
+    "resize": "ปรับขนาด {{title}}",
+    "refused": {
+      "value-changed": "กิจกรรมนั้นถูกเปลี่ยนบนอุปกรณ์อื่น ปฏิทินแสดงตามที่โน้ตระบุไว้",
+      "start-missing": "โน้ตนั้นไม่มีเวลาเริ่มแล้ว จึงไม่ปรากฏบนปฏิทิน",
+      "base-mismatch": "โน้ตเปลี่ยนไประหว่างที่ปฏิทินกำลังเขียน ไม่มีอะไรถูกเขียนทับ"
+    },
+    "weekdayLong": {
+      "monday": "วันจันทร์",
+      "tuesday": "วันอังคาร",
+      "wednesday": "วันพุธ",
+      "thursday": "วันพฤหัสบดี",
+      "friday": "วันศุกร์",
+      "saturday": "วันเสาร์",
+      "sunday": "วันอาทิตย์"
+    },
     "form": {
+      "title": "กิจกรรมใหม่",
+      "openNote": "เปิดโน้ต",
+      "eventTitle": "ชื่อกิจกรรม",
+      "starts": "เริ่ม",
+      "startDate": "วันที่เริ่ม",
+      "startTime": "เวลาเริ่ม หรือทั้งวัน",
+      "ends": "สิ้นสุด",
+      "endDate": "วันที่สิ้นสุด หรือเว้นว่างไว้สำหรับวันเดียว",
+      "endTime": "เวลาสิ้นสุด",
+      "addEnd": "เพิ่มเวลาสิ้นสุด",
+      "clearEnd": "เอาเวลาสิ้นสุดออก",
+      "allDay": "ทั้งวัน",
+      "timed": "ระบุเวลา",
+      "endBeforeStart": "กิจกรรมสิ้นสุดก่อนเริ่มไม่ได้ เปลี่ยนวันที่สิ้นสุด",
+      "repeat": "ทำซ้ำ",
+      "repeatNever": "ไม่ทำซ้ำ",
+      "repeatInterval": "ทุก",
+      "repeatWeekdays": "ในวันใดวันหนึ่งของสัปดาห์",
+      "repeatDayOfMonth": "ในวันที่กำหนดของเดือน",
+      "repeatCount": "จำนวนครั้ง",
+      "repeatUnit": "ทุกช่วงเวลาเท่าใด",
+      "repeatWeekday": "วันในสัปดาห์",
+      "repeatDay": "วันที่ของเดือน",
+      "repeatLastDay": "วันสุดท้าย",
+      "repeatOrdinal": "ลำดับที่",
+      "decrease": "ลด {{label}}",
+      "increase": "เพิ่ม {{label}}",
+      "remindLabel": "เตือน",
+      "remind": "เตือนฉันล่วงหน้าอย่างมาก {{days}} วัน",
+      "remindNone": "ไม่เตือน",
+      "leadBeyondHorizon": "การเตือนล่วงหน้าได้ไม่เกิน {{days}} วัน เลือกระยะนำที่สั้นกว่านี้",
+      "titleRequired": "ตั้งชื่อให้กิจกรรม",
+      "save": "บันทึกกิจกรรม",
+      "unit": {
+        "day": "วัน",
+        "week": "สัปดาห์",
+        "month": "เดือน",
+        "year": "ปี"
+      },
+      "ordinal": {
+        "first": "ที่หนึ่ง",
+        "second": "ที่สอง",
+        "third": "ที่สาม",
+        "fourth": "ที่สี่",
+        "last": "สุดท้าย"
+      },
+      "lead": {
+        "10m": "ก่อน 10 นาที",
+        "30m": "ก่อน 30 นาที",
+        "1h": "ก่อน 1 ชั่วโมง",
+        "2h": "ก่อน 2 ชั่วโมง",
+        "1d": "ก่อน 1 วัน",
+        "2d": "ก่อน 2 วัน",
+        "7d": "ก่อน 1 สัปดาห์",
+        "1m": "ก่อน 1 นาที"
+      },
+      "noTime": "ไม่มีเวลา",
+      "hour": "ชั่วโมง",
+      "minute": "นาที",
+      "editTitle": "แก้ไขกิจกรรม",
+      "calendarLabel": "ปฏิทิน",
+      "noCalendar": "ไม่มีปฏิทิน",
       "calendarPlaceholder": "ตั้งชื่อปฏิทิน เช่น ส่วนตัว",
       "calendarRequired": "กำหนดปฏิทินให้กิจกรรม ปฏิทินเป็นตัวกำหนดสีของกิจกรรม และเป็นสิ่งที่มุมมองนี้ปิดได้"
     },
+    "occurrenceOf": "หนึ่งครั้งของชุดที่ทำซ้ำ ในวันที่ {{date}}",
+    "occurrence": {
+      "thisIsOne": "นี่เป็นหนึ่งครั้งของชุดที่ทำซ้ำ ในวันที่ {{date}} หากต้องการเปลี่ยน ให้แก้ไขทั้งชุดหรือเพิ่มกิจกรรมครั้งเดียวในวันนี้",
+      "editSeries": "แก้ไขทั้งชุด",
+      "addOneOff": "เพิ่มกิจกรรมครั้งเดียวในวันนี้",
+      "skip": "ยกเลิกครั้งนี้",
+      "retime": "เริ่มครั้งนี้เมื่อ",
+      "retimeHint": "เปลี่ยนเฉพาะวันนี้ ส่วนที่เหลือของชุดยังใช้เวลาของตัวเอง",
+      "retimeSave": "เปลี่ยนเวลา"
+    },
+    "import": "นำเข้าไฟล์ .ics",
+    "export": "ส่งออกเป็น .ics",
+    "imported": "นำเข้ากิจกรรม {{count}} รายการจาก {{filename}}",
+    "importRefused": {
+      "too-large": "ไฟล์นั้นใหญ่เกินกว่าที่ Myne จะอ่าน (1 MiB) ไฟล์ขนาดนั้นมีแต่ห้องนิรภัยทั้งห้อง ไม่ใช่ตารางนัดหมาย",
+      "malformed-property": "ไฟล์นั้นไม่ใช่ปฏิทิน .ics: มีบรรทัดหนึ่งที่ไม่ใช่รูปแบบ NAME:value หรือ NAME;param:value",
+      "unreadable-start": "ไฟล์นั้นมีเวลาเริ่มที่ Myne อ่านไม่ได้ จึงไม่มีอะไรถูกนำเข้า",
+      "unknown-zone": "ไฟล์นั้นระบุเขตเวลาที่อุปกรณ์นี้ไม่รู้จัก จึงไม่มีอะไรถูกนำเข้า",
+      "value-shape-mismatch": "ไฟล์นั้นระบุกิจกรรมเป็นวันที่และให้เวลาด้วย จึงไม่มีอะไรถูกนำเข้า",
+      "unreadable-rule": "ไฟล์นั้นทำซ้ำตามกฎที่ Myne ไม่รองรับ จึงไม่มีอะไรถูกนำเข้า",
+      "missing-start": "ไฟล์นั้นมีกิจกรรมที่ไม่มีเวลาเริ่ม และกิจกรรมที่ไม่มีเวลาเริ่มย่อมไม่มีที่อยู่บนปฏิทิน",
+      "no-events": "ไฟล์นั้นไม่มีกิจกรรมอยู่เลย"
+    },
+    "exported": "เขียนกิจกรรม {{count}} รายการลง {{filename}}",
+    "exportFailed": "เขียนไฟล์ .ics นั้นไม่ได้",
+    "exportEmpty": "ยังไม่มีอะไรในปฏิทินให้ส่งออก",
+    "importedSkipped": "นำเข้ากิจกรรม {{count}} รายการจาก {{filename}} และข้าม {{skipped}} รายการที่ห้องนิรภัยนี้มีอยู่แล้ว",
+    "title": "ปฏิทิน",
+    "close": "ปิดปฏิทิน",
+    "noEvents": "ไม่มีอะไรในวันนี้",
+    "conflict": "ทับซ้อนกับกิจกรรมอื่น",
+    "composer": {
+      "title": "กิจกรรมใหม่",
+      "titleLabel": "คือกิจกรรมอะไร",
+      "start": "เริ่ม",
+      "end": "สิ้นสุด (ไม่บังคับ)",
+      "badTime": "เวลาเขียนในรูปแบบ 09:00 แบบ 24 ชั่วโมง",
+      "create": "เพิ่มลงปฏิทิน",
+      "cancel": "ยกเลิก",
+      "createFailed": "บันทึกกิจกรรมไม่ได้",
+      "repeatNever": "ครั้งเดียว",
+      "repeatDaily": "ทุกวัน",
+      "repeatWeekly": "ทุกสัปดาห์",
+      "repeatMonthly": "ทุกเดือน",
+      "remindNone": "ไม่เตือน",
+      "calendarLabel": "ปฏิทิน (ชื่อ)",
+      "refused": "กิจกรรมนี้ถูกเปลี่ยนที่อื่น จึงไม่มีอะไรถูกบันทึก เปิดมันอีกครั้ง",
+      "date": "วันที่",
+      "badDate": "ใช้รูปแบบ YYYY-MM-DD"
+    },
+    "skipFailed": "ยกเลิกครั้งนั้นไม่ได้ มันยังอยู่ในปฏิทิน",
+    "taskRow": "งานที่ครบกำหนด {date}",
+    "composeOn": "เพิ่มกิจกรรมใน {date}",
+    "calendarsToggle": "ปฏิทินที่แสดง",
+    "calendarsToggleHelper": "เอาติ๊กออกจากรายการหนึ่งเพื่อซ่อนจากมุมมองนี้ ไม่มีอะไรถูกลบ",
     "calendarsToggleFailed": "ปฏิทินนั้นไม่ถูกสลับ ยังคงเหมือนเดิม"
+  },
+  "identityForget": {
+    "body": "การทำเช่นนี้ลบตัวตนออกจากอุปกรณ์นี้เท่านั้น บัญชีบนเซิร์ฟเวอร์และห้องนิรภัยใดที่มันเป็นเจ้าของหรือเข้าร่วมไม่ถูกแตะต้อง และคุณกู้คืนตัวตนได้ด้วยวลี 24 คำของมันบนอุปกรณ์อื่น",
+    "savedPhraseTail": "ถ้าคุณยังไม่ได้บันทึกวลีนั้น อุปกรณ์นี้จะกู้คืนมันไม่ได้",
+    "rosterTail": "คำเชิญและการจัดการรายชื่อสมาชิกบนอุปกรณ์นี้จะต้องปลดล็อกมันอีกครั้ง"
   }
 }
