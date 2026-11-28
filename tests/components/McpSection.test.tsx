@@ -402,8 +402,10 @@ describe("the approval dialog", () => {
     // the new two-sentence wording must reach the screen (not the retired
     // three-clause text).
     fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
-    expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain(
-      "can change anything in the folders you name",
+    await waitFor(() =>
+      expect(screen.getByTestId("settings.mcp-scope-line").textContent).toContain(
+        "can change anything in the folders you name",
+      ),
     );
     fireEvent.click(screen.getByTestId("settings.mcp-whole-vault-toggle"));
     expect(screen.getByTestId("settings.mcp-access-picker-toggle")).toBeTruthy();
@@ -421,6 +423,11 @@ describe("the approval dialog", () => {
       .find((node) => node.getAttribute("data-value") === "Private/");
     fireEvent.click(leaveOut!);
     fireEvent.click(screen.getByTestId("settings.mcp-tool-note_edit"));
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.mcp-approve") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
     fireEvent.click(screen.getByTestId("settings.mcp-approve"));
     await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
     // One list, derived into the two fields the grant carries: the exclusion set is
@@ -542,9 +549,9 @@ describe("the approval dialog", () => {
     expect(scope.textContent).toContain("not writable until you name it");
     expect(
       (screen.getByTestId("settings.mcp-approve") as HTMLButtonElement).disabled,
-    ).toBe(false);
-    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
-    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    ).toBe(true);
+    // A failed preview leaves no write scope known, so nothing is submitted.
+    expect(setMcpConnectionGrant).not.toHaveBeenCalled();
   });
 
   it("grants the whole vault by default, with an empty exclusion set", async () => {
@@ -604,6 +611,51 @@ describe("the approval dialog", () => {
     expect(excluded).toEqual([]);
     expect(write).toEqual(["Projects/", "Projects/New/", "Work/"]);
     expect(write).not.toContain("Private/");
+  });
+
+  it("does not submit a previous flow's readable set when opening a second flow", async () => {
+    // A stale preview from a previous connection must not leak into a new one:
+    // the second flow's own preview decides the write scope.
+    readMcpExternalAccess.mockResolvedValue(view([]));
+    readMcpGrantPreview
+      .mockResolvedValueOnce({
+        noteCount: 40,
+        folderCount: 1,
+        excludedCount: 0,
+        excludedFolders: [],
+        folders: ["", "Old/"],
+      })
+      .mockResolvedValueOnce({
+        noteCount: 40,
+        folderCount: 1,
+        excludedCount: 0,
+        excludedFolders: [],
+        folders: ["", "New/"],
+      });
+    renderSection();
+    await screen.findByTestId("settings.mcp-add");
+    // First flow: open, advance, then close without approving.
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
+    fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
+    await screen.findByTestId("settings.mcp-step-scope");
+    fireEvent.click(screen.getByTestId("settings.mcp-flow-modal-close"));
+    // Second flow.
+    await screen.findByTestId("settings.mcp-add");
+    fireEvent.click(screen.getByTestId("settings.mcp-add"));
+    fireEvent.click((await screen.findAllByTestId("settings.mcp-client"))[0]);
+    fireEvent.click(await screen.findByTestId("settings.mcp-flow-next"));
+    await screen.findByTestId("settings.mcp-step-scope");
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("settings.mcp-approve") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("settings.mcp-approve"));
+    await waitFor(() => expect(setMcpConnectionGrant).toHaveBeenCalledTimes(1));
+    const [, , write] = setMcpConnectionGrant.mock.calls[0];
+    expect(write).toEqual(["New/"]);
+    expect(write).not.toContain("Old/");
   });
 
   it("shows the switch bank on a vault that has never approved a connection", async () => {

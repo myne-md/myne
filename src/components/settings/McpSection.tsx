@@ -411,10 +411,13 @@ export function McpSection({
       // Write scope comes from the host's readable set (preview.folders), which
       // already excludes the quiet union (AI/CLI excluded folders); deriving
       // from view.folders would submit folders the host rejects.
-      const readable = preview?.folders ?? known;
+      const readable = preview?.folders;
       return {
         excluded: flow.access,
-        write: readable.filter((folder) => folder !== "" && !chosen.has(folder)),
+        write:
+          readable === undefined
+            ? []
+            : readable.filter((folder) => folder !== "" && !chosen.has(folder)),
       };
     }
     return {
@@ -425,6 +428,7 @@ export function McpSection({
 
   useEffect(() => {
     if (flow === null || flow.step !== 3) return;
+    setPreview(null);
     let alive = true;
     readMcpGrantPreview(derived.excluded)
       .then((next) => {
@@ -438,10 +442,15 @@ export function McpSection({
     };
   }, [flow?.step, derived.excluded]);
 
+  useEffect(() => {
+    if (flow === null) setPreview(null);
+  }, [flow]);
+
   const pending = view?.writeRequests ?? [];
   const folderLabels = useFolderLabels();
 
-  const startNew = () =>
+  const startNew = () => {
+    setPreview(null);
     setFlow({
       step: 1,
       presetId: null,
@@ -451,8 +460,10 @@ export function McpSection({
       wholeVault: true,
       disabled: [],
     });
+  };
 
   const startEdit = (row: McpConnectionView) => {
+    setPreview(null);
     // The list is the READABLE set: seeding it from `write_folders` narrowed a whole-vault
     // grant to the root. Write verbs stay on only where it already writes what it reads.
     const readable = row.legacy
@@ -999,7 +1010,11 @@ export function McpSection({
                 </Button>
                 <Button
                   variant="primary"
-                  disabled={busy || flow.name.trim().length === 0}
+                  disabled={
+                    busy ||
+                    flow.name.trim().length === 0 ||
+                    (flow.wholeVault && preview === null)
+                  }
                   onClick={() => void approve()}
                   data-testid="settings.mcp-approve"
                 >
